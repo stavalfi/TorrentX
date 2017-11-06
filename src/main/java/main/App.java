@@ -1,4 +1,4 @@
-package UniversityFinalProjects;
+package main;
 
 /**
  * Hello world!
