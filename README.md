@@ -1,3 +1,3 @@
 # torrentx 
 
-[![Build Status](https://travis-ci.org/UniversityFinalProjects/ProjectY.svg?branch=development)](https://travis-ci.org/UniversityFinalProjects/ProjectY)
+[![Build Status](https://travis-ci.org/UniversityFinalProjects/torrentx.svg?branch=master)](https://travis-ci.org/UniversityFinalProjects/torrentx)
