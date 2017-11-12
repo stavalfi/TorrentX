@@ -14,7 +14,7 @@ public class App {
         // udp://tracker.leechers-paradise.org:6969
         // udp://tracker.internetwarriors.net:1337
         // udp://tracker.opentrackr.org:1337/announce
-        String url = "tracker.leechers-paradise.org";
+        String url = "tracker.coppersurfer.tk";
         short port = 6969;
         printTrackerInfo(url, port);
         //printTorrentFileInfo();
