@@ -6,7 +6,7 @@ import java.net.*;
 
 // this class is for you shachar to play with udp packets
 public class Shachar_UDPClientServerExample {
-        private static void runClientServer() throws IOException, InterruptedException {
+        public static void runClientServer() throws IOException, InterruptedException {
         Thread t1 = new Thread(() -> {
             try {
                 serverUDP();

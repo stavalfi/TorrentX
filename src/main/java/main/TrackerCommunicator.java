@@ -31,7 +31,6 @@ public class TrackerCommunicator {
         sendData.putLong(connectionId); // connection_id (64 bit)
         sendData.putInt(2); // action we want to perform - scrape the server (32 bits)
         sendData.putInt(123456); // transaction_id - random int we make (32 bits)
-        sendData.putInt(123456); // transaction_id - random int we make (32 bits)
         //        sendData.put(); // info_hash = (20 bits)
 
         return sendData.array();
@@ -65,8 +64,8 @@ public class TrackerCommunicator {
      * @param connectionId we retrieve from the server after we successfully connected
      * @return the packet
      */
-    private static byte[] buildDefaultAnnouncePacket(long connectionId) {
-        /** offset == bytes not bits!!!!!!
+      private static byte[] buildDefaultAnnouncePacket(long connectionId) {
+         /** offset == bytes not bits!!!!!!
          * Offset  Size    Name    Value
          * 0       64-bit integer  connection_id    same connection_id // the connectionId we received from the server after we successfully connected
          * 8       32-bit integer  action          1                   // announce
