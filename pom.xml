@@ -70,9 +70,9 @@
       <version>1.16.18</version>
     </dependency>
     <dependency>
-      <groupId>torrentparser.plugin</groupId>
-      <artifactId>torrentparser-maven-plugin</artifactId>
-      <version>1.0-SNAPSHOT</version>
+      <groupId>io.github.universityfinalprojects</groupId>
+      <artifactId>tparser</artifactId>
+      <version>1.0</version>
     </dependency>
     <dependency>
       <groupId>commons-codec</groupId>
