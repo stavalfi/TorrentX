@@ -2,7 +2,7 @@ package main.requests;
 
 import lombok.Getter;
 import lombok.ToString;
-
+import org.apache.commons.codec.binary.Hex;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.codec.binary.Hex;
@@ -115,8 +115,8 @@ public class AnnounceRequest implements PacketRequest {
             bytes[i/2] = (byte)(left | right);
             // System.out.println(Integer.toBinaryString(torrentInfoHash[i/2] & 0xff));
         }
-        //        System.out.println(torrentInfoHash);
-        //        System.out.println( Hex.encodeHexString( bytes ) );
+//                System.out.println(torrentInfoHash);
+//                System.out.println( Hex.encodeHexString( bytes ) );
         return bytes;
     }
 }

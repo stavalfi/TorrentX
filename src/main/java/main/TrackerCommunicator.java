@@ -14,25 +14,11 @@ import java.net.InetAddress;
  */
 public class TrackerCommunicator {
 
-    public static AnnounceResponse communicate(String trackerIp, int trackerUdpPort, AnnounceRequest announceRequest) throws IOException {
-        byte[] response = new byte[AnnounceResponse.packetResponseSize()];
+    public static ConnectionResponse communicate(String trackerIp, int trackerUdpPort,
+                                                 ConnectionRequest connectionRequest) throws IOException {
+        byte[] response = new byte[ConnectionResponse.packetResponseSize()];
 
-        communicate(trackerIp,trackerUdpPort,announceRequest.buildRequestPacket(),response);
-
-        // NumWant == how much peers's ip&port we asked for.
-        return new AnnounceResponse(response,announceRequest.getNumWant());
-    }
-    public static ScrapeResponse communicate(String trackerIp, int trackerUdpPort, ScrapeRequest scrapeRequest) throws IOException {
-        byte[] response = new byte[ScrapeResponse.packetResponseSize()];
-
-        communicate(trackerIp,trackerUdpPort,scrapeRequest.buildRequestPacket(),response);
-
-        return new ScrapeResponse(response);
-    }
-    public static ConnectionResponse communicate(String trackerIp, int trackerUdpPort, ConnectionRequest connectionRequest) throws IOException {
-        byte[] response = new byte[AnnounceResponse.packetResponseSize()];
-
-        communicate(trackerIp,trackerUdpPort,connectionRequest.buildRequestPacket(),response);
+        communicate(trackerIp, trackerUdpPort, connectionRequest.buildRequestPacket(), response);
 
         return new ConnectionResponse(response);
     }
@@ -45,5 +31,21 @@ public class TrackerCommunicator {
         DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
         clientSocket.receive(receivePacket);
         clientSocket.close();
+    }
+    public static AnnounceResponse communicate(String trackerIp, int trackerUdpPort, AnnounceRequest announceRequest) throws IOException {
+        byte[] response = new byte[AnnounceResponse.packetResponseSize()];
+
+        communicate(trackerIp, trackerUdpPort, announceRequest.buildRequestPacket(), response);
+
+        // NumWant == how much peers's ip&port we asked for.
+        return new AnnounceResponse(response, announceRequest.getNumWant());
+    }
+
+    public static ScrapeResponse communicate(String trackerIp, int trackerUdpPort, ScrapeRequest scrapeRequest) throws IOException {
+        byte[] response = new byte[ScrapeResponse.packetResponseSize()];
+
+        communicate(trackerIp, trackerUdpPort, scrapeRequest.buildRequestPacket(), response);
+
+        return new ScrapeResponse(response, scrapeRequest.getTorrentInfoHashs());
     }
 }

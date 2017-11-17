@@ -37,7 +37,8 @@ public class AnnounceResponse {
     public AnnounceResponse(byte[] receiveData,int maxPeers)
     {
         ByteBuffer receiveData_analyze = ByteBuffer.wrap(receiveData);
-        assert this.action == receiveData_analyze.getInt();
+        int action = receiveData_analyze.getInt();
+        assert this.action == action;
         this.transactionId =  receiveData_analyze.getInt();
         this.interval =  receiveData_analyze.getInt();
         this.leechersAmount =  receiveData_analyze.getInt();

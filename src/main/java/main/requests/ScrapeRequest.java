@@ -5,6 +5,7 @@ import lombok.ToString;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @Getter
 @ToString
@@ -13,12 +14,12 @@ public class ScrapeRequest implements PacketRequest
     private final long connectionId;
     private final int action=2;
     private final int transactionId=123456;
-    private final String torrentInfoHash;
+    private final List<String> torrentInfoHashs;
 
-    public ScrapeRequest(long connectionId,String torrentInfoHash)
+    public ScrapeRequest(long connectionId,final List<String> torrentInfoHashs)
     {
         this.connectionId=connectionId;
-        this.torrentInfoHash=torrentInfoHash;
+        this.torrentInfoHashs=torrentInfoHashs;
     }
 
     /** offset == bytes not bits!!!!!!
@@ -35,7 +36,10 @@ public class ScrapeRequest implements PacketRequest
         sendData.putLong(this.connectionId); // connection_id (64 bit)
         sendData.putInt(this.action); // action we want to perform - scrape the server (32 bits)
         sendData.putInt(this.transactionId); // transaction_id - random int we make (32 bits)
-        sendData.put(AnnounceRequest.castTorrentInfoHash(this.torrentInfoHash)); // torrentInfoHash = (20 bits)
+        /**
+         * each torrentInfoHash byte array is 20 bytes.
+         */
+        this.torrentInfoHashs.forEach((String torrentInfoHash)->sendData.put(AnnounceRequest.castTorrentInfoHash(torrentInfoHash)));
 
         return sendData.array();
     }

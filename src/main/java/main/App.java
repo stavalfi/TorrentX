@@ -11,6 +11,7 @@ import main.response.ConnectionResponse;
 import main.response.ScrapeResponse;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 public class App {
     public static void main(String[] args) throws IOException {
@@ -30,21 +31,31 @@ public class App {
     private static void printTrackerInfo(String ip, short port,String TorrentHashInfo) throws IOException {
 
         System.out.println("------connecting-------");
-        ConnectionResponse connectionResponse = TrackerCommunicator.communicate(ip,port,new ConnectionRequest());
+        ConnectionRequest connectionRequest = new ConnectionRequest();
+
+        System.out.println(connectionRequest);
+
+        ConnectionResponse connectionResponse = TrackerCommunicator.communicate(ip,port,connectionRequest);
         System.out.println(connectionResponse);
+
         System.out.println("------announcing-------");
         AnnounceRequest announceRequest = new AnnounceRequest(connectionResponse.getConnectionId(),TorrentHashInfo,
-                "0",0,0,0,2,0,0,100,(short)8091);
+                "0",0,0,0,2,0,0,10,(short)8091);
 
+        System.out.println(announceRequest);
         AnnounceResponse announceResponse = TrackerCommunicator.communicate(ip,port,announceRequest);
         System.out.println(announceResponse);
         System.out.println("peer list:");
         announceResponse.getPeers().forEach(System.out::println);
 
         System.out.println("------scraping-------");
-        ScrapeRequest scrapeRequest = new ScrapeRequest(connectionResponse.getConnectionId(),TorrentHashInfo);
+        ScrapeRequest scrapeRequest = new ScrapeRequest(connectionResponse.getConnectionId(), Arrays.asList(TorrentHashInfo));
+        System.out.println(scrapeRequest);
 
         ScrapeResponse scrapeResponse = TrackerCommunicator.communicate(ip,port,scrapeRequest);
+        System.out.println(scrapeResponse);
+        System.out.println("update: ");
+        scrapeResponse.getScrapeResponseForTorrentInfoHashs().forEach(System.out::println);
     }
 
     private static void printTorrentFileInfo() throws IOException {
