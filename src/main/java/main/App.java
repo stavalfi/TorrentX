@@ -3,6 +3,12 @@ package main;
 import christophedetroyer.torrent.Torrent;
 import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
+import main.requests.AnnounceRequest;
+import main.requests.ConnectionRequest;
+import main.requests.ScrapeRequest;
+import main.response.AnnounceResponse;
+import main.response.ConnectionResponse;
+import main.response.ScrapeResponse;
 
 import java.io.IOException;
 
@@ -16,17 +22,29 @@ public class App {
         // udp://tracker.opentrackr.org:1337/announce
         String url = "tracker.coppersurfer.tk";
         short port = 6969;
-        printTrackerInfo(url, port);
+        Torrent t1 = TorrentParser.parseTorrent("src/main/resources/torrent-file-example.torrent");
+        printTrackerInfo(url, port,t1.getInfo_hash());
         //printTorrentFileInfo();
     }
 
-    private static void printTrackerInfo(String url, short port) throws IOException {
+    private static void printTrackerInfo(String ip, short port,String TorrentHashInfo) throws IOException {
+
         System.out.println("------connecting-------");
-        long connectionId = TrackerCommunicator.connect(url, port);
+        ConnectionResponse connectionResponse = TrackerCommunicator.communicate(ip,port,new ConnectionRequest());
+        System.out.println(connectionResponse);
         System.out.println("------announcing-------");
-        TrackerCommunicator.announce(url, port, connectionId);
+        AnnounceRequest announceRequest = new AnnounceRequest(connectionResponse.getConnectionId(),TorrentHashInfo,
+                "0",0,0,0,2,0,0,100,(short)8091);
+
+        AnnounceResponse announceResponse = TrackerCommunicator.communicate(ip,port,announceRequest);
+        System.out.println(announceResponse);
+        System.out.println("peer list:");
+        announceResponse.getPeers().forEach(System.out::println);
+
         System.out.println("------scraping-------");
-        TrackerCommunicator.scrape(url, port, connectionId);
+        ScrapeRequest scrapeRequest = new ScrapeRequest(connectionResponse.getConnectionId(),TorrentHashInfo);
+
+        ScrapeResponse scrapeResponse = TrackerCommunicator.communicate(ip,port,scrapeRequest);
     }
 
     private static void printTorrentFileInfo() throws IOException {
