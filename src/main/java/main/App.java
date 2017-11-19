@@ -3,15 +3,16 @@ package main;
 import christophedetroyer.torrent.Torrent;
 import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
-import main.requests.AnnounceRequest;
-import main.requests.ConnectionRequest;
-import main.requests.ScrapeRequest;
-import main.response.AnnounceResponse;
-import main.response.ConnectionResponse;
-import main.response.ScrapeResponse;
+import main.tracker.requests.AnnounceRequest;
+import main.tracker.requests.ConnectionRequest;
+import main.tracker.requests.ScrapeRequest;
+import main.tracker.response.AnnounceResponse;
+import main.tracker.response.ConnectionResponse;
+import main.tracker.response.ScrapeResponse;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 
 public class App {
     public static void main(String[] args) throws IOException {
@@ -27,6 +28,8 @@ public class App {
         printTrackerInfo(url, port,t1.getInfo_hash());
         //printTorrentFileInfo();
     }
+
+
 
     private static void printTrackerInfo(String ip, short port,String TorrentHashInfo) throws IOException {
 
@@ -49,7 +52,7 @@ public class App {
         announceResponse.getPeers().forEach(System.out::println);
 
         System.out.println("------scraping-------");
-        ScrapeRequest scrapeRequest = new ScrapeRequest(connectionResponse.getConnectionId(), Arrays.asList(TorrentHashInfo));
+        ScrapeRequest scrapeRequest = new ScrapeRequest(connectionResponse.getConnectionId(), Collections.singletonList(TorrentHashInfo));
         System.out.println(scrapeRequest);
 
         ScrapeResponse scrapeResponse = TrackerCommunicator.communicate(ip,port,scrapeRequest);
@@ -63,17 +66,17 @@ public class App {
         System.out.println("Created By: " + t1.getCreatedBy());
         System.out.println("Main tracker: " + t1.getAnnounce());
         System.out.println("Tracker List: ");
-        t1.getAnnounceList().forEach((String tracker) -> System.out.println(tracker));
+        t1.getAnnounceList().forEach(System.out::println);
         System.out.println("Comment: " + t1.getComment());
         System.out.println("Creation Date: " + t1.getCreationDate());
         System.out.println("Info_hash: " + t1.getInfo_hash());
         System.out.println("Name: " + t1.getName());
         System.out.println("Piece Length: " + t1.getPieceLength());
         System.out.println("Pieces: " + t1.getPieces());
-        System.out.println("Pieces Blob: " + t1.getPiecesBlob());
+        System.out.println("Pieces Blob: " + Arrays.toString(t1.getPiecesBlob()));
         System.out.println("Total Size: " + t1.getTotalSize());
         System.out.println("Is Single File Torrent: " + t1.isSingleFileTorrent());
         System.out.println("File List: ");
-        t1.getFileList().forEach((TorrentFile torrentFile) -> System.out.println(torrentFile));
+        t1.getFileList().forEach(System.out::println);
     }
 }

@@ -1,4 +1,4 @@
-package main.response;
+package main.tracker.response;
 
 import lombok.Getter;
 import lombok.ToString;

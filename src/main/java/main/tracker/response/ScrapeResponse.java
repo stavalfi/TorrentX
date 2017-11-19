@@ -1,4 +1,4 @@
-package main.response;
+package main.tracker.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

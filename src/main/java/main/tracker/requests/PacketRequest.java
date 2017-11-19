@@ -1,4 +1,4 @@
-package main.requests;
+package main.tracker.requests;
 
 public interface PacketRequest {
     byte[] buildRequestPacket();

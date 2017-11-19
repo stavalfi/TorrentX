@@ -1,10 +1,10 @@
-package main.requests;
+package main.tracker.requests;
 
 import lombok.Getter;
 import lombok.ToString;
+import main.TorrentInfoHashConverter;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Getter
@@ -36,10 +36,8 @@ public class ScrapeRequest implements PacketRequest
         sendData.putLong(this.connectionId); // connection_id (64 bit)
         sendData.putInt(this.action); // action we want to perform - scrape the server (32 bits)
         sendData.putInt(this.transactionId); // transaction_id - random int we make (32 bits)
-        /**
-         * each torrentInfoHash byte array is 20 bytes.
-         */
-        this.torrentInfoHashs.forEach((String torrentInfoHash)->sendData.put(AnnounceRequest.castTorrentInfoHash(torrentInfoHash)));
+        // each torrentInfoHash byte array is 20 bytes.
+        this.torrentInfoHashs.forEach((String torrentInfoHash)->sendData.put(TorrentInfoHashConverter.torrentInfoHashToBytes(torrentInfoHash)));
 
         return sendData.array();
     }

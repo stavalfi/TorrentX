@@ -1,7 +1,11 @@
 package main;
 
-import main.requests.*;
-import main.response.*;
+import main.tracker.requests.AnnounceRequest;
+import main.tracker.requests.ConnectionRequest;
+import main.tracker.requests.ScrapeRequest;
+import main.tracker.response.AnnounceResponse;
+import main.tracker.response.ConnectionResponse;
+import main.tracker.response.ScrapeResponse;
 
 import java.io.IOException;
 import java.net.DatagramPacket;

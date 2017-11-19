@@ -1,6 +1,5 @@
-package main.requests;
+package main.tracker.requests;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.ToString;
 
