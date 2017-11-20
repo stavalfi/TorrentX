@@ -25,6 +25,8 @@ public class HandShake {
         this.torrentInfoHash = torrentInfoHash;
         this.peerId = peerId;
         assert reserved.capacity() == 8;
+        assert torrentInfoHash.length() == 40;
+        assert peerId.length() == 20;
     }
 
     public int getPstrLength() {
@@ -35,8 +37,9 @@ public class HandShake {
      * cast HandShake object to HandShake packet in bytes.
      *
      * @param handShake object
-     * @return a byte array (49 + pstrlen bytes) with the following structure:
+     * @return a byte buffer (49 + pstrlen bytes) with the following structure:
      * Offset       Size            Name        value
+     *
      * 0            8-bit           byte        pstrLength
      * 1            pstrlen-bit     bytes       pstr
      * 1+pstrlen    8-bit           byte        reserved
