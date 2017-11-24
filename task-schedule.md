@@ -1,10 +1,10 @@
 # Task Schedule
-### Feature 1: getting started. `IN PROGRESS`
+### Feature 1: Getting started. `IN PROGRESS`
 
 1. Understand what .torrent files are.
 2. How to communicate with a tracker.
 3. How to communicate with a peer. 
-
+4. Paper - Introduction and related work.
 -----
 
 ##### PBI-1: Create work space. `DONE`
@@ -49,3 +49,14 @@
 4. Which parts a seeder have from a file until now. `NOT STARTED` ()
 5. Download one random part from a seeder. `NOT STARTED` ()
 
+-----
+
+##### PBI-5: Others. `NOT STARTED`
+
+1. Learn how to work with latex.
+2. transform this file to latex.
+3. Create a paper on: `NOT STARTED` `14\12\17`
+    * What are we building.
+    * How client torrent application work.
+    * What our application do,add,won't do compared to other client torrent applications.
+    * How our application will work including technologies.
