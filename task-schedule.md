@@ -43,19 +43,19 @@
 
 ##### PBI-5: Communicate with a seeder. `IN PROGRESS` 
 
-1. Find the protocol and port which enable us to communicate with a seeder. `IN PROGRESS` (stav)
-2. List the methods we can run on a given seeder. `NOT STARTED` ()
-3. Ask if he have the file specified by the torrent file. `NOT STARTED` ()
-4. Which parts a seeder have from a file until now. `NOT STARTED` ()
-5. Download one random part from a seeder. `NOT STARTED` ()
+1. Find the protocol and port which enable us to communicate with a seeder. `IN PROGRESS`
+2. List the methods we can run on a given seeder. `NOT STARTED`
+3. Ask if he have the file specified by the torrent file. `NOT STARTED`
+4. Which parts a seeder have from a file until now. `NOT STARTED`
+5. Download one random part from a seeder. `NOT STARTED`
 
 -----
 
-##### PBI-5: Others. `NOT STARTED`
+##### PBI-5: Others. `DONE`
 
 1. Learn how to work with latex.
 2. transform this file to latex.
-3. Create a paper on: `NOT STARTED` `14\12\17`
+3. Create a paper on: `14\12\17`
     * What are we building.
     * How client torrent application work.
     * What our application do,add,won't do compared to other client torrent applications.
