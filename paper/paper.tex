@@ -1,0 +1,79 @@
+
+\documentclass[11pt]{article}
+
+\usepackage{xcolor}
+\usepackage{chngcntr}
+\usepackage{enumitem}
+\usepackage[small]{titlesec}
+\newlist{paragraphlist}{enumerate}{1}
+
+
+\setlist[paragraphlist,1]{leftmargin=*,label={\bfseries \arabic*}}
+
+\counterwithin{paragraphlisti}{subsubsection}
+
+
+
+
+\title{{\Huge   Introduction and Related work}}
+
+\author{Stav Alfi and Shachar Rosenman}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+
+
+\section*{What are we building.}
+In recent years, BitTorrent has emerged as a very scalable peer-to-peer file distribution mechanism.
+Because of the great popularity of the BitTorrent there is a lot of interest among the scientific community on whether it is possible to improve the performance of this protocol.
+  So many measurement and analytical studies have published suggestions for different algorithms that achieves performance improvements.
+
+
+Our goal is to select an algorithm, study it and then implement it to prove that the theoretical assumptions are indeed proven in experiments. Then we can publish it so users can enjoy even better performance
+
+study
+Our goal is to select an algorithm that is most effective and implement it
+
+\section*{How BitTorrent Works.}
+BitTorrent is a peer-to-peer protocol, which means that the computers in a BitTorrent “swarm” (a group of computers downloading and uploading the same torrent) transfer data between each other without the need for a central server, Where all the information passes through a particular server.
+while  The tracker server keeps track of where file copies reside on peer machines, which ones are available at time of the client request, and helps coordinate efficient transmission and reassembly of the copied file.
+
+Traditionally, a computer joins a BitTorrent swarm by loading a torrent file into a BitTorrent client. The BitTorrent client contacts a “tracker” specified in the .torrent file. The tracker is a special server that keeps track of the connected computers. The tracker shares IP addresses with other BitTorrent clients in the swarm, allowing clients to connect to each other.
+
+
+Once connected, a BitTorrent client downloads pieces of the files ,Each file to be distributed is divided into small information chunks called pieces. Downloading peers achieve rapid download speeds by requesting multiple pieces from different computers simultaneously in the swarm.
+The torrent
+application download each peace and combine them togheter. Once the BitTorrent client has some data, it can then begin to upload that data to other BitTorrent clients in the swarm. There are three types involved in the distribution process:
+
+\textbf{Seeder}  is a person who has a torrent file open in their client and they have the complete file downloaded already.
+
+\textbf{Leechers} are those who are downloading and uploading at the same time. If a user starts sharing a file that he already has, and downloads what other users have already uploaded or are in the process of uploading a torrent file, he becomes a leecher.
+
+\textbf{peers}  is someone who is both downloading and uploading the file in the swarm. Files are downloaded in pieces. When a user downloads some pieces, he then automatically starts uploading it.A file will be downloaded faster if more people are involved in the swarm. A peer becomes a seed when he has completed 100% of the file and wishes to continue uploading.
+
+
+
+
+\textbf{Public IP} address is the address that is assigned to a computing device to allow direct access over the Internet. A web server, email server and any server device directly accessible from the Internet are candidate for a public IP address. A public IP address is globally unique, and can only be assigned to a unique device.
+Private ip
+
+\textbf{private IP} address is the address space allows to create local network. When a computer is assigned a private IP address, the local devices see this computer via it's private IP address. However, the devices residing outside of the local network cannot directly communicate via the private IP address, but uses your router's public IP address to communicate. To allow direct access to a local device which is assigned a private IP address, a Network Address Translator (NAT) should be used.
+
+\textbf{NAT} is a method of remapping one IP address space into another, the majority of NATs map multiple private hosts to one publicly exposed IP address. In a typical configuration, a local network uses one of the designated private IP address. 
+A router on that network has a private address in that address space. The router is also connected to the Internet with a public address. As traffic passes from the local network to the Internet, the source address in each packet is translated on the fly from a private address to the public address. The router tracks basic data about each active connection (particularly the destination address and port). When a reply returns to the router, it uses the connection tracking data it stored during the outbound phase to determine the private address on the internal network to which to forward the reply
+
+the system works fine until you want to give people on the outside Internet
+access to files. when they try to reach the computer through the public IP address they actually reach the router and the router doesn't know how to forward the connection to the appropriate computer, this way a leecher can not find the computer that has the file
+unless it's been told how to do so. 
+
+telling the router which computer to forward a connection to is called \textbf{port forwarding}, each server based application has a port number it works through, its port number is very useful in giving the router the information it needs to forward a connection. 
+
+To save the trouble of keeping track of ports and configuring routers many NAT routers now have what is called \textbf{universal plug in play (UPnP)} . when UPNP is enabled on the router applications on the computer can manage the forwarding themselves, the program will tell the router which port it will be receiving requests on, and the router will set up the necessary forwarding, so that information from the outside Internet can be directed to the appropriate local computer. this allows the ports to be managed by server based programs from the computers they belong to making network management less of a hassle. there are times though when you PNP either isn't available on the router or isn't enabled for security purposes and manual port forwarding becomes necessary.
+
+
+
+
+
+\end{document}
