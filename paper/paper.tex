@@ -28,7 +28,7 @@
   \begin{flushleft}
 
     TorrentX is a client side software for downloading and uploading torrents through the internet.
-    There is a support for downloading and uploading the same torrent through a cluster which located in your private network. This architecture let us discover and use more seeders by examining more of them on different virtual/physical machines on a cluster.
+    There is support for downloading and uploading the same torrent through a cluster which is located in your private network. This architecture lets  us discover and use more seeders by examining more of them on different virtual/physical machines on a cluster.
 
   \end{flushleft}
   \begin{flushleft}
@@ -38,9 +38,9 @@
   \end{flushleft}
   \begin{flushleft}
 
-    In the recent years, BitTorrent has emerged as a scalable peer-to-peer file distribution mechanism.
+    In recent years, BitTorrent has emerged as a scalable peer-to-peer file distribution mechanism.
     Because of the great popularity of the BitTorrent there is a lot of interest among the scientific community on whether it is possible to improve the performance of this protocol.
-    So many measurement and analytical studies have published suggestions for different algorithms that achieves performance improvements.
+    So many measurement and analytical studies have published suggestions for different algorithms that achieve performance improvements.
 
   \end{flushleft}
   \begin{flushleft}
@@ -52,17 +52,17 @@
   \begin{flushleft}
 
     BitTorrent is a peer-to-peer protocol, which means that the computers in a BitTorrent “swarm” (a group of computers downloading and uploading the same torrent) transfer data between each other without the need for a central server, where all the information passes through a particular server.
-    while the tracker server keeps track of where file copies reside on peer machines, which ones are available at time of the client request, and helps coordinate efficient transmission and reassembly of the copied file.
+    The tracker server keeps track of where file copies reside on peer machines, which ones are available at the time of the clients request, and helps coordinate efficient transmission and reassembly of the copied file.
 
   \end{flushleft}
   \begin{flushleft}
 
-    A server who responsible for saving the leechers (threads which attempting to download a torrent) and seeders (leechers who finished downloading the torrent) information is called a tracker. When a new leecher want to download, it sends a request to one of the avilable trackers in the torrent file and ask for all the peers (leechers and seeders). This request is called announcement.
+    A server who is responsible for saving the leechers (threads which  are attempting to download a torrent) and seeders (leechers who finished downloading the torrent) information is called a tracker. When a new leecher wants to download, it sends a request to one of the available trackers in the torrent file and asks for all the peers (leechers and seeders). This request is called announcement.
 
   \end{flushleft}
   \begin{flushleft}
 
-    It is importent to note that the tracker is refering to every peer by peer-public-ip.
+    It is important to note that the tracker is referring to every peer by peer-public-ip.
 
   \end{flushleft}
   \begin{flushleft}
@@ -72,40 +72,40 @@
   \end{flushleft}
   \begin{flushleft}
 
-    Once a leecher is getting response from the tracker about a request to specific torrent's peer list, the leecher's BitTorrent client software downloads the pieces of the files. Each file in the torrent is divided into small information chunks called pieces. Each peace in the torrent have a constant size except the last peace. A peace size is defined in the torrent file. All in all, We can conclude that peers exchange peaces of multiple torrents concurrently in a distributed system.
+    Once a leecher is getting a response from the tracker about a request to a specific torrent's peer list, the leecher's BitTorrent client software downloads the pieces of the files. Each file in the torrent is divided into small information chunks called pieces. Each piece in the torrent has a same size except the last piece. A piece size is defined in the torrent file. All in all, We can conclude that peers exchange piece of multiple torrents concurrently in a distributed system.
 
   \end{flushleft}
 
 
-  \section*{Peers massages}
+  \section*{Peers messages}
   \begin{flushleft}
 
-    To better understand how a given torrent algorithm works, we must understand what types of messages are transfered between peers in the p2p (peer-to-peer) protocol. Every message is described in the p2p protocol by what it's size must be, what it's content and by what order.
+    To better understand how a given torrent algorithm works, we must understand what types of messages are transfered between peers in the p2p (peer-to-peer) protocol. Every message is described in the p2p protocol by what its size must be, what its content and by what order.
 
   \end{flushleft}
   \begin{flushleft}
 
-    1. The keep-alive message is a message with zero bytes, specified with the length prefix set to zero. There is no message ID and no payload (extra data). Peers may close a connection if they receive no messages (keep-alive or any other message) for a certain period of time, so a keep-alive message must be sent to maintain the connection alive if no command have been sent for a given amount of time. This amount of time is generally two minutes.
+    1. The keep-alive message is a message with zero bytes, specified with the length prefix set to zero. There is no message ID and no payload (extra data). Peers may close a connection if they receive no messages (keep-alive or any other message) for a certain period of time, so a keep-alive message must be sent to maintain the connection alive if no command has been sent for a given amount of time. This amount of time is generally two minutes.
 
   \end{flushleft}
   \begin{flushleft}
 
-    2. Choke message means that if peer1 send it to peer2, then peer1 will ignore any future requests for peaces. We can conclude that peer1 is too busy. The choke message is fixed-length and has no payload.
+    2. Choke message means that if peer(i) sends it to peer(j), then peer(i) will ignore any future requests for pieces. The choke message is fixed-length and has no payload.
 
   \end{flushleft}
   \begin{flushleft}
 
-    3. Unchoke message means that if peer1 send it to peer2, then peer1 will no longer ignore any future requests for peaces. The unchoke message is fixed-length and has no payload.
+    3. Unchoke message means that if peer(i) sends it to peer(j), then peer(i) will no longer ignore any future requests for pieces. The unchoke message is fixed-length and has no payload.
 
   \end{flushleft}
   \begin{flushleft}
 
-    4. Interested message means that if peer1 send it to peer2, peer1 want peaces which peer2 have to offer. The interested message is fixed-length and has no payload.
+    4. Interested message means that if peer(i) sends it to peer(j), peer(i) wants peaces which peer(j) has to offer.  The interested message is fixed-length and has no payload.
 
   \end{flushleft}
   \begin{flushleft}
 
-    5. Not interested message means that if peer1 send it to peer2, peer1 does not want any peaces which peer2 have to offer.The not interested message is fixed-length and has no payload.
+    5. Not interested message means that if peer(i) send it to peer(j), peer(i) does not want any peaces which peer(j) have to offer.The not interested message is fixed-length and has no payload.
 
   \end{flushleft}
   \begin{flushleft}
@@ -115,17 +115,13 @@
   \end{flushleft}
   \begin{flushleft}
 
-    Implementer's Note: That is the strict definition, in reality some games may be played. In particular because peers are extremely unlikely to download pieces that they already have, a peer may choose not to advertise having a piece to a peer that already has that piece. At a minimum "HAVE suppression" will result in a 0.5 reduction in the number of HAVE messages, this translates to around a 25-35% reduction in protocol overhead. At the same time, it may be worthwhile to send a HAVE message to a peer that has that piece already since it will be useful in determining which piece is rare.
-
-  \end{flushleft}
-  \begin{flushleft}
 
     7. The bitfield message may only be sent immediately after the handshaking sequence is completed, and before any other messages are sent. It is optional, and need not be sent if a client has no pieces.
 
   \end{flushleft}
   \begin{flushleft}
 
-    The bitfield message is variable length, where X is the length of the bitfield. The payload is a bitfield representing the pieces that have been successfully downloaded. The high bit in the first byte corresponds to piece index 0. Bits that are cleared indicated a missing piece, and set bits indicate a valid and available piece. Spare bits at the end are set to zero.
+    The bitfield message is variable length, /The payload is a bitfield representing the pieces that have been successfully downloaded. The high bit in the first byte corresponds to piece index 0. Bits that are cleared indicated a missing piece, and set bits indicate a valid and available piece. Spare bits at the end are set to zero.
 
   \end{flushleft}
   \begin{flushleft}
@@ -140,7 +136,7 @@
   \end{flushleft}
   \begin{flushleft}
 
-    9. he piece message is variable length, where X is the length of the block. The payload contains the following information: Index: integer specifying the zero-based piece index. Begin: integer specifying the zero-based byte offset within the piece. Block: block of data, which is a subset of the piece specified by index.
+    9. The piece message is variable length, where X is the length of the block. The payload contains the following information: Index: integer specifying the zero-based piece index. Begin: integer specifying the zero-based byte offset within the piece. Block: block of data, which is a subset of the piece specified by index.
 
   \end{flushleft}
   \begin{flushleft}
@@ -151,16 +147,16 @@
   \begin{flushleft}
 
     Downloading peers achieve rapid download speeds by requesting multiple pieces from different computers simultaneously in the swarm.
-    The torrent application download each peace and combine them togheter. Once the BitTorrent client has some data, it can then begin to upload that data to other BitTorrent clients in the swarm.
+    The torrent application downloads each piece and combines them together. Once the BitTorrent client has some data, it can then begin to upload that data to other BitTorrent clients in the swarm.
 
   \end{flushleft}
   \begin{flushleft}
   \end{flushleft}
   \begin{flushleft}
 
-    Because multiple machines listen to the same port in the same network, we need to be able to get response from the WAN to the LAN. In short, \textbf{NAT} is a method of remapping public IP address and a port number to private ip address and a port number and vice versa. The majority of NATs map multiple private hosts to one publicly exposed IP address. In a typical configuration, a local network uses one of the designated private IP address. A router on that network has a private address in that address space. The router is also connected to the Internet with a public address. As traffic passes from the local network to the Internet, the source address in each packet is translated on the fly from a private address to the public address. The router tracks basic data about each active connection (particularly the destination address and port). When a reply returns to the router, it uses the connection tracking data it stored during the outbound phase to determine the private address on the internal network to which to forward the reply the system works fine until you want to give people on the outside Internet access to files. When they try to reach the computer through the public IP address they actually reach the router and the router doesn't know how to forward the connection to the appropriate computer, this way a leecher can not find the computer that has the file unless it's been told how to do so.
+    Because multiple machines listen to the same port in the same network, we need to be able to get a response from the WAN to the LAN. In short, \textbf{NAT} is a method of remapping a public IP address and a port number to a private ip address and a port number and vice versa. The majority of NATs map multiple private hosts to one publicly exposed IP address. In a typical configuration, a local network uses one of the designated private IP addresses. A router on that network has a private address in that address space. The router is also connected to the Internet with a public address. As traffic passes from the local network to the Internet, the source address in each packet is translated on the fly from a private address to the public address. The router tracks basic data about each active connection (particularly the destination address and port). When a reply returns to the router, it uses the connection tracking data it stored during The outbound phase to determine the private address on the internal network to which to forward the reply. the system works fine until you want to give people on the outside Internet access to files. When they try to reach the computer through the public IP address they actually reach the router and the router doesn't know how to forward the connection to the appropriate computer, this way a leecher can not find the computer that has the file unless it's been told how to do so.
 
-    A Bittorrent client application listen to a specific port in every machine. To be able to add this port to the NAT in it's router, one must use \textbf{universal plug in play (UPnP)} to avoid menually adding a port and a IP address to the NAT. The UPNP is a way to configure the NAT in any programming language. Telling the router which computer to forward a connection to is called \textbf{port forwarding}, each server based application has a port number it works through, its port number is very useful in giving the router the information it needs to forward a connection.
+    A Bittorrent client application listens to a specific port in every machine. To be able to add this port to the NAT in its router, one must use \textbf{universal plug in play (UPnP)} to avoid manually adding a port and a IP address to the NAT. The UPNP is a way to configure the NAT in any programming language. Telling the router which computer to forward a connection to is called \textbf{port forwarding}, each server based application has a port number it works through, its port number is very useful in giving the router the information it needs to forward a connection.
 
   \end{flushleft}
 
