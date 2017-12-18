@@ -25,28 +25,32 @@ public class App {
         String url = "tracker.coppersurfer.tk";
         short port = 6969;
         Torrent t1 = TorrentParser.parseTorrent("src/main/resources/torrent-file-example.torrent");
-        printTrackerInfo(url, port,t1.getInfo_hash());
-        //printTorrentFileInfo();
+        //printTorrentFileInfo(t1);
+        printTrackerInfo("tracker.coppersurfer.tk", (short) 6969, t1.getInfo_hash());
+        // printTrackerInfo("rarbg.com", (short) 2710, t1.getInfo_hash());
+        printTrackerInfo("p4p.arenabg.com", (short) 1337, t1.getInfo_hash());
+        printTrackerInfo("tracker.leechers-paradise.org", (short) 6969, t1.getInfo_hash());
+        printTrackerInfo("tracker.internetwarriors.net", (short) 1337, t1.getInfo_hash());
+        printTrackerInfo("tracker.opentrackr.org", (short) 1337, t1.getInfo_hash());
     }
 
 
-
-    private static void printTrackerInfo(String ip, short port,String TorrentHashInfo) throws IOException {
+    private static void printTrackerInfo(String ip, short port, String TorrentHashInfo) throws IOException {
 
         System.out.println("------connecting-------");
         ConnectionRequest connectionRequest = new ConnectionRequest();
 
         System.out.println(connectionRequest);
 
-        ConnectionResponse connectionResponse = TrackerCommunicator.communicate(ip,port,connectionRequest);
+        ConnectionResponse connectionResponse = TrackerCommunicator.communicate(ip, port, connectionRequest);
         System.out.println(connectionResponse);
 
         System.out.println("------announcing-------");
-        AnnounceRequest announceRequest = new AnnounceRequest(connectionResponse.getConnectionId(),TorrentHashInfo,
-                "0",0,0,0,2,0,0,10,(short)8091);
+        AnnounceRequest announceRequest = new AnnounceRequest(connectionResponse.getConnectionId(), TorrentHashInfo,
+                "0", 0, 0, 0, 2, 0, 0, 1000, (short) 8091);
 
         System.out.println(announceRequest);
-        AnnounceResponse announceResponse = TrackerCommunicator.communicate(ip,port,announceRequest);
+        AnnounceResponse announceResponse = TrackerCommunicator.communicate(ip, port, announceRequest);
         System.out.println(announceResponse);
         System.out.println("peer list:");
         announceResponse.getPeers().forEach(System.out::println);
@@ -55,18 +59,19 @@ public class App {
         ScrapeRequest scrapeRequest = new ScrapeRequest(connectionResponse.getConnectionId(), Collections.singletonList(TorrentHashInfo));
         System.out.println(scrapeRequest);
 
-        ScrapeResponse scrapeResponse = TrackerCommunicator.communicate(ip,port,scrapeRequest);
+        ScrapeResponse scrapeResponse = TrackerCommunicator.communicate(ip, port, scrapeRequest);
         System.out.println(scrapeResponse);
         System.out.println("update: ");
         scrapeResponse.getScrapeResponseForTorrentInfoHashs().forEach(System.out::println);
     }
 
-    private static void printTorrentFileInfo() throws IOException {
-        Torrent t1 = TorrentParser.parseTorrent("src/main/resources/torrent-file-example.torrent");
+    private static void printTorrentFileInfo(Torrent t1) throws IOException {
         System.out.println("Created By: " + t1.getCreatedBy());
         System.out.println("Main tracker: " + t1.getAnnounce());
-        System.out.println("Tracker List: ");
-        t1.getAnnounceList().forEach(System.out::println);
+        if (t1.getAnnounceList() != null) {
+            System.out.println("Tracker List: ");
+            t1.getAnnounceList().forEach(System.out::println);
+        }
         System.out.println("Comment: " + t1.getComment());
         System.out.println("Creation Date: " + t1.getCreationDate());
         System.out.println("Info_hash: " + t1.getInfo_hash());
