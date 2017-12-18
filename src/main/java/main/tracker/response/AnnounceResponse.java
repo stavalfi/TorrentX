@@ -12,10 +12,11 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static org.joou.Unsigned.ushort;
+
 @Getter
 @ToString
 public class AnnounceResponse {
-
 
 
     private final int action = 1;
@@ -46,7 +47,7 @@ public class AnnounceResponse {
         this.seedersAmount = receiveData_analyze.getInt();
 
         this.peers = IntStream.range(0, Integer.min(maxPeers, this.leechersAmount + this.seedersAmount))
-                .mapToObj((int index) -> new Peer(castIntegerToInetAddress(receiveData_analyze.getInt()), receiveData_analyze.getShort()))
+                .mapToObj((int index) -> new Peer(castIntegerToInetAddress(receiveData_analyze.getInt()), ushort(receiveData_analyze.getShort())))
                 .collect(Collectors.toList());
     }
 

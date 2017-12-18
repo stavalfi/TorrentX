@@ -47,7 +47,7 @@ public class App {
 
         System.out.println("------announcing-------");
         AnnounceRequest announceRequest = new AnnounceRequest(connectionResponse.getConnectionId(), TorrentHashInfo,
-                "0", 0, 0, 0, 2, 0, 0, 10, (short) 8091);
+                "0", 0, 0, 0, 2, 0, 0, 1000, (short) 8091);
 
         System.out.println(announceRequest);
         AnnounceResponse announceResponse = TrackerCommunicator.communicate(ip, port, announceRequest);
