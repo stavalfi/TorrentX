@@ -16,7 +16,9 @@ import java.util.stream.IntStream;
 @ToString
 public class AnnounceResponse {
 
-    private final int action=1;
+
+
+    private final int action = 1;
     private final int transactionId;
     private final int interval;
     private final int leechersAmount;
@@ -34,26 +36,25 @@ public class AnnounceResponse {
      * 24 + 6 * n  16-bit integer  TCP port
      * 20 + 6 * N
      */
-    public AnnounceResponse(byte[] receiveData,int maxPeers)
-    {
+    public AnnounceResponse(byte[] receiveData, int maxPeers) {
         ByteBuffer receiveData_analyze = ByteBuffer.wrap(receiveData);
         int action = receiveData_analyze.getInt();
         assert this.action == action;
-        this.transactionId =  receiveData_analyze.getInt();
-        this.interval =  receiveData_analyze.getInt();
-        this.leechersAmount =  receiveData_analyze.getInt();
-        this.seedersAmount =  receiveData_analyze.getInt();
+        this.transactionId = receiveData_analyze.getInt();
+        this.interval = receiveData_analyze.getInt();
+        this.leechersAmount = receiveData_analyze.getInt();
+        this.seedersAmount = receiveData_analyze.getInt();
 
-        this.peers = IntStream.range(0, Integer.min(maxPeers,this.leechersAmount +this.seedersAmount))
-                .mapToObj((int index)-> new Peer(castIntegerToInetAddress(receiveData_analyze.getInt()),receiveData_analyze.getShort()))
+        this.peers = IntStream.range(0, Integer.min(maxPeers, this.leechersAmount + this.seedersAmount))
+                .mapToObj((int index) -> new Peer(castIntegerToInetAddress(receiveData_analyze.getInt()), receiveData_analyze.getShort()))
                 .collect(Collectors.toList());
     }
-    public static int packetResponseSize()
-    {
+
+    public static int packetResponseSize() {
         return 1000;
     }
-    private static InetAddress castIntegerToInetAddress(int ip)
-    {
+
+    private static InetAddress castIntegerToInetAddress(int ip) {
         byte[] bytes = BigInteger.valueOf(ip).toByteArray();
         try {
             return InetAddress.getByAddress(bytes);
