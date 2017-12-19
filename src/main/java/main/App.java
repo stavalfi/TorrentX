@@ -3,6 +3,7 @@ package main;
 import christophedetroyer.torrent.Torrent;
 import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
+import main.peer.HandShake;
 import main.tracker.requests.AnnounceRequest;
 import main.tracker.requests.ConnectionRequest;
 import main.tracker.requests.ScrapeRequest;
@@ -16,26 +17,37 @@ import java.util.Collections;
 
 public class App {
     public static void main(String[] args) throws IOException {
-        // udp://tracker.coppersurfer.tk:6969/announce
-        // udp://9.rarbg.com:2710/announce
-        // udp://p4p.arenabg.com:1337
-        // udp://tracker.leechers-paradise.org:6969
-        // udp://tracker.internetwarriors.net:1337
-        // udp://tracker.opentrackr.org:1337/announce
-        String url = "tracker.coppersurfer.tk";
-        short port = 6969;
+        String myPeerId = "-AZ5750-TpkXttZLfpSH";
         Torrent t1 = TorrentParser.parseTorrent("src/main/resources/torrent-file-example.torrent");
-        //printTorrentFileInfo(t1);
-        printTrackerInfo("tracker.coppersurfer.tk", (short) 6969, t1.getInfo_hash());
-        // printTrackerInfo("rarbg.com", (short) 2710, t1.getInfo_hash());
-        printTrackerInfo("p4p.arenabg.com", (short) 1337, t1.getInfo_hash());
-        printTrackerInfo("tracker.leechers-paradise.org", (short) 6969, t1.getInfo_hash());
-        printTrackerInfo("tracker.internetwarriors.net", (short) 1337, t1.getInfo_hash());
-        printTrackerInfo("tracker.opentrackr.org", (short) 1337, t1.getInfo_hash());
+        printTorrentFileInfo(t1);
+        printTrackerInfo("tracker.coppersurfer.tk", (short) 6969, t1.getInfo_hash(), myPeerId);
+        printTrackerInfo("p4p.arenabg.com", (short) 1337, t1.getInfo_hash(), myPeerId);
+        printTrackerInfo("tracker.leechers-paradise.org", (short) 6969, t1.getInfo_hash(), myPeerId);
+        printTrackerInfo("tracker.internetwarriors.net", (short) 1337, t1.getInfo_hash(), myPeerId);
+        printTrackerInfo("tracker.opentrackr.org", (short) 1337, t1.getInfo_hash(), myPeerId);
+
+        System.out.println();
+        System.out.println("----------------------------------");
+        System.out.println("----------------------------------");
+        System.out.println("----------------------------------");
+        System.out.println("----------------------------------");
+        System.out.println();
+
+        // Peer(ipAddress=/62.178.164.31, tcpPort=32673)
+
+        String peerIp = "62.178.164.31";
+        int peerPort = 32673;
+
+        PeerCommunicator.sendMessage(peerIp, peerPort, new HandShake(t1.getInfo_hash(), myPeerId));
+
+//        String peerId2 = "2d415a353735302d54706b5874745a4c66705348";
+//        byte[] id = TorrentInfoHashConverter.torrentInfoHashToBytes(peerId2);
+//        System.out.println(TorrentInfoHashConverter.bytesToTorrentInfoHash(id));
+
     }
 
 
-    private static void printTrackerInfo(String ip, short port, String TorrentHashInfo) throws IOException {
+    private static void printTrackerInfo(String ip, short port, String TorrentHashInfo, String myPeerId) throws IOException {
 
         System.out.println("------connecting-------");
         ConnectionRequest connectionRequest = new ConnectionRequest();
@@ -46,8 +58,11 @@ public class App {
         System.out.println(connectionResponse);
 
         System.out.println("------announcing-------");
+        // TODO: change 8091
+        short tcpPortImListeningOn = 8091;
+        int maxPeersIWantFromTracker = 1000;
         AnnounceRequest announceRequest = new AnnounceRequest(connectionResponse.getConnectionId(), TorrentHashInfo,
-                "0", 0, 0, 0, 2, 0, 0, 1000, (short) 8091);
+                "01234567890123456789", 0, 0, 0, 2, 0, 0, maxPeersIWantFromTracker, tcpPortImListeningOn);
 
         System.out.println(announceRequest);
         AnnounceResponse announceResponse = TrackerCommunicator.communicate(ip, port, announceRequest);
