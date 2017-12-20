@@ -12,33 +12,28 @@ import java.net.Socket;
 
 public class PeerCommunicator {
 
-   /* public static void sendMessage(String peerIp, int peerTCPPort, Message message) throws IOException {
-        byte[] receiveData = new byte[1000];
-
-        communicate(peerIp, peerTCPPort, (HandShake)message, receiveData);
-    }*/
+//    public static void sendMessage(String peerIp, int peerTCPPort, Message message) throws IOException {
+//        byte[] receiveData = new byte[1000];
+//
+//        communicate(peerIp, peerTCPPort, message., receiveData);
+//    }
 
     public static void sendMessage(String peerIp, int peerTCPPort, HandShake handShake) throws IOException {
         byte[] receiveData = new byte[1000];
-        communicate(peerIp, peerTCPPort, handShake, receiveData);
+        communicate(peerIp, peerTCPPort, HandShake.createPacketFromObject(handShake), receiveData);
     }
 
-    private static void communicate(String peerIp, int peerPort, HandShake handShake, byte[] messageWeReceive) throws IOException {
+    private static void communicate(String peerIp, int peerPort, byte[] messageToSend, byte[] messageWeReceive) throws IOException {
         // start communicating with the peer
+        System.out.println("start communicating with peer");
         Socket clientSocket = new Socket(peerIp, peerPort);
-
+        System.out.println("successfuly communicated with peer");
         //af1f3dbc5d5baeaf83f812e06aa91bb7b55cce8
         DataOutputStream os = new DataOutputStream(clientSocket.getOutputStream());
 
-        os.writeByte(19);
-        os.write("BitTorrent protocol".getBytes());
-        os.write(new byte[8]);
-        os.write(handShake.getTorrentInfoHash());
-        os.write(handShake.getPeerId().getBytes());
-
+        os.write(messageToSend);
 
         System.out.println("sending to peer...");
-        //outToServer.write(messageWeSend);
         System.out.println("sent to peer...");
 
         // receive data in tcp

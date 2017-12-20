@@ -6,6 +6,7 @@ import main.NaturalX.Natural1;
 import main.TorrentInfoHashConverter;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 @Getter
 @Setter
@@ -21,6 +22,16 @@ public class HandShake {
     private final byte[] torrentInfoHash;// 20 bytes
     private final String peerId; // 20 bytes
 
+    public static byte[] hexStringToByteArray(String s) {
+        int len = s.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+                    + Character.digit(s.charAt(i + 1), 16));
+        }
+        return data;
+    }
+
     public HandShake(String torrentInfoHash, String peerId) {
         int reservedBytesAmount = 8;
         String protocolVersion = "BitTorrent protocol";
@@ -32,7 +43,9 @@ public class HandShake {
         // pstr.length() return the number of chars in it without the "/n".
         this.pstrLength = new Natural1(protocolVersion.length());
         this.pstr = ByteBuffer.wrap(protocolVersion.getBytes());
-        this.reserved = ByteBuffer.wrap(new byte[reservedBytesAmount]);
+        //this.reserved = ByteBuffer.wrap(new byte[reservedBytesAmount]);
+        this.reserved = ByteBuffer.wrap(hexStringToByteArray("8000000000130004"));
+
         this.torrentInfoHash = TorrentInfoHashConverter.torrentInfoHashToBytes(torrentInfoHash);
         this.peerId = peerId;
         assert reserved.capacity() == reservedBytesAmount;
@@ -52,18 +65,30 @@ public class HandShake {
      * <p>
      * 0            8-bit           byte        pstrLength
      * 1            pstrlen-bit     bytes       pstr
-     * 1+pstrlen    8-bit           byte        reserved
+     * 1+pstrlen    64-bit           byte        reserved
      * 9+pstrlen    20-bit          String      torrentInfoHash
      * 29+pstrlen   20-bit          String      peerId
      * 49+pstrlen
      */
     public static byte[] createPacketFromObject(HandShake handShake) {
         ByteBuffer buffer = ByteBuffer.allocate(49 + (int) handShake.pstrLength.getNumber());
-        buffer.put(handShake.pstrLength.buffer());
+        assert buffer.capacity() == 68;
+        assert handShake.pstrLength.buffer().capacity() == 1;
+        assert handShake.pstrLength.getNumber() == 19;
+        byte b=19;
+        buffer.put(b);
         buffer.put(handShake.pstr);
+        assert handShake.pstr.array().length == 19;
         buffer.put(handShake.reserved);
+        System.out.println(handShake.reserved.capacity());
+        assert handShake.reserved.capacity() == 8;
+
         buffer.put(handShake.getTorrentInfoHash());
+        assert handShake.getTorrentInfoHash().length == 20;
+
         buffer.put(handShake.peerId.getBytes());
+        assert handShake.peerId.getBytes().length == 20;
+
 
         return buffer.array();
     }
@@ -76,6 +101,7 @@ public class HandShake {
         ByteBuffer pstr = buffer.get(new byte[(int) pstrLength.getNumber()]);
         ByteBuffer reserved = buffer.get(new byte[8]);
         String torrentInfoHash = TorrentInfoHashConverter.bytesToTorrentInfoHash(buffer.get(new byte[20]).array());
+
         String peerId = new String(buffer.get(new byte[20]).array());
 
         HandShake handShake = new HandShake(torrentInfoHash, peerId);

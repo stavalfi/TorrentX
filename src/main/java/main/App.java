@@ -35,8 +35,8 @@ public class App {
 
         // Peer(ipAddress=/62.178.164.31, tcpPort=32673)
 
-        String peerIp = "18.195.250.225";
-        int peerPort = 8116;
+        String peerIp = "117.248.121.147";
+        int peerPort = 19908;
 
         PeerCommunicator.sendMessage(peerIp, peerPort, new HandShake(t1.getInfo_hash(), myPeerId));
 
