@@ -21,10 +21,10 @@ public class App {
         Torrent t1 = TorrentParser.parseTorrent("src/main/resources/torrent-file-example.torrent");
         printTorrentFileInfo(t1);
         printTrackerInfo("tracker.coppersurfer.tk", (short) 6969, t1.getInfo_hash(), myPeerId);
-        printTrackerInfo("p4p.arenabg.com", (short) 1337, t1.getInfo_hash(), myPeerId);
-        printTrackerInfo("tracker.leechers-paradise.org", (short) 6969, t1.getInfo_hash(), myPeerId);
-        printTrackerInfo("tracker.internetwarriors.net", (short) 1337, t1.getInfo_hash(), myPeerId);
-        printTrackerInfo("tracker.opentrackr.org", (short) 1337, t1.getInfo_hash(), myPeerId);
+//        printTrackerInfo("p4p.arenabg.com", (short) 1337, t1.getInfo_hash(), myPeerId);
+//        printTrackerInfo("tracker.leechers-paradise.org", (short) 6969, t1.getInfo_hash(), myPeerId);
+//        printTrackerInfo("tracker.internetwarriors.net", (short) 1337, t1.getInfo_hash(), myPeerId);
+//        printTrackerInfo("tracker.opentrackr.org", (short) 1337, t1.getInfo_hash(), myPeerId);
 
         System.out.println();
         System.out.println("----------------------------------");
@@ -35,8 +35,8 @@ public class App {
 
         // Peer(ipAddress=/62.178.164.31, tcpPort=32673)
 
-        String peerIp = "62.178.164.31";
-        int peerPort = 32673;
+        String peerIp = "18.195.250.225";
+        int peerPort = 8116;
 
         PeerCommunicator.sendMessage(peerIp, peerPort, new HandShake(t1.getInfo_hash(), myPeerId));
 
