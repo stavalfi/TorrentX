@@ -2,16 +2,18 @@ package main.peer;
 
 import lombok.Getter;
 import lombok.Setter;
-import main.NaturalX.Natural1;
 import main.TorrentInfoHashConverter;
+import org.joou.UByte;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import static org.joou.Unsigned.ubyte;
+
 @Getter
 @Setter
 public class HandShake {
-    private Natural1 pstrLength;
+    private UByte pstrLength;
     // pstr - string identifier of the protocol
     private ByteBuffer pstr;
     // reserved- eight (8) reserved bytes.
@@ -41,7 +43,7 @@ public class HandShake {
         assert peerId.length() == 20;
 
         // pstr.length() return the number of chars in it without the "/n".
-        this.pstrLength = new Natural1(protocolVersion.length());
+        this.pstrLength = ubyte(protocolVersion.length());
         this.pstr = ByteBuffer.wrap(protocolVersion.getBytes());
         //this.reserved = ByteBuffer.wrap(new byte[reservedBytesAmount]);
         this.reserved = ByteBuffer.wrap(hexStringToByteArray("8000000000130004"));
@@ -51,9 +53,7 @@ public class HandShake {
         assert reserved.capacity() == reservedBytesAmount;
     }
 
-    public int getPstrLength() {
-        return (int) this.pstrLength.getNumber();
-    }
+
 
     /**
      * cast HandShake object to HandShake packet in bytes.
@@ -71,10 +71,9 @@ public class HandShake {
      * 49+pstrlen
      */
     public static byte[] createPacketFromObject(HandShake handShake) {
-        ByteBuffer buffer = ByteBuffer.allocate(49 + (int) handShake.pstrLength.getNumber());
+        ByteBuffer buffer = ByteBuffer.allocate(49 + (int) handShake.pstrLength.intValue());
         assert buffer.capacity() == 68;
-        assert handShake.pstrLength.buffer().capacity() == 1;
-        assert handShake.pstrLength.getNumber() == 19;
+        assert handShake.pstrLength.intValue() == 19;
         byte b=19;
         buffer.put(b);
         buffer.put(handShake.pstr);
@@ -97,8 +96,8 @@ public class HandShake {
 
         ByteBuffer buffer = ByteBuffer.wrap(bytes);
 
-        Natural1 pstrLength = new Natural1(buffer.get());
-        ByteBuffer pstr = buffer.get(new byte[(int) pstrLength.getNumber()]);
+        UByte pstrLength = ubyte(buffer.get());
+        ByteBuffer pstr = buffer.get(new byte[pstrLength.intValue()]);
         ByteBuffer reserved = buffer.get(new byte[8]);
         String torrentInfoHash = TorrentInfoHashConverter.bytesToTorrentInfoHash(buffer.get(new byte[20]).array());
 

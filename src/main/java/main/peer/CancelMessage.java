@@ -1,16 +1,16 @@
 package main.peer;
 
-import main.NaturalX;
-
 import java.nio.ByteBuffer;
 
+import static org.joou.Unsigned.ubyte;
+import static org.joou.Unsigned.uint;
+
 public class CancelMessage extends Message {
+    private static int length=13;
+    private static byte messageId=7;
     public CancelMessage(int index, int begin, int length) {
-        super(13, 7,
-                ByteBuffer.allocate(12)
-                        .put(new NaturalX.Natural4(index).buffer())
-                        .put(new NaturalX.Natural4(begin).buffer())
-                        .put(new NaturalX.Natural4(length).buffer())
-        );
+        super(length, messageId, ByteBuffer.allocate(12).putInt(index)
+                                                        .putInt(begin)
+                                                        .putInt(length));
     }
 }
