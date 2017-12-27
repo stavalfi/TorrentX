@@ -31,15 +31,18 @@ public class PeerCommunicator {
         //af1f3dbc5d5baeaf83f812e06aa91bb7b55cce8
         DataOutputStream os = new DataOutputStream(clientSocket.getOutputStream());
 
-        os.write(messageToSend);
-
         System.out.println("sending to peer...");
+        os.write(messageToSend);
         System.out.println("sent to peer...");
 
         // receive data in tcp
-        System.out.println("waiting for response from peer...");
-        System.out.println(clientSocket.getInputStream().read(messageWeReceive));
-
+        for (int i = 0; i < 1; i++) {
+            System.out.println("waiting for response from peer...");
+            System.out.println(clientSocket.getInputStream().read(messageWeReceive));
+            HandShake handShake=HandShake.createObjectFromPacket(messageWeReceive);
+            System.out.println(handShake);
+            messageWeReceive=new byte[1000];
+        }
         clientSocket.close();
     }
 

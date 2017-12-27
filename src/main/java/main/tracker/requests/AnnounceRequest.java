@@ -2,7 +2,7 @@ package main.tracker.requests;
 
 import lombok.Getter;
 import lombok.ToString;
-import main.TorrentInfoHashConverter;
+import main.HexByteConverter;
 
 import java.nio.ByteBuffer;
 
@@ -64,7 +64,7 @@ public class AnnounceRequest implements PacketRequest {
         sendData.putLong(this.connectionId); // connection_id
         sendData.putInt(this.action); // action we want to perform - announce
         sendData.putInt(this.transactionId); // transaction_id - random int we make (32 bits)
-        sendData.put(TorrentInfoHashConverter.torrentInfoHashToBytes(this.torrentInfoHash)); //info_hash (20 bits)
+        sendData.put(HexByteConverter.hexToByte(this.torrentInfoHash)); //info_hash (20 bits)
         sendData.put(new byte[20]); // peer_id (20 bits)
         sendData.putLong(this.downloaded); // downloaded (64 bits)
         sendData.putLong(this.left); // left (64 bits)
