@@ -47,7 +47,7 @@ public class AnnounceResponse {
         this.seedersAmount = receiveData_analyze.getInt();
 
         this.peers = IntStream.range(0, Integer.min(maxPeers, this.leechersAmount + this.seedersAmount))
-                .mapToObj((int index) -> new Peer(castIntegerToInetAddress(receiveData_analyze.getInt()), ushort(receiveData_analyze.getShort())))
+                .mapToObj((int index) -> new Peer(castIntegerToInetAddress(receiveData_analyze.getInt()).getHostAddress(), ushort(receiveData_analyze.getShort())))
                 .collect(Collectors.toList());
     }
 

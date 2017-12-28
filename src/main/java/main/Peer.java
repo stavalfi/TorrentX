@@ -13,7 +13,7 @@ import java.net.InetAddress;
 @Getter
 @ToString
 public class Peer {
-    private final InetAddress ipAddress;
+    private final String ipAddress;
     private final UShort tcpPort;
 
 
