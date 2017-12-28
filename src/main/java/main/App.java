@@ -2,12 +2,11 @@ package main;
 
 import christophedetroyer.torrent.Torrent;
 import christophedetroyer.torrent.TorrentParser;
-import main.peer.HandShake;
 import main.tracker.requests.AnnounceRequest;
-import main.tracker.requests.ConnectionRequest;
+import main.tracker.requests.ConnectRequest;
 import main.tracker.requests.ScrapeRequest;
 import main.tracker.response.AnnounceResponse;
-import main.tracker.response.ConnectionResponse;
+import main.tracker.response.ConnectResponse;
 import main.tracker.response.ScrapeResponse;
 
 import java.io.IOException;
@@ -37,7 +36,7 @@ public class App {
         String peerIp = "87.219.121.218";
         int peerPort = 53497;
 
-        PeerCommunicator.sendMessage(peerIp, peerPort, new HandShake(HexByteConverter.hexToByte(t1.getInfo_hash()), myPeerId.getBytes()));
+        //PeerCommunicator.sendMessage(peerIp, peerPort, new HandShake(HexByteConverter.hexToByte(t1.getInfo_hash()), myPeerId.getBytes()));
     }
 
 
@@ -50,19 +49,20 @@ public class App {
         System.out.println("----------------------------------");
 
         System.out.println("------connecting-------");
-        ConnectionRequest connectionRequest = new ConnectionRequest();
+        ConnectRequest connectRequest = new ConnectRequest(123456);
 
-        System.out.println(connectionRequest);
+        System.out.println(connectRequest);
 
-        ConnectionResponse connectionResponse = TrackerCommunicator.communicate(ip, port, connectionRequest);
-        System.out.println(connectionResponse);
+        ConnectResponse connectResponse = TrackerCommunicator.communicate(ip, port, connectRequest);
+        System.out.println(connectResponse);
 
         System.out.println("------announcing-------");
         // TODO: change 8091
         short tcpPortImListeningOn = 8091;
         int maxPeersIWantFromTracker = 1000;
-        AnnounceRequest announceRequest = new AnnounceRequest(connectionResponse.getConnectionId(), TorrentHashInfo,
-                myPeerId, 0, 0, 0, 2, 0, 0, maxPeersIWantFromTracker, tcpPortImListeningOn);
+        byte[] torrentHashInfoAsByteArray = HexByteConverter.hexToByte(TorrentHashInfo);
+        AnnounceRequest announceRequest = new AnnounceRequest(connectResponse.getConnectionId(), 123456, torrentHashInfoAsByteArray,
+                myPeerId.getBytes(), 0, 0, 0, 2, 0, 0, maxPeersIWantFromTracker, tcpPortImListeningOn);
 
         System.out.println(announceRequest);
         AnnounceResponse announceResponse = TrackerCommunicator.communicate(ip, port, announceRequest);
@@ -71,7 +71,7 @@ public class App {
         announceResponse.getPeers().forEach(System.out::println);
 
         System.out.println("------scraping-------");
-        ScrapeRequest scrapeRequest = new ScrapeRequest(connectionResponse.getConnectionId(), Collections.singletonList(TorrentHashInfo));
+        ScrapeRequest scrapeRequest = new ScrapeRequest(connectResponse.getConnectionId(), 123456, Collections.singletonList(torrentHashInfoAsByteArray));
         System.out.println(scrapeRequest);
 
         ScrapeResponse scrapeResponse = TrackerCommunicator.communicate(ip, port, scrapeRequest);

@@ -19,7 +19,7 @@ import static org.joou.Unsigned.ushort;
 public class AnnounceResponse {
 
 
-    private final int action = 1;
+    private final int action;
     private final int transactionId;
     private final int interval;
     private final int leechersAmount;
@@ -39,8 +39,8 @@ public class AnnounceResponse {
      */
     public AnnounceResponse(byte[] receiveData, int maxPeers) {
         ByteBuffer receiveData_analyze = ByteBuffer.wrap(receiveData);
-        int action = receiveData_analyze.getInt();
-        assert this.action == action;
+        this.action = receiveData_analyze.getInt();
+        assert this.action == 1;
         this.transactionId = receiveData_analyze.getInt();
         this.interval = receiveData_analyze.getInt();
         this.leechersAmount = receiveData_analyze.getInt();
