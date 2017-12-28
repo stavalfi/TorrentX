@@ -2,7 +2,7 @@ package main.tracker.requests;
 
 import lombok.Getter;
 import lombok.ToString;
-import main.TorrentInfoHashConverter;
+import main.HexByteConverter;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -37,7 +37,7 @@ public class ScrapeRequest implements PacketRequest
         sendData.putInt(this.action); // action we want to perform - scrape the server (32 bits)
         sendData.putInt(this.transactionId); // transaction_id - random int we make (32 bits)
         // each torrentInfoHash byte array is 20 bytes.
-        this.torrentInfoHashs.forEach((String torrentInfoHash)->sendData.put(TorrentInfoHashConverter.torrentInfoHashToBytes(torrentInfoHash)));
+        this.torrentInfoHashs.forEach((String torrentInfoHash)->sendData.put(HexByteConverter.hexToByte(torrentInfoHash)));
 
         return sendData.array();
     }

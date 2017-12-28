@@ -6,13 +6,15 @@ import lombok.ToString;
 import org.joou.UShort;
 
 import static org.joou.Unsigned.ushort;
+
 import java.net.InetAddress;
 
 @AllArgsConstructor
 @Getter
 @ToString
-public class Peer
-{
+public class Peer {
     private final InetAddress ipAddress;
     private final UShort tcpPort;
+
+
 }

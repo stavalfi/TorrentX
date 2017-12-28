@@ -10,6 +10,16 @@
     <name>torrentx</name>
     <url>http://maven.apache.org</url>
 
+    <repositories>
+        <repository>
+            <id>4thline-repo</id>
+            <url>http://4thline.org/m2</url>
+            <snapshots>
+                <enabled>false</enabled> <!-- Or true, if you like to use unreleased code -->
+            </snapshots>
+        </repository>
+    </repositories>
+
     <build>
         <plugins>
             <!--unable asserts when running test lifecycle.-->
@@ -79,6 +89,11 @@
             <groupId>org.jooq</groupId>
             <artifactId>joou-java-6</artifactId>
             <version>0.9.3</version>
+        </dependency>
+        <dependency>
+            <groupId>org.fourthline.cling</groupId>
+            <artifactId>cling-core</artifactId>
+            <version>2.1.1</version>
         </dependency>
     </dependencies>
 </project>
