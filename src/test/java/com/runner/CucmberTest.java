@@ -12,7 +12,7 @@ import org.junit.runner.RunWith;
                 "pretty"
         },
         glue = "com.steps",
-        features = "classpath:cucumber/calculator.feature"
+        features = "classpath:cucumber/"
 )
 public class CucmberTest {
 }

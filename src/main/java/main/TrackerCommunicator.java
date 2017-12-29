@@ -1,10 +1,10 @@
 package main;
 
 import main.tracker.requests.AnnounceRequest;
-import main.tracker.requests.ConnectionRequest;
+import main.tracker.requests.ConnectRequest;
 import main.tracker.requests.ScrapeRequest;
 import main.tracker.response.AnnounceResponse;
-import main.tracker.response.ConnectionResponse;
+import main.tracker.response.ConnectResponse;
 import main.tracker.response.ScrapeResponse;
 
 import java.io.IOException;
@@ -18,29 +18,19 @@ import java.net.InetAddress;
  */
 public class TrackerCommunicator {
 
-    public static ConnectionResponse communicate(String trackerIp, int trackerUdpPort,
-                                                 ConnectionRequest connectionRequest) throws IOException {
-        byte[] response = new byte[ConnectionResponse.packetResponseSize()];
+    public static ConnectResponse communicate(String trackerIp, int trackerUdpPort,
+                                              ConnectRequest connectRequest) throws IOException {
+        byte[] response = new byte[ConnectResponse.packetResponseSize()];
 
-        communicate(trackerIp, trackerUdpPort, connectionRequest.buildRequestPacket(), response);
+        communicate(trackerIp, trackerUdpPort, connectRequest.buildRequestPacket(), response);
 
-        return new ConnectionResponse(response);
+        return new ConnectResponse(response);
     }
 
-    private static void communicate(String ip, int port, byte[] sendData, byte[] receiveData) throws IOException {
-        DatagramSocket clientSocket = new DatagramSocket();
-        InetAddress IPAddress = InetAddress.getByName(ip);
-        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
-        clientSocket.send(sendPacket);
-        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-        clientSocket.receive(receivePacket);
-        clientSocket.close();
-    }
     public static AnnounceResponse communicate(String trackerIp, int trackerUdpPort, AnnounceRequest announceRequest) throws IOException {
         byte[] response = new byte[AnnounceResponse.packetResponseSize()];
 
         communicate(trackerIp, trackerUdpPort, announceRequest.buildRequestPacket(), response);
-
         // NumWant == how much peers's ip&port we asked for.
         return new AnnounceResponse(response, announceRequest.getNumWant());
     }
@@ -51,5 +41,15 @@ public class TrackerCommunicator {
         communicate(trackerIp, trackerUdpPort, scrapeRequest.buildRequestPacket(), response);
 
         return new ScrapeResponse(response, scrapeRequest.getTorrentInfoHashs());
+    }
+
+    private static void communicate(String ip, int port, byte[] sendData, byte[] receiveData) throws IOException {
+        DatagramSocket clientSocket = new DatagramSocket();
+        InetAddress IPAddress = InetAddress.getByName(ip);
+        DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
+        clientSocket.send(sendPacket);
+        DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+        clientSocket.receive(receivePacket);
+        clientSocket.close();
     }
 }

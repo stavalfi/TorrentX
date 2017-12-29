@@ -8,8 +8,8 @@ import java.nio.ByteBuffer;
 
 @Getter
 @ToString
-public class ConnectionResponse {
-    private final int action = 0;
+public class ConnectResponse {
+    private final int action;
     private final int transactionId;
     private final long ConnectionId;
 
@@ -23,10 +23,10 @@ public class ConnectionResponse {
      * 8       64-bit integer  connection_id
      * 16
      */
-    public ConnectionResponse(byte[] receiveData) {
+    public ConnectResponse(byte[] receiveData) {
         ByteBuffer receiveData_analyze = ByteBuffer.wrap(receiveData);
-        int action = receiveData_analyze.getInt();
-        assert this.action == action;
+        this.action = receiveData_analyze.getInt();
+        assert this.action == 0;
         this.transactionId = receiveData_analyze.getInt();
         this.ConnectionId = receiveData_analyze.getLong();
     }

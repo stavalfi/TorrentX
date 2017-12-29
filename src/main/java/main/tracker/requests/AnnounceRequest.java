@@ -11,10 +11,10 @@ import java.nio.ByteBuffer;
 public class AnnounceRequest implements PacketRequest {
 
     private final long connectionId;
-    private final int action=1;
-    private final int transactionId=123456;
-    private final String torrentInfoHash;
-    private final String peerId;
+    private final int action = 1;
+    private final int transactionId;
+    private final byte[] torrentInfoHash;
+    private final byte[] peerId;
     private final long downloaded;
     private final long left;
     private final long uploaded;
@@ -25,23 +25,34 @@ public class AnnounceRequest implements PacketRequest {
     private final short tcpPort;
 
 
-    public AnnounceRequest(long connectionId,String torrentInfoHash,final String peerId,final long downloaded
-            ,long left,long uploaded,int event,int ipAddress,int key,int numWant,short tcpPort)
-    {
-        this.connectionId=connectionId;
-        this.torrentInfoHash=torrentInfoHash;
-        this.peerId=peerId;
-        this.downloaded=downloaded;
-        this.left=left;
-        this.uploaded=uploaded;
-        this.event=event;
-        this.ipAddress=ipAddress;
-        this.key=key;
-        this.numWant=numWant;
+    public AnnounceRequest(long connectionId,
+                           int transactionId,
+                           byte[] torrentInfoHash,
+                           byte[] peerId,
+                           long downloaded,
+                           long left,
+                           long uploaded,
+                           int event,
+                           int ipAddress,
+                           int key,
+                           int numWant,
+                           short tcpPort) {
+        this.connectionId = connectionId;
+        this.transactionId = transactionId;
+        this.torrentInfoHash = torrentInfoHash;
+        this.peerId = peerId;
+        this.downloaded = downloaded;
+        this.left = left;
+        this.uploaded = uploaded;
+        this.event = event;
+        this.ipAddress = ipAddress;
+        this.key = key;
+        this.numWant = numWant;
         this.tcpPort = tcpPort;
     }
 
-    /** offset == bytes not bits!!!!!!
+    /**
+     * offset == bytes not bits!!!!!!
      * Offset  Size    Name    Value
      * 0       64-bit integer  connection_id    same connection_id // the connectionId we received from the server after we successfully connected
      * 8       32-bit integer  action          1                   // announce
@@ -64,8 +75,8 @@ public class AnnounceRequest implements PacketRequest {
         sendData.putLong(this.connectionId); // connection_id
         sendData.putInt(this.action); // action we want to perform - announce
         sendData.putInt(this.transactionId); // transaction_id - random int we make (32 bits)
-        sendData.put(HexByteConverter.hexToByte(this.torrentInfoHash)); //info_hash (20 bits)
-        sendData.put(new byte[20]); // peer_id (20 bits)
+        sendData.put(this.torrentInfoHash); //info_hash (20 bits)
+        sendData.put(this.peerId); // peer_id (20 bits)
         sendData.putLong(this.downloaded); // downloaded (64 bits)
         sendData.putLong(this.left); // left (64 bits)
         sendData.putLong(this.uploaded); // uploaded (64 bits)

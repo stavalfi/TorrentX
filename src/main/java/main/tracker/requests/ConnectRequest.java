@@ -7,13 +7,18 @@ import java.nio.ByteBuffer;
 
 @Getter
 @ToString
-public class ConnectionRequest implements PacketRequest {
+public class ConnectRequest implements PacketRequest {
 
     private final long connectionId = 0x41727101980L;
-    private final int action=0;
-    private final int transactionId=123456;
+    private final int action = 0;
+    private final int transactionId;
 
-    /** offset == bytes not bits!!!!!!
+    public ConnectRequest(int transactionId) {
+        this.transactionId = transactionId;
+    }
+
+    /**
+     * offset == bytes not bits!!!!!!
      * Offset  Size            Name            Value
      * 0       64-bit integer  connection_id   0x41727101980
      * 8       32-bit integer  action          0 // connect
