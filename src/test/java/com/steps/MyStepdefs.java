@@ -150,7 +150,7 @@ public class MyStepdefs {
         try {
             this.handShakeResponse = PeerCommunicator.sendMessage(
                     peer.getIpAddress(),
-                    peer.getTcpPort(),
+                    peer.getTcpPort().intValue(),
                     this.handShakeRequest);
             return true;
         } catch (IOException e) {

@@ -1,39 +1,25 @@
 package main.peer;
 
-import org.joou.UByte;
-import org.joou.UInteger;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 import java.nio.ByteBuffer;
 
-
+@Getter
+@AllArgsConstructor
 public abstract class Message {
 
-    private int length; // 4 bytes - the length in bytes of byte-size(massageId) + byte-size(payload)
-    private byte massageId; // 1 byte
-    private ByteBuffer payload; // length - 1 bytes
+    private final int length; // 4 bytes - the length in bytes of byte-size(messageId) + byte-size(payload)
+    private final byte messageId; // 1 byte
+    private final byte[] payload;
 
-    public Message(int length, byte massageId, ByteBuffer payload) {
-        this.length = length;
-        this.massageId = massageId;
-        this.payload = ByteBuffer.allocate(length - 1);
-    }
+    public byte[] createPacketFromObject() {
+        ByteBuffer buffer = ByteBuffer.allocate(4 + this.length);
 
-    public Message(int length, byte massageId, byte[] payload) {
-        this.length = length;
-        this.massageId = massageId;
-        this.payload = ByteBuffer.wrap(payload);
-        assert payload.length == length - 1;
-    }
+        buffer.putInt(this.length);
+        buffer.put(this.messageId);
+        buffer.put(this.payload);
 
-    public int getLength() {
-        return length;
-    }
-
-    public byte getMassageId() {
-        return massageId;
-    }
-
-    public ByteBuffer getPayload() {
-        return payload;
+        return buffer.array();
     }
 }

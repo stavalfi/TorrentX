@@ -11,6 +11,6 @@ public class CancelMessage extends Message {
     public CancelMessage(int index, int begin, int length) {
         super(length, messageId, ByteBuffer.allocate(12).putInt(index)
                                                         .putInt(begin)
-                                                        .putInt(length));
+                                                        .putInt(length).array());
     }
 }

@@ -15,6 +15,6 @@ public class PieceMessage extends Message {
         super(9 + block.length, messageId, ByteBuffer.allocate(4 + 4 + block.length)
                                                             .putInt(index)
                                                             .putInt(begin)
-                                                            .put(block));
+                                                            .put(block).array());
     }
 }
