@@ -1,6 +1,6 @@
 Feature: test peer-2-peer messages.
 
-  Scenario Outline: we send handshake message must receive handshake back.
+  Scenario Outline: we send handshake message and must receive handshake back.
     Given new torrent file: "<torrentFilePath>".
     When application read trackers for this torrent.
     Then choose one tracker.

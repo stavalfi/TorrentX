@@ -1,5 +1,6 @@
 package main;
 
+import lombok.SneakyThrows;
 import main.tracker.requests.AnnounceRequest;
 import main.tracker.requests.ConnectRequest;
 import main.tracker.requests.ScrapeRequest;
@@ -21,8 +22,9 @@ import java.net.InetAddress;
 public class TrackerCommunicator {
     private static Logger logger = LoggerFactory.getLogger(TrackerCommunicator.class);
 
+    @SneakyThrows
     public static ConnectResponse communicate(String trackerIp, int trackerUdpPort,
-                                              ConnectRequest connectRequest) throws IOException {
+                                              ConnectRequest connectRequest) {
         logger.info("sending connect request to tracker: " + trackerIp + ":" + trackerUdpPort);
 
         byte[] response = new byte[ConnectResponse.packetResponseSize()];
@@ -34,7 +36,8 @@ public class TrackerCommunicator {
         return connectResponse;
     }
 
-    public static AnnounceResponse communicate(String trackerIp, int trackerUdpPort, AnnounceRequest announceRequest) throws IOException {
+    @SneakyThrows
+    public static AnnounceResponse communicate(String trackerIp, int trackerUdpPort, AnnounceRequest announceRequest) {
         logger.info("sending announce request to tracker: " + trackerIp + ":" + trackerUdpPort);
 
         byte[] response = new byte[AnnounceResponse.packetResponseSize()];
