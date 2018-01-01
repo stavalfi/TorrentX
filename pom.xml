@@ -96,10 +96,11 @@
             <version>2.1.1</version>
         </dependency>
         <!--<dependency>-->
-            <!--<groupId>com.papertrailapp</groupId>-->
-            <!--<artifactId>logback-syslog4j</artifactId>-->
-            <!--<version>1.0.0</version>-->
+        <!--<groupId>com.papertrailapp</groupId>-->
+        <!--<artifactId>logback-syslog4j</artifactId>-->
+        <!--<version>1.0.0</version>-->
         <!--</dependency>-->
+        <!--logs-->
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
@@ -110,5 +111,25 @@
             <artifactId>logback-access</artifactId>
             <version>1.2.3</version>
         </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.projectreactor</groupId>
+                <artifactId>reactor-bom</artifactId>
+                <version>Bismuth-RELEASE</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 </project>
