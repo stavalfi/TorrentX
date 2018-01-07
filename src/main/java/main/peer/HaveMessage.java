@@ -12,6 +12,6 @@ public class HaveMessage extends Message {
      * @param pieceIndex
      */
     public HaveMessage(int pieceIndex) {
-        super(length, messageId, ByteBuffer.allocate(4).putInt(pieceIndex));
+        super(length, messageId, ByteBuffer.allocate(4).putInt(pieceIndex).array());
     }
 }

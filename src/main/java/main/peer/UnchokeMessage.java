@@ -9,6 +9,6 @@ public class UnchokeMessage extends Message {
      * The unchoke message is fixed-length and has no payload.
      */
     public UnchokeMessage() {
-        super(length,messageId,ByteBuffer.allocate(0));
+        super(length,messageId,ByteBuffer.allocate(0).array());
     }
 }

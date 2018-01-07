@@ -20,6 +20,6 @@ public class RequestMessage extends Message {
         super(length, messageId,ByteBuffer.allocate(12)
                 .putInt(index)
                 .putInt(begin)
-                .putInt(length));
+                .putInt(length).array());
     }
 }

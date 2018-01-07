@@ -1,28 +1,35 @@
 package main;
 
 import main.peer.HandShake;
+import main.peer.Message;
 import org.joou.UShort;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 
 public class PeerCommunicator {
 
-//    public static void sendMessage(String peerIp, int peerTCPPort, Message message) throws IOException {
-//        byte[] receiveData = new byte[1000];
-//
-//        communicate(peerIp, peerTCPPort, message., receiveData);
-//    }
+    private static Logger logger = LoggerFactory.getLogger(PeerCommunicator.class);
 
-    public static HandShake sendMessage(String peerIp, UShort peerTCPPort, HandShake handShake) throws IOException {
+    public static void sendMessage(String peerIp, int peerTCPPort, Message message) throws IOException {
+        byte[] receiveData = new byte[1000];
+
+        communicate(peerIp, peerTCPPort, message.createPacketFromObject(), receiveData);
+    }
+
+    public static HandShake sendMessage(String peerIp, int peerTCPPort, HandShake handShake) throws IOException {
+        logger.debug("sending handshake: " + handShake.toString());
         byte[] receiveData = new byte[1000];
         communicate(peerIp, peerTCPPort, HandShake.createPacketFromObject(handShake), receiveData);
         return HandShake.createObjectFromPacket(receiveData);
     }
 
-    private static void communicate(String peerIp, UShort peerPort, byte[] messageToSend, byte[] messageWeReceive) throws IOException {
+    private static void communicate(String peerIp, int peerTCPPort, byte[] messageToSend, byte[] messageWeReceive) throws IOException {
         // start communicating with the peer
-        Socket clientSocket = new Socket(peerIp, peerPort.intValue());
+        Socket clientSocket = new Socket(peerIp, peerTCPPort);
         DataOutputStream os = new DataOutputStream(clientSocket.getOutputStream());
 
         os.write(messageToSend);

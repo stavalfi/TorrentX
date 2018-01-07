@@ -9,6 +9,6 @@ public class NotInterestedMessage extends Message {
      * The not interested message is fixed-length and has no payload.
      */
     public NotInterestedMessage() {
-        super(length,messageId, ByteBuffer.allocate(0));
+        super(length,messageId, ByteBuffer.allocate(0).array());
     }
 }

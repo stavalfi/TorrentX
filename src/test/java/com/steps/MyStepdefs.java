@@ -19,6 +19,7 @@ import main.tracker.requests.ScrapeRequest;
 import main.tracker.response.AnnounceResponse;
 import main.tracker.response.ConnectResponse;
 import main.tracker.response.ScrapeResponse;
+import org.joou.UShort;
 import org.junit.Assert;
 
 import java.io.IOException;
@@ -27,13 +28,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static org.joou.Unsigned.ushort;
+
 public class MyStepdefs {
 
     private Torrent torrentFile;
     byte[] torrentInfoHashAsByteArray;
-    private Map<String, Short> trackersConnectionInfo;
+    private Map<String, UShort> trackersConnectionInfo;
 
-    private Map.Entry<String, Short> activeTracker;
+    private Map.Entry<String, UShort> activeTracker;
     private final byte[] peerIdAsByteArray = "-AZ5750-TpkXttZLfpSH".getBytes();
     private final short tcpPortApplicationListenOn = 8091;
 
@@ -64,7 +67,7 @@ public class MyStepdefs {
                 .stream()
                 .map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
                 .filter(Matcher::matches)
-                .collect(Collectors.toMap((Matcher matcher) -> matcher.group(1), (Matcher matcher) -> Short.parseShort(matcher.group(2))));
+                .collect(Collectors.toMap((Matcher matcher) -> matcher.group(1), (Matcher matcher) -> ushort(Short.parseShort(matcher.group(2)))));
     }
 
     @Then("^tracker response with same transaction id.$")
@@ -103,7 +106,7 @@ public class MyStepdefs {
         this.connectRequest = CreateTrackerRequests.getInstance().createConnectRequest();
 
         this.connectResponse = TrackerCommunicator.communicate(this.activeTracker.getKey(),
-                activeTracker.getValue(),
+                activeTracker.getValue().intValue(),
                 this.connectRequest);
     }
 
@@ -118,7 +121,7 @@ public class MyStepdefs {
                 this.tcpPortApplicationListenOn);
 
         this.announceResponse = TrackerCommunicator.communicate(this.activeTracker.getKey(),
-                activeTracker.getValue(),
+                activeTracker.getValue().intValue(),
                 this.announceRequest);
     }
 
@@ -132,7 +135,7 @@ public class MyStepdefs {
                 this.torrentInfoHashAsByteArray);
 
         this.scrapeResponse = TrackerCommunicator.communicate(this.activeTracker.getKey(),
-                activeTracker.getValue(),
+                activeTracker.getValue().intValue(),
                 this.scrapeRequest);
     }
 
@@ -150,10 +153,10 @@ public class MyStepdefs {
         try {
             this.handShakeResponse = PeerCommunicator.sendMessage(
                     peer.getIpAddress(),
-                    peer.getTcpPort(),
+                    peer.getTcpPort().intValue(),
                     this.handShakeRequest);
             return true;
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }

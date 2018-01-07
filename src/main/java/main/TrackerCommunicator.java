@@ -1,11 +1,14 @@
 package main;
 
+import lombok.SneakyThrows;
 import main.tracker.requests.AnnounceRequest;
 import main.tracker.requests.ConnectRequest;
 import main.tracker.requests.ScrapeRequest;
 import main.tracker.response.AnnounceResponse;
 import main.tracker.response.ConnectResponse;
 import main.tracker.response.ScrapeResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -17,30 +20,44 @@ import java.net.InetAddress;
  * http://www.rasterbar.com/products/libtorrent/udp_tracker_protocol.html
  */
 public class TrackerCommunicator {
+    private static Logger logger = LoggerFactory.getLogger(TrackerCommunicator.class);
 
+    @SneakyThrows
     public static ConnectResponse communicate(String trackerIp, int trackerUdpPort,
-                                              ConnectRequest connectRequest) throws IOException {
+                                              ConnectRequest connectRequest) {
+        logger.info("sending connect request to tracker: " + trackerIp + ":" + trackerUdpPort);
+
         byte[] response = new byte[ConnectResponse.packetResponseSize()];
 
         communicate(trackerIp, trackerUdpPort, connectRequest.buildRequestPacket(), response);
+        ConnectResponse connectResponse = new ConnectResponse(response);
 
-        return new ConnectResponse(response);
+        logger.info("receive connect response from tracker: " + trackerIp + ":" + trackerUdpPort);
+        return connectResponse;
     }
 
-    public static AnnounceResponse communicate(String trackerIp, int trackerUdpPort, AnnounceRequest announceRequest) throws IOException {
-        byte[] response = new byte[AnnounceResponse.packetResponseSize()];
+    @SneakyThrows
+    public static AnnounceResponse communicate(String trackerIp, int trackerUdpPort, AnnounceRequest announceRequest) {
+        logger.info("sending announce request to tracker: " + trackerIp + ":" + trackerUdpPort);
 
+        byte[] response = new byte[AnnounceResponse.packetResponseSize()];
         communicate(trackerIp, trackerUdpPort, announceRequest.buildRequestPacket(), response);
         // NumWant == how much peers's ip&port we asked for.
-        return new AnnounceResponse(response, announceRequest.getNumWant());
+        AnnounceResponse announceResponse = new AnnounceResponse(response, announceRequest.getNumWant());
+
+        logger.info("receive announce response from tracker: " + trackerIp + ":" + trackerUdpPort);
+        return announceResponse;
     }
 
     public static ScrapeResponse communicate(String trackerIp, int trackerUdpPort, ScrapeRequest scrapeRequest) throws IOException {
+        logger.info("sending scrape request to tracker: " + trackerIp + ":" + trackerUdpPort);
         byte[] response = new byte[ScrapeResponse.packetResponseSize()];
 
         communicate(trackerIp, trackerUdpPort, scrapeRequest.buildRequestPacket(), response);
 
-        return new ScrapeResponse(response, scrapeRequest.getTorrentInfoHashs());
+        ScrapeResponse scrapeResponse = new ScrapeResponse(response, scrapeRequest.getTorrentInfoHashs());
+        logger.info("receive scrape response from tracker: " + trackerIp + ":" + trackerUdpPort);
+        return scrapeResponse;
     }
 
     private static void communicate(String ip, int port, byte[] sendData, byte[] receiveData) throws IOException {

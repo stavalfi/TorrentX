@@ -9,6 +9,6 @@ public class ChokeMessage extends Message {
      * The choke message is fixed-length and has no payload.
      */
     public ChokeMessage() {
-        super(length,messageId,ByteBuffer.allocate(0));
+        super(length,messageId,ByteBuffer.allocate(0).array());
     }
 }

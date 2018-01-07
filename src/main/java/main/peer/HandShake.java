@@ -23,6 +23,13 @@ public class HandShake {
     private final byte[] torrentInfoHash;// 20 bytes
     private final byte[] peerId; // 20 bytes
 
+
+    @Override
+    public String toString() {
+        return "Handshake - torrentInfoHash: " + HexByteConverter.byteToHex(this.torrentInfoHash)
+                + " peerId: " + new String(this.peerId).toString();
+    }
+
     public HandShake(byte[] torrentInfoHash, byte[] peerId) {
         int reservedBytesAmount = 8;
         String protocolVersion = "BitTorrent protocol";
@@ -40,13 +47,6 @@ public class HandShake {
         this.peerId = peerId;
         assert reserved.length == reservedBytesAmount;
     }
-
-    @Override
-    public String toString() {
-        String peerId = new String(this.peerId);
-        return "torrentInfoHash: " + HexByteConverter.byteToHex(this.torrentInfoHash) + " , peerId: " + peerId;
-    }
-
 
     /**
      * cast HandShake object to HandShake packet in bytes.
