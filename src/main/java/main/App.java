@@ -1,15 +1,18 @@
 package main;
 
-import lombok.SneakyThrows;
+import com.sun.xml.internal.txw2.IllegalAnnotationException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.SynchronousSink;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
+import sun.misc.GC;
 
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.net.Socket;
+import java.security.InvalidParameterException;
+import java.time.Duration;
+import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 public class App {
@@ -21,23 +24,16 @@ public class App {
     }
 
     public static void f1() throws Exception {
-
-        Flux.create(App::accept).subscribe(System.out::print);
-        System.out.println("done");
+        System.out.println(UUID.randomUUID().toString());
+        Flux.create((FluxSink<Integer> fluxSink) -> {
+            fluxSink.error(new InvalidParameterException());
+        })
+                .map(x -> x + 1)
+                .onErrorMap(InvalidParameterException.class, (Throwable e) -> new InvalidParameterException())
+                .subscribe(System.out::println, System.out::println, System.out::println);
+        Thread.sleep(5 * 1000);
     }
 
-
-    private static void accept(FluxSink<Integer> sync) {
-        // start communicating with the peer
-        Socket clientSocket = new Socket(peerIp, peerTCPPort);
-        DataOutputStream os = new DataOutputStream(clientSocket.getOutputStream());
-
-        os.write(messageToSend);
-
-        // receive data in tcp
-        clientSocket.getInputStream().read(messageWeReceive);
-        clientSocket.close();
-    }
 }
 
 

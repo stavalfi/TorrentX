@@ -8,7 +8,7 @@ import java.nio.ByteBuffer;
 
 @Getter
 @ToString
-public class AnnounceRequest implements PacketRequest {
+public class AnnounceRequest extends TrackerRequest {
 
     private final long connectionId;
     private final int action = 1;
@@ -25,18 +25,8 @@ public class AnnounceRequest implements PacketRequest {
     private final short tcpPort;
 
 
-    public AnnounceRequest(long connectionId,
-                           int transactionId,
-                           byte[] torrentInfoHash,
-                           byte[] peerId,
-                           long downloaded,
-                           long left,
-                           long uploaded,
-                           int event,
-                           int ipAddress,
-                           int key,
-                           int numWant,
-                           short tcpPort) {
+    public AnnounceRequest(String ip, int port, long connectionId, int transactionId, byte[] torrentInfoHash, byte[] peerId, long downloaded, long left, long uploaded, int event, int ipAddress, int key, int numWant, short tcpPort) {
+        super(ip, port);
         this.connectionId = connectionId;
         this.transactionId = transactionId;
         this.torrentInfoHash = torrentInfoHash;
@@ -69,6 +59,7 @@ public class AnnounceRequest implements PacketRequest {
      * 96      16-bit integer  tcpPort       ???? // The tcpPort you're listening on.
      * 98
      */
+    @Override
     public byte[] buildRequestPacket() {
 
         ByteBuffer sendData = ByteBuffer.allocate(98); // we need 98 bits at list

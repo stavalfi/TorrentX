@@ -1,5 +1,6 @@
 package main.tracker.requests;
 
+import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
 
@@ -7,13 +8,15 @@ import java.nio.ByteBuffer;
 
 @Getter
 @ToString
-public class ConnectRequest implements PacketRequest {
+public class ConnectRequest extends TrackerRequest {
 
     private final long connectionId = 0x41727101980L;
     private final int action = 0;
     private final int transactionId;
 
-    public ConnectRequest(int transactionId) {
+
+    public ConnectRequest(String ip, int port, int transactionId) {
+        super(ip, port);
         this.transactionId = transactionId;
     }
 
@@ -25,6 +28,7 @@ public class ConnectRequest implements PacketRequest {
      * 12      32-bit integer  transaction_id  random (we decide)
      * 16
      */
+    @Override
     public byte[] buildRequestPacket() {
 
         ByteBuffer sendData = ByteBuffer.allocate(128);
