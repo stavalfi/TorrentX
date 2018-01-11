@@ -33,7 +33,7 @@ public class AnnounceResponse extends TrackerResponse {
 
     /**
      * Offset      Size            Name            Value
-     * 0           32-bit integer  action          1 // announce
+     * 0           32-bit integer  action          1 // scrape
      * 4           32-bit integer  transaction_id
      * 8           32-bit integer  interval
      * 12          32-bit integer  leechersAmount

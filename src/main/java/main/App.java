@@ -14,8 +14,8 @@ import java.util.Arrays;
 public class App {
     public static void main(String[] args) throws Exception {
         String TorrentFilePath = "src/main/resources/torrent-file-example.torrent";
-        // TorrentFilePrinter.printTorrentFileInfo(TorrentFilePath);
-        f1();
+        TorrentFilePrinter.printAllPeers(TorrentFilePath);
+        //f1();
     }
 
 
@@ -33,7 +33,7 @@ public class App {
                 .flatMap((ConnectResponse response) -> AnnounceToTracker.announce(response, torrentId))
                 .doOnNext(System.out::println)
                 .flatMap((AnnounceResponse response) -> connectResponseHot)
-                .flatMap((ConnectResponse response) -> ScrapeToTracker.announce(response, Arrays.asList(torrentId)))
+                .flatMap((ConnectResponse response) -> ScrapeToTracker.scrape(response, Arrays.asList(torrentId)))
                 .flatMapMany(ScrapeResponse::getScrapeResponseForTorrentInfoHashs)
                 .subscribe(System.out::println, System.out::println, System.out::println);
     }
@@ -41,12 +41,12 @@ public class App {
 
 
 //    torrent hash: af1f3dbc5d5baeaf83f812e06aa91bbd7b55cce8
-//    udp://tracker.coppersurfer.tk:6969/announce
-//    udp://9.rarbg.com:2710/announce
+//    udp://tracker.coppersurfer.tk:6969/scrape
+//    udp://9.rarbg.com:2710/scrape
 //    udp://p4p.arenabg.com:1337
 //    udp://tracker.leechers-paradise.org:6969
 //    udp://tracker.internetwarriors.net:1337
-//    udp://tracker.opentrackr.org:1337/announce
+//    udp://tracker.opentrackr.org:1337/scrape
 
 //    Peer(ipAddress=35.160.55.32, tcpPort=8104)
 //    Peer(ipAddress=52.59.116.245, tcpPort=8114)

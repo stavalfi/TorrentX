@@ -55,7 +55,7 @@ public class AnnounceRequest extends TrackerRequest {
      * offset == bytes not bits!!!!!!
      * Offset  Size    Name    Value
      * 0       64-bit integer  connection_id    same connection_id // the connectionId we received from the server after we successfully connected
-     * 8       32-bit integer  action          1                   // announce
+     * 8       32-bit integer  action          1                   // scrape
      * 12      32-bit integer  transaction_id                      // we randomly decide
      * 16      20-byte string  info_hash  torrent_info_hash // the hash of the torrent we want to scrape on
      * 36      20-byte string  peer_id  my-peer-id-!??!!?! how do I get it omg?
@@ -74,7 +74,7 @@ public class AnnounceRequest extends TrackerRequest {
 
         ByteBuffer sendData = ByteBuffer.allocate(98); // we need 98 bits at list
         sendData.putLong(this.connectionId); // connection_id
-        sendData.putInt(this.action); // action we want to perform - announce
+        sendData.putInt(this.action); // action we want to perform - scrape
         sendData.putInt(this.transactionId); // transaction_id - random int we make (32 bits)
         sendData.put(this.torrentInfoHash); //info_hash (20 bits)
         sendData.put(this.peerId); // peer_id (20 bits)

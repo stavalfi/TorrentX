@@ -12,7 +12,7 @@ import java.util.function.Function;
 
 public class AnnounceToTracker {
     static short portWeListenForPeersRequests = 8181;
-    static byte[] peerId = "01234567890123456789".getBytes();
+    static byte[] peerId = "-AZ5750-TpkXttZLfpSH".getBytes();
 
     public static Mono<AnnounceResponse> announce(ConnectResponse connectResponse, String torrentHash) {
 

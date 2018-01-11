@@ -15,7 +15,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class ScrapeToTracker {
-    public static Mono<ScrapeResponse> announce(ConnectResponse connectResponse, List<String> torrentHash) {
+    public static Mono<ScrapeResponse> scrape(ConnectResponse connectResponse, List<String> torrentHash) {
 
         List<byte[]> torrentsHashes = torrentHash.stream()
                 .map(HexByteConverter::hexToByte)
