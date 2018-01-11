@@ -3,7 +3,7 @@ package main.tracker.response;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.ToString;
-import main.tracker.ScrapeMessage;
+import reactor.core.publisher.Flux;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 
 @Getter
 @ToString
-public class ScrapeResponse extends TrackerResponse<ScrapeMessage> {
+public class ScrapeResponse extends TrackerResponse {
 
     @Getter
     @ToString
@@ -31,6 +31,10 @@ public class ScrapeResponse extends TrackerResponse<ScrapeMessage> {
     private final int transactionId;
     private final List<ScrapeResponseForTorrentInfoHash> ScrapeResponseForTorrentInfoHashs;
 
+    public Flux<ScrapeResponseForTorrentInfoHash> getScrapeResponseForTorrentInfoHashs() {
+        return Flux.fromStream(this.ScrapeResponseForTorrentInfoHashs.stream());
+    }
+
     /**
      * Offset      Size            Name            Value
      * 0           32-bit integer  action          2 // scrape
@@ -45,15 +49,15 @@ public class ScrapeResponse extends TrackerResponse<ScrapeMessage> {
      *                         The order is importent and I assume that the answer
      *                         will be with the same order as this list.
      */
-    public ScrapeResponse(byte[] receiveData, List<byte[]> torrentInfoHashs) {
-        ByteBuffer receiveData_analyze = ByteBuffer.wrap(receiveData);
-        this.action = receiveData_analyze.getInt();
+    public ScrapeResponse(String ip, int port, ByteBuffer receiveData, List<byte[]> torrentInfoHashs) {
+        super(ip, port);
+        this.action = receiveData.getInt();
         assert this.action == 2;
-        this.transactionId = receiveData_analyze.getInt();
+        this.transactionId = receiveData.getInt();
 
         this.ScrapeResponseForTorrentInfoHashs = torrentInfoHashs.stream()
                 .map((byte[] torrentInfoHash) -> new ScrapeResponseForTorrentInfoHash
-                        (torrentInfoHash, receiveData_analyze.getInt(), receiveData_analyze.getInt(), receiveData_analyze.getInt()))
+                        (torrentInfoHash, receiveData.getInt(), receiveData.getInt(), receiveData.getInt()))
                 .collect(Collectors.toList());
     }
 

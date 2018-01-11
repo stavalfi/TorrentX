@@ -2,14 +2,12 @@ package main.tracker.requests;
 
 import lombok.Getter;
 import lombok.ToString;
-import main.HexByteConverter;
-import main.tracker.AnnounceMessage;
 
 import java.nio.ByteBuffer;
 
 @Getter
 @ToString
-public class AnnounceRequest extends TrackerRequest<AnnounceMessage> {
+public class AnnounceRequest extends TrackerRequest {
 
     private final long connectionId;
     private final int action = 1;
@@ -25,8 +23,19 @@ public class AnnounceRequest extends TrackerRequest<AnnounceMessage> {
     private final int numWant;
     private final short tcpPort;
 
+    public AnnounceRequest(String ip, int port, long connectionId,
+                           byte[] torrentInfoHash, byte[] peerId, short tcpPort) {
+        this(ip, port, connectionId, 123456,
+                torrentInfoHash, peerId, 0, 0,
+                0, 0, 0, 0,
+                1000, tcpPort);
+    }
 
-    public AnnounceRequest(String ip, int port, long connectionId, int transactionId, byte[] torrentInfoHash, byte[] peerId, long downloaded, long left, long uploaded, int event, int ipAddress, int key, int numWant, short tcpPort) {
+
+    public AnnounceRequest(String ip, int port, long connectionId, int transactionId,
+                           byte[] torrentInfoHash, byte[] peerId, long downloaded,
+                           long left, long uploaded, int event, int ipAddress,
+                           int key, int numWant, short tcpPort) {
         super(ip, port);
         this.connectionId = connectionId;
         this.transactionId = transactionId;
@@ -61,7 +70,7 @@ public class AnnounceRequest extends TrackerRequest<AnnounceMessage> {
      * 98
      */
     @Override
-    public byte[] buildRequestPacket() {
+    public ByteBuffer buildRequestPacket() {
 
         ByteBuffer sendData = ByteBuffer.allocate(98); // we need 98 bits at list
         sendData.putLong(this.connectionId); // connection_id
@@ -78,6 +87,6 @@ public class AnnounceRequest extends TrackerRequest<AnnounceMessage> {
         sendData.putInt(this.numWant); // num_want = The maximum number of peers you want in the reply. Use -1 for default.
         sendData.putShort(this.tcpPort); // tcpPort (16 bits)
 
-        return sendData.array();
+        return sendData;
     }
 }

@@ -1,42 +1,52 @@
 package main;
 
-import com.sun.xml.internal.txw2.IllegalAnnotationException;
-import main.tracker.requests.ConnectRequest;
+import main.tracker.AnnounceToTracker;
+import main.tracker.ConnectToTracker;
+import main.tracker.ScrapeToTracker;
+import main.tracker.response.AnnounceResponse;
 import main.tracker.response.ConnectResponse;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
-import reactor.core.scheduler.Scheduler;
-import reactor.core.scheduler.Schedulers;
-import sun.misc.GC;
+import main.tracker.response.ScrapeResponse;
+import reactor.core.publisher.Mono;
 
-import java.nio.ByteBuffer;
-import java.security.InvalidParameterException;
-import java.time.Duration;
-import java.util.Objects;
-import java.util.UUID;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.stream.Stream;
+import java.util.Arrays;
+
 
 public class App {
     public static void main(String[] args) throws Exception {
         String TorrentFilePath = "src/main/resources/torrent-file-example.torrent";
-        TorrentFilePrinter.printTorrentFileInfo(TorrentFilePath);
-//        TorrentFilePrinter.printAllPeers(TorrentFilePath);
+        // TorrentFilePrinter.printTorrentFileInfo(TorrentFilePath);
         f1();
     }
 
+
     public static void f1() throws Exception {
-//        TrackerX.request(new ConnectRequest("!", 12, 12),
-//                (ByteBuffer response) -> new ConnectResponse(response.array()))
-//                .subscribe(System.out::println, System.out::println, System.out::println);
 
+        String torrentId = "af1f3dbc5d5baeaf83f812e06aa91bbd7b55cce8";
+        String trackerIp = "tracker.coppersurfer.tk";
+        short port = 6969;
 
+        Mono<ConnectResponse> connectResponseHot = ConnectToTracker.connect(trackerIp, port)
+                .cache();
+
+        connectResponseHot
+                .doOnNext(System.out::println)
+                .flatMap((ConnectResponse response) -> AnnounceToTracker.announce(response, torrentId))
+                .doOnNext(System.out::println)
+                .flatMap((AnnounceResponse response) -> connectResponseHot)
+                .flatMap((ConnectResponse response) -> ScrapeToTracker.announce(response, Arrays.asList(torrentId)))
+                .flatMapMany(ScrapeResponse::getScrapeResponseForTorrentInfoHashs)
+                .subscribe(System.out::println, System.out::println, System.out::println);
     }
-
 }
 
+
+//    torrent hash: af1f3dbc5d5baeaf83f812e06aa91bbd7b55cce8
+//    udp://tracker.coppersurfer.tk:6969/announce
+//    udp://9.rarbg.com:2710/announce
+//    udp://p4p.arenabg.com:1337
+//    udp://tracker.leechers-paradise.org:6969
+//    udp://tracker.internetwarriors.net:1337
+//    udp://tracker.opentrackr.org:1337/announce
 
 //    Peer(ipAddress=35.160.55.32, tcpPort=8104)
 //    Peer(ipAddress=52.59.116.245, tcpPort=8114)

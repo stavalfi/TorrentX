@@ -2,15 +2,13 @@ package main.tracker.requests;
 
 import lombok.Getter;
 import lombok.ToString;
-import main.HexByteConverter;
-import main.tracker.ScrapeMessage;
 
 import java.nio.ByteBuffer;
 import java.util.List;
 
 @Getter
 @ToString
-public class ScrapeRequest extends TrackerRequest<ScrapeMessage> {
+public class ScrapeRequest extends TrackerRequest {
     private final long connectionId;
     private final int action = 2;
     private final int transactionId;
@@ -33,7 +31,7 @@ public class ScrapeRequest extends TrackerRequest<ScrapeMessage> {
      * 16 + 20 * N
      */
     @Override
-    public byte[] buildRequestPacket() {
+    public ByteBuffer buildRequestPacket() {
 
         ByteBuffer sendData = ByteBuffer.allocate(36);
         sendData.putLong(this.connectionId); // connection_id (64 bit)
@@ -42,6 +40,6 @@ public class ScrapeRequest extends TrackerRequest<ScrapeMessage> {
         // each torrentInfoHash byte array is 20 bytes.
         this.torrentInfoHashs.forEach((byte[] torrentInfoHash) -> sendData.put(torrentInfoHash));
 
-        return sendData.array();
+        return sendData;
     }
 }

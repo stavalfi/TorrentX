@@ -3,7 +3,7 @@ package main.tracker.response;
 import lombok.Getter;
 import lombok.ToString;
 import main.Peer;
-import main.tracker.AnnounceMessage;
+import reactor.core.publisher.Flux;
 
 import java.math.BigInteger;
 import java.net.InetAddress;
@@ -17,7 +17,7 @@ import static org.joou.Unsigned.ushort;
 
 @Getter
 @ToString
-public class AnnounceResponse extends TrackerResponse<AnnounceMessage>{
+public class AnnounceResponse extends TrackerResponse {
 
 
     private final int action;
@@ -26,6 +26,10 @@ public class AnnounceResponse extends TrackerResponse<AnnounceMessage>{
     private final int leechersAmount;
     private final int seedersAmount;
     private final List<Peer> peers;
+
+    public Flux<Peer> getPeers() {
+        return Flux.fromStream(peers.stream());
+    }
 
     /**
      * Offset      Size            Name            Value
@@ -38,17 +42,17 @@ public class AnnounceResponse extends TrackerResponse<AnnounceMessage>{
      * 24 + 6 * n  16-bit integer  TCP port
      * 20 + 6 * N
      */
-    public AnnounceResponse(byte[] receiveData, int maxPeers) {
-        ByteBuffer receiveData_analyze = ByteBuffer.wrap(receiveData);
-        this.action = receiveData_analyze.getInt();
+    public AnnounceResponse(String ip, int port, ByteBuffer receiveData, int maxPeersWeWantToGet) {
+        super(ip, port);
+        this.action = receiveData.getInt();
         assert this.action == 1;
-        this.transactionId = receiveData_analyze.getInt();
-        this.interval = receiveData_analyze.getInt();
-        this.leechersAmount = receiveData_analyze.getInt();
-        this.seedersAmount = receiveData_analyze.getInt();
+        this.transactionId = receiveData.getInt();
+        this.interval = receiveData.getInt();
+        this.leechersAmount = receiveData.getInt();
+        this.seedersAmount = receiveData.getInt();
 
-        this.peers = IntStream.range(0, Integer.min(maxPeers, this.leechersAmount + this.seedersAmount))
-                .mapToObj((int index) -> new Peer(castIntegerToInetAddress(receiveData_analyze.getInt()).getHostAddress(), ushort(receiveData_analyze.getShort())))
+        this.peers = IntStream.range(0, Integer.min(maxPeersWeWantToGet, this.leechersAmount + this.seedersAmount))
+                .mapToObj((int index) -> new Peer(castIntegerToInetAddress(receiveData.getInt()).getHostAddress(), ushort(receiveData.getShort())))
                 .collect(Collectors.toList());
     }
 

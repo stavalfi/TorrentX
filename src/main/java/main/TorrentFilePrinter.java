@@ -53,13 +53,13 @@ public class TorrentFilePrinter {
                 .map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
                 .filter(Matcher::matches)
                 .map((Matcher matcher) -> new AbstractMap.SimpleEntry<String, UShort>(matcher.group(2), ushort(matcher.group(3))))
-                .map(tracker -> {
-                    ConnectResponse connectResponse = TrackerCommunicator.communicate(tracker.getKey(), tracker.getValue().intValue(), new ConnectRequest(123456));
-                    AnnounceRequest announceRequest = new AnnounceRequest(connectResponse.getConnectionId(), 123456, torrentInfoHash, peerIdAsByteArray,
-                            0, 0, 0, 2, 0, 0, 1000, (short) 8091);
-                    return TrackerCommunicator.communicate(tracker.getKey(), tracker.getValue().intValue(), announceRequest);
-                })
-                .flatMap(res -> res.getPeers().stream())
+//                .map(tracker -> {
+//                    ConnectResponse connectResponse = TrackerCommunicator.communicate(tracker.getKey(), tracker.getValue().intValue(), new ConnectRequest(123456));
+//                    AnnounceRequest announceRequest = new AnnounceRequest(connectResponse.getConnectionId(), 123456, torrentInfoHash, peerIdAsByteArray,
+//                            0, 0, 0, 2, 0, 0, 1000, (short) 8091);
+//                    return TrackerCommunicator.communicate(tracker.getKey(), tracker.getValue().intValue(), announceRequest);
+//                })
+//                .flatMap(res -> res.getPeers().stream())
                 .forEach(System.out::println);
     }
 }

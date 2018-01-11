@@ -1,6 +1,8 @@
 package main.tracker.requests;
 
-public abstract class TrackerRequest<T> {
+import java.nio.ByteBuffer;
+
+public abstract class TrackerRequest {
     private final String ip;
     private final int port;
 
@@ -9,7 +11,7 @@ public abstract class TrackerRequest<T> {
         this.port = port;
     }
 
-    public abstract byte[] buildRequestPacket();
+    public abstract ByteBuffer buildRequestPacket();
 
     public String getIp() {
         return ip;
