@@ -3,12 +3,13 @@ package main.tracker.requests;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.ToString;
+import main.tracker.ConnectMessage;
 
 import java.nio.ByteBuffer;
 
 @Getter
 @ToString
-public class ConnectRequest extends TrackerRequest {
+public class ConnectRequest extends TrackerRequest<ConnectMessage> {
 
     private final long connectionId = 0x41727101980L;
     private final int action = 0;

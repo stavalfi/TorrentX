@@ -2,13 +2,14 @@ package main.tracker.response;
 
 import lombok.Getter;
 import lombok.ToString;
+import main.tracker.ConnectMessage;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 @Getter
 @ToString
-public class ConnectResponse {
+public class ConnectResponse  extends TrackerResponse<ConnectMessage> {
     private final int action;
     private final int transactionId;
     private final long ConnectionId;

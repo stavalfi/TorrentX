@@ -3,12 +3,13 @@ package main.tracker.requests;
 import lombok.Getter;
 import lombok.ToString;
 import main.HexByteConverter;
+import main.tracker.AnnounceMessage;
 
 import java.nio.ByteBuffer;
 
 @Getter
 @ToString
-public class AnnounceRequest extends TrackerRequest {
+public class AnnounceRequest extends TrackerRequest<AnnounceMessage> {
 
     private final long connectionId;
     private final int action = 1;

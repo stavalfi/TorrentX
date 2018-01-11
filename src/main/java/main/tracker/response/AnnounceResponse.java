@@ -3,6 +3,7 @@ package main.tracker.response;
 import lombok.Getter;
 import lombok.ToString;
 import main.Peer;
+import main.tracker.AnnounceMessage;
 
 import java.math.BigInteger;
 import java.net.InetAddress;
@@ -16,7 +17,7 @@ import static org.joou.Unsigned.ushort;
 
 @Getter
 @ToString
-public class AnnounceResponse {
+public class AnnounceResponse extends TrackerResponse<AnnounceMessage>{
 
 
     private final int action;

@@ -1,14 +1,18 @@
 package main;
 
 import com.sun.xml.internal.txw2.IllegalAnnotationException;
+import main.tracker.requests.ConnectRequest;
+import main.tracker.response.ConnectResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import sun.misc.GC;
 
+import java.nio.ByteBuffer;
 import java.security.InvalidParameterException;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -17,21 +21,18 @@ import java.util.stream.Stream;
 
 public class App {
     public static void main(String[] args) throws Exception {
-//        String TorrentFilePath = "src/main/resources/torrent-file-example.torrent";
-//        TorrentFilePrinter.printTorrentFileInfo(TorrentFilePath);
+        String TorrentFilePath = "src/main/resources/torrent-file-example.torrent";
+        TorrentFilePrinter.printTorrentFileInfo(TorrentFilePath);
 //        TorrentFilePrinter.printAllPeers(TorrentFilePath);
         f1();
     }
 
     public static void f1() throws Exception {
-        System.out.println(UUID.randomUUID().toString());
-        Flux.create((FluxSink<Integer> fluxSink) -> {
-            fluxSink.error(new InvalidParameterException());
-        })
-                .map(x -> x + 1)
-                .onErrorMap(InvalidParameterException.class, (Throwable e) -> new InvalidParameterException())
-                .subscribe(System.out::println, System.out::println, System.out::println);
-        Thread.sleep(5 * 1000);
+//        TrackerX.request(new ConnectRequest("!", 12, 12),
+//                (ByteBuffer response) -> new ConnectResponse(response.array()))
+//                .subscribe(System.out::println, System.out::println, System.out::println);
+
+
     }
 
 }

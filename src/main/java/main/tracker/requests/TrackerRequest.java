@@ -1,6 +1,6 @@
 package main.tracker.requests;
 
-public abstract class TrackerRequest {
+public abstract class TrackerRequest<T> {
     private final String ip;
     private final int port;
 
@@ -9,7 +9,7 @@ public abstract class TrackerRequest {
         this.port = port;
     }
 
-    abstract byte[] buildRequestPacket();
+    public abstract byte[] buildRequestPacket();
 
     public String getIp() {
         return ip;

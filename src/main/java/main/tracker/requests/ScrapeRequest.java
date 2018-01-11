@@ -3,19 +3,21 @@ package main.tracker.requests;
 import lombok.Getter;
 import lombok.ToString;
 import main.HexByteConverter;
+import main.tracker.ScrapeMessage;
 
 import java.nio.ByteBuffer;
 import java.util.List;
 
 @Getter
 @ToString
-public class ScrapeRequest implements PacketRequest {
+public class ScrapeRequest extends TrackerRequest<ScrapeMessage> {
     private final long connectionId;
     private final int action = 2;
     private final int transactionId;
     private final List<byte[]> torrentInfoHashs;
 
-    public ScrapeRequest(long connectionId, int transactionId, final List<byte[]> torrentInfoHashs) {
+    public ScrapeRequest(String ip, int port, long connectionId, int transactionId, List<byte[]> torrentInfoHashs) {
+        super(ip, port);
         this.connectionId = connectionId;
         this.transactionId = transactionId;
         this.torrentInfoHashs = torrentInfoHashs;
@@ -30,6 +32,7 @@ public class ScrapeRequest implements PacketRequest {
      * 16 + 20 * n     20-byte string  torrentInfoHash  torrent_info_hash // the hash of the torrent we want to scrape on
      * 16 + 20 * N
      */
+    @Override
     public byte[] buildRequestPacket() {
 
         ByteBuffer sendData = ByteBuffer.allocate(36);

@@ -3,6 +3,7 @@ package main.tracker.response;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.ToString;
+import main.tracker.ScrapeMessage;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -10,7 +11,7 @@ import java.util.stream.Collectors;
 
 @Getter
 @ToString
-public class ScrapeResponse {
+public class ScrapeResponse extends TrackerResponse<ScrapeMessage> {
 
     @Getter
     @ToString
