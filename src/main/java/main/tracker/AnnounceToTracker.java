@@ -4,7 +4,6 @@ import main.HexByteConverter;
 import main.tracker.requests.AnnounceRequest;
 import main.tracker.response.AnnounceResponse;
 import main.tracker.response.ConnectResponse;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.nio.ByteBuffer;
@@ -23,7 +22,7 @@ public class AnnounceToTracker {
                 new AnnounceResponse(connectResponse.getIp(), connectResponse.getPort(),
                         response, request.getNumWant());
 
-        return TrackerX.communicate(request, createResponse);
+        return TrackerCommunication.communicate(request, createResponse);
 
 
     }

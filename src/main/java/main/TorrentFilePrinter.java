@@ -4,20 +4,12 @@ import christophedetroyer.torrent.Torrent;
 import christophedetroyer.torrent.TorrentParser;
 import main.tracker.AnnounceToTracker;
 import main.tracker.ConnectToTracker;
-import main.tracker.requests.AnnounceRequest;
-import main.tracker.requests.ConnectRequest;
 import main.tracker.response.AnnounceResponse;
 import main.tracker.response.ConnectResponse;
-import org.joou.UShort;
 import reactor.core.publisher.Flux;
 
 import java.io.IOException;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
-import static org.joou.Unsigned.ushort;
+import java.util.Arrays;
 
 public class TorrentFilePrinter {
     public static void printTorrentFileInfo(String path) throws IOException {
@@ -43,20 +35,11 @@ public class TorrentFilePrinter {
     }
 
     public static void printAllPeers(String path) throws Exception {
-        Torrent t1 = TorrentParser.parseTorrent(path);
-        String trackerPattern = "^udp://(\\d*\\.)?(.*):(\\d*)(.*)?$";
+        TorrentInfo torrentInfo = new TorrentInfo(TorrentParser.parseTorrent(path));
 
-        List<AbstractMap.SimpleEntry<String, UShort>> trackers = t1.getAnnounceList()
-                .stream()
-                .filter((String tracker) -> !tracker.equals("udp://9.rarbg.com:2710/scrape")) // problematic tracker !!!!
-                .map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
-                .filter(Matcher::matches)
-                .map((Matcher matcher) -> new AbstractMap.SimpleEntry<String, UShort>(matcher.group(2), ushort(matcher.group(3))))
-                .collect(Collectors.toList());
-
-        Flux.fromStream(trackers.stream())
-                .flatMap(tracker -> ConnectToTracker.connect(tracker.getKey(), tracker.getValue().intValue()))
-                .flatMap((ConnectResponse response) -> AnnounceToTracker.announce(response, t1.getInfo_hash()))
+        Flux.fromStream(torrentInfo.getTrackerList().stream())
+                .flatMap(tracker -> ConnectToTracker.connect(tracker.getTracker(), tracker.getPort()))
+                .flatMap((ConnectResponse response) -> AnnounceToTracker.announce(response, torrentInfo.getTorrentInfoHash()))
                 .flatMap(AnnounceResponse::getPeers)
                 .subscribe(System.out::println, System.out::println, System.out::println);
     }

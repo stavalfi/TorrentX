@@ -1,12 +1,9 @@
 package main.tracker;
 
 import main.HexByteConverter;
-import main.tracker.requests.AnnounceRequest;
 import main.tracker.requests.ScrapeRequest;
-import main.tracker.response.AnnounceResponse;
 import main.tracker.response.ConnectResponse;
 import main.tracker.response.ScrapeResponse;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.nio.ByteBuffer;
@@ -27,7 +24,7 @@ public class ScrapeToTracker {
         Function<ByteBuffer, ScrapeResponse> createResponse = (ByteBuffer response) ->
                 new ScrapeResponse(connectResponse.getIp(), connectResponse.getPort(), response, torrentsHashes);
 
-        return TrackerX.communicate(request, createResponse);
+        return TrackerCommunication.communicate(request, createResponse);
 
 
     }
