@@ -1,0 +1,24 @@
+package main.tracker;
+
+import lombok.SneakyThrows;
+
+import java.net.InetAddress;
+
+public class Tracker {
+    final String tracker;
+    final int port;
+
+    public Tracker(String tracker, int port) {
+        this.tracker = tracker;
+        this.port = port;
+    }
+
+
+    public String getTracker() {
+        return tracker;
+    }
+
+    public int getPort() {
+        return port;
+    }
+}
