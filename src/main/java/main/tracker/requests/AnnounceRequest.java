@@ -10,8 +10,6 @@ import java.nio.ByteBuffer;
 public class AnnounceRequest extends TrackerRequest {
 
     private final long connectionId;
-    private final int action = 1;
-    private final int transactionId;
     private final byte[] torrentInfoHash;
     private final byte[] peerId;
     private final long downloaded;
@@ -36,9 +34,8 @@ public class AnnounceRequest extends TrackerRequest {
                            byte[] torrentInfoHash, byte[] peerId, long downloaded,
                            long left, long uploaded, int event, int ipAddress,
                            int key, int numWant, short tcpPort) {
-        super(ip, port);
+        super(ip, port, 1, transactionId);
         this.connectionId = connectionId;
-        this.transactionId = transactionId;
         this.torrentInfoHash = torrentInfoHash;
         this.peerId = peerId;
         this.downloaded = downloaded;
@@ -74,8 +71,8 @@ public class AnnounceRequest extends TrackerRequest {
 
         ByteBuffer sendData = ByteBuffer.allocate(98); // we need 98 bits at list
         sendData.putLong(this.connectionId); // connection_id
-        sendData.putInt(this.action); // action we want to perform - scrape
-        sendData.putInt(this.transactionId); // transaction_id - random int we make (32 bits)
+        sendData.putInt(getActionNumber()); // action we want to perform - scrape
+        sendData.putInt(getTransactionId()); // transaction_id - random int we make (32 bits)
         sendData.put(this.torrentInfoHash); //info_hash (20 bits)
         sendData.put(this.peerId); // peer_id (20 bits)
         sendData.putLong(this.downloaded); // downloaded (64 bits)

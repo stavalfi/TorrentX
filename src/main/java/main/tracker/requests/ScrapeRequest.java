@@ -10,14 +10,11 @@ import java.util.List;
 @ToString
 public class ScrapeRequest extends TrackerRequest {
     private final long connectionId;
-    private final int action = 2;
-    private final int transactionId;
     private final List<byte[]> torrentInfoHashs;
 
     public ScrapeRequest(String ip, int port, long connectionId, int transactionId, List<byte[]> torrentInfoHashs) {
-        super(ip, port);
+        super(ip, port,2, transactionId);
         this.connectionId = connectionId;
-        this.transactionId = transactionId;
         this.torrentInfoHashs = torrentInfoHashs;
     }
 
@@ -35,8 +32,8 @@ public class ScrapeRequest extends TrackerRequest {
 
         ByteBuffer sendData = ByteBuffer.allocate(36);
         sendData.putLong(this.connectionId); // connection_id (64 bit)
-        sendData.putInt(this.action); // action we want to perform - scrape the server (32 bits)
-        sendData.putInt(this.transactionId); // transaction_id - random int we make (32 bits)
+        sendData.putInt(getActionNumber()); // action we want to perform - scrape the server (32 bits)
+        sendData.putInt(getTransactionId()); // transaction_id - random int we make (32 bits)
         // each torrentInfoHash byte array is 20 bytes.
         this.torrentInfoHashs.forEach((byte[] torrentInfoHash) -> sendData.put(torrentInfoHash));
 

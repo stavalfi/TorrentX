@@ -8,8 +8,6 @@ import java.nio.ByteBuffer;
 @Getter
 @ToString
 public class ConnectResponse extends TrackerResponse {
-    private final int action;
-    private final int transactionId;
     private final long ConnectionId;
 
     /**
@@ -22,11 +20,11 @@ public class ConnectResponse extends TrackerResponse {
      * 8       64-bit integer  connection_id
      * 16
      */
-    public ConnectResponse(String ip, int port,ByteBuffer receiveData) {
+    public ConnectResponse(String ip, int port, ByteBuffer receiveData) {
         super(ip, port);
-        this.action = receiveData.getInt();
-        assert this.action == 0;
-        this.transactionId = receiveData.getInt();
+        setActionNumber(receiveData.getInt());
+        assert getActionNumber() == 0;
+        setTransactionId(receiveData.getInt());
         this.ConnectionId = receiveData.getLong();
     }
 

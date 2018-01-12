@@ -27,8 +27,6 @@ public class ScrapeResponse extends TrackerResponse {
 
     }
 
-    private final int action;
-    private final int transactionId;
     private final List<ScrapeResponseForTorrentInfoHash> ScrapeResponseForTorrentInfoHashs;
 
     public Flux<ScrapeResponseForTorrentInfoHash> getScrapeResponseForTorrentInfoHashs() {
@@ -51,9 +49,9 @@ public class ScrapeResponse extends TrackerResponse {
      */
     public ScrapeResponse(String ip, int port, ByteBuffer receiveData, List<byte[]> torrentInfoHashs) {
         super(ip, port);
-        this.action = receiveData.getInt();
-        assert this.action == 2;
-        this.transactionId = receiveData.getInt();
+        setActionNumber(receiveData.getInt());
+        assert getActionNumber() == 2;
+        setTransactionId(receiveData.getInt());
 
         this.ScrapeResponseForTorrentInfoHashs = torrentInfoHashs.stream()
                 .map((byte[] torrentInfoHash) -> new ScrapeResponseForTorrentInfoHash

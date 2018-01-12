@@ -19,9 +19,6 @@ import static org.joou.Unsigned.ushort;
 @ToString
 public class AnnounceResponse extends TrackerResponse {
 
-
-    private final int action;
-    private final int transactionId;
     private final int interval;
     private final int leechersAmount;
     private final int seedersAmount;
@@ -44,9 +41,9 @@ public class AnnounceResponse extends TrackerResponse {
      */
     public AnnounceResponse(String ip, int port, ByteBuffer receiveData, int maxPeersWeWantToGet) {
         super(ip, port);
-        this.action = receiveData.getInt();
-        assert this.action == 1;
-        this.transactionId = receiveData.getInt();
+        setActionNumber(receiveData.getInt());
+        assert getActionNumber() == 1;
+        setTransactionId(receiveData.getInt());
         this.interval = receiveData.getInt();
         this.leechersAmount = receiveData.getInt();
         this.seedersAmount = receiveData.getInt();
