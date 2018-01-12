@@ -3,26 +3,45 @@ package main.tracker;
 import lombok.SneakyThrows;
 import main.tracker.requests.TrackerRequest;
 import main.tracker.response.TrackerResponse;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.util.function.Function;
 
 public class TrackerX {
 
-    public static <Request extends TrackerRequest>
+    public static <Request extends TrackerRequest, Response extends TrackerResponse>
+    Mono<Response> communicate(Request request, Function<ByteBuffer, Response> createResponse) {
+        Mono<Response> responseMono = sendRequest(request)
+                .flatMap((DatagramSocket trackerSocket) ->
+                        getResponse(trackerSocket, createResponse));
+
+        // the retry operation will run the first, ever created, publisher again
+        // which is defined in sendRequest method.
+        return responseMono.flatMap((Response response) -> {
+            if (request.getTransactionId() != response.getTransactionId() ||
+                    request.getActionNumber() != response.getActionNumber())
+                return Mono.error(new BadResponse("response's transaction-id is not equal to the request's transaction-id."));
+            if (request.getActionNumber() != response.getActionNumber())
+                return Mono.error(new BadResponse("response's action-number is not equal to the request's action-number."));
+            return responseMono;
+        }).retry(1, (Throwable exception) ->
+                exception instanceof SocketTimeoutException || exception instanceof BadResponse);
+    }
+
+    private static <Request extends TrackerRequest>
     Mono<DatagramSocket> sendRequest(Request request) {
         return Mono.just(request)
                 .map(TrackerX::makeRequest)
                 .flatMap(TrackerX::sendRequest);
     }
 
-    public static <Response extends TrackerResponse>
+    private static <Response extends TrackerResponse>
     Mono<Response> getResponse(DatagramSocket trackerSocket, Function<ByteBuffer, Response> createResponse) {
         return Mono.just(trackerSocket)
                 .flatMap(TrackerX::receiveResponse)
@@ -57,6 +76,7 @@ public class TrackerX {
             try {
                 byte[] receiveData = new byte[1000];
                 DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+                trackerSocket.setSoTimeout(1000);
                 trackerSocket.receive(receivePacket);
                 sink.success(ByteBuffer.wrap(receiveData));
             } catch (IOException exception) {
