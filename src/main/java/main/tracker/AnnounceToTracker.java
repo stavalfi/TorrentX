@@ -16,15 +16,14 @@ public class AnnounceToTracker {
 
     public static Mono<AnnounceResponse> announce(ConnectResponse connectResponse, String torrentHash) {
 
-        AnnounceRequest announceRequest = new AnnounceRequest(connectResponse.getIp(), connectResponse.getPort(), connectResponse.getConnectionId(),
+        AnnounceRequest request = new AnnounceRequest(connectResponse.getIp(), connectResponse.getPort(), connectResponse.getConnectionId(),
                 HexByteConverter.hexToByte(torrentHash), peerId, portWeListenForPeersRequests);
 
         Function<ByteBuffer, AnnounceResponse> createResponse = (ByteBuffer response) ->
                 new AnnounceResponse(connectResponse.getIp(), connectResponse.getPort(),
-                        response, announceRequest.getNumWant());
+                        response, request.getNumWant());
 
-        return TrackerX.sendRequest(announceRequest)
-                .flatMap(socket -> TrackerX.getResponse(socket, createResponse));
+        return TrackerX.communicate(request, createResponse);
 
 
     }

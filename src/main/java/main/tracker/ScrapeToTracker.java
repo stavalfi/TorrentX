@@ -27,8 +27,7 @@ public class ScrapeToTracker {
         Function<ByteBuffer, ScrapeResponse> createResponse = (ByteBuffer response) ->
                 new ScrapeResponse(connectResponse.getIp(), connectResponse.getPort(), response, torrentsHashes);
 
-        return TrackerX.sendRequest(request)
-                .flatMap(socket -> TrackerX.getResponse(socket, createResponse));
+        return TrackerX.communicate(request, createResponse);
 
 
     }
