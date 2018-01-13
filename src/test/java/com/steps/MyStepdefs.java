@@ -1,95 +1,82 @@
 package com.steps;
 
 import christophedetroyer.torrent.Torrent;
-import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
+import main.TorrentInfo;
 import main.tracker.AnnounceToTracker;
 import main.tracker.ConnectToTracker;
 import main.tracker.ScrapeToTracker;
+import main.tracker.Tracker;
 import main.tracker.response.AnnounceResponse;
 import main.tracker.response.ConnectResponse;
 import main.tracker.response.ScrapeResponse;
 import org.joou.UShort;
 import org.junit.Assert;
+import org.junit.Before;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SynchronousSink;
 
+import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.AbstractMap;
 import java.util.Arrays;
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.joou.Unsigned.ushort;
 
 public class MyStepdefs {
 
-    private Torrent torrent;
+    private TorrentInfo torrent;
 
     private Flux<ConnectResponse> connectResponse;
     private Flux<AnnounceResponse> announceResponse;
     private Flux<ScrapeResponse> scrapeResponse;
 
-
     @Given("^new torrent file: \"([^\"]*)\".$")
     public void newTorrentFile(String torrentFilePath) throws Throwable {
         String torrentFilesLocation = "src/test/resources/";
-        this.torrent = TorrentParser.parseTorrent(torrentFilesLocation + torrentFilePath);
+        this.torrent = new TorrentInfo(TorrentParser.parseTorrent(torrentFilesLocation + torrentFilePath));
     }
 
     @When("^application read trackers for this torrent.$")
     public void applicationReadTrackersForThisTorrent() throws Throwable {
-        // tracker pattern example: udp://tracker.coppersurfer.tk:6969/scrape
-        String trackerPattern = "^udp://(\\d*\\.)?(.*):(\\d*)(.*)?$";
-
-        Stream<AbstractMap.SimpleEntry<String, UShort>> trackers = this.torrent.getAnnounceList()
-                .stream()
-                .filter((String tracker) -> !tracker.equals("udp://9.rarbg.com:2710/scrape")) // problematic tracker !!!!
-                .map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
-                .filter(Matcher::matches)
-                .map((Matcher matcher) -> new AbstractMap.SimpleEntry<String, UShort>(matcher.group(2), ushort(matcher.group(3))));
-
-        this.connectResponse = Flux.fromStream(trackers)
-                .flatMap(tracker -> ConnectToTracker.connect(tracker.getKey(), tracker.getValue().intValue()))
+        this.connectResponse = Flux.fromStream(this.torrent.getTrackerList().stream())
+                .handle((Tracker tracker, SynchronousSink<ConnectResponse> sink) -> {
+                    ConnectToTracker.connect(tracker.getTracker(), tracker.getPort())
+                            .subscribe(sink::next, error -> {
+                                if (!(error instanceof SocketTimeoutException))
+                                    sink.error(error);
+                            }, sink::complete);
+                })
+                .take(1)
                 .cache();
 
         this.announceResponse = this.connectResponse
-                .flatMap(connectResponse -> AnnounceToTracker.announce(connectResponse, this.torrent.getInfo_hash()));
+                .flatMap(connectResponse -> AnnounceToTracker.announce(connectResponse, this.torrent.getTorrentInfoHash()));
 
         this.scrapeResponse = this.connectResponse
-                .flatMap(connectResponse -> ScrapeToTracker.scrape(connectResponse, Arrays.asList(this.torrent.getInfo_hash())));
+                .flatMap(connectResponse -> ScrapeToTracker.scrape(connectResponse, Arrays.asList(this.torrent.getTorrentInfoHash())));
     }
 
     @Then("^application send tracker-request: CONNECT.$")
     public void applicationSendTrackerRequestCONNECT() throws Throwable {
-        this.connectResponse
-                .subscribe((ConnectResponse connectResponse) -> {
-                            Assert.assertEquals(0, connectResponse.getAction());
-                        },
-                        exception -> Assert.fail(exception.toString()));
+        this.connectResponse.subscribe(null, exception -> Assert.fail(exception.toString()), null);
     }
 
     @Then("^application send tracker-request: ANNOUNCE.$")
     public void applicationSendRequestRequestANNOUNCE() throws Throwable {
-        this.announceResponse
-                .subscribe((AnnounceResponse announceResponse) -> {
-                            Assert.assertEquals(1, announceResponse.getAction());
-                        },
-                        exception -> Assert.fail(exception.toString()));
+        this.announceResponse.subscribe(null, exception -> Assert.fail(exception.toString()));
     }
 
     @Then("^application send tracker-request: SCRAPE.$")
     public void applicationSendRequestRequestSCRAPE() throws Throwable {
-        this.scrapeResponse
-                .subscribe((ScrapeResponse scrapeResponse) -> {
-                            Assert.assertEquals(2, scrapeResponse.getAction());
-                        },
-                        exception -> Assert.fail(exception.toString()));
+        this.scrapeResponse.subscribe(null, exception -> Assert.fail(exception.toString()));
     }
 
 //    @Then("^choose one active peer to communicate with.$")
