@@ -21,4 +21,12 @@ public class Tracker {
     public int getPort() {
         return port;
     }
+
+    @Override
+    public String toString() {
+        return "Tracker{" +
+                "tracker='" + tracker + '\'' +
+                ", port=" + port +
+                '}';
+    }
 }
