@@ -1,7 +1,5 @@
 package main.tracker.response;
 
-import lombok.Getter;
-import lombok.ToString;
 import main.Peer;
 import reactor.core.publisher.Flux;
 
@@ -15,8 +13,6 @@ import java.util.stream.IntStream;
 
 import static org.joou.Unsigned.ushort;
 
-@Getter
-@ToString
 public class AnnounceResponse extends TrackerResponse {
 
     private final int interval;
@@ -66,5 +62,27 @@ public class AnnounceResponse extends TrackerResponse {
             e.printStackTrace();
             return null;
         }
+    }
+
+    @Override
+    public String toString() {
+        return "AnnounceResponse{" +
+                "interval=" + interval +
+                ", leechersAmount=" + leechersAmount +
+                ", seedersAmount=" + seedersAmount +
+                ", peers=" + peers +
+                "} " + super.toString();
+    }
+
+    public int getInterval() {
+        return interval;
+    }
+
+    public int getLeechersAmount() {
+        return leechersAmount;
+    }
+
+    public int getSeedersAmount() {
+        return seedersAmount;
     }
 }

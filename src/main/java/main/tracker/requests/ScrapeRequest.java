@@ -1,13 +1,8 @@
 package main.tracker.requests;
 
-import lombok.Getter;
-import lombok.ToString;
-
 import java.nio.ByteBuffer;
 import java.util.List;
 
-@Getter
-@ToString
 public class ScrapeRequest extends TrackerRequest {
     private final long connectionId;
     private final List<byte[]> torrentInfoHashs;
@@ -38,5 +33,13 @@ public class ScrapeRequest extends TrackerRequest {
         this.torrentInfoHashs.forEach((byte[] torrentInfoHash) -> sendData.put(torrentInfoHash));
 
         return sendData;
+    }
+
+    @Override
+    public String toString() {
+        return "ScrapeRequest{" +
+                "connectionId=" + connectionId +
+                ", torrentInfoHashs=" + torrentInfoHashs +
+                "} " + super.toString();
     }
 }

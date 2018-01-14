@@ -34,4 +34,13 @@ public abstract class TrackerRequest {
 
     public abstract ByteBuffer buildRequestPacket();
 
+    @Override
+    public String toString() {
+        return "TrackerRequest{" +
+                "ip='" + ip + '\'' +
+                ", port=" + port +
+                ", actionNumber=" + actionNumber +
+                ", transactionId=" + transactionId +
+                '}';
+    }
 }

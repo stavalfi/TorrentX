@@ -1,36 +1,29 @@
 package main.tracker.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.ToString;
 import reactor.core.publisher.Flux;
 
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Getter
-@ToString
 public class ScrapeResponse extends TrackerResponse {
-
-    @Getter
-    @ToString
-    @AllArgsConstructor
-    public class ScrapeResponseForTorrentInfoHash {
-        /**
-         * I do not get torrentInfoHash in the response so I need to understand it from the order of the same request.
-         */
-        private final byte[] torrentInfoHash;
-        private final int complete; // 	The current number of connected seeds.
-        private final int downloaded; // The number of times this torrent has been downloaded.
-        private final int incomplete; // The current number of connected leechers.
-
-    }
 
     private final List<ScrapeResponseForTorrentInfoHash> ScrapeResponseForTorrentInfoHashs;
 
-    public Flux<ScrapeResponseForTorrentInfoHash> getScrapeResponseForTorrentInfoHashs() {
-        return Flux.fromStream(this.ScrapeResponseForTorrentInfoHashs.stream());
+    public ScrapeResponse(String ip, int port, List<ScrapeResponseForTorrentInfoHash> scrapeResponseForTorrentInfoHashs) {
+        super(ip, port);
+        ScrapeResponseForTorrentInfoHashs = scrapeResponseForTorrentInfoHashs;
+    }
+
+    public List<ScrapeResponseForTorrentInfoHash> getScrapeResponseForTorrentInfoHashs() {
+        return ScrapeResponseForTorrentInfoHashs;
+    }
+
+    @Override
+    public String toString() {
+        return "ScrapeResponse{" +
+                "ScrapeResponseForTorrentInfoHashs=" + ScrapeResponseForTorrentInfoHashs +
+                "} " + super.toString();
     }
 
     /**
@@ -42,10 +35,10 @@ public class ScrapeResponse extends TrackerResponse {
      * ?           32-bit integer  incomplete
      * 8 + 12 * N
      *
-     * @param response      what the tracker sent me back.
+     * @param response          what the tracker sent me back.
      * @param torrentInfoHashes what torrents I asked about in the scrape request.
-     *                         The order is importent and I assume that the answer
-     *                         will be with the same order as this list.
+     *                          The order is importent and I assume that the answer
+     *                          will be with the same order as this list.
      */
     public ScrapeResponse(String ip, int port, byte[] response, List<byte[]> torrentInfoHashes) {
         super(ip, port);

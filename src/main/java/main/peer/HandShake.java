@@ -1,7 +1,5 @@
 package main.peer;
 
-import lombok.Getter;
-import lombok.Setter;
 import main.HexByteConverter;
 import org.joou.UByte;
 
@@ -9,8 +7,6 @@ import java.nio.ByteBuffer;
 
 import static org.joou.Unsigned.ubyte;
 
-@Getter
-@Setter
 public class HandShake {
     private UByte pstrLength;
     // pstr - string identifier of the protocol
@@ -23,6 +19,37 @@ public class HandShake {
     private final byte[] torrentInfoHash;// 20 bytes
     private final byte[] peerId; // 20 bytes
 
+    public void setPstrLength(UByte pstrLength) {
+        this.pstrLength = pstrLength;
+    }
+
+    public void setPstr(byte[] pstr) {
+        this.pstr = pstr;
+    }
+
+    public void setReserved(byte[] reserved) {
+        this.reserved = reserved;
+    }
+
+    public UByte getPstrLength() {
+        return pstrLength;
+    }
+
+    public byte[] getPstr() {
+        return pstr;
+    }
+
+    public byte[] getReserved() {
+        return reserved;
+    }
+
+    public byte[] getTorrentInfoHash() {
+        return torrentInfoHash;
+    }
+
+    public byte[] getPeerId() {
+        return peerId;
+    }
 
     @Override
     public String toString() {

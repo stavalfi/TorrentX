@@ -1,12 +1,7 @@
 package main.tracker.requests;
 
-import lombok.Getter;
-import lombok.ToString;
-
 import java.nio.ByteBuffer;
 
-@Getter
-@ToString
 public class ConnectRequest extends TrackerRequest {
 
     private final long connectionId = 0x41727101980L;
@@ -33,5 +28,16 @@ public class ConnectRequest extends TrackerRequest {
         sendData.putInt(getTransactionId()); // transaction_id - random int we make (32 bits)
 
         return sendData;
+    }
+
+    @Override
+    public String toString() {
+        return "ConnectRequest{" +
+                "connectionId=" + connectionId +
+                '}' + super.toString();
+    }
+
+    public long getConnectionId() {
+        return connectionId;
     }
 }

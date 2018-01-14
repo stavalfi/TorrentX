@@ -1,12 +1,8 @@
 package main.tracker.requests;
 
-import lombok.Getter;
-import lombok.ToString;
-
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
-@Getter
-@ToString
 public class AnnounceRequest extends TrackerRequest {
 
     private final long connectionId;
@@ -85,5 +81,66 @@ public class AnnounceRequest extends TrackerRequest {
         sendData.putShort(this.tcpPort); // tcpPort (16 bits)
 
         return sendData;
+    }
+
+    @Override
+    public String toString() {
+        return "AnnounceRequest{" +
+                "connectionId=" + connectionId +
+                ", torrentInfoHash=" + Arrays.toString(torrentInfoHash) +
+                ", peerId=" + Arrays.toString(peerId) +
+                ", downloaded=" + downloaded +
+                ", left=" + left +
+                ", uploaded=" + uploaded +
+                ", event=" + event +
+                ", ipAddress=" + ipAddress +
+                ", key=" + key +
+                ", numWant=" + numWant +
+                ", tcpPort=" + tcpPort +
+                '}' + super.toString();
+    }
+
+    public long getConnectionId() {
+        return connectionId;
+    }
+
+    public byte[] getTorrentInfoHash() {
+        return torrentInfoHash;
+    }
+
+    public byte[] getPeerId() {
+        return peerId;
+    }
+
+    public long getDownloaded() {
+        return downloaded;
+    }
+
+    public long getLeft() {
+        return left;
+    }
+
+    public long getUploaded() {
+        return uploaded;
+    }
+
+    public int getEvent() {
+        return event;
+    }
+
+    public int getIpAddress() {
+        return ipAddress;
+    }
+
+    public int getKey() {
+        return key;
+    }
+
+    public int getNumWant() {
+        return numWant;
+    }
+
+    public short getTcpPort() {
+        return tcpPort;
     }
 }

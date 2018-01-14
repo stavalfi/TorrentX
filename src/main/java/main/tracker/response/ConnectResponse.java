@@ -1,12 +1,7 @@
 package main.tracker.response;
 
-import lombok.Getter;
-import lombok.ToString;
-
 import java.nio.ByteBuffer;
 
-@Getter
-@ToString
 public class ConnectResponse extends TrackerResponse {
     private final long ConnectionId;
 
@@ -31,5 +26,16 @@ public class ConnectResponse extends TrackerResponse {
 
     public static int packetResponseSize() {
         return 1000;
+    }
+
+    public long getConnectionId() {
+        return ConnectionId;
+    }
+
+    @Override
+    public String toString() {
+        return "ConnectResponse{" +
+                "ConnectionId=" + ConnectionId +
+                "} " + super.toString();
     }
 }

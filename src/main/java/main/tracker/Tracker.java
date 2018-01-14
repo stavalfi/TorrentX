@@ -1,9 +1,5 @@
 package main.tracker;
 
-import lombok.SneakyThrows;
-
-import java.net.InetAddress;
-
 public class Tracker {
     final String tracker;
     final int port;

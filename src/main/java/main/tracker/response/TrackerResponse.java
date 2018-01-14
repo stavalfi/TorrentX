@@ -12,6 +12,16 @@ public class TrackerResponse {
         this.port = port;
     }
 
+    @Override
+    public String toString() {
+        return "TrackerResponse{" +
+                "ip='" + ip + '\'' +
+                ", port=" + port +
+                ", actionNumber=" + actionNumber +
+                ", transactionId=" + transactionId +
+                '}';
+    }
+
     public String getIp() {
         return ip;
     }
