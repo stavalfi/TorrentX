@@ -3,8 +3,8 @@ package main.peer;
 import java.nio.ByteBuffer;
 
 public class UnchokeMessage extends Message {
-    private static int length=1;
-    private static byte messageId=1;
+    private static final int length=1;
+    private static final byte messageId=1;
     /**
      * The unchoke message is fixed-length and has no payload.
      */

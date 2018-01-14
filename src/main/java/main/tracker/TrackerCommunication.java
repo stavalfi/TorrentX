@@ -11,7 +11,7 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.function.Function;
 
-public class TrackerCommunication {
+class TrackerCommunication {
 
     public static <Request extends TrackerRequest, Response extends TrackerResponse>
     Mono<Response> communicate(Request request, Function<ByteBuffer, Response> createResponse) {
@@ -82,12 +82,10 @@ public class TrackerCommunication {
             try {
                 DatagramSocket clientSocket = new DatagramSocket();
                 clientSocket.send(request);
-                assert clientSocket != null;
                 sink.success(clientSocket);
 
             } catch (IOException exception) {
                 sink.error(exception);
-            } finally {
             }
         });
     }
@@ -99,7 +97,6 @@ public class TrackerCommunication {
                 DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
                 trackerSocket.setSoTimeout(5000);
                 trackerSocket.receive(receivePacket);
-                assert receivePacket != null;
                 ByteBuffer response = ByteBuffer.wrap(receiveData);
                 sink.success(response);
             } catch (IOException exception) {

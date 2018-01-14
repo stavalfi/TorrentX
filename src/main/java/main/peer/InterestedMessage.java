@@ -2,12 +2,9 @@ package main.peer;
 
 import java.nio.ByteBuffer;
 
-import static org.joou.Unsigned.ubyte;
-import static org.joou.Unsigned.uint;
-
 public class InterestedMessage extends Message {
-    private static int length=1;
-    private static byte messageId=2;
+    private static final int length=1;
+    private static final byte messageId=2;
     /**
      * The interested message is fixed-length and has no payload.
      */

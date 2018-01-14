@@ -54,7 +54,7 @@ public class HandShake {
     @Override
     public String toString() {
         return "Handshake - torrentInfoHash: " + HexByteConverter.byteToHex(this.torrentInfoHash)
-                + " peerId: " + new String(this.peerId).toString();
+                + " peerId: " + new String(this.peerId);
     }
 
     public HandShake(byte[] torrentInfoHash, byte[] peerId) {

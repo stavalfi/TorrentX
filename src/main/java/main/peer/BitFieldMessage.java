@@ -3,7 +3,7 @@ package main.peer;
 import java.util.BitSet;
 
 public class BitFieldMessage extends Message {
-    private static byte messageId=5;
+    private static final byte messageId=5;
     /**
      * The bitField message may only be sent immediately after the handshaking
      *  sequence is completed, and before any other messages are sent.

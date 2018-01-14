@@ -10,8 +10,8 @@ import java.nio.ByteBuffer;
 import java.util.function.Function;
 
 public class AnnounceToTracker {
-    static short portWeListenForPeersRequests = 8181;
-    static byte[] peerId = "-AZ5750-TpkXttZLfpSH".getBytes();
+    private static final short portWeListenForPeersRequests = 8181;
+    private static final byte[] peerId = "-AZ5750-TpkXttZLfpSH".getBytes();
 
     public static Mono<AnnounceResponse> announce(ConnectResponse connectResponse, String torrentHash) {
 

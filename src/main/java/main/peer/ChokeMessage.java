@@ -3,8 +3,8 @@ package main.peer;
 import java.nio.ByteBuffer;
 
 public class ChokeMessage extends Message {
-    private static int length=1;
-    private static byte messageId=0;
+    private static final int length=1;
+    private static final byte messageId=0;
     /**
      * The choke message is fixed-length and has no payload.
      */

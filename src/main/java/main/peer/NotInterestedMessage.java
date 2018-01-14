@@ -3,8 +3,8 @@ package main.peer;
 import java.nio.ByteBuffer;
 
 public class NotInterestedMessage extends Message {
-    private static int length=1;
-    private static byte messageId=3;
+    private static final int length=1;
+    private static final byte messageId=3;
     /**
      * The not interested message is fixed-length and has no payload.
      */

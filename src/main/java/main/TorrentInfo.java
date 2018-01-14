@@ -1,24 +1,16 @@
 package main;
 
 import christophedetroyer.torrent.Torrent;
-import christophedetroyer.torrent.TorrentFile;
 import main.tracker.Tracker;
-import org.joou.UShort;
 
-import javax.sound.midi.Track;
-import java.net.InetAddress;
-import java.util.AbstractMap;
 import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static org.joou.Unsigned.ushort;
 
 public class TorrentInfo {
-    private Torrent torrent;
+    private final Torrent torrent;
 
     public TorrentInfo(Torrent torrent) {
         this.torrent = torrent;

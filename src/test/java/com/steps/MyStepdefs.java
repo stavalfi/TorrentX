@@ -1,10 +1,8 @@
 package com.steps;
 
 import christophedetroyer.torrent.TorrentParser;
-import cucumber.api.PendingException;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
-import cucumber.api.java.en.When;
 import main.TorrentInfo;
 import main.tracker.*;
 import main.tracker.response.AnnounceResponse;
@@ -32,20 +30,10 @@ public class MyStepdefs {
     // we will test this sequence
     private Mono<? extends TrackerResponse> trackerResponseMono;
 
-    @BeforeClass
-    public static void f1() {
-        System.out.println("hi");
-    }
-
     @Given("^new torrent file: \"([^\"]*)\".$")
     public void newTorrentFile(String torrentFilePath) throws Throwable {
         String torrentFilesLocation = "src/test/resources/";
         this.torrent = new TorrentInfo(TorrentParser.parseTorrent(torrentFilesLocation + torrentFilePath));
-    }
-
-    @When("^application read trackers for this torrent.$")
-    public void applicationReadTrackersForThisTorrent() throws Throwable {
-
     }
 
     @Then("^change the torrent-info-hash to a valid but not exist hash.$")
@@ -62,7 +50,6 @@ public class MyStepdefs {
     public void extraNotRespondingTrackersToTheTrackerList() throws Throwable {
         String torrentHashInfo = this.torrent.getTorrentInfoHash();
         this.torrent.getTrackerList().stream().findFirst().ifPresent(tracker -> {
-            assert tracker != null;
             List<Tracker> fakeTrackers = Arrays.asList(
                     new Tracker("wrongUrl.com", 8090), // wrong url (but valid url) and a random port
                     new Tracker(tracker.getTracker(), tracker.getPort() + 1) // wrong port
@@ -83,7 +70,7 @@ public class MyStepdefs {
         String torrentHashInfo = this.torrent.getTorrentInfoHash();
         this.torrent = mock(TorrentInfo.class);
         Mockito.when(this.torrent.getTorrentInfoHash()).thenReturn(torrentHashInfo);
-        Mockito.when(this.torrent.getTrackerList()).thenReturn(Arrays.asList(new Tracker("invalid.url.123", 123)));
+        Mockito.when(this.torrent.getTrackerList()).thenReturn(Collections.singletonList(new Tracker("invalid.url.123", 123)));
     }
 
     @Then("^application send signal: \"([^\"]*)\".$")
@@ -99,7 +86,7 @@ public class MyStepdefs {
                     put(RequestSignalType.Scrape,
                             (Tracker tracker) -> ConnectToTracker.connect(tracker.getTracker(), tracker.getPort())
                                     .flatMap(connectResponse ->
-                                            ScrapeToTracker.scrape(connectResponse, Arrays.asList(torrent.getTorrentInfoHash()))));
+                                            ScrapeToTracker.scrape(connectResponse, Collections.singletonList(torrent.getTorrentInfoHash()))));
                 }};
 
         // if I get an errorSignal signal containing one of those errors,
@@ -142,7 +129,7 @@ public class MyStepdefs {
     private enum RequestSignalType {
         Connect,
         Announce,
-        Scrape;
+        Scrape
     }
 
     private enum ResponseSignalType {

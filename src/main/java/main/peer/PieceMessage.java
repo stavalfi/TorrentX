@@ -3,7 +3,7 @@ package main.peer;
 import java.nio.ByteBuffer;
 
 public class PieceMessage extends Message {
-    private static byte messageId=7;
+    private static final byte messageId=7;
     /**
      * The payload contains the following information: (by this order)
      *

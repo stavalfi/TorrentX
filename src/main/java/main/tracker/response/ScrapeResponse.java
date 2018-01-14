@@ -1,28 +1,26 @@
 package main.tracker.response;
 
-import reactor.core.publisher.Flux;
-
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class ScrapeResponse extends TrackerResponse {
 
-    private final List<ScrapeResponseForTorrentInfoHash> ScrapeResponseForTorrentInfoHashs;
+    private final List<ScrapeResponseForTorrentInfoHash> ScrapeResponseForTorrentInfoHashes;
 
-    public ScrapeResponse(String ip, int port, List<ScrapeResponseForTorrentInfoHash> scrapeResponseForTorrentInfoHashs) {
+    public ScrapeResponse(String ip, int port, List<ScrapeResponseForTorrentInfoHash> scrapeResponseForTorrentInfoHashes) {
         super(ip, port);
-        ScrapeResponseForTorrentInfoHashs = scrapeResponseForTorrentInfoHashs;
+        ScrapeResponseForTorrentInfoHashes = scrapeResponseForTorrentInfoHashes;
     }
 
-    public List<ScrapeResponseForTorrentInfoHash> getScrapeResponseForTorrentInfoHashs() {
-        return ScrapeResponseForTorrentInfoHashs;
+    public List<ScrapeResponseForTorrentInfoHash> getScrapeResponseForTorrentInfoHashes() {
+        return ScrapeResponseForTorrentInfoHashes;
     }
 
     @Override
     public String toString() {
         return "ScrapeResponse{" +
-                "ScrapeResponseForTorrentInfoHashs=" + ScrapeResponseForTorrentInfoHashs +
+                "ScrapeResponseForTorrentInfoHashes=" + ScrapeResponseForTorrentInfoHashes +
                 "} " + super.toString();
     }
 
@@ -37,7 +35,7 @@ public class ScrapeResponse extends TrackerResponse {
      *
      * @param response          what the tracker sent me back.
      * @param torrentInfoHashes what torrents I asked about in the scrape request.
-     *                          The order is importent and I assume that the answer
+     *                          The order is important and I assume that the answer
      *                          will be with the same order as this list.
      */
     public ScrapeResponse(String ip, int port, byte[] response, List<byte[]> torrentInfoHashes) {
@@ -47,7 +45,7 @@ public class ScrapeResponse extends TrackerResponse {
         assert getActionNumber() == 2;
         setTransactionId(receiveData.getInt());
 
-        this.ScrapeResponseForTorrentInfoHashs = torrentInfoHashes.stream()
+        this.ScrapeResponseForTorrentInfoHashes = torrentInfoHashes.stream()
                 .map((byte[] torrentInfoHash) -> new ScrapeResponseForTorrentInfoHash
                         (torrentInfoHash, receiveData.getInt(), receiveData.getInt(), receiveData.getInt()))
                 .collect(Collectors.toList());

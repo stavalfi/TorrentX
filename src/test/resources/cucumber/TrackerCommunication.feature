@@ -2,7 +2,6 @@ Feature: test tracker api calls.
 
   Scenario Outline: find any tracker, from all the trackers, which response to: connect,announce and scrape requests.
     Given new torrent file: "<torrentFilePath>".
-    When application read trackers for this torrent.
 
     Then application send signal: "Connect".
     Then application receive signal: "Connect".
@@ -19,7 +18,6 @@ Feature: test tracker api calls.
 
   Scenario Outline: communicating with collection of trackers which contain a not-responding trackers.
     Given new torrent file: "<torrentFilePath>".
-    When application read trackers for this torrent.
     Given extra not-responding trackers to the tracker-list.
 
     Then application send signal: "Connect".

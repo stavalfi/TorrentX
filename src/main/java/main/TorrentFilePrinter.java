@@ -11,7 +11,7 @@ import reactor.core.publisher.Flux;
 import java.io.IOException;
 import java.util.Arrays;
 
-public class TorrentFilePrinter {
+class TorrentFilePrinter {
     public static void printTorrentFileInfo(String path) throws IOException {
         Torrent t1 = TorrentParser.parseTorrent(path);
 
