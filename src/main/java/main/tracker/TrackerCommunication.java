@@ -3,6 +3,8 @@ package main.tracker;
 import main.tracker.requests.TrackerRequest;
 import main.tracker.response.ErrorResponse;
 import main.tracker.response.TrackerResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SynchronousSink;
 
@@ -10,11 +12,16 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 class TrackerCommunication {
+    private static Logger logger = LoggerFactory.getLogger(TrackerCommunication.class);
 
     public static <Request extends TrackerRequest, Response extends TrackerResponse>
     Mono<Response> communicate(Request request, Function<ByteBuffer, Response> createResponse) {
+
+        Predicate<Throwable> retryOnErrors = (Throwable exception) -> exception instanceof BadResponseException ||
+                exception instanceof SocketTimeoutException;
 
         return sendRequest(request)
                 // before we map to response bytes to response object, check if the response is ErrorResponse
@@ -39,10 +46,15 @@ class TrackerCommunication {
                                 " not equal to the request's action-number."));
                     sink.next(response);
                 })
+                .doOnError(error -> logger.warn("error signal: (the application maybe try to send the request again). ", error))
                 // the retry operation will run the first, ever created, publisher again
                 // which is defined in sendRequest method.
-                .retry(2, exception -> exception instanceof BadResponseException ||
-                        exception instanceof SocketTimeoutException);
+                .retry(2, retryOnErrors)
+                .doOnError(retryOnErrors, error -> logger.warn("error signal: " +
+                        "(the application retried to send a request agian and failed). ", error))
+                .doOnError(retryOnErrors.negate(), error -> logger.error("error signal: " +
+                        "(the application didn't try to send a request agian after this error). ", error))
+                .doOnNext(response -> logger.info("next signal: ", response.toString()));
     }
 
     private static <Request extends TrackerRequest>
