@@ -42,18 +42,19 @@ public class ScrapeResponse extends TrackerResponse {
      * ?           32-bit integer  incomplete
      * 8 + 12 * N
      *
-     * @param receiveData      what the tracker sent me back.
-     * @param torrentInfoHashs what torrents I asked about in the scrape request.
+     * @param response      what the tracker sent me back.
+     * @param torrentInfoHashes what torrents I asked about in the scrape request.
      *                         The order is importent and I assume that the answer
      *                         will be with the same order as this list.
      */
-    public ScrapeResponse(String ip, int port, ByteBuffer receiveData, List<byte[]> torrentInfoHashs) {
+    public ScrapeResponse(String ip, int port, byte[] response, List<byte[]> torrentInfoHashes) {
         super(ip, port);
+        ByteBuffer receiveData = ByteBuffer.wrap(response);
         setActionNumber(receiveData.getInt());
         assert getActionNumber() == 2;
         setTransactionId(receiveData.getInt());
 
-        this.ScrapeResponseForTorrentInfoHashs = torrentInfoHashs.stream()
+        this.ScrapeResponseForTorrentInfoHashs = torrentInfoHashes.stream()
                 .map((byte[] torrentInfoHash) -> new ScrapeResponseForTorrentInfoHash
                         (torrentInfoHash, receiveData.getInt(), receiveData.getInt(), receiveData.getInt()))
                 .collect(Collectors.toList());

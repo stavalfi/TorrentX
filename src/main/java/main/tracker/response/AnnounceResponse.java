@@ -39,8 +39,9 @@ public class AnnounceResponse extends TrackerResponse {
      * 24 + 6 * n  16-bit integer  TCP port
      * 20 + 6 * N
      */
-    public AnnounceResponse(String ip, int port, ByteBuffer receiveData, int maxPeersWeWantToGet) {
+    public AnnounceResponse(String ip, int port, byte[] response, int maxPeersWeWantToGet) {
         super(ip, port);
+        ByteBuffer receiveData = ByteBuffer.wrap(response);
         setActionNumber(receiveData.getInt());
         assert getActionNumber() == 1;
         setTransactionId(receiveData.getInt());

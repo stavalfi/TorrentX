@@ -20,8 +20,9 @@ public class ConnectResponse extends TrackerResponse {
      * 8       64-bit integer  connection_id
      * 16
      */
-    public ConnectResponse(String ip, int port, ByteBuffer receiveData) {
+    public ConnectResponse(String ip, int port, byte[] response) {
         super(ip, port);
+        ByteBuffer receiveData = ByteBuffer.wrap(response);
         setActionNumber(receiveData.getInt());
         assert getActionNumber() == 0;
         setTransactionId(receiveData.getInt());

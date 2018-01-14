@@ -22,7 +22,7 @@ public class ScrapeToTracker {
                 connectResponse.getConnectionId(), 123456, torrentsHashes);
 
         Function<ByteBuffer, ScrapeResponse> createResponse = (ByteBuffer response) ->
-                new ScrapeResponse(connectResponse.getIp(), connectResponse.getPort(), response, torrentsHashes);
+                new ScrapeResponse(connectResponse.getIp(), connectResponse.getPort(), response.array(), torrentsHashes);
 
         return TrackerCommunication.communicate(request, createResponse);
 

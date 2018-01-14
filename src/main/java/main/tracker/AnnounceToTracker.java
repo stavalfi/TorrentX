@@ -20,7 +20,7 @@ public class AnnounceToTracker {
 
         Function<ByteBuffer, AnnounceResponse> createResponse = (ByteBuffer response) ->
                 new AnnounceResponse(connectResponse.getIp(), connectResponse.getPort(),
-                        response, request.getNumWant());
+                        response.array(), request.getNumWant());
 
         return TrackerCommunication.communicate(request, createResponse);
 

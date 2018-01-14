@@ -12,7 +12,7 @@ public class ConnectToTracker {
         int transactionId = 123456;
         ConnectRequest request = new ConnectRequest(ip, port, transactionId);
         Function<ByteBuffer, ConnectResponse> createResponse = (ByteBuffer response) ->
-                new ConnectResponse(ip, port, response);
+                new ConnectResponse(ip, port, response.array());
 
         return TrackerCommunication.communicate(request, createResponse);
     }
