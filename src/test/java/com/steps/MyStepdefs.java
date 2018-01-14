@@ -1,42 +1,41 @@
 package com.steps;
 
-import christophedetroyer.torrent.Torrent;
 import christophedetroyer.torrent.TorrentParser;
+import cucumber.api.PendingException;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
 import main.TorrentInfo;
-import main.tracker.AnnounceToTracker;
-import main.tracker.ConnectToTracker;
-import main.tracker.ScrapeToTracker;
-import main.tracker.Tracker;
+import main.tracker.*;
 import main.tracker.response.AnnounceResponse;
 import main.tracker.response.ConnectResponse;
 import main.tracker.response.ScrapeResponse;
-import org.joou.UShort;
-import org.junit.Assert;
-import org.junit.Before;
+import main.tracker.response.TrackerResponse;
+import org.junit.BeforeClass;
+import org.mockito.Mockito;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SynchronousSink;
+import reactor.test.StepVerifier;
 
-import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.util.AbstractMap;
-import java.util.Arrays;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Stream;
+import java.util.*;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
-import static org.joou.Unsigned.ushort;
+import static org.mockito.Mockito.mock;
 
 public class MyStepdefs {
 
+    // what is the torrent we are talking about
     private TorrentInfo torrent;
 
-    private Flux<ConnectResponse> connectResponse;
-    private Flux<AnnounceResponse> announceResponse;
-    private Flux<ScrapeResponse> scrapeResponse;
+    // we will test this sequence
+    private Mono<? extends TrackerResponse> trackerResponseMono;
+
+    @BeforeClass
+    public static void f1() {
+        System.out.println("hi");
+    }
 
     @Given("^new torrent file: \"([^\"]*)\".$")
     public void newTorrentFile(String torrentFilePath) throws Throwable {
@@ -46,77 +45,136 @@ public class MyStepdefs {
 
     @When("^application read trackers for this torrent.$")
     public void applicationReadTrackersForThisTorrent() throws Throwable {
-        this.connectResponse = Flux.fromStream(this.torrent.getTrackerList().stream())
-                .handle((Tracker tracker, SynchronousSink<ConnectResponse> sink) -> {
-                    ConnectToTracker.connect(tracker.getTracker(), tracker.getPort())
-                            .subscribe(sink::next, error -> {
-                                if (!(error instanceof SocketTimeoutException))
-                                    sink.error(error);
-                            }, sink::complete);
-                })
+
+    }
+
+    @Then("^change the torrent-info-hash to a valid but not exist hash.$")
+    public void changeTheTorrentInfoHashToAValidButNotExistHash() throws Throwable {
+        String fakeTorrentHashInfo = "0123456789012345678901234567890123456789"; // 40 hex numbers
+        List<Tracker> originalTrackers = this.torrent.getTrackerList();
+        // define our mock object
+        this.torrent = mock(TorrentInfo.class);
+        Mockito.when(this.torrent.getTorrentInfoHash()).thenReturn(fakeTorrentHashInfo);
+        Mockito.when(this.torrent.getTrackerList()).thenReturn(originalTrackers);
+    }
+
+    @Given("^extra not-responding trackers to the tracker-list.$")
+    public void extraNotRespondingTrackersToTheTrackerList() throws Throwable {
+        String torrentHashInfo = this.torrent.getTorrentInfoHash();
+        this.torrent.getTrackerList().stream().findFirst().ifPresent(tracker -> {
+            assert tracker != null;
+            List<Tracker> fakeTrackers = Arrays.asList(
+                    new Tracker("wrongUrl.com", 8090), // wrong url (but valid url) and a random port
+                    new Tracker(tracker.getTracker(), tracker.getPort() + 1) // wrong port
+            );
+            List<Tracker> trackers = new LinkedList<>();
+            trackers.addAll(fakeTrackers);
+            trackers.addAll(this.torrent.getTrackerList());
+            trackers.addAll(fakeTrackers);
+            // define our mock object
+            this.torrent = mock(TorrentInfo.class);
+            Mockito.when(this.torrent.getTorrentInfoHash()).thenReturn(torrentHashInfo);
+            Mockito.when(this.torrent.getTrackerList()).thenReturn(trackers);
+        });
+    }
+
+    @Given("^invalid url of a tracker.$")
+    public void invalidUrlOfATracker() throws Throwable {
+        String torrentHashInfo = this.torrent.getTorrentInfoHash();
+        this.torrent = mock(TorrentInfo.class);
+        Mockito.when(this.torrent.getTorrentInfoHash()).thenReturn(torrentHashInfo);
+        Mockito.when(this.torrent.getTrackerList()).thenReturn(Arrays.asList(new Tracker("invalid.url.123", 123)));
+    }
+
+    @Then("^application send signal: \"([^\"]*)\".$")
+    public void applicationSendSignal(RequestSignalType requestToTracker) throws Throwable {
+        Map<RequestSignalType, Function<Tracker, Mono<? extends TrackerResponse>>> getResponseByRequestType =
+                new HashMap<RequestSignalType, Function<Tracker, Mono<? extends TrackerResponse>>>() {{
+                    put(RequestSignalType.Connect,
+                            (Tracker tracker) -> ConnectToTracker.connect(tracker.getTracker(), tracker.getPort()));
+                    put(RequestSignalType.Announce,
+                            (Tracker tracker) -> ConnectToTracker.connect(tracker.getTracker(), tracker.getPort())
+                                    .flatMap(connectResponse ->
+                                            AnnounceToTracker.announce(connectResponse, torrent.getTorrentInfoHash())));
+                    put(RequestSignalType.Scrape,
+                            (Tracker tracker) -> ConnectToTracker.connect(tracker.getTracker(), tracker.getPort())
+                                    .flatMap(connectResponse ->
+                                            ScrapeToTracker.scrape(connectResponse, Arrays.asList(torrent.getTorrentInfoHash()))));
+                }};
+
+        // if I get an errorSignal signal containing one of those errors,
+        // then I will communicate with the next tracker in the tracker-list.
+        Predicate<Throwable> communicationErrorsToIgnore = (Throwable error) ->
+                error instanceof SocketTimeoutException ||
+                        error instanceof BadResponseException;
+
+        this.trackerResponseMono = Flux.fromStream(this.torrent.getTrackerList().stream())
+                // given a tracker, communicate with him and get the signal containing the response.
+                .flatMap(getResponseByRequestType.get(requestToTracker).andThen(getResponseMono ->
+                        // if an errorSignal signal from the following list occurs, ignore it.
+                        getResponseMono.onErrorResume(communicationErrorsToIgnore, error -> Mono.empty())))
                 .take(1)
-                .cache();
-
-        this.announceResponse = this.connectResponse
-                .flatMap(connectResponse -> AnnounceToTracker.announce(connectResponse, this.torrent.getTorrentInfoHash()));
-
-        this.scrapeResponse = this.connectResponse
-                .flatMap(connectResponse -> ScrapeToTracker.scrape(connectResponse, Arrays.asList(this.torrent.getTorrentInfoHash())));
+                // it will send errorSignal signal if the
+                // sequence have more then one element
+                // so I used take(1) to ensure that.
+                .single();
     }
 
-    @Then("^application send tracker-request: CONNECT.$")
-    public void applicationSendTrackerRequestCONNECT() throws Throwable {
-        this.connectResponse.subscribe(null, exception -> Assert.fail(exception.toString()), null);
+    @Then("^application receive signal: \"([^\"]*)\".$")
+    public void applicationReceiveSignal(String signal) throws Throwable {
+        StepVerifier.FirstStep<? extends TrackerResponse> verifier = StepVerifier.create(this.trackerResponseMono);
+
+        boolean isAnErrorSignal = Arrays.stream(ErrorSignalTypes.values())
+                .anyMatch(signalType -> signalType.toString().equals(signal));
+
+        if (isAnErrorSignal) {
+            verifier.expectError(ErrorSignalTypes.valueOf(signal).getErrorSignal())
+                    .verify();
+            return;
+        }
+        // it's a onNext signal so it's a good response from the tracker
+        verifier.expectNextMatches((TrackerResponse response) ->
+                response.getClass() == ResponseSignalType.valueOf(signal).getSignal())
+                .expectComplete()
+                .verify();
     }
 
-    @Then("^application send tracker-request: ANNOUNCE.$")
-    public void applicationSendRequestRequestANNOUNCE() throws Throwable {
-        this.announceResponse.subscribe(null, exception -> Assert.fail(exception.toString()));
+    private enum RequestSignalType {
+        Connect,
+        Announce,
+        Scrape;
     }
 
-    @Then("^application send tracker-request: SCRAPE.$")
-    public void applicationSendRequestRequestSCRAPE() throws Throwable {
-        this.scrapeResponse.subscribe(null, exception -> Assert.fail(exception.toString()));
+    private enum ResponseSignalType {
+        Connect(ConnectResponse.class),
+        Announce(AnnounceResponse.class),
+        Scrape(ScrapeResponse.class);
+        final Class<? extends TrackerResponse> signal;
+
+        ResponseSignalType(Class<? extends TrackerResponse> signal) {
+            this.signal = signal;
+        }
+
+        public Class<? extends TrackerResponse> getSignal() {
+            return this.signal;
+        }
     }
 
-//    @Then("^choose one active peer to communicate with.$")
-//    public void chooseOnePeer() throws Throwable {
-//        this.handShakeRequest = new HandShake(this.torrentInfoHashAsByteArray, this.peerIdAsByteArray);
-//        this.activePeer = this.announceResponse.getPeers()
-//                .stream()
-//                .filter((Peer peer) -> tryConnectPeer(peer))
-//                .findFirst()
-//                .get();
-//    }
-//
-//    private boolean tryConnectPeer(Peer peer) {
-//        try {
-//            this.handShakeResponse = PeerCommunicator.sendMessage(
-//                    peer.getIpAddress(),
-//                    peer.getTcpPort().intValue(),
-//                    this.handShakeRequest);
-//            return true;
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            return false;
-//        }
-//    }
-//
-//    @When("^application send to peer a peer-request: \"([^\"]*)\".$")
-//    public void applicationSendToPeerAPeerRequest(PeerMessageType peerMessageType) throws Throwable {
-//
-//    }
-//
-//    @Then("^application receive from peer a peer-response: \"([^\"]*)\".$")
-//    public void applicationReceiveFromPeerAPeerResponse(PeerMessageType peerMessageType) throws Throwable {
-//        switch (peerMessageType) {
-//            case HANDSHAKE:
-//                Assert.assertNotNull(this.handShakeResponse);
-//                String torrentInfoHashFromRequest = HexByteConverter.byteToHex(this.handShakeRequest.getTorrentInfoHash());
-//                String torrentInfoHashFromResponse = HexByteConverter.byteToHex(this.handShakeResponse.getTorrentInfoHash());
-//                Assert.assertEquals(torrentInfoHashFromRequest, torrentInfoHashFromResponse);
-//                break;
-//        }
-//    }
+    private enum ErrorSignalTypes {
+        IOException(java.io.IOException.class),
+        UnknownHostException(java.net.UnknownHostException.class),
+        SecurityException(java.lang.SecurityException.class),
+        BadResponseException(main.tracker.BadResponseException.class);
+
+        final Class<? extends Throwable> errorSignal;
+
+        ErrorSignalTypes(Class<? extends Throwable> errorSignal) {
+            this.errorSignal = errorSignal;
+        }
+
+        public Class<? extends Throwable> getErrorSignal() {
+            return this.errorSignal;
+        }
+    }
 }
 
