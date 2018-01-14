@@ -1,41 +1,14 @@
 package main;
 
-import main.tracker.AnnounceToTracker;
-import main.tracker.ConnectToTracker;
-import main.tracker.ScrapeToTracker;
-import main.tracker.response.AnnounceResponse;
-import main.tracker.response.ConnectResponse;
-import main.tracker.response.ScrapeResponse;
-import reactor.core.publisher.Mono;
-
-import java.util.Arrays;
-
-
 public class App {
     public static void main(String[] args) throws Exception {
         String TorrentFilePath = "src/main/resources/torrent-file-example.torrent";
         TorrentFilePrinter.printAllPeers(TorrentFilePath);
-        //f1();
+
     }
 
+    private static void f2() throws Exception {
 
-    public static void f1() throws Exception {
-
-        String torrentId = "af1f3dbc5d5baeaf83f812e06aa91bbd7b55cce8";
-        String trackerIp = "tracker.coppersurfer.tk";
-        short port = 6969;
-
-        Mono<ConnectResponse> connectResponseHot = ConnectToTracker.connect(trackerIp, port)
-                .cache();
-
-        connectResponseHot
-                .doOnNext(System.out::println)
-                .flatMap((ConnectResponse response) -> AnnounceToTracker.announce(response, torrentId))
-                .doOnNext(System.out::println)
-                .flatMap((AnnounceResponse response) -> connectResponseHot)
-                .flatMap((ConnectResponse response) -> ScrapeToTracker.scrape(response, Arrays.asList(torrentId)))
-                .flatMapMany(ScrapeResponse::getScrapeResponseForTorrentInfoHashs)
-                .subscribe(System.out::println, System.out::println, System.out::println);
     }
 }
 
