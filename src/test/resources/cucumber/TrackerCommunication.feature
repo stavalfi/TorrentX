@@ -3,14 +3,14 @@ Feature: test tracker api calls.
   Scenario Outline: find any tracker, from all the trackers, which response to: connect,announce and scrape requests.
     Given new torrent file: "<torrentFilePath>".
 
-    Then application send signal: "Connect".
-    Then application receive signal: "Connect".
+    Then application send signal "Connect" to tracker.
+    Then application receive signal "Connect" from tracker.
 
-    Then application send signal: "Announce".
-    Then application receive signal: "Announce".
+    Then application send signal "Announce" to tracker.
+    Then application receive signal "Announce" from tracker.
 
-    Then application send signal: "Scrape".
-    Then application receive signal: "Scrape".
+    Then application send signal "Scrape" to tracker.
+    Then application receive signal "Scrape" from tracker.
 
     Examples:
       | torrentFilePath               |
@@ -20,8 +20,8 @@ Feature: test tracker api calls.
     Given new torrent file: "<torrentFilePath>".
     Given extra not-responding trackers to the tracker-list.
 
-    Then application send signal: "Connect".
-    Then application receive signal: "Connect".
+    Then application send signal "Connect" to tracker.
+    Then application receive signal "Connect" from tracker.
 
     Examples:
       | torrentFilePath               |
@@ -31,8 +31,8 @@ Feature: test tracker api calls.
     Given new torrent file: "<torrentFilePath>".
     Given invalid url of a tracker.
 
-    Then application send signal: "Connect".
-    Then application receive signal: "UnknownHostException".
+    Then application send signal "Connect" to tracker.
+    Then application receive error signal "UnknownHostException" from tracker.
 
     Examples:
       | torrentFilePath               |

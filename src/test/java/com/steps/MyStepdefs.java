@@ -4,12 +4,12 @@ import christophedetroyer.torrent.TorrentParser;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import main.TorrentInfo;
+import main.peer.*;
 import main.tracker.*;
 import main.tracker.response.AnnounceResponse;
 import main.tracker.response.ConnectResponse;
 import main.tracker.response.ScrapeResponse;
 import main.tracker.response.TrackerResponse;
-import org.junit.BeforeClass;
 import org.mockito.Mockito;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -73,7 +73,7 @@ public class MyStepdefs {
         Mockito.when(this.torrent.getTrackerList()).thenReturn(Collections.singletonList(new Tracker("invalid.url.123", 123)));
     }
 
-    @Then("^application send signal: \"([^\"]*)\".$")
+    @Then("^application send signal \"([^\"]*)\" to tracker.$")
     public void applicationSendSignal(RequestSignalType requestToTracker) throws Throwable {
         Map<RequestSignalType, Function<Tracker, Mono<? extends TrackerResponse>>> getResponseByRequestType =
                 new HashMap<RequestSignalType, Function<Tracker, Mono<? extends TrackerResponse>>>() {{
@@ -107,23 +107,62 @@ public class MyStepdefs {
                 .single();
     }
 
-    @Then("^application receive signal: \"([^\"]*)\".$")
-    public void applicationReceiveSignal(String signal) throws Throwable {
-        StepVerifier.FirstStep<? extends TrackerResponse> verifier = StepVerifier.create(this.trackerResponseMono);
-
-        boolean isAnErrorSignal = Arrays.stream(ErrorSignalTypes.values())
-                .anyMatch(signalType -> signalType.toString().equals(signal));
-
-        if (isAnErrorSignal) {
-            verifier.expectError(ErrorSignalTypes.valueOf(signal).getErrorSignal())
-                    .verify();
-            return;
-        }
-        // it's a onNext signal so it's a good response from the tracker
-        verifier.expectNextMatches((TrackerResponse response) ->
-                response.getClass() == ResponseSignalType.valueOf(signal).getSignal())
+    @Then("^application receive signal \"([^\"]*)\" from tracker.$")
+    public void applicationReceiveSignal(ResponseSignalType responseSignalType) throws Throwable {
+        StepVerifier.create(this.trackerResponseMono)
+                .expectNextMatches((TrackerResponse response) ->
+                        response.getClass() == responseSignalType.getSignal())
                 .expectComplete()
                 .verify();
+    }
+
+    @Then("^application receive error signal \"([^\"]*)\" from tracker.$")
+    public void applicationReceiveErrorSignalFromTracker(ErrorSignalType errorSignalType) throws Throwable {
+        StepVerifier.create(this.trackerResponseMono)
+                .expectError(errorSignalType.getErrorSignal())
+                .verify();
+    }
+
+    @Then("^change our peer-id to an unregistered peer-id.$")
+    public void changeOurPeerIdToAnUnregisteredPeerId() throws Throwable {
+
+    }
+
+    @Then("^change the torrent-info-hash to a invalid torrent-info-hash.$")
+    public void changeTheTorrentInfoHashToAInvalidTorrentInfoHash() throws Throwable {
+    }
+
+    @Then("^application send communication request to peer.$")
+    public void applicationSendCommunicationRequestToPeer() throws Throwable {
+    }
+
+    @Then("^application receive communication response from peer: \"([^\"]*)\".$")
+    public void applicationReceiveCommunicationResponseFromPeer(String peersConnectionStatus) throws Throwable {
+    }
+
+
+    private enum PeerMessageType {
+        BitFieldMessage(BitFieldMessage.class),
+        CancelMessage(CancelMessage.class),
+        ChokeMessage(ChokeMessage.class),
+        HaveMessage(HaveMessage.class),
+        InterestedMessage(InterestedMessage.class),
+        IsAliveMessage(IsAliveMessage.class),
+        NotInterestedMessage(NotInterestedMessage.class),
+        PieceMessage(PieceMessage.class),
+        PortMessage(PortMessage.class),
+        RequestMessage(RequestMessage.class),
+        UnchokeMessage(UnchokeMessage.class);
+
+        final Class<? extends PeerMessage> signal;
+
+        PeerMessageType(Class<? extends PeerMessage> signal) {
+            this.signal = signal;
+        }
+
+        public Class<? extends PeerMessage> getSignal() {
+            return this.signal;
+        }
     }
 
     private enum RequestSignalType {
@@ -147,7 +186,7 @@ public class MyStepdefs {
         }
     }
 
-    private enum ErrorSignalTypes {
+    private enum ErrorSignalType {
         IOException(java.io.IOException.class),
         UnknownHostException(java.net.UnknownHostException.class),
         SecurityException(java.lang.SecurityException.class),
@@ -155,7 +194,7 @@ public class MyStepdefs {
 
         final Class<? extends Throwable> errorSignal;
 
-        ErrorSignalTypes(Class<? extends Throwable> errorSignal) {
+        ErrorSignalType(Class<? extends Throwable> errorSignal) {
             this.errorSignal = errorSignal;
         }
 
