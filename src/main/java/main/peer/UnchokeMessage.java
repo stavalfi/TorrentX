@@ -2,7 +2,7 @@ package main.peer;
 
 import java.nio.ByteBuffer;
 
-public class UnchokeMessage extends Message {
+public class UnchokeMessage extends PeerMessage {
     private static final int length=1;
     private static final byte messageId=1;
     /**

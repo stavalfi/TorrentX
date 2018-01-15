@@ -2,7 +2,7 @@ package main.peer;
 
 import java.nio.ByteBuffer;
 
-public class IsAliveMessage extends Message {
+public class IsAliveMessage extends PeerMessage {
     private static final int length=0;
     private static final byte messageId=0;
     public IsAliveMessage() {

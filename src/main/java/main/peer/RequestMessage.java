@@ -3,7 +3,7 @@ package main.peer;
 import java.nio.ByteBuffer;
 
 // The request message is fixed length, and is used to request a block.
-public class RequestMessage extends Message {
+public class RequestMessage extends PeerMessage {
     private static int length=13;
     private static final byte messageId=6;
     /**

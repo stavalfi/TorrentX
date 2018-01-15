@@ -2,7 +2,7 @@ package main.peer;
 
 import java.nio.ByteBuffer;
 
-public class CancelMessage extends Message {
+public class CancelMessage extends PeerMessage {
     private static int length=13;
     private static final byte messageId=7;
     public CancelMessage(int index, int begin, int length) {

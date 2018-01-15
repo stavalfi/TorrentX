@@ -2,13 +2,13 @@ package main.peer;
 
 import java.nio.ByteBuffer;
 
-public abstract class Message {
+public abstract class PeerMessage {
 
     private final int length; // 4 bytes - the length in bytes of byte-size(messageId) + byte-size(payload)
     private final byte messageId; // 1 byte
     private final byte[] payload;
 
-    public Message(int length, byte messageId, byte[] payload) {
+    public PeerMessage(int length, byte messageId, byte[] payload) {
         this.length = length;
         this.messageId = messageId;
         this.payload = payload;

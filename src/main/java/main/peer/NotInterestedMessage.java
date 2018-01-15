@@ -2,7 +2,7 @@ package main.peer;
 
 import java.nio.ByteBuffer;
 
-public class NotInterestedMessage extends Message {
+public class NotInterestedMessage extends PeerMessage {
     private static final int length=1;
     private static final byte messageId=3;
     /**
