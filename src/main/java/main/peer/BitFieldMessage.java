@@ -1,6 +1,7 @@
 package main.peer;
 
-import java.nio.ByteBuffer;
+import main.Peer;
+
 import java.util.BitSet;
 
 public class BitFieldMessage extends PeerMessage {
@@ -17,11 +18,11 @@ public class BitFieldMessage extends PeerMessage {
      *               and set bits indicate a valid and available piece.
      *               Spare bits at the end are set to zero.
      */
-    public BitFieldMessage(BitSet peaces) {
-        super(1 + peaces.toByteArray().length, messageId, peaces.toByteArray());
+    public BitFieldMessage(Peer from, Peer to,BitSet peaces) {
+        super(from, to, 1 + peaces.toByteArray().length, messageId, peaces.toByteArray());
     }
 
-    public BitFieldMessage(byte[] peerMessage) {
-        super(peerMessage);
+    public BitFieldMessage(Peer from, Peer to,byte[] peerMessage) {
+        super(from, to, peerMessage);
     }
 }

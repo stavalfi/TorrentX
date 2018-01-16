@@ -1,5 +1,7 @@
 package main.peer;
 
+import main.Peer;
+
 import java.nio.ByteBuffer;
 
 public class InterestedMessage extends PeerMessage {
@@ -8,10 +10,10 @@ public class InterestedMessage extends PeerMessage {
     /**
      * The interested message is fixed-length and has no payload.
      */
-    public InterestedMessage() {
-        super(length,messageId, ByteBuffer.allocate(0).array());
+    public InterestedMessage(Peer from, Peer to) {
+        super(from, to, length,messageId, ByteBuffer.allocate(0).array());
     }
-    public InterestedMessage(byte[] peerMessage) {
-        super(peerMessage);
+    public InterestedMessage(Peer from, Peer to,byte[] peerMessage) {
+        super(from, to, peerMessage);
     }
 }

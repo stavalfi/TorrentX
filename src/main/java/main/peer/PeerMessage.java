@@ -1,22 +1,28 @@
 package main.peer;
 
-import javafx.util.BuilderFactory;
+import main.Peer;
 
 import java.nio.ByteBuffer;
 
 public abstract class PeerMessage {
 
+    private final Peer from;
+    private final Peer to;
     private final int length; // 4 bytes - the length in bytes of sizeof(messageId) + sizeof(payload)
     private final byte messageId; // 1 byte
     private final byte[] payload;
 
-    public PeerMessage(int length, byte messageId, byte[] payload) {
+    public PeerMessage(Peer from, Peer to, int length, byte messageId, byte[] payload) {
         this.length = length;
         this.messageId = messageId;
         this.payload = payload;
+        this.from = from;
+        this.to = to;
     }
 
-    public PeerMessage(byte[] peerMessage) {
+    public PeerMessage(Peer from, Peer to, byte[] peerMessage) {
+        this.from = from;
+        this.to = to;
         ByteBuffer buffer = ByteBuffer.wrap(peerMessage);
         this.length = buffer.getInt();
         this.messageId = buffer.get();
