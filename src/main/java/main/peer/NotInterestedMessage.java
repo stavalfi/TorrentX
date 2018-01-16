@@ -11,4 +11,7 @@ public class NotInterestedMessage extends PeerMessage {
     public NotInterestedMessage() {
         super(length,messageId, ByteBuffer.allocate(0).array());
     }
+    public NotInterestedMessage(byte[] peerMessage) {
+        super(peerMessage);
+    }
 }

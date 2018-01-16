@@ -8,4 +8,7 @@ public class IsAliveMessage extends PeerMessage {
     public IsAliveMessage() {
         super(length, messageId, ByteBuffer.allocate(0).array());
     }
+    public IsAliveMessage(byte[] peerMessage) {
+        super(peerMessage);
+    }
 }

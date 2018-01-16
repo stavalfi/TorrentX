@@ -17,4 +17,7 @@ public class PieceMessage extends PeerMessage {
                                                             .putInt(begin)
                                                             .put(block).array());
     }
+    public PieceMessage(byte[] peerMessage) {
+        super(peerMessage);
+    }
 }

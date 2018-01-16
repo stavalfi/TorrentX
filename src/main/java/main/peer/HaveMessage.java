@@ -16,4 +16,7 @@ public class HaveMessage extends PeerMessage {
     public HaveMessage(int pieceIndex) {
         super(length, messageId, ByteBuffer.allocate(4).putInt(pieceIndex).array());
     }
+    public HaveMessage(byte[] peerMessage) {
+        super(peerMessage);
+    }
 }

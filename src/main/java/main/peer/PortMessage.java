@@ -9,4 +9,7 @@ public class PortMessage extends PeerMessage {
     public PortMessage(short listenPort) {
         super(length, messageId, ByteBuffer.allocate(2).putShort(listenPort).array());
     }
+    public PortMessage(byte[] peerMessage) {
+        super(peerMessage);
+    }
 }

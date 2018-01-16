@@ -19,4 +19,7 @@ public class RequestMessage extends PeerMessage {
                 .putInt(begin)
                 .putInt(length).array());
     }
+    public RequestMessage(byte[] peerMessage) {
+        super(peerMessage);
+    }
 }

@@ -11,4 +11,7 @@ public class ChokeMessage extends PeerMessage {
     public ChokeMessage() {
         super(length,messageId,ByteBuffer.allocate(0).array());
     }
+    public ChokeMessage(byte[] peerMessage) {
+        super(peerMessage);
+    }
 }

@@ -11,4 +11,7 @@ public class InterestedMessage extends PeerMessage {
     public InterestedMessage() {
         super(length,messageId, ByteBuffer.allocate(0).array());
     }
+    public InterestedMessage(byte[] peerMessage) {
+        super(peerMessage);
+    }
 }
