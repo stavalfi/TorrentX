@@ -1,6 +1,7 @@
 package com.steps;
 
 import christophedetroyer.torrent.TorrentParser;
+import cucumber.api.PendingException;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import main.TorrentInfo;
@@ -34,16 +35,6 @@ public class MyStepdefs {
     public void newTorrentFile(String torrentFilePath) throws Throwable {
         String torrentFilesLocation = "src/test/resources/";
         this.torrent = new TorrentInfo(TorrentParser.parseTorrent(torrentFilesLocation + torrentFilePath));
-    }
-
-    @Then("^change the torrent-info-hash to a valid but not exist hash.$")
-    public void changeTheTorrentInfoHashToAValidButNotExistHash() throws Throwable {
-        String fakeTorrentHashInfo = "0123456789012345678901234567890123456789"; // 40 hex numbers
-        List<Tracker> originalTrackers = this.torrent.getTrackerList();
-        // define our mock object
-        this.torrent = mock(TorrentInfo.class);
-        Mockito.when(this.torrent.getTorrentInfoHash()).thenReturn(fakeTorrentHashInfo);
-        Mockito.when(this.torrent.getTrackerList()).thenReturn(originalTrackers);
     }
 
     @Given("^extra not-responding trackers to the tracker-list.$")
@@ -123,21 +114,64 @@ public class MyStepdefs {
                 .verify();
     }
 
+    @Then("^application send Handshake request to a random peer.$")
+    public void applicationSendCommunicationRequestToARandomPeer() throws Throwable {
+        // Write code here that turns the phrase above into concrete actions
+        throw new PendingException();
+    }
+
+    @Then("^application receive Handshake response from the same peer: \"([^\"]*)\".$")
+    public void applicationReceiveCommunicationResponseFromTheSamePeer(String arg0) throws Throwable {
+        // Write code here that turns the phrase above into concrete actions
+        throw new PendingException();
+    }
+
     @Then("^change our peer-id to an unregistered peer-id.$")
     public void changeOurPeerIdToAnUnregisteredPeerId() throws Throwable {
+        // Write code here that turns the phrase above into concrete actions
+        throw new PendingException();
+    }
 
+    @Then("^fix invalid details of the torrent.$")
+    public void fixInvalidDetailsOfTheTorrent() throws Throwable {
+        // Write code here that turns the phrase above into concrete actions
+        throw new PendingException();
     }
 
     @Then("^change the torrent-info-hash to a invalid torrent-info-hash.$")
     public void changeTheTorrentInfoHashToAInvalidTorrentInfoHash() throws Throwable {
+        // Write code here that turns the phrase above into concrete actions
+        throw new PendingException();
     }
 
-    @Then("^application send communication request to peer.$")
-    public void applicationSendCommunicationRequestToPeer() throws Throwable {
+    @Given("^new torrent file: \"([^\"]*)\" containing the following fake peers:$")
+    public void newTorrentFileContainingTheFollowingFakePeers(String arg0) throws Throwable {
+        // Write code here that turns the phrase above into concrete actions
+        throw new PendingException();
     }
 
-    @Then("^application receive communication response from peer: \"([^\"]*)\".$")
-    public void applicationReceiveCommunicationResponseFromPeer(String peersConnectionStatus) throws Throwable {
+    @Then("^application send Handshake request to the following peers:$")
+    public void applicationSendHandshakeRequestToTheFollowingPeers() throws Throwable {
+        // Write code here that turns the phrase above into concrete actions
+        throw new PendingException();
+    }
+
+    @Then("^application receive Handshake response from the following peers:$")
+    public void applicationReceiveHandshakeResponseFromTheFollowingPeers() throws Throwable {
+        // Write code here that turns the phrase above into concrete actions
+        throw new PendingException();
+    }
+
+    @Then("^application send in parallel to the following peers:$")
+    public void applicationSendInParallelToTheFollowingPeers() throws Throwable {
+        // Write code here that turns the phrase above into concrete actions
+        throw new PendingException();
+    }
+
+    @Then("^application receive messages from the following peers:$")
+    public void applicationReceiveMessagesFromTheFollowingPeers() throws Throwable {
+        // Write code here that turns the phrase above into concrete actions
+        throw new PendingException();
     }
 
 
