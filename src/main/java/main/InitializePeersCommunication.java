@@ -9,7 +9,7 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 public class InitializePeersCommunication {
     private static Logger logger = LoggerFactory.getLogger(PeersCommunicator.class);
 
-    public static Mono<PeersCommunicator> initialize(String peerIp, int peerPort) {
+    public static Mono<PeersCommunicator> initialize(Peer peer) {
         return Mono.error(new NotImplementedException());
     }
 

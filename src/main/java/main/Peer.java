@@ -6,9 +6,9 @@ public class Peer {
     private final String ipAddress;
     private final int tcpPort;
 
-    public Peer(String ipAddress, UShort tcpPort) {
+    public Peer(String ipAddress, int tcpPort) {
         this.ipAddress = ipAddress;
-        this.tcpPort = tcpPort.intValue();
+        this.tcpPort = tcpPort;
     }
 
     public String getIpAddress() {

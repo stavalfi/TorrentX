@@ -13,15 +13,13 @@ import java.net.Socket;
 public class PeersCommunicator {
     private static Logger logger = LoggerFactory.getLogger(PeersCommunicator.class);
 
-    private int peerPort;
-    private final String peerIp;
+    private Peer peer;
     private Socket peersocket;
 
-    public PeersCommunicator(String peerIp, int peerPort, Socket peerSocket) {
+    public PeersCommunicator(Peer peer, Socket peerSocket) {
         assert peerSocket != null;
 
-        this.peerIp = peerIp;
-        this.peerPort = peerPort;
+        this.peer = peer;
         this.peersocket = peerSocket;
     }
 

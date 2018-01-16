@@ -116,62 +116,52 @@ public class MyStepdefs {
 
     @Then("^application send Handshake request to a random peer.$")
     public void applicationSendCommunicationRequestToARandomPeer() throws Throwable {
-        // Write code here that turns the phrase above into concrete actions
-        throw new PendingException();
+
     }
 
     @Then("^application receive Handshake response from the same peer: \"([^\"]*)\".$")
     public void applicationReceiveCommunicationResponseFromTheSamePeer(String arg0) throws Throwable {
-        // Write code here that turns the phrase above into concrete actions
-        throw new PendingException();
+
     }
 
     @Then("^change our peer-id to an unregistered peer-id.$")
     public void changeOurPeerIdToAnUnregisteredPeerId() throws Throwable {
-        // Write code here that turns the phrase above into concrete actions
-        throw new PendingException();
+
     }
 
     @Then("^fix invalid details of the torrent.$")
     public void fixInvalidDetailsOfTheTorrent() throws Throwable {
-        // Write code here that turns the phrase above into concrete actions
-        throw new PendingException();
+
     }
 
     @Then("^change the torrent-info-hash to a invalid torrent-info-hash.$")
     public void changeTheTorrentInfoHashToAInvalidTorrentInfoHash() throws Throwable {
-        // Write code here that turns the phrase above into concrete actions
-        throw new PendingException();
+
     }
 
     @Given("^new torrent file: \"([^\"]*)\" containing the following fake peers:$")
     public void newTorrentFileContainingTheFollowingFakePeers(String arg0) throws Throwable {
-        // Write code here that turns the phrase above into concrete actions
-        throw new PendingException();
+
     }
 
     @Then("^application send Handshake request to the following peers:$")
     public void applicationSendHandshakeRequestToTheFollowingPeers() throws Throwable {
-        // Write code here that turns the phrase above into concrete actions
-        throw new PendingException();
+
     }
 
     @Then("^application receive Handshake response from the following peers:$")
     public void applicationReceiveHandshakeResponseFromTheFollowingPeers() throws Throwable {
-        // Write code here that turns the phrase above into concrete actions
-        throw new PendingException();
+
     }
 
     @Then("^application send in parallel to the following peers:$")
     public void applicationSendInParallelToTheFollowingPeers() throws Throwable {
-        // Write code here that turns the phrase above into concrete actions
-        throw new PendingException();
+
     }
 
     @Then("^application receive messages from the following peers:$")
     public void applicationReceiveMessagesFromTheFollowingPeers() throws Throwable {
-        // Write code here that turns the phrase above into concrete actions
-        throw new PendingException();
+
     }
 
 
