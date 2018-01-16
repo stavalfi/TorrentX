@@ -4,18 +4,18 @@ import org.joou.UShort;
 
 public class Peer {
     private final String ipAddress;
-    private final UShort tcpPort;
+    private final int tcpPort;
 
     public Peer(String ipAddress, UShort tcpPort) {
         this.ipAddress = ipAddress;
-        this.tcpPort = tcpPort;
+        this.tcpPort = tcpPort.intValue();
     }
 
     public String getIpAddress() {
         return ipAddress;
     }
 
-    public UShort getTcpPort() {
+    public int getTcpPort() {
         return tcpPort;
     }
 
