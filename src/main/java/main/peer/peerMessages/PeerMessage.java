@@ -54,7 +54,7 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
         ByteBuffer buffer = ByteBuffer.wrap(peerMessage);
         int length = buffer.getInt();
         if (length == 0)
-            return 10;//it's KeepAlive message;
+            return 10; // it's KeepAlive message;
         return buffer.get();
     }
 

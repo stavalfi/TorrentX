@@ -9,13 +9,7 @@ class App {
     }
 
     private static int f2() {
-        try {
-            return 1;
-        } catch (Exception e) {
-            return 2;
-        } finally {
-
-        }
+        return 1;
     }
 }
 

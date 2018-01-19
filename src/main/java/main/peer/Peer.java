@@ -24,8 +24,8 @@ public class Peer {
 
         Peer peer = (Peer) o;
 
-        if (getPeerPort() != peer.getPeerPort()) return false;
-        return getPeerIp().equals(peer.getPeerIp());
+        return getPeerPort() == peer.getPeerPort() &&
+                getPeerIp().equals(peer.getPeerIp());
     }
 
     @Override

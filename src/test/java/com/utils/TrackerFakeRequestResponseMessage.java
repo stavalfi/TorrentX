@@ -1,7 +1,5 @@
 package com.utils;
 
-import java.util.Optional;
-
 public class TrackerFakeRequestResponseMessage {
     private final TrackerRequestType trackerRequestType;
     private final ErrorSignalType errorSignalType;
@@ -15,7 +13,7 @@ public class TrackerFakeRequestResponseMessage {
         return trackerRequestType;
     }
 
-    public Optional<ErrorSignalType> getErrorSignalType() {
-        return Optional.ofNullable(errorSignalType);
+    public ErrorSignalType getErrorSignalType() {
+        return errorSignalType;
     }
 }

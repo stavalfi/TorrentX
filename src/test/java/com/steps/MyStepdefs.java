@@ -134,51 +134,51 @@ public class MyStepdefs {
 
         peerFakeMessages.stream()
                 .collect(Collectors.groupingBy(Function.identity()))
-                .forEach((PeerFakeMessage peer, List<PeerFakeMessage> messages) -> {
-                    InitializePeersCommunication.getInstance().initialize(new Peer(peer.getPeerIp(), peer.getPeerPort()))
-                            .subscribe((PeersCommunicator peersCommunicator) -> {
-                                List<PeerMessage> messagesWeSend = messages.stream()
-                                        .map(PeerFakeMessage::getSendMessageType)
-                                        .map(PeerMessageType::getSignal)
-                                        .map(Utils::createFakeMessage)
-                                        .collect(Collectors.toList());
+                .forEach((PeerFakeMessage peer, List<PeerFakeMessage> messages) ->
+                        InitializePeersCommunication.getInstance().initialize(new Peer(peer.getPeerIp(), peer.getPeerPort()))
+                                .subscribe((PeersCommunicator peersCommunicator) -> {
+                                    List<PeerMessage> messagesWeSend = messages.stream()
+                                            .map(PeerFakeMessage::getSendMessageType)
+                                            .map(PeerMessageType::getSignal)
+                                            .map(Utils::createFakeMessage)
+                                            .collect(Collectors.toList());
 
-                                List<PeerMessage> messagesWeShouldReceive = messages.stream()
-                                        .filter(message -> message.getErrorSignalType() != null)
-                                        .map(PeerFakeMessage::getReceiveMessageType)
-                                        .map(PeerMessageType::getSignal)
-                                        .map(Utils::createFakeMessage)
-                                        .sorted()
-                                        .collect(Collectors.toList());
-
-                                StepVerifier.Step<PeerMessage> messagesWeActuallyReceived =
-                                        StepVerifier.create(Flux.fromIterable(messagesWeSend)
-                                                .flatMap(peersCommunicator::send))
-                                                .expectNextCount(messagesWeShouldReceive.size());
-
-                                boolean isSequenceShouldContainErrorSignal = messages.stream()
-                                        .anyMatch(message -> message.getErrorSignalType() != null);
-
-                                if (isSequenceShouldContainErrorSignal) {
-                                    ErrorSignalType errorSignalType = messages.stream()
+                                    List<PeerMessage> messagesWeShouldReceive = messages.stream()
                                             .filter(message -> message.getErrorSignalType() != null)
-                                            .findAny()
-                                            .get() // isSequenceShouldContainErrorSignal == true
-                                            .getErrorSignalType();
-                                    messagesWeActuallyReceived.expectError(errorSignalType.getErrorSignal())
-                                            .verify();
-                                } else
-                                    messagesWeActuallyReceived.expectComplete()
-                                            .verify();
+                                            .map(PeerFakeMessage::getReceiveMessageType)
+                                            .map(PeerMessageType::getSignal)
+                                            .map(Utils::createFakeMessage)
+                                            .sorted()
+                                            .collect(Collectors.toList());
 
-                                try {
-                                    peersCommunicator.closeConnection();
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                }
-                            });
+                                    StepVerifier.Step<PeerMessage> messagesWeActuallyReceived =
+                                            StepVerifier.create(Flux.fromIterable(messagesWeSend)
+                                                    .flatMap(peersCommunicator::send))
+                                                    .expectNextCount(messagesWeShouldReceive.size());
 
-                });
+                                    boolean isSequenceContainErrorSignal = messages.stream()
+                                            .anyMatch(message -> message.getErrorSignalType() != null);
+
+                                    if (isSequenceContainErrorSignal) {
+                                        messages.stream()
+                                                .filter(message -> message.getErrorSignalType() != null)
+                                                .map(PeerFakeMessage::getErrorSignalType)
+                                                .findAny()
+                                                .ifPresent((ErrorSignalType errorSignalType) ->
+                                                        messagesWeActuallyReceived
+                                                                .expectError(errorSignalType.getErrorSignal())
+                                                                .verify());
+
+                                    } else
+                                        messagesWeActuallyReceived.expectComplete()
+                                                .verify();
+
+                                    try {
+                                        peersCommunicator.closeConnection();
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
+                                }));
 
         this.remoteFakePeers.forEach(RemoteFakePeer::shutdown);
     }
@@ -194,47 +194,44 @@ public class MyStepdefs {
 
         List<Tracker> trackers = this.torrentInfo.getTrackerList();
         Flux<? extends TrackerResponse> actualResponseFlux = Flux.fromIterable(trackers)
-                .flatMap(tracker -> {
-                    return Flux.fromIterable(messages)
-                            // given a tracker, communicate with him and get the signal containing the response.
-                            .flatMap(messageWeNeedToSend -> {
-                                switch (messageWeNeedToSend.getTrackerRequestType()) {
-                                    case Connect:
-                                        return ConnectToTracker.connect(tracker.getTracker(), tracker.getPort());
-                                    case Announce:
-                                        return ConnectToTracker.connect(tracker.getTracker(), tracker.getPort())
-                                                .flatMap(connectResponse ->
-                                                        AnnounceToTracker.announce(connectResponse, torrentInfo.getTorrentInfoHash()));
-                                    case Scrape:
-                                        return ConnectToTracker.connect(tracker.getTracker(), tracker.getPort())
-                                                .flatMap(connectResponse ->
-                                                        ScrapeToTracker.scrape(connectResponse, Collections.singletonList(torrentInfo.getTorrentInfoHash())));
-                                    default:
-                                        throw new IllegalArgumentException(messageWeNeedToSend.getTrackerRequestType().toString());
-                                }
-                            })
-                            // collect all the responses from this tracker until there are no more to a list.
-                            .buffer()
-                            // if something went wrong, return empty flux.
-                            .onErrorResume(communicationErrorsToIgnore, error -> Mono.empty())
-                            .flatMap(Flux::fromIterable);
-                })
+                .flatMap(tracker ->
+                        Flux.fromIterable(messages)
+                                // given a tracker, communicate with him and get the signal containing the response.
+                                .flatMap(messageWeNeedToSend -> {
+                                    switch (messageWeNeedToSend.getTrackerRequestType()) {
+                                        case Connect:
+                                            return ConnectToTracker.connect(tracker.getTracker(), tracker.getPort());
+                                        case Announce:
+                                            return ConnectToTracker.connect(tracker.getTracker(), tracker.getPort())
+                                                    .flatMap(connectResponse ->
+                                                            AnnounceToTracker.announce(connectResponse, torrentInfo.getTorrentInfoHash()));
+                                        case Scrape:
+                                            return ConnectToTracker.connect(tracker.getTracker(), tracker.getPort())
+                                                    .flatMap(connectResponse ->
+                                                            ScrapeToTracker.scrape(connectResponse, Collections.singletonList(torrentInfo.getTorrentInfoHash())));
+                                        default:
+                                            throw new IllegalArgumentException(messageWeNeedToSend.getTrackerRequestType().toString());
+                                    }
+                                })
+                                // collect all the responses from this tracker until there are no more to a list.
+                                .buffer()
+                                // if something went wrong, return empty flux.
+                                .onErrorResume(communicationErrorsToIgnore, error -> Mono.empty())
+                                .flatMap(Flux::fromIterable))
                 // take is an operation which may send "cancel" signal.
                 .take(messages.size());
 
         // check the responses
 
-        Optional<ErrorSignalType> expectedErrorSignal = messages
+        Optional<TrackerFakeRequestResponseMessage> expectedErrorSignal = messages
                 .stream()
-                .map(TrackerFakeRequestResponseMessage::getErrorSignalType)
-                .filter(error -> error.isPresent())
-                .map(error -> error.get())
+                .filter(message -> message.getErrorSignalType() != null)
                 .findAny();
 
 
         if (expectedErrorSignal.isPresent()) {
             StepVerifier.create(actualResponseFlux)
-                    .expectError(expectedErrorSignal.get().getErrorSignal())
+                    .expectError(expectedErrorSignal.get().getErrorSignalType().getErrorSignal())
                     .verify();
             return;
         }

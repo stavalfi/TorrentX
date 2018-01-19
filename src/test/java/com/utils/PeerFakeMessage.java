@@ -24,8 +24,8 @@ public class PeerFakeMessage {
 
         PeerFakeMessage that = (PeerFakeMessage) o;
 
-        if (getPeerPort() != that.getPeerPort()) return false;
-        return getPeerIp().equals(that.getPeerIp());
+        return getPeerPort() == that.getPeerPort() &&
+                getPeerIp().equals(that.getPeerIp());
     }
 
     @Override
