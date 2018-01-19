@@ -2,7 +2,6 @@ Feature: connect to a fake peers and communicate with them.
   1. the fake peers response with the same peer-message they received.
   2. the second response will be delayed in 2 seconds.
   3. the third response will cause the peer to shutdown the connection.
-  4. if application send PortMessage then the fake peer will send PortMessage with it's same port to my new port
 
   Background: read a torrent file and create fake servers which represent peers.
     Given new torrent file: "torrent-file-example1.torrent" containing the following fake peers:
