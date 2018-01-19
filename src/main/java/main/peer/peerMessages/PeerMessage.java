@@ -1,4 +1,4 @@
-package main.peer;
+package main.peer.peerMessages;
 
 import main.Peer;
 
@@ -52,8 +52,10 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
 
     public static int getMessageId(byte[] peerMessage) {
         ByteBuffer buffer = ByteBuffer.wrap(peerMessage);
-        int messageIdPosition = 4;
-        return buffer.get(messageIdPosition);
+        int length = buffer.getInt();
+        if (length == 0)
+            return 10;//it's KeepAlive message;
+        return buffer.get();
     }
 
     public int getLength() {

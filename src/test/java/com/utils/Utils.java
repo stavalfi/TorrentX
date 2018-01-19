@@ -2,7 +2,7 @@ package com.utils;
 
 import christophedetroyer.torrent.TorrentParser;
 import main.TorrentInfo;
-import main.peer.PeerMessage;
+import main.peer.peerMessages.PeerMessage;
 
 import java.io.IOException;
 

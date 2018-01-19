@@ -4,7 +4,7 @@ import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import main.*;
-import main.peer.PeerMessage;
+import main.peer.peerMessages.PeerMessage;
 import main.tracker.*;
 import main.tracker.response.TrackerResponse;
 import org.mockito.Mockito;
@@ -12,6 +12,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.*;
 import java.util.function.Function;
@@ -166,7 +167,11 @@ public class MyStepdefs {
                                     messagesWeActuallyReceived.expectComplete()
                                             .verify();
 
-                                peersCommunicator.closeConnection();
+                                try {
+                                    peersCommunicator.closeConnection();
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
                             });
 
                 });
