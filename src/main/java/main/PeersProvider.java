@@ -7,7 +7,7 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import java.util.stream.Stream;
 
 public class PeersProvider {
-    public Flux<Peer> peers(Stream<Tracker> trackers) {
-        return Flux.error(new NotImplementedException());
+    public static Flux<Peer> peers(Stream<Tracker> trackers) {
+        return Flux.error(new Exception());
     }
 }

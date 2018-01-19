@@ -6,6 +6,7 @@ import main.tracker.response.TrackerResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 import reactor.core.publisher.SynchronousSink;
 
 import java.io.IOException;
@@ -13,6 +14,7 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 
 class TrackerCommunication {
     private static Logger logger = LoggerFactory.getLogger(TrackerCommunication.class);
@@ -46,15 +48,15 @@ class TrackerCommunication {
                                 " not equal to the request's action-number."));
                     sink.next(response);
                 })
-                .doOnError(error -> logger.warn("error signal: (the application maybe try to send the request again). ", error))
+                .doOnError(retryOnErrors, error -> logger.warn("error signal: (the application maybe try to send the request again). ", error))
                 // the retry operation will run the first, ever created, publisher again
                 // which is defined in sendRequest method.
-                .retry(2, retryOnErrors)
+                .retry(1, retryOnErrors)
                 .doOnError(retryOnErrors, error -> logger.warn("error signal: " +
-                        "(the application retried to send a request agian and failed). ", error))
+                        "(the application retried to send a request again and failed). ", error))
                 .doOnError(retryOnErrors.negate(), error -> logger.error("error signal: " +
-                        "(the application didn't try to send a request agian after this error). ", error))
-                .doOnNext(response -> logger.info("next signal: ", response.toString()));
+                        "(the application didn't try to send a request again after this error). ", error))
+                .log(null, Level.INFO, SignalType.ON_NEXT);
     }
 
     private static <Request extends TrackerRequest>
@@ -107,7 +109,7 @@ class TrackerCommunication {
             try {
                 byte[] receiveData = new byte[1000];
                 DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-                trackerSocket.setSoTimeout(5000);
+                trackerSocket.setSoTimeout(1000);
                 trackerSocket.receive(receivePacket);
                 ByteBuffer response = ByteBuffer.wrap(receiveData);
                 sink.success(response);

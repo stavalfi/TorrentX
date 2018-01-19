@@ -8,7 +8,7 @@ import java.nio.ByteBuffer;
 import java.util.function.Function;
 
 public class ConnectToTracker {
-    public static Mono<ConnectResponse> connect(String ip, int port) {
+    public static Mono<? extends ConnectResponse> connect(String ip, int port) {
         int transactionId = 123456;
         ConnectRequest request = new ConnectRequest(ip, port, transactionId);
         Function<ByteBuffer, ConnectResponse> createResponse = (ByteBuffer response) ->

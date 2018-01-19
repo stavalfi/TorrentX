@@ -4,10 +4,12 @@ class App {
     public static void main(String[] args) throws Exception {
         String TorrentFilePath = "src/main/resources/torrent-file-example.torrent";
 //        TorrentFilePrinter.printAllPeers(TorrentFilePath);
+
         f2();
     }
 
     private static void f2() {
+
     }
 }
 

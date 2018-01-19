@@ -1,6 +1,6 @@
 package main.tracker.response;
 
-public class TrackerResponse {
+public abstract class TrackerResponse {
     private final String ip;
     private final int port;
     private int actionNumber;

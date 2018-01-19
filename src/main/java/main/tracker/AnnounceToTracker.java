@@ -1,5 +1,6 @@
 package main.tracker;
 
+import main.AppConfig;
 import main.HexByteConverter;
 import main.tracker.requests.AnnounceRequest;
 import main.tracker.response.AnnounceResponse;
@@ -10,13 +11,13 @@ import java.nio.ByteBuffer;
 import java.util.function.Function;
 
 public class AnnounceToTracker {
-    private static final short portWeListenForPeersRequests = 8181;
-    private static final byte[] peerId = "-AZ5750-TpkXttZLfpSH".getBytes();
+    private static final int portWeListenForPeersRequests = AppConfig.getInstance().getTcpPortListeningForPeersMessages();
+    private static final byte[] peerId = AppConfig.getInstance().getPeerId().getBytes();
 
-    public static Mono<AnnounceResponse> announce(ConnectResponse connectResponse, String torrentHash) {
+    public static Mono<? extends AnnounceResponse> announce(ConnectResponse connectResponse, String torrentHash) {
 
         AnnounceRequest request = new AnnounceRequest(connectResponse.getIp(), connectResponse.getPort(), connectResponse.getConnectionId(),
-                HexByteConverter.hexToByte(torrentHash), peerId, portWeListenForPeersRequests);
+                HexByteConverter.hexToByte(torrentHash), peerId, (short) portWeListenForPeersRequests);
 
         Function<ByteBuffer, AnnounceResponse> createResponse = (ByteBuffer response) ->
                 new AnnounceResponse(connectResponse.getIp(), connectResponse.getPort(),

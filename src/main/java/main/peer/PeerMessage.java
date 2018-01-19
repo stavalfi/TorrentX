@@ -4,7 +4,7 @@ import main.Peer;
 
 import java.nio.ByteBuffer;
 
-public abstract class PeerMessage {
+public abstract class PeerMessage implements Comparable<PeerMessage> {
 
     private final Peer from;
     private final Peer to;
@@ -29,6 +29,15 @@ public abstract class PeerMessage {
         int sizeOfPayload = this.length - 4;// this.length - sizeof(messageId)==this.length - 4
         this.payload = new byte[sizeOfPayload];
         buffer.get(this.payload);
+    }
+
+    @Override
+    public int compareTo(PeerMessage peerMessage) {
+        if (this.messageId > peerMessage.getMessageId())
+            return 1;
+        else if (this.messageId < peerMessage.getMessageId())
+            return -1;
+        return 0;
     }
 
     public byte[] createPacketFromObject() {

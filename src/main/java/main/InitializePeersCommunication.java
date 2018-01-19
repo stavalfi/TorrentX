@@ -9,11 +9,22 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 public class InitializePeersCommunication {
     private static Logger logger = LoggerFactory.getLogger(PeersCommunicator.class);
 
+    private Flux<PeersCommunicator> allPeersCommunicatorFlux;
+
     public static Mono<PeersCommunicator> initialize(Peer peer) {
-        return Mono.error(new NotImplementedException());
+        return Mono.error(new Exception());
+    }
+
+    public static void closeAllPeersCommunicator() {
+
     }
 
     public static Flux<PeersCommunicator> listen() {
-        return Flux.error(new NotImplementedException());
+        return Flux.error(new Exception());
     }
+
+    public static void stopListenForNewPeers() {
+
+    }
+
 }
