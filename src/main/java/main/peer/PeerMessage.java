@@ -67,4 +67,12 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
     public byte[] getPayload() {
         return payload;
     }
+
+    public Peer getFrom() {
+        return from;
+    }
+
+    public Peer getTo() {
+        return to;
+    }
 }
