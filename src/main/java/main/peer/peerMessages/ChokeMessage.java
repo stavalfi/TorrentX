@@ -1,6 +1,6 @@
 package main.peer.peerMessages;
 
-import main.Peer;
+import main.peer.Peer;
 
 import java.nio.ByteBuffer;
 

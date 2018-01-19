@@ -1,52 +1,71 @@
-package main;
+package main.peer;
 
 
-import main.peer.PeerMessage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import main.peer.peerMessages.PeerMessage;
 import reactor.core.publisher.Flux;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+import reactor.core.publisher.FluxSink;
+import reactor.core.scheduler.Schedulers;
 
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 
 public class PeersCommunicator {
-    private static Logger logger = LoggerFactory.getLogger(PeersCommunicator.class);
-
     private Peer peer;
-    private Socket peerSocket;
+    private final Socket peerSocket;
+    private final DataOutputStream dataOutputStream;
+    private final Flux<PeerMessage> responses;
 
-    public PeersCommunicator(Peer peer, Socket peerSocket) {
+    public PeersCommunicator(Peer peer, Socket peerSocket) throws Exception {
         assert peerSocket != null;
-
         this.peer = peer;
         this.peerSocket = peerSocket;
+        this.dataOutputStream = new DataOutputStream(this.peerSocket.getOutputStream());
+        this.responses = waitForResponses(new DataInputStream(this.peerSocket.getInputStream()));
     }
 
-    /**
-     * @param peerMessage
-     * @return an hot flux!
-     */
+    private Flux<PeerMessage> waitForResponses(DataInputStream dataInputStream) {
+        return Flux.create((FluxSink<PeerMessage> sink) -> {
+            while (true) {
+                byte[] data = new byte[1000];
+                try {
+                    dataInputStream.read(data);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).publishOn(Schedulers.single());
+    }
+
     public Flux<PeerMessage> send(PeerMessage peerMessage) {
-        return Flux.error(new Exception());
+        try {
+            this.dataOutputStream.write(peerMessage.createPacketFromObject());
+            return receive();
+        } catch (IOException e) {
+            try {
+                closeConnection();
+            } catch (IOException e1) {
+                // TODO: do something better... it's a fatal problem with my design!!!S
+                e1.printStackTrace();
+            }
+            return Flux.error(e);
+        }
     }
 
     /**
      * @return an hot flux!
      */
     public Flux<PeerMessage> receive() {
-        return Flux.error(new Exception());
+        return this.responses;
     }
 
     public Peer getPeer() {
         return peer;
     }
 
-    public void closeConnection() {
-
+    public void closeConnection() throws IOException {
+        this.dataOutputStream.close();
+        this.peerSocket.close();
     }
 
 

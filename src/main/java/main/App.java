@@ -5,11 +5,17 @@ class App {
         String TorrentFilePath = "src/main/resources/torrent-file-example.torrent";
 //        TorrentFilePrinter.printAllPeers(TorrentFilePath);
 
-        f2();
+        System.out.println(f2());
     }
 
-    private static void f2() {
+    private static int f2() {
+        try {
+            return 1;
+        } catch (Exception e) {
+            return 2;
+        } finally {
 
+        }
     }
 }
 

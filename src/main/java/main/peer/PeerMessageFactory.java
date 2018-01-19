@@ -1,4 +1,4 @@
-package main;
+package main.peer;
 
 import main.peer.peerMessages.*;
 

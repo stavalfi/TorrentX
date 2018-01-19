@@ -1,6 +1,6 @@
 package com.utils;
 
-import main.Peer;
+import main.peer.Peer;
 
 import java.io.IOException;
 import java.io.InputStream;

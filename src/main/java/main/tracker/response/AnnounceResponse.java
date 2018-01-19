@@ -1,6 +1,6 @@
 package main.tracker.response;
 
-import main.Peer;
+import main.peer.Peer;
 import reactor.core.publisher.Flux;
 
 import java.math.BigInteger;

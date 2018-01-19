@@ -1,4 +1,4 @@
-package main;
+package main.peer;
 
 public class Peer {
     private final String peerIp;

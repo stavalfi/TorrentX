@@ -1,14 +1,14 @@
 package com.utils;
 
-import main.peer.*;
+import main.peer.peerMessages.*;
 
 public enum PeerMessageType {
-    BitFieldMessage(main.peer.BitFieldMessage.class),
-    CancelMessage(main.peer.CancelMessage.class),
-    ChokeMessage(main.peer.ChokeMessage.class),
-    HaveMessage(main.peer.HaveMessage.class),
-    InterestedMessage(main.peer.InterestedMessage.class),
-    IsAliveMessage(IsAliveMessage.class),
+    BitFieldMessage(main.peer.peerMessages.BitFieldMessage.class),
+    CancelMessage(main.peer.peerMessages.CancelMessage.class),
+    ChokeMessage(main.peer.peerMessages.ChokeMessage.class),
+    HaveMessage(main.peer.peerMessages.HaveMessage.class),
+    InterestedMessage(main.peer.peerMessages.InterestedMessage.class),
+    IsAliveMessage(KeepAliveMessage.class),
     NotInterestedMessage(NotInterestedMessage.class),
     PieceMessage(PieceMessage.class),
     PortMessage(PortMessage.class),
