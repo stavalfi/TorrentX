@@ -1,28 +1,34 @@
 package main.peer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-public class InitializePeersCommunication {
-    private static Logger logger = LoggerFactory.getLogger(PeersCommunicator.class);
+import java.net.ServerSocket;
 
+public class InitializePeersCommunication {
+
+    private ServerSocket listenToPeerConnection;
     private Flux<PeersCommunicator> allPeersCommunicatorFlux;
 
-    public static Mono<PeersCommunicator> initialize(Peer peer) {
+    private static InitializePeersCommunication instance = new InitializePeersCommunication();
+
+    public static InitializePeersCommunication getInstance() {
+        return instance;
+    }
+
+    public Mono<PeersCommunicator> initialize(Peer peer) {
         return Mono.error(new Exception());
     }
 
-    public static void closeAllPeersCommunicator() {
+    public void closeAllPeersCommunicator() {
 
     }
 
-    public static Flux<PeersCommunicator> listen() {
+    public Flux<PeersCommunicator> listen() {
         return Flux.error(new Exception());
     }
 
-    public static void stopListenForNewPeers() {
+    public void stopListenForNewPeers() {
 
     }
 

@@ -3,7 +3,7 @@ package com.steps;
 import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
-import main.*;
+import main.TorrentInfo;
 import main.peer.InitializePeersCommunication;
 import main.peer.Peer;
 import main.peer.PeersCommunicator;
@@ -77,7 +77,7 @@ public class MyStepdefs {
     @Then("^application receive Handshake response from the same peer.$")
     public void applicationReceiveHandshakeResponseFromTheSamePeer() throws Throwable {
         Mono<Peer> connectedPeerMono = PeersProvider.peers(this.torrentInfo.getTrackerList().stream())
-                .flatMap(InitializePeersCommunication::initialize)
+                .flatMap(InitializePeersCommunication.getInstance()::initialize)
                 .map(PeersCommunicator::getPeer)
                 .take(1)
                 .single();
@@ -91,7 +91,7 @@ public class MyStepdefs {
     @Then("^communication with the peer failed: \"([^\"]*)\".$")
     public void communicationWithThePeerFailed(ErrorSignalType errorSignalType) throws Throwable {
         Flux<Peer> connectedPeerMono = PeersProvider.peers(this.torrentInfo.getTrackerList().stream())
-                .flatMap(InitializePeersCommunication::initialize)
+                .flatMap(InitializePeersCommunication.getInstance()::initialize)
                 .map(PeersCommunicator::getPeer);
 
         StepVerifier.create(connectedPeerMono)
@@ -135,7 +135,7 @@ public class MyStepdefs {
         peerFakeMessages.stream()
                 .collect(Collectors.groupingBy(Function.identity()))
                 .forEach((PeerFakeMessage peer, List<PeerFakeMessage> messages) -> {
-                    InitializePeersCommunication.initialize(new Peer(peer.getPeerIp(), peer.getPeerPort()))
+                    InitializePeersCommunication.getInstance().initialize(new Peer(peer.getPeerIp(), peer.getPeerPort()))
                             .subscribe((PeersCommunicator peersCommunicator) -> {
                                 List<PeerMessage> messagesWeSend = messages.stream()
                                         .map(PeerFakeMessage::getSendMessageType)
