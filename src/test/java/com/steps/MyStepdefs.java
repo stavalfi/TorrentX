@@ -35,14 +35,11 @@ public class MyStepdefs {
     private TorrentInfo torrentInfo = mock(TorrentInfo.class);
 
     private List<RemoteFakePeer> remoteFakePeers;
-    private InitializePeersCommunication initializePeersCommunication;
 
     @Given("^new torrent file: \"([^\"]*)\".$")
     public void newTorrentFile(String torrentFileName) throws Throwable {
         this.torrentFilePath = torrentFileName;
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
-
-        this.initializePeersCommunication = new InitializePeersCommunication(torrentInfo.getTorrentInfoHash());
 
         Mockito.when(this.torrentInfo.getTorrentInfoHash()).thenReturn(torrentInfo.getTorrentInfoHash());
         Mockito.when(this.torrentInfo.getTrackerList()).thenReturn(torrentInfo.getTrackerList());
@@ -55,11 +52,6 @@ public class MyStepdefs {
         assert fakeTorrentInfoHash.length() == 40;
         Mockito.when(this.torrentInfo.getTorrentInfoHash()).thenReturn(fakeTorrentInfoHash);
         Mockito.when(this.torrentInfo.getTrackerList()).thenReturn(torrentInfo.getTrackerList());
-
-        // I can safely restart this object because no one connected
-        // to me and I didn't connect to no one yet.
-        this.initializePeersCommunication.stopListenForNewPeers();
-        this.initializePeersCommunication = new InitializePeersCommunication(this.torrentInfo.getTorrentInfoHash());
     }
 
     @Given("^additional not-responding trackers to the tracker-list.$")
@@ -108,7 +100,7 @@ public class MyStepdefs {
         Mono<PeersCommunicator> connectedPeerMono =
                 TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList())
                         .flatMap((TrackerConnection trackerConnection) ->
-                                PeersProvider.connectToPeers(trackerConnection, this.initializePeersCommunication))
+                                PeersProvider.connectToPeers(trackerConnection, this.torrentInfo.getTorrentInfoHash()))
                         .take(1)
                         .single();
 
@@ -123,7 +115,7 @@ public class MyStepdefs {
         Mono<PeersCommunicator> connectedPeerMono =
                 TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList())
                         .flatMap((TrackerConnection trackerConnection) ->
-                                PeersProvider.connectToPeers(trackerConnection, this.initializePeersCommunication))
+                                PeersProvider.connectToPeers(trackerConnection, this.torrentInfo.getTorrentInfoHash()))
                         .take(1)
                         .single();
 
@@ -203,7 +195,9 @@ public class MyStepdefs {
         peerFakeMessages.stream()
                 .collect(Collectors.groupingBy(Function.identity()))
                 .forEach((PeerFakeMessage peer, List<PeerFakeMessage> messages) ->
-                        this.initializePeersCommunication.connectToPeer(new Peer(peer.getPeerIp(), peer.getPeerPort()))
+                        InitializePeersCommunication
+                                .getInstance()
+                                .connectToPeer(this.torrentInfo.getTorrentInfoHash(), new Peer(peer.getPeerIp(), peer.getPeerPort()))
                                 .subscribe((PeersCommunicator peersCommunicator) -> {
                                     List<PeerMessage> messagesWeSend = messages.stream()
                                             .map(PeerFakeMessage::getSendMessageType)

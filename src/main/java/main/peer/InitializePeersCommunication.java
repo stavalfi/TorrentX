@@ -2,6 +2,7 @@ package main.peer;
 
 import main.AppConfig;
 import main.HexByteConverter;
+import main.MyTorrents;
 import main.peer.peerMessages.HandShake;
 import main.tracker.BadResponseException;
 import reactor.core.publisher.Flux;
@@ -19,13 +20,11 @@ import java.net.Socket;
 
 public class InitializePeersCommunication {
 
-    private final byte[] torrentInfoHash;
     private ServerSocket listenToPeerConnection;
     private final Flux<PeersCommunicator> allPeersCommunicatorFlux;
 
-    public InitializePeersCommunication(String torrentInfoHash) {
-        assert torrentInfoHash.length() == 40;
-        this.torrentInfoHash = HexByteConverter.hexToByte(torrentInfoHash);
+    private InitializePeersCommunication() {
+
         try {
             this.listenToPeerConnection = new ServerSocket(AppConfig.getInstance().getTcpPortListeningForPeersMessages());
         } catch (IOException e) {
@@ -49,7 +48,7 @@ public class InitializePeersCommunication {
         }).publishOn(Schedulers.single());
     }
 
-    public Mono<PeersCommunicator> connectToPeer(Peer peer) {
+    public Mono<PeersCommunicator> connectToPeer(String torrentInfoHash, Peer peer) {
         return Mono.create((MonoSink<PeersCommunicator> sink) -> {
             try {
                 Socket peerSocket = new Socket();
@@ -58,7 +57,7 @@ public class InitializePeersCommunication {
                 DataInputStream dataInputStream = new DataInputStream(peerSocket.getInputStream());
 
                 // firstly, we need to send Handshake message to the peer and receive Handshake back.
-                HandShake handShakeSending = new HandShake(this.torrentInfoHash, AppConfig.getInstance().getPeerId().getBytes());
+                HandShake handShakeSending = new HandShake(HexByteConverter.hexToByte(torrentInfoHash), AppConfig.getInstance().getPeerId().getBytes());
                 dataOutputStream.write(handShakeSending.createPacketFromObject());
 
                 byte[] data = new byte[1024];
@@ -66,7 +65,7 @@ public class InitializePeersCommunication {
                 dataInputStream.read(data);
                 HandShake handShakeReceived = HandShake.createObjectFromPacket(data);
                 String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
-                if (!HexByteConverter.byteToHex(this.torrentInfoHash).equals(receivedTorrentInfoHash)) {
+                if (!torrentInfoHash.equals(receivedTorrentInfoHash)) {
                     // the peer sent me invalid HandShake message.
                     // by the p2p spec, I need to close to the socket.
                     dataInputStream.close();
@@ -94,7 +93,10 @@ public class InitializePeersCommunication {
         byte[] data = new byte[1024];
         dataInputStream.read(data);
         HandShake handShakeReceived = HandShake.createObjectFromPacket(data);
-        if (!HexByteConverter.byteToHex(this.torrentInfoHash).equals(HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash()))) {
+        String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
+        if (MyTorrents.myTorrents
+                .stream()
+                .anyMatch(torrentInfo -> torrentInfo.getTorrentInfoHash().equals(receivedTorrentInfoHash))) {
             // the peer sent me invalid HandShake message.
             // by the p2p spec, I need to close to the socket.
             dataInputStream.close();
@@ -102,7 +104,7 @@ public class InitializePeersCommunication {
             peerSocket.close();
         }
 
-        HandShake handShakeSending = new HandShake(this.torrentInfoHash, AppConfig.getInstance().getPeerId().getBytes());
+        HandShake handShakeSending = new HandShake(handShakeReceived.getTorrentInfoHash(), AppConfig.getInstance().getPeerId().getBytes());
         dataOutputStream.write(handShakeSending.createPacketFromObject());
         // all went well, I accept this connection.
         Peer peer = new Peer(peerSocket.getInetAddress().getHostAddress(), peerSocket.getPort());
@@ -120,7 +122,9 @@ public class InitializePeersCommunication {
         this.listenToPeerConnection.close();
     }
 
-    public String getTorrentInfoHash() {
-        return HexByteConverter.byteToHex(torrentInfoHash);
+    private static InitializePeersCommunication instance = new InitializePeersCommunication();
+
+    public static InitializePeersCommunication getInstance() {
+        return instance;
     }
 }

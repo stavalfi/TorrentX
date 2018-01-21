@@ -7,7 +7,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 
-import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.function.Predicate;
 import java.util.logging.Level;
@@ -23,17 +22,18 @@ public class PeersProvider {
     }
 
     public static Flux<PeersCommunicator> connectToPeers(TrackerConnection trackerConnection,
-                                                         InitializePeersCommunication initializePeersCommunication) {
+                                                         String torrentInfoHash) {
         Predicate<Throwable> communicationErrorsToIgnore = (Throwable error) ->
                 error instanceof SocketTimeoutException ||
-                        error instanceof BadResponseException ||
-                        error instanceof SocketException; // if the peer do: "connection reset"
+                        error instanceof BadResponseException;
+        // || error instanceof SocketException; // if the peer do: "connection reset"
 
-        return trackerConnection.announce(initializePeersCommunication.getTorrentInfoHash())
+        return trackerConnection.announce(torrentInfoHash)
                 .flux()
                 .flatMap(AnnounceResponse::getPeers)
+                .log(null, Level.INFO, true, SignalType.ON_NEXT)
                 .flatMap((Peer peer) ->
-                        initializePeersCommunication.connectToPeer(peer) // send him Handshake request.
+                        InitializePeersCommunication.getInstance().connectToPeer(torrentInfoHash, peer) // send him Handshake request.
                                 .onErrorResume(communicationErrorsToIgnore, error -> Mono.empty()))
                 .log(null, Level.INFO, true, SignalType.ON_NEXT);
 
