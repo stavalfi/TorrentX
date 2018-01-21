@@ -1,12 +1,41 @@
 package main.peer;
 
-import main.tracker.Tracker;
+import main.tracker.BadResponseException;
+import main.tracker.TrackerConnection;
+import main.tracker.response.AnnounceResponse;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 
-import java.util.stream.Stream;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.util.function.Predicate;
+import java.util.logging.Level;
 
 public class PeersProvider {
-    public static Flux<Peer> peers(Stream<Tracker> trackers) {
-        return Flux.error(new Exception());
+
+    public static Flux<Peer> getPeers(TrackerConnection trackerConnection,
+                                      String torrentInfoHash) {
+        return trackerConnection.announce(torrentInfoHash)
+                .flux()
+                .flatMap(AnnounceResponse::getPeers)
+                .log(null, Level.FINE, true, SignalType.ON_NEXT);
+    }
+
+    public static Flux<PeersCommunicator> connectToPeers(TrackerConnection trackerConnection,
+                                                         InitializePeersCommunication initializePeersCommunication) {
+        Predicate<Throwable> communicationErrorsToIgnore = (Throwable error) ->
+                error instanceof SocketTimeoutException ||
+                        error instanceof BadResponseException ||
+                        error instanceof SocketException; // if the peer do: "connection reset"
+
+        return trackerConnection.announce(initializePeersCommunication.getTorrentInfoHash())
+                .flux()
+                .flatMap(AnnounceResponse::getPeers)
+                .flatMap((Peer peer) ->
+                        initializePeersCommunication.connectToPeer(peer) // send him Handshake request.
+                                .onErrorResume(communicationErrorsToIgnore, error -> Mono.empty()))
+                .log(null, Level.INFO, true, SignalType.ON_NEXT);
+
     }
 }

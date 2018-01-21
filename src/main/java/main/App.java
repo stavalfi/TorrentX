@@ -1,15 +1,14 @@
 package main;
 
 class App {
-    public static void main(String[] args) throws Exception {
-        String TorrentFilePath = "src/main/resources/torrent-file-example.torrent";
-//        TorrentFilePrinter.printAllPeers(TorrentFilePath);
+    static final String TorrentFilePath = "src/main/resources/torrent-file-example.torrent";
 
-        System.out.println(f2());
+    public static void main(String[] args) throws Exception {
+        f2();
     }
 
-    private static int f2() {
-        return 1;
+    private static void f2() {
+
     }
 }
 

@@ -2,11 +2,9 @@ package main;
 
 import christophedetroyer.torrent.Torrent;
 import christophedetroyer.torrent.TorrentParser;
-import main.tracker.AnnounceToTracker;
-import main.tracker.ConnectToTracker;
-import main.tracker.response.AnnounceResponse;
-import main.tracker.response.ConnectResponse;
-import reactor.core.publisher.Flux;
+import main.peer.PeersProvider;
+import main.tracker.TrackerConnection;
+import main.tracker.TrackerProvider;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -37,10 +35,9 @@ class TorrentFilePrinter {
     public static void printAllPeers(String path) throws Exception {
         TorrentInfo torrentInfo = new TorrentInfo(TorrentParser.parseTorrent(path));
 
-        Flux.fromStream(torrentInfo.getTrackerList().stream())
-                .flatMap(tracker -> ConnectToTracker.connect(tracker.getTracker(), tracker.getPort()))
-                .flatMap((ConnectResponse response) -> AnnounceToTracker.announce(response, torrentInfo.getTorrentInfoHash()))
-                .flatMap(AnnounceResponse::getPeers)
+        TrackerProvider.connectToTrackers(torrentInfo.getTrackerList())
+                .flatMap((TrackerConnection trackerConnection) ->
+                        PeersProvider.getPeers(trackerConnection, torrentInfo.getTorrentInfoHash()))
                 .subscribe(System.out::println, System.out::println, System.out::println);
     }
 }

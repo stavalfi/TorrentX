@@ -18,11 +18,11 @@ public class AnnounceRequest extends TrackerRequest {
     private final short tcpPort;
 
     public AnnounceRequest(String ip, int port, long connectionId,
-                           byte[] torrentInfoHash, byte[] peerId, short tcpPort) {
+                           byte[] torrentInfoHash, byte[] peerId, int numWant, short tcpPort) {
         this(ip, port, connectionId, 123456,
                 torrentInfoHash, peerId, 0, 0,
                 0, 0, 0, 0,
-                1000, tcpPort);
+                numWant, tcpPort);
     }
 
 

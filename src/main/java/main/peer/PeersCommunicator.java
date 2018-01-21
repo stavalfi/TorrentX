@@ -12,19 +12,19 @@ import java.io.IOException;
 import java.net.Socket;
 
 public class PeersCommunicator {
-    private final Peer peer;
     private final Peer me;
+    private final Peer peer;
     private final Socket peerSocket;
     private final DataOutputStream dataOutputStream;
     private final Flux<PeerMessage> responses;
 
-    public PeersCommunicator(Peer peer, Socket peerSocket) throws Exception {
+    public PeersCommunicator(Peer peer, Socket peerSocket, DataOutputStream dataOutputStream, DataInputStream dataInputStream) throws IOException {
         assert peerSocket != null;
         this.peer = peer;
         this.peerSocket = peerSocket;
         this.me = new Peer("localhost", peerSocket.getLocalPort());
-        this.dataOutputStream = new DataOutputStream(this.peerSocket.getOutputStream());
-        this.responses = waitForResponses(new DataInputStream(this.peerSocket.getInputStream()));
+        this.dataOutputStream = dataOutputStream;
+        this.responses = waitForResponses(dataInputStream);
     }
 
     private Flux<PeerMessage> waitForResponses(DataInputStream dataInputStream) {
@@ -77,5 +77,10 @@ public class PeersCommunicator {
     public void closeConnection() throws IOException {
         this.dataOutputStream.close();
         this.peerSocket.close();
+    }
+
+    @Override
+    public String toString() {
+        return this.peer.toString();
     }
 }

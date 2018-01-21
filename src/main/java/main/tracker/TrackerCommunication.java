@@ -54,8 +54,7 @@ class TrackerCommunication {
                 .doOnError(retryOnErrors, error -> logger.warn("error signal: " +
                         "(the application retried to send a request again and failed). ", error))
                 .doOnError(retryOnErrors.negate(), error -> logger.error("error signal: " +
-                        "(the application didn't try to send a request again after this error). ", error))
-                .log(null, Level.INFO, SignalType.ON_NEXT);
+                        "(the application didn't try to send a request again after this error). ", error));
     }
 
     private static <Request extends TrackerRequest>
