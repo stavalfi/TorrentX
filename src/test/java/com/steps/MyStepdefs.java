@@ -19,10 +19,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
-import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.*;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -42,15 +40,6 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
 
         Mockito.when(this.torrentInfo.getTorrentInfoHash()).thenReturn(torrentInfo.getTorrentInfoHash());
-        Mockito.when(this.torrentInfo.getTrackerList()).thenReturn(torrentInfo.getTrackerList());
-    }
-
-    @Then("^change the torrent-info-hash to a invalid torrent-info-hash.$")
-    public void changeTheTorrentInfoHashToAInvalidTorrentInfoHash() throws Throwable {
-        TorrentInfo torrentInfo = Utils.readTorrentFile(this.torrentFilePath);
-        String fakeTorrentInfoHash = "0123456789012345678901234567890123456789";
-        assert fakeTorrentInfoHash.length() == 40;
-        Mockito.when(this.torrentInfo.getTorrentInfoHash()).thenReturn(fakeTorrentInfoHash);
         Mockito.when(this.torrentInfo.getTrackerList()).thenReturn(torrentInfo.getTrackerList());
     }
 
@@ -90,38 +79,27 @@ public class MyStepdefs {
                 .collect(Collectors.toList());
     }
 
-    @Then("^application send Handshake request to a random peer.$")
-    public void applicationSendCommunicationRequestToARandomPeer() throws Throwable {
+    @Then("^application send and receive Handshake from the same random peer.$")
+    public void applicationSendAndReceiveHandshakeFromTheSameRandomPeer() throws Throwable {
 
     }
 
-    @Then("^application receive Handshake response from the same random peer.$")
-    public void applicationReceiveHandshakeResponseFromTheSamePeer() throws Throwable {
+    @Then("^application send Handshake request to a random peer.$")
+    public void applicationSendCommunicationRequestToARandomPeer() throws Throwable {
         Mono<PeersCommunicator> connectedPeerMono =
                 TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList())
                         .flatMap((TrackerConnection trackerConnection) ->
                                 PeersProvider.connectToPeers(trackerConnection, this.torrentInfo.getTorrentInfoHash()))
                         .take(1)
-                        .single();
+                        .single()
+                        .cache();
 
         StepVerifier.create(connectedPeerMono)
                 .expectNextCount(1)
                 .expectComplete()
                 .verify();
-    }
 
-    @Then("^communication with the random peer failed: \"([^\"]*)\".$")
-    public void communicationWithThePeerFailed(ErrorSignalType errorSignalType) throws Throwable {
-        Mono<PeersCommunicator> connectedPeerMono =
-                TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList())
-                        .flatMap((TrackerConnection trackerConnection) ->
-                                PeersProvider.connectToPeers(trackerConnection, this.torrentInfo.getTorrentInfoHash()))
-                        .take(1)
-                        .single();
-
-        StepVerifier.create(connectedPeerMono)
-                .expectError(errorSignalType.getErrorSignal())
-                .verify();
+        connectedPeerMono.subscribe(PeersCommunicator::closeConnection);
     }
 
     @Then("^application send and receive the following messages from a random tracker:$")
@@ -129,7 +107,9 @@ public class MyStepdefs {
 
         if (messages.stream()
                 .noneMatch(fakeMessage -> fakeMessage.getTrackerRequestType() == TrackerRequestType.Connect))
-            throw new IllegalArgumentException("messages list must contain `connect` request.");
+            throw new IllegalArgumentException("messages list must contain `connect` request" +
+                    " (we are not using it in the tests but " +
+                    "it should be there before any other request).");
 
         // if I get an errorSignal signal containing one of those errors,
         // then I will communicate with the next tracker in the tracker-list.
@@ -164,85 +144,57 @@ public class MyStepdefs {
                 .filter(message -> message.getErrorSignalType() != null)
                 .findAny();
 
-        if (expectedErrorSignal.isPresent()) {
+        if (expectedErrorSignal.isPresent())
             StepVerifier.create(actualTrackerResponseFlux)
                     .expectError(expectedErrorSignal.get().getErrorSignalType().getErrorSignal())
                     .verify();
-            return;
-        }
-
-        StepVerifier.create(actualTrackerResponseFlux)
-                .expectNextCount(messages.size() - 1)
-                .expectComplete()
-                .verify();
+        else
+            StepVerifier.create(actualTrackerResponseFlux)
+                    .expectNextCount(messages.size() - 1)
+                    .expectComplete()
+                    .verify();
     }
 
-    @Then("^application send in parallel and receive the following messages:$")
-    public void applicationSendInParallelAndReceiveTheFollowingMessages(List<PeerFakeMessage> peerFakeMessages) throws
-            Throwable {
+    @Then("^application send to \\[peer ip: \"([^\"]*)\", peer port: \"([^\"]*)\"\\] and receive the following messages:$")
+    public void applicationSendToPeerIpPeerPortAndReceiveTheFollowingMessages(String peerIp, int peerPort, List<PeerFakeRequestResponse> peerFakeRequestResponses) throws Throwable {
 
-        // What are we doing here:
-        // groupBy all messages by peers. for each peer: connect to him,
-        // send him all the messages from peerFakeMessages
-        // list UNTIL I see a message which it's response is error signal.
-        // After sending the messages (maybe not all), then wait
-        // for a response. The response may be a message or an error signal.
-        // after I verified that the messages/error signal came back,
-        // shut down the socket with this peer.
-        // then the scenario is over so we must shut down all
-        // the remoteFakePeers servers also.
+        RemoteFakePeer remoteFakePeer = new RemoteFakePeer(new Peer(peerIp, peerPort));
 
-        peerFakeMessages.stream()
-                .collect(Collectors.groupingBy(Function.identity()))
-                .forEach((PeerFakeMessage peer, List<PeerFakeMessage> messages) ->
-                        InitializePeersCommunication
-                                .getInstance()
-                                .connectToPeer(this.torrentInfo.getTorrentInfoHash(), new Peer(peer.getPeerIp(), peer.getPeerPort()))
-                                .subscribe((PeersCommunicator peersCommunicator) -> {
-                                    List<PeerMessage> messagesWeSend = messages.stream()
-                                            .map(PeerFakeMessage::getSendMessageType)
-                                            .map(PeerMessageType::getSignal)
-                                            .map(Utils::createFakeMessage)
-                                            .collect(Collectors.toList());
+        Mono<PeersCommunicator> peersCommunicatorMono =
+                InitializePeersCommunication.getInstance()
+                        .connectToPeer(this.torrentInfo.getTorrentInfoHash(), remoteFakePeer)
+                        .cache();
 
-                                    List<PeerMessage> messagesWeShouldReceive = messages.stream()
-                                            .filter(message -> message.getErrorSignalType() != null)
-                                            .map(PeerFakeMessage::getReceiveMessageType)
-                                            .map(PeerMessageType::getSignal)
-                                            .map(Utils::createFakeMessage)
-                                            .sorted()
-                                            .collect(Collectors.toList());
+        Flux<PeerMessage> peerResponseFlux = Flux.fromIterable(peerFakeRequestResponses)
+                .zipWith(peersCommunicatorMono)
+                .flatMap(fakeMessageWithPeerCommunication ->
+                {
+                    PeerFakeRequestResponse peerFakeRequestResponse = fakeMessageWithPeerCommunication.getT1();
+                    PeersCommunicator peersCommunicator = fakeMessageWithPeerCommunication.getT2();
+                    PeerMessage generatedMessage = Utils.createFakeMessage(peerFakeRequestResponse.getSendMessageType().getSignal());
+                    return peersCommunicator.send(generatedMessage);
+                });
 
-                                    StepVerifier.Step<PeerMessage> messagesWeActuallyReceived =
-                                            StepVerifier.create(Flux.fromIterable(messagesWeSend)
-                                                    .flatMap(peersCommunicator::send))
-                                                    .expectNextCount(messagesWeShouldReceive.size());
+        Optional<ErrorSignalType> errorSignalType =
+                peerFakeRequestResponses
+                        .stream()
+                        .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() != null)
+                        .map(PeerFakeRequestResponse::getErrorSignalType)
+                        .findAny();
 
-                                    boolean isSequenceContainErrorSignal = messages.stream()
-                                            .anyMatch(message -> message.getErrorSignalType() != null);
+        if (!errorSignalType.isPresent())
+            StepVerifier.create(peerResponseFlux)
+                    .expectNextCount(peerFakeRequestResponses.size())
+                    .expectComplete()
+                    .verify();
+        else
+            StepVerifier.create(peerResponseFlux)
+                    .expectNextCount(peerFakeRequestResponses.size() - 1)
+                    .expectError(errorSignalType.get().getErrorSignal())
+                    .verify();
 
-                                    if (isSequenceContainErrorSignal) {
-                                        messages.stream()
-                                                .filter(message -> message.getErrorSignalType() != null)
-                                                .map(PeerFakeMessage::getErrorSignalType)
-                                                .findAny()
-                                                .ifPresent((ErrorSignalType errorSignalType) ->
-                                                        messagesWeActuallyReceived
-                                                                .expectError(errorSignalType.getErrorSignal())
-                                                                .verify());
-
-                                    } else
-                                        messagesWeActuallyReceived.expectComplete()
-                                                .verify();
-
-                                    try {
-                                        peersCommunicator.closeConnection();
-                                    } catch (IOException e) {
-                                        e.printStackTrace();
-                                    }
-                                }));
-
-        this.remoteFakePeers.forEach(RemoteFakePeer::shutdown);
+        peersCommunicatorMono.subscribe(PeersCommunicator::closeConnection);
+        remoteFakePeer.shutdown();
     }
 
 }

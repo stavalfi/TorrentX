@@ -5,10 +5,4 @@ Feature: initialize connection between application with random peer.
 
   Scenario: we send handshake message and must receive handshake back.
     Then application send Handshake request to a random peer.
-    Then application receive Handshake response from the same random peer.
-
-  Scenario: we send invalid torrent-info-hash inside the handshake message
-  to a peer and connection must be terminated by the peer.
-    Then change the torrent-info-hash to a invalid torrent-info-hash.
-    Then application send Handshake request to a random peer.
-    Then communication with the random peer failed: "SocketException".
+    Then application send and receive Handshake from the same random peer.

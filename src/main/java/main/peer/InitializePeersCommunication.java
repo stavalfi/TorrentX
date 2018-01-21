@@ -65,7 +65,7 @@ public class InitializePeersCommunication {
                 dataInputStream.read(data);
                 HandShake handShakeReceived = HandShake.createObjectFromPacket(data);
                 String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
-                if (!torrentInfoHash.equals(receivedTorrentInfoHash)) {
+                if (!torrentInfoHash.toLowerCase().equals(receivedTorrentInfoHash.toLowerCase())) {
                     // the peer sent me invalid HandShake message.
                     // by the p2p spec, I need to close to the socket.
                     dataInputStream.close();
@@ -96,7 +96,7 @@ public class InitializePeersCommunication {
         String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
         if (MyTorrents.myTorrents
                 .stream()
-                .anyMatch(torrentInfo -> torrentInfo.getTorrentInfoHash().equals(receivedTorrentInfoHash))) {
+                .anyMatch(torrentInfo -> torrentInfo.getTorrentInfoHash().toLowerCase().equals(receivedTorrentInfoHash.toLowerCase()))) {
             // the peer sent me invalid HandShake message.
             // by the p2p spec, I need to close to the socket.
             dataInputStream.close();

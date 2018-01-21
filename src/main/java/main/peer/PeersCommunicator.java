@@ -53,12 +53,7 @@ public class PeersCommunicator {
             this.dataOutputStream.write(peerMessage.createPacketFromObject());
             return receive();
         } catch (IOException e) {
-            try {
-                closeConnection();
-            } catch (IOException e1) {
-                // TODO: do something better... it's a fatal problem with my design!!!
-                e1.printStackTrace();
-            }
+            closeConnection();
             return Flux.error(e);
         }
     }
@@ -74,9 +69,13 @@ public class PeersCommunicator {
         return peer;
     }
 
-    public void closeConnection() throws IOException {
-        this.dataOutputStream.close();
-        this.peerSocket.close();
+    public void closeConnection() {
+        try {
+            this.dataOutputStream.close();
+            this.peerSocket.close();
+        } catch (IOException exception) {
+            exception.printStackTrace();
+        }
     }
 
     @Override

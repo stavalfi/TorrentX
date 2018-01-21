@@ -6,7 +6,6 @@ import main.tracker.response.TrackerResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SignalType;
 import reactor.core.publisher.SynchronousSink;
 
 import java.io.IOException;
@@ -14,7 +13,6 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.logging.Level;
 
 class TrackerCommunication {
     private static Logger logger = LoggerFactory.getLogger(TrackerCommunication.class);
@@ -47,14 +45,24 @@ class TrackerCommunication {
                                 " not equal to the request's action-number."));
                     sink.next(response);
                 })
-                .doOnError(retryOnErrors, error -> logger.warn("error signal: (the application maybe try to send the request again). ", error))
+                .doOnError(retryOnErrors, error ->
+                        logger.warn("error signal: (the application will maybe try to send" +
+                                " the request again to the same tracker)." +
+                                "\nerror message: " + error.getMessage() + ".\n" +
+                                "error type: " + error.getClass().getName()))
                 // the retry operation will run the first, ever created, publisher again
                 // which is defined in sendRequest method.
                 .retry(1, retryOnErrors)
-                .doOnError(retryOnErrors, error -> logger.warn("error signal: " +
-                        "(the application retried to send a request again and failed). ", error))
-                .doOnError(retryOnErrors.negate(), error -> logger.error("error signal: " +
-                        "(the application didn't try to send a request again after this error). ", error));
+                .doOnError(retryOnErrors, error ->
+                        logger.warn("error signal: (the application retried to send" +
+                                " a request to the same tracker again and failed)." +
+                                "\nerror message: " + error.getMessage() + ".\n" +
+                                "error type: " + error.getClass().getName()))
+                .doOnError(retryOnErrors.negate(), error ->
+                        logger.error("error signal: (the application doesn't try to send" +
+                                " a request again after this error)." +
+                                "\nerror message: " + error.getMessage() + ".\n" +
+                                "error type: " + error.getClass().getName()));
     }
 
     private static <Request extends TrackerRequest>
