@@ -1,6 +1,9 @@
 package com.utils;
 
 import main.peer.Peer;
+import main.peer.PeerMessageFactory;
+import main.peer.peerMessages.HandShake;
+import main.peer.peerMessages.PeerMessage;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,8 +24,8 @@ public class RemoteFakePeer extends Peer {
     private ServerSocket listenToPeerConnection;
     private final List<Socket> peerConnections = new ArrayList<>();
 
-    public RemoteFakePeer(Peer peer) {
-        super(peer.getPeerIp(), peer.getPeerPort());
+    public RemoteFakePeer(Peer Me) {
+        super(Me.getPeerIp(), Me.getPeerPort());
         try {
             this.listenToPeerConnection = new ServerSocket(this.getPeerPort());
         } catch (IOException e) {
@@ -40,25 +43,36 @@ public class RemoteFakePeer extends Peer {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+                shutdown();
             }
         }).start();
     }
 
-    private void waitForMessagesFromPeer(Socket peerConnection) throws IOException, InterruptedException {
+    private void waitForMessagesFromPeer(Socket peerConnection) {
         int receivedMessagesAmount = 0;
         while (!this.closeEverything) {
-            InputStream in = peerConnection.getInputStream();
-            OutputStream out = peerConnection.getOutputStream();
-            byte[] data = new byte[2000];
-            in.read(data);
             receivedMessagesAmount++;
-            if (receivedMessagesAmount == 2) {
-                Thread.sleep(2000);
-            } else if (receivedMessagesAmount == 3) {
-                peerConnection.close();
-                return;
+            try {
+                InputStream inputStream = peerConnection.getInputStream();
+                OutputStream outputStream = peerConnection.getOutputStream();
+                if (receivedMessagesAmount == 1) {
+                    HandShake handShakeReceived = new HandShake(inputStream);
+                    outputStream.write(handShakeReceived.createPacketFromObject());
+                } else {
+                    Peer fromPeer = new Peer("localhost", peerConnection.getPort());
+                    PeerMessage peerMessage = PeerMessageFactory.create(fromPeer, this, inputStream);
+                    outputStream.write(peerMessage.createPacketFromObject());
+                }
+            } catch (IOException e) {
+                // I dont want to print errors from this class.
+                // a possible error can be if a peer is closing the connection with This Fake peer.
+//                e.printStackTrace();
+                try {
+                    peerConnection.close();
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
             }
-            out.write(data);
         }
     }
 
