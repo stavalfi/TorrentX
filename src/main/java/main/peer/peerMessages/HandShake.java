@@ -3,6 +3,8 @@ package main.peer.peerMessages;
 import main.HexByteConverter;
 import org.joou.UByte;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 import static org.joou.Unsigned.ubyte;
@@ -35,6 +37,24 @@ public class HandShake {
         this.torrentInfoHash = torrentInfoHash;
         this.peerId = peerId;
         assert reserved.length == reservedBytesAmount;
+    }
+
+    public HandShake(InputStream dataInputStream) throws IOException {
+        byte[] data = new byte[1];
+        dataInputStream.read(data);
+        byte pstrLength = ByteBuffer.wrap(data).get();
+        data = new byte[pstrLength + 48];// how much we need to read more.
+        dataInputStream.read(data);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(1 + pstrLength + 48);
+        byteBuffer.put(pstrLength);
+        byteBuffer.put(data);
+        HandShake handShake = HandShake.createObjectFromPacket(byteBuffer.array());
+
+        this.peerId = handShake.peerId;
+        this.pstr = handShake.pstr;
+        this.pstrLength = handShake.pstrLength;
+        this.reserved = handShake.reserved;
+        this.torrentInfoHash = handShake.torrentInfoHash;
     }
 
     /**
