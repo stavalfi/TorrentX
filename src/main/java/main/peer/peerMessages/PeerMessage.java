@@ -26,7 +26,7 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
         ByteBuffer buffer = ByteBuffer.wrap(peerMessage);
         this.length = buffer.getInt();
         this.messageId = buffer.get();
-        int sizeOfPayload = this.length - 4;// this.length - sizeof(messageId)==this.length - 4
+        int sizeOfPayload = this.length - 1;// this.length - sizeof(messageId)==this.length - 1
         this.payload = new byte[sizeOfPayload];
         buffer.get(this.payload);
     }
@@ -44,8 +44,14 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
         ByteBuffer buffer = ByteBuffer.allocate(4 + this.length);
 
         buffer.putInt(this.length);
-        buffer.put(this.messageId);
-        buffer.put(this.payload);
+        // when receiving a peerMessage,
+        // I first check what is the value of "length".
+        // if length==0 then I don't read any more bytes.
+        // so there is no reason to send dummy bytes.
+        if (this.length > 0) {
+            buffer.put(this.messageId);
+            buffer.put(this.payload);
+        }
 
         return buffer.array();
     }
