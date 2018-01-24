@@ -6,55 +6,57 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.scheduler.Schedulers;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.Socket;
 
 public class PeersCommunicator {
     private final Peer me;
     private final Peer peer;
     private final Socket peerSocket;
-    private final DataOutputStream dataOutputStream;
     private final Flux<PeerMessage> responses;
 
-    public PeersCommunicator(Peer peer, Socket peerSocket, DataOutputStream dataOutputStream, DataInputStream dataInputStream) throws IOException {
+    public PeersCommunicator(Peer peer, Socket peerSocket) throws IOException {
         assert peerSocket != null;
         this.peer = peer;
         this.peerSocket = peerSocket;
         this.me = new Peer("localhost", peerSocket.getLocalPort());
-        this.dataOutputStream = dataOutputStream;
-        this.responses = waitForResponses(dataInputStream);
+        this.responses = waitForResponses(peerSocket.getInputStream());
     }
 
-    private Flux<PeerMessage> waitForResponses(DataInputStream dataInputStream) {
+    private Flux<PeerMessage> waitForResponses(InputStream inputStream) {
         return Flux.create((FluxSink<PeerMessage> sink) -> {
-            while (!this.peerSocket.isClosed() && !this.peerSocket.isConnected()) {
-                byte[] data = new byte[1024];
-                try {
-                    dataInputStream.read(data);
-                    sink.next(PeerMessageFactory.create(this.me, this.peer, data));
-                } catch (IOException e) {
-                    sink.error(e);
-                    try {
-                        dataInputStream.close();
-                        closeConnection();
-                    } catch (IOException e1) {
-                        // TODO: do something better... it's a fatal problem with my design!!!
-                        e1.printStackTrace();
-                    }
-                }
-            }
-        }).publishOn(Schedulers.single());
+            Thread thread = new Thread(() -> listenForPeerMessages(sink, inputStream));
+            sink.onDispose(thread::interrupt);
+            thread.start();
+        }).log().publishOn(Schedulers.single());
     }
 
     public Flux<PeerMessage> send(PeerMessage peerMessage) {
         try {
-            this.dataOutputStream.write(peerMessage.createPacketFromObject());
+            this.peerSocket.getOutputStream().write(peerMessage.createPacketFromObject());
             return receive();
         } catch (IOException e) {
             closeConnection();
             return Flux.error(e);
+        }
+    }
+
+    private void listenForPeerMessages(FluxSink<PeerMessage> sink, InputStream inputStream) {
+        while (!sink.isCancelled() && !this.peerSocket.isClosed() && this.peerSocket.isConnected()) {
+            try {
+                PeerMessage peerMessage = PeerMessageFactory.create(this.me, this.peer, inputStream);
+                sink.next(peerMessage);
+            } catch (IOException e) {
+                sink.error(e);
+                try {
+                    inputStream.close();
+                    closeConnection();
+                } catch (IOException e1) {
+                    // TODO: do something better... it's a fatal problem with my design!!!
+                    e1.printStackTrace();
+                }
+            }
         }
     }
 
@@ -69,9 +71,12 @@ public class PeersCommunicator {
         return peer;
     }
 
+    public Peer getMe() {
+        return me;
+    }
+
     public void closeConnection() {
         try {
-            this.dataOutputStream.close();
             this.peerSocket.close();
         } catch (IOException exception) {
             exception.printStackTrace();
