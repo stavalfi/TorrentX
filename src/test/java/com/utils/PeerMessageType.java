@@ -8,7 +8,7 @@ public enum PeerMessageType {
     ChokeMessage(main.peer.peerMessages.ChokeMessage.class),
     HaveMessage(main.peer.peerMessages.HaveMessage.class),
     InterestedMessage(main.peer.peerMessages.InterestedMessage.class),
-    IsAliveMessage(KeepAliveMessage.class),
+    KeepAliveMessage(KeepAliveMessage.class),
     NotInterestedMessage(NotInterestedMessage.class),
     PieceMessage(PieceMessage.class),
     PortMessage(PortMessage.class),
