@@ -11,6 +11,7 @@ import java.io.InputStream;
 import java.net.Socket;
 
 public class PeersCommunicator {
+    private boolean IWantToCloseConnection;
     private final Peer me;
     private final Peer peer;
     private final Socket peerSocket;
@@ -22,6 +23,7 @@ public class PeersCommunicator {
         this.peerSocket = peerSocket;
         this.me = new Peer("localhost", peerSocket.getLocalPort());
         this.responses = waitForResponses(peerSocket.getInputStream());
+        this.IWantToCloseConnection = false;
     }
 
     private Flux<PeerMessage> waitForResponses(InputStream inputStream) {
@@ -29,7 +31,10 @@ public class PeersCommunicator {
             Thread thread = new Thread(() -> listenForPeerMessages(sink, inputStream));
             sink.onDispose(thread::interrupt);
             thread.start();
-        }).log().publishOn(Schedulers.single());
+        })
+                .log()
+                //.log(null, Level.WARNING, true, SignalType.ON_ERROR)
+                .publishOn(Schedulers.single());
     }
 
     public Flux<PeerMessage> send(PeerMessage peerMessage) {
@@ -48,7 +53,8 @@ public class PeersCommunicator {
                 PeerMessage peerMessage = PeerMessageFactory.create(this.me, this.peer, inputStream);
                 sink.next(peerMessage);
             } catch (IOException e) {
-                sink.error(e);
+                if (!this.IWantToCloseConnection)//only if it wasn't because of me.
+                    sink.error(e);
                 try {
                     inputStream.close();
                     closeConnection();
@@ -76,6 +82,7 @@ public class PeersCommunicator {
     }
 
     public void closeConnection() {
+        this.IWantToCloseConnection = true;
         try {
             this.peerSocket.close();
         } catch (IOException exception) {

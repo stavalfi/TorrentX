@@ -167,7 +167,7 @@ public class MyStepdefs {
                         .cache();
 
         Flux<PeerMessage> peerResponseFlux = Flux.fromIterable(peerFakeRequestResponses)
-                .zipWith(peersCommunicatorMono)
+                .zipWith(peersCommunicatorMono)// it does not call peersCommunicatorMono agian!!!!! FUCK!
                 .flatMap(fakeMessageWithPeerCommunication ->
                 {
                     PeerFakeRequestResponse peerFakeRequestResponse = fakeMessageWithPeerCommunication.getT1();
@@ -196,6 +196,7 @@ public class MyStepdefs {
                     .expectComplete()
                     .verify();
 
+        System.out.println("finished");
         peersCommunicatorMono.subscribe(PeersCommunicator::closeConnection);
         remoteFakePeer.shutdown();
     }
