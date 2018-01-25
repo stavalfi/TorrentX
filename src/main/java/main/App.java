@@ -1,7 +1,5 @@
 package main;
 
-import reactor.core.publisher.Flux;
-
 class App {
     static final String TorrentFilePath = "src/main/resources/torrent-file-example.torrent";
 
@@ -10,11 +8,7 @@ class App {
     }
 
     private static void f2() {
-        Flux.create(sink -> {
-            sink.next(1);
-            sink.next(2);
-            sink.error(new Exception());
-        }).take(1).doOnError(System.out::println).doOnNext(System.out::println).subscribe();
+
     }
 }
 
