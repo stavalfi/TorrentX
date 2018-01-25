@@ -4,11 +4,14 @@ package main.peer;
 import main.peer.peerMessages.PeerMessage;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
+import java.util.logging.Level;
 
 public class PeersCommunicator {
     private boolean IWantToCloseConnection;
@@ -22,28 +25,27 @@ public class PeersCommunicator {
         this.peer = peer;
         this.peerSocket = peerSocket;
         this.me = new Peer("localhost", peerSocket.getLocalPort());
-        this.responses = waitForResponses(peerSocket.getInputStream());
         this.IWantToCloseConnection = false;
+        this.responses = waitForResponses(peerSocket.getInputStream());
     }
 
     private Flux<PeerMessage> waitForResponses(InputStream inputStream) {
-        return Flux.create((FluxSink<PeerMessage> sink) -> {
+        Flux<PeerMessage> peerMessageFlux = Flux.create((FluxSink<PeerMessage> sink) -> {
             Thread thread = new Thread(() -> listenForPeerMessages(sink, inputStream));
             sink.onDispose(thread::interrupt);
             thread.start();
-        })
-                .log()
-                //.log(null, Level.WARNING, true, SignalType.ON_ERROR)
-                .publishOn(Schedulers.single());
+        }).publishOn(Schedulers.single());
+
+        return peerMessageFlux.log(null, Level.WARNING, true, SignalType.ON_ERROR);
     }
 
-    public Flux<PeerMessage> send(PeerMessage peerMessage) {
+    public Mono<Void> send(PeerMessage peerMessage) {
         try {
             this.peerSocket.getOutputStream().write(peerMessage.createPacketFromObject());
-            return receive();
+            return Mono.empty();
         } catch (IOException e) {
             closeConnection();
-            return Flux.error(e);
+            return Mono.error(e);
         }
     }
 
@@ -53,7 +55,7 @@ public class PeersCommunicator {
                 PeerMessage peerMessage = PeerMessageFactory.create(this.me, this.peer, inputStream);
                 sink.next(peerMessage);
             } catch (IOException e) {
-                if (!this.IWantToCloseConnection)//only if it wasn't because of me.
+                if (!this.IWantToCloseConnection) // only if it wasn't because of me.
                     sink.error(e);
                 try {
                     inputStream.close();

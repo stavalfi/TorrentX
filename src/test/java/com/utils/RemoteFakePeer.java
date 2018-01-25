@@ -42,7 +42,10 @@ public class RemoteFakePeer extends Peer {
                     waitForMessagesFromPeer(newPeerConnection);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                // I don't want to print errors from this class.
+                // a possible error can be if a peer is closing
+                // the connection with This Fake peer.
+                // e.printStackTrace();
                 shutdown();
             }
         }).start();
@@ -58,12 +61,18 @@ public class RemoteFakePeer extends Peer {
                     HandShake handShakeReceived = new HandShake(inputStream);
                     outputStream.write(handShakeReceived.createPacketFromObject());
                 } else {
+                    if (receivedMessagesAmount == 2)
+                        Thread.sleep(2000);
+                    else if (receivedMessagesAmount == 3) {
+                        peerConnection.close();
+                        return;
+                    }
                     Peer fromPeer = new Peer("localhost", peerConnection.getPort());
                     PeerMessage peerMessage = PeerMessageFactory.create(fromPeer, this, inputStream);
                     outputStream.write(peerMessage.createPacketFromObject());
                 }
                 receivedMessagesAmount++;
-            } catch (IOException e) {
+            } catch (IOException | InterruptedException e) {
                 // I don't want to print errors from this class.
                 // a possible error can be if a peer is closing
                 // the connection with This Fake peer.
@@ -88,7 +97,10 @@ public class RemoteFakePeer extends Peer {
             try {
                 socket.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                // I don't want to print errors from this class.
+                // a possible error can be if a peer is closing
+                // the connection with This Fake peer.
+                // e.printStackTrace();
             }
         });
     }

@@ -161,12 +161,14 @@ public class MyStepdefs {
 
         RemoteFakePeer remoteFakePeer = new RemoteFakePeer(new Peer(peerIp, peerPort));
         remoteFakePeer.listen();
+
         Mono<PeersCommunicator> peersCommunicatorMono =
                 InitializePeersCommunication.getInstance()
                         .connectToPeer(this.torrentInfo.getTorrentInfoHash(), remoteFakePeer)
                         .cache();
 
-        Flux<PeerMessage> peerResponseFlux = Flux.fromIterable(peerFakeRequestResponses)
+        // send all messages
+        Flux<Void> peerRequestsFlux = Flux.fromIterable(peerFakeRequestResponses)
                 .map(PeerFakeRequestResponse::getSendMessageType)
                 .flatMap(peerRequestMessage ->
                         peersCommunicatorMono.flux()
@@ -177,6 +179,16 @@ public class MyStepdefs {
                                     return peersCommunicator.send(fakeRequest);
                                 }));
 
+        // check that all the messages sent successfully.
+        // note: Mono<Void> never signal onNext. Only error or complete.
+        StepVerifier.create(peerRequestsFlux)
+                .verifyComplete();
+
+        // receive all responses from peers.
+        Flux<PeerMessage> peersResponses = peersCommunicatorMono.flux()
+                .flatMap(PeersCommunicator::receive);
+
+        // check if we expect an error.
         Optional<ErrorSignalType> errorSignalType =
                 peerFakeRequestResponses
                         .stream()
@@ -185,17 +197,15 @@ public class MyStepdefs {
                         .findAny();
 
         if (errorSignalType.isPresent())
-            StepVerifier.create(peerResponseFlux.take(peerFakeRequestResponses.size() - 1))
+            StepVerifier.create(peersResponses)
                     .expectNextCount(peerFakeRequestResponses.size() - 1)
                     .expectError(errorSignalType.get().getErrorSignal())
                     .verify();
         else
-            StepVerifier.create(peerResponseFlux.take(peerFakeRequestResponses.size()))
+            StepVerifier.create(peersResponses.take(peerFakeRequestResponses.size()))
                     .expectNextCount(peerFakeRequestResponses.size())
-                    .expectComplete()
-                    .verify();
+                    .verifyComplete();
 
-        System.out.println("finished");
         peersCommunicatorMono.subscribe(PeersCommunicator::closeConnection);
         remoteFakePeer.shutdown();
     }
