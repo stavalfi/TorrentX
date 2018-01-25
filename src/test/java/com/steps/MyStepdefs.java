@@ -167,16 +167,15 @@ public class MyStepdefs {
                         .cache();
 
         Flux<PeerMessage> peerResponseFlux = Flux.fromIterable(peerFakeRequestResponses)
-                .zipWith(peersCommunicatorMono)// it does not call peersCommunicatorMono agian!!!!! FUCK!
-                .flatMap(fakeMessageWithPeerCommunication ->
-                {
-                    PeerFakeRequestResponse peerFakeRequestResponse = fakeMessageWithPeerCommunication.getT1();
-                    PeersCommunicator peersCommunicator = fakeMessageWithPeerCommunication.getT2();
-                    PeerMessage generatedMessage =
-                            Utils.createFakeMessage(peerFakeRequestResponse.getSendMessageType(),
-                                    peersCommunicator.getMe(), peersCommunicator.getPeer());
-                    return peersCommunicator.send(generatedMessage);
-                });
+                .map(PeerFakeRequestResponse::getSendMessageType)
+                .flatMap(peerRequestMessage ->
+                        peersCommunicatorMono.flux()
+                                .flatMap(peersCommunicator ->
+                                {
+                                    PeerMessage fakeRequest = Utils.createFakeMessage(peerRequestMessage,
+                                            peersCommunicator.getMe(), peersCommunicator.getPeer());
+                                    return peersCommunicator.send(fakeRequest);
+                                }));
 
         Optional<ErrorSignalType> errorSignalType =
                 peerFakeRequestResponses
