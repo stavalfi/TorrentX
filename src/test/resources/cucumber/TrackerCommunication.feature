@@ -1,21 +1,28 @@
 Feature: test tracker api calls.
 
-#  Scenario Outline: test connection, announce and scrape requests and responses to one of the trackers.
-#    Given new torrent file: "<torrentFilePath>".
-#    When application read trackers for this torrent.
-#    Then choose one tracker.
-#
-#    When application send tracker-request: CONNECT.
-#    Then tracker response with same transaction id.
-#
-#    When application send tracker-request: ANNOUNCE.
-#    Then tracker response with same transaction id.
-#
-#    When application send tracker-request: SCRAPE.
-#    Then tracker response with same transaction id.
-#    Examples:
-#      | torrentFilePath               |
-#      | torrent-file-example1.torrent |
+  Background: read torrent file.
+    Given new torrent file: "torrent-file-example1.torrent".
+
+  Scenario: find any tracker, from all the trackers, which response to: connect,announce and scrape requests.
+    Then application send and receive the following messages from a random tracker:
+      | trackerRequestType | errorSignalType |
+      | Connect            |                 |
+      | Announce           |                 |
+      | Scrape             |                 |
+
+
+  Scenario: communicating with collection of trackers which contain a not-responding trackers.
+    Given additional not-responding trackers to the tracker-list.
+    Then application send and receive the following messages from a random tracker:
+      | trackerRequestType | errorSignalType |
+      | Connect            |                 |
+
+  Scenario: communicating with collection of trackers which contain invalid urls of trackers.
+    Given additional invalid url of a tracker.
+    Then application send and receive the following messages from a random tracker:
+      | trackerRequestType | errorSignalType      |
+      | Connect            | UnknownHostException |
+
 
 
 

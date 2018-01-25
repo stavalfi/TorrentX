@@ -14,5 +14,5 @@ import org.junit.runner.RunWith;
         glue = "com.steps",
         features = "classpath:cucumber/"
 )
-public class CucmberTest {
+public class CucumberTest {
 }

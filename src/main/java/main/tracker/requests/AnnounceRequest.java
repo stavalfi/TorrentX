@@ -1,18 +1,11 @@
 package main.tracker.requests;
 
-import lombok.Getter;
-import lombok.ToString;
-import main.HexByteConverter;
-
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
-@Getter
-@ToString
-public class AnnounceRequest implements PacketRequest {
+public class AnnounceRequest extends TrackerRequest {
 
     private final long connectionId;
-    private final int action = 1;
-    private final int transactionId;
     private final byte[] torrentInfoHash;
     private final byte[] peerId;
     private final long downloaded;
@@ -24,21 +17,21 @@ public class AnnounceRequest implements PacketRequest {
     private final int numWant;
     private final short tcpPort;
 
+    public AnnounceRequest(String ip, int port, long connectionId,
+                           byte[] torrentInfoHash, byte[] peerId, int numWant, short tcpPort) {
+        this(ip, port, connectionId, 123456,
+                torrentInfoHash, peerId, 0, 0,
+                0, 0, 0, 0,
+                numWant, tcpPort);
+    }
 
-    public AnnounceRequest(long connectionId,
-                           int transactionId,
-                           byte[] torrentInfoHash,
-                           byte[] peerId,
-                           long downloaded,
-                           long left,
-                           long uploaded,
-                           int event,
-                           int ipAddress,
-                           int key,
-                           int numWant,
-                           short tcpPort) {
+
+    public AnnounceRequest(String ip, int port, long connectionId, int transactionId,
+                           byte[] torrentInfoHash, byte[] peerId, long downloaded,
+                           long left, long uploaded, int event, int ipAddress,
+                           int key, int numWant, short tcpPort) {
+        super(ip, port, 1, transactionId);
         this.connectionId = connectionId;
-        this.transactionId = transactionId;
         this.torrentInfoHash = torrentInfoHash;
         this.peerId = peerId;
         this.downloaded = downloaded;
@@ -55,7 +48,7 @@ public class AnnounceRequest implements PacketRequest {
      * offset == bytes not bits!!!!!!
      * Offset  Size    Name    Value
      * 0       64-bit integer  connection_id    same connection_id // the connectionId we received from the server after we successfully connected
-     * 8       32-bit integer  action          1                   // announce
+     * 8       32-bit integer  action          1                   // scrape
      * 12      32-bit integer  transaction_id                      // we randomly decide
      * 16      20-byte string  info_hash  torrent_info_hash // the hash of the torrent we want to scrape on
      * 36      20-byte string  peer_id  my-peer-id-!??!!?! how do I get it omg?
@@ -69,12 +62,13 @@ public class AnnounceRequest implements PacketRequest {
      * 96      16-bit integer  tcpPort       ???? // The tcpPort you're listening on.
      * 98
      */
-    public byte[] buildRequestPacket() {
+    @Override
+    public ByteBuffer buildRequestPacket() {
 
         ByteBuffer sendData = ByteBuffer.allocate(98); // we need 98 bits at list
         sendData.putLong(this.connectionId); // connection_id
-        sendData.putInt(this.action); // action we want to perform - announce
-        sendData.putInt(this.transactionId); // transaction_id - random int we make (32 bits)
+        sendData.putInt(getActionNumber()); // action we want to perform - scrape
+        sendData.putInt(getTransactionId()); // transaction_id - random int we make (32 bits)
         sendData.put(this.torrentInfoHash); //info_hash (20 bits)
         sendData.put(this.peerId); // peer_id (20 bits)
         sendData.putLong(this.downloaded); // downloaded (64 bits)
@@ -86,6 +80,67 @@ public class AnnounceRequest implements PacketRequest {
         sendData.putInt(this.numWant); // num_want = The maximum number of peers you want in the reply. Use -1 for default.
         sendData.putShort(this.tcpPort); // tcpPort (16 bits)
 
-        return sendData.array();
+        return sendData;
+    }
+
+    @Override
+    public String toString() {
+        return "AnnounceRequest{" +
+                "connectionId=" + connectionId +
+                ", torrentInfoHash=" + Arrays.toString(torrentInfoHash) +
+                ", peerId=" + Arrays.toString(peerId) +
+                ", downloaded=" + downloaded +
+                ", left=" + left +
+                ", uploaded=" + uploaded +
+                ", event=" + event +
+                ", ipAddress=" + ipAddress +
+                ", key=" + key +
+                ", numWant=" + numWant +
+                ", tcpPort=" + tcpPort +
+                '}' + super.toString();
+    }
+
+    public long getConnectionId() {
+        return connectionId;
+    }
+
+    public byte[] getTorrentInfoHash() {
+        return torrentInfoHash;
+    }
+
+    public byte[] getPeerId() {
+        return peerId;
+    }
+
+    public long getDownloaded() {
+        return downloaded;
+    }
+
+    public long getLeft() {
+        return left;
+    }
+
+    public long getUploaded() {
+        return uploaded;
+    }
+
+    public int getEvent() {
+        return event;
+    }
+
+    public int getIpAddress() {
+        return ipAddress;
+    }
+
+    public int getKey() {
+        return key;
+    }
+
+    public int getNumWant() {
+        return numWant;
+    }
+
+    public short getTcpPort() {
+        return tcpPort;
     }
 }

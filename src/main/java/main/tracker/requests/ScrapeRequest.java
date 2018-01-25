@@ -1,24 +1,16 @@
 package main.tracker.requests;
 
-import lombok.Getter;
-import lombok.ToString;
-import main.HexByteConverter;
-
 import java.nio.ByteBuffer;
 import java.util.List;
 
-@Getter
-@ToString
-public class ScrapeRequest implements PacketRequest {
+public class ScrapeRequest extends TrackerRequest {
     private final long connectionId;
-    private final int action = 2;
-    private final int transactionId;
-    private final List<byte[]> torrentInfoHashs;
+    private final List<byte[]> torrentInfoHashes;
 
-    public ScrapeRequest(long connectionId, int transactionId, final List<byte[]> torrentInfoHashs) {
+    public ScrapeRequest(String ip, int port, long connectionId, int transactionId, List<byte[]> torrentInfoHashes) {
+        super(ip, port,2, transactionId);
         this.connectionId = connectionId;
-        this.transactionId = transactionId;
-        this.torrentInfoHashs = torrentInfoHashs;
+        this.torrentInfoHashes = torrentInfoHashes;
     }
 
     /**
@@ -30,15 +22,24 @@ public class ScrapeRequest implements PacketRequest {
      * 16 + 20 * n     20-byte string  torrentInfoHash  torrent_info_hash // the hash of the torrent we want to scrape on
      * 16 + 20 * N
      */
-    public byte[] buildRequestPacket() {
+    @Override
+    public ByteBuffer buildRequestPacket() {
 
         ByteBuffer sendData = ByteBuffer.allocate(36);
         sendData.putLong(this.connectionId); // connection_id (64 bit)
-        sendData.putInt(this.action); // action we want to perform - scrape the server (32 bits)
-        sendData.putInt(this.transactionId); // transaction_id - random int we make (32 bits)
+        sendData.putInt(getActionNumber()); // action we want to perform - scrape the server (32 bits)
+        sendData.putInt(getTransactionId()); // transaction_id - random int we make (32 bits)
         // each torrentInfoHash byte array is 20 bytes.
-        this.torrentInfoHashs.forEach((byte[] torrentInfoHash) -> sendData.put(torrentInfoHash));
+        this.torrentInfoHashes.forEach(sendData::put);
 
-        return sendData.array();
+        return sendData;
+    }
+
+    @Override
+    public String toString() {
+        return "ScrapeRequest{" +
+                "connectionId=" + connectionId +
+                ", torrentInfoHashes=" + torrentInfoHashes +
+                "} " + super.toString();
     }
 }

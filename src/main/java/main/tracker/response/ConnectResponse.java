@@ -1,16 +1,8 @@
 package main.tracker.response;
 
-import lombok.Getter;
-import lombok.ToString;
-
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
-@Getter
-@ToString
-public class ConnectResponse {
-    private final int action;
-    private final int transactionId;
+public class ConnectResponse extends TrackerResponse {
     private final long ConnectionId;
 
     /**
@@ -23,15 +15,27 @@ public class ConnectResponse {
      * 8       64-bit integer  connection_id
      * 16
      */
-    public ConnectResponse(byte[] receiveData) {
-        ByteBuffer receiveData_analyze = ByteBuffer.wrap(receiveData);
-        this.action = receiveData_analyze.getInt();
-        assert this.action == 0;
-        this.transactionId = receiveData_analyze.getInt();
-        this.ConnectionId = receiveData_analyze.getLong();
+    public ConnectResponse(String ip, int port, byte[] response) {
+        super(ip, port);
+        ByteBuffer receiveData = ByteBuffer.wrap(response);
+        setActionNumber(receiveData.getInt());
+        assert getActionNumber() == 0;
+        setTransactionId(receiveData.getInt());
+        this.ConnectionId = receiveData.getLong();
     }
 
     public static int packetResponseSize() {
         return 1000;
+    }
+
+    public long getConnectionId() {
+        return ConnectionId;
+    }
+
+    @Override
+    public String toString() {
+        return "ConnectResponse{" +
+                "ConnectionId=" + ConnectionId +
+                "} " + super.toString();
     }
 }

@@ -1,16 +1,14 @@
-package main.peer;
+package main.peer.peerMessages;
 
-import lombok.Getter;
-import lombok.Setter;
 import main.HexByteConverter;
 import org.joou.UByte;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 import static org.joou.Unsigned.ubyte;
 
-@Getter
-@Setter
 public class HandShake {
     private UByte pstrLength;
     // pstr - string identifier of the protocol
@@ -22,13 +20,6 @@ public class HandShake {
     private byte[] reserved;
     private final byte[] torrentInfoHash;// 20 bytes
     private final byte[] peerId; // 20 bytes
-
-
-    @Override
-    public String toString() {
-        return "Handshake - torrentInfoHash: " + HexByteConverter.byteToHex(this.torrentInfoHash)
-                + " peerId: " + new String(this.peerId).toString();
-    }
 
     public HandShake(byte[] torrentInfoHash, byte[] peerId) {
         int reservedBytesAmount = 8;
@@ -48,10 +39,27 @@ public class HandShake {
         assert reserved.length == reservedBytesAmount;
     }
 
+    public HandShake(InputStream dataInputStream) throws IOException {
+        byte[] data = new byte[1];
+        dataInputStream.read(data);
+        byte pstrLength = ByteBuffer.wrap(data).get();
+        data = new byte[pstrLength + 48];// how much we need to read more.
+        dataInputStream.read(data);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(1 + pstrLength + 48);
+        byteBuffer.put(pstrLength);
+        byteBuffer.put(data);
+        HandShake handShake = HandShake.createObjectFromPacket(byteBuffer.array());
+
+        this.peerId = handShake.peerId;
+        this.pstr = handShake.pstr;
+        this.pstrLength = handShake.pstrLength;
+        this.reserved = handShake.reserved;
+        this.torrentInfoHash = handShake.torrentInfoHash;
+    }
+
     /**
      * cast HandShake object to HandShake packet in bytes.
      *
-     * @param handShake object
      * @return a byte buffer (49 + pstrlen bytes) with the following structure:
      * <pstrlen><pstr><reserved><info_hash><peer_id>
      * Offset       Size            Name        value
@@ -63,22 +71,22 @@ public class HandShake {
      * 29+pstrlen   20-bit          String      peerId
      * 49+pstrlen
      */
-    public static byte[] createPacketFromObject(HandShake handShake) {
-        ByteBuffer buffer = ByteBuffer.allocate(49 + handShake.pstrLength.intValue());
+    public byte[] createPacketFromObject() {
+        ByteBuffer buffer = ByteBuffer.allocate(49 + this.pstrLength.intValue());
         byte b = 19;
 
         assert buffer.capacity() == 68;
-        assert handShake.pstrLength.intValue() == 19;
-        assert handShake.pstr.length == 19;
-        assert handShake.reserved.length == 8;
-        assert handShake.getTorrentInfoHash().length == 20;
-        assert handShake.peerId.length == 20;
+        assert this.pstrLength.intValue() == 19;
+        assert this.pstr.length == 19;
+        assert this.reserved.length == 8;
+        assert this.getTorrentInfoHash().length == 20;
+        assert this.peerId.length == 20;
 
         buffer.put(b);
-        buffer.put(handShake.pstr);
-        buffer.put(handShake.reserved);
-        buffer.put(handShake.getTorrentInfoHash());
-        buffer.put(handShake.peerId);
+        buffer.put(this.pstr);
+        buffer.put(this.reserved);
+        buffer.put(this.getTorrentInfoHash());
+        buffer.put(this.peerId);
 
         return buffer.array();
     }
@@ -107,6 +115,44 @@ public class HandShake {
         handShake.setReserved(reservedByteArray);
 
         return handShake;
+    }
+
+    public void setPstrLength(UByte pstrLength) {
+        this.pstrLength = pstrLength;
+    }
+
+    public void setPstr(byte[] pstr) {
+        this.pstr = pstr;
+    }
+
+    public void setReserved(byte[] reserved) {
+        this.reserved = reserved;
+    }
+
+    public UByte getPstrLength() {
+        return pstrLength;
+    }
+
+    public byte[] getPstr() {
+        return pstr;
+    }
+
+    public byte[] getReserved() {
+        return reserved;
+    }
+
+    public byte[] getTorrentInfoHash() {
+        return torrentInfoHash;
+    }
+
+    public byte[] getPeerId() {
+        return peerId;
+    }
+
+    @Override
+    public String toString() {
+        return "Handshake - torrentInfoHash: " + HexByteConverter.byteToHex(this.torrentInfoHash)
+                + " peerId: " + new String(this.peerId);
     }
 
 }

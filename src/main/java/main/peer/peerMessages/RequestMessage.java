@@ -1,14 +1,14 @@
-package main.peer;
+package main.peer.peerMessages;
+
+import main.peer.Peer;
 
 import java.nio.ByteBuffer;
 
-import static org.joou.Unsigned.ubyte;
-import static org.joou.Unsigned.uint;
-
 // The request message is fixed length, and is used to request a block.
-public class RequestMessage extends Message {
-    private static int length=13;
-    private static byte messageId=6;
+public class RequestMessage extends PeerMessage {
+    private static int length = 13;
+    private static final byte messageId = 6;
+
     /**
      * The payload contains the following information: (in this order)
      *
@@ -16,10 +16,14 @@ public class RequestMessage extends Message {
      * @param begin  integer (4 bytes) specifying the zero-based byte offset within the piece.
      * @param length integer (4 bytes) specifying the requested length.
      */
-    public RequestMessage(int index, int begin, int length) {
-        super(length, messageId,ByteBuffer.allocate(12)
+    public RequestMessage(Peer from, Peer to, int index, int begin, int length) {
+        super(from, to, RequestMessage.length, messageId, ByteBuffer.allocate(12)
                 .putInt(index)
                 .putInt(begin)
                 .putInt(length).array());
+    }
+
+    public RequestMessage(Peer from, Peer to, byte[] peerMessage) {
+        super(from, to, peerMessage);
     }
 }
