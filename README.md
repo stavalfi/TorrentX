@@ -5,3 +5,5 @@ There is support for downloading and uploading the same torrent through a cluste
 This architecture lets  us discover and use more seeders by examining more of them on different virtual/physical machines on a cluster.
 
 [![Build Status](https://travis-ci.org/UniversityFinalProjects/torrentx.svg?branch=master)](https://travis-ci.org/UniversityFinalProjects/torrentx)
+
+[![CircleCI](https://circleci.com/gh/UniversityFinalProjects/torrentx/tree/reactor_temp.svg?style=svg)](https://circleci.com/gh/UniversityFinalProjects/torrentx/tree/reactor_temp)
