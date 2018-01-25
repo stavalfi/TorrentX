@@ -25,10 +25,15 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
         this.to = to;
         ByteBuffer buffer = ByteBuffer.wrap(peerMessage);
         this.length = buffer.getInt();
-        this.messageId = buffer.get();
-        int sizeOfPayload = this.length - 1;// this.length - sizeof(messageId)==this.length - 1
-        this.payload = new byte[sizeOfPayload];
-        buffer.get(this.payload);
+        if (this.length > 0) {
+            this.messageId = buffer.get();
+            int sizeOfPayload = this.length - 1;// this.length - sizeof(messageId)==this.length - 1
+            this.payload = new byte[sizeOfPayload];
+            buffer.get(this.payload);
+        } else {
+            this.messageId = 10; // it's KeepAlive message
+            this.payload = new byte[0];
+        }
     }
 
     @Override
