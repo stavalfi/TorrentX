@@ -13,7 +13,8 @@ public enum PeerMessageType {
     PieceMessage(PieceMessage.class),
     PortMessage(PortMessage.class),
     RequestMessage(RequestMessage.class),
-    UnchokeMessage(UnchokeMessage.class);
+    UnchokeMessage(UnchokeMessage.class),
+    ExtendedMessage(ExtendedMessage.class);
 
     final Class<? extends PeerMessage> signal;
 
