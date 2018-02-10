@@ -39,6 +39,8 @@ public class Utils {
                 return new InterestedMessage(from, to);
             case NotInterestedMessage:
                 return new NotInterestedMessage(from, to);
+            case ExtendedMessage:
+                return new ExtendedMessage(from, to, new byte[10]);
             default:
                 throw new IllegalArgumentException(peerMessageType.toString());
         }
