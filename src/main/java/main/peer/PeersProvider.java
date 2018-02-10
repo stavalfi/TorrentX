@@ -1,6 +1,5 @@
 package main.peer;
 
-import main.tracker.BadResponseException;
 import main.tracker.TrackerConnection;
 import main.tracker.response.AnnounceResponse;
 import org.slf4j.Logger;
@@ -9,6 +8,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 
+import java.io.EOFException;
 import java.net.SocketTimeoutException;
 import java.util.function.Predicate;
 import java.util.logging.Level;
@@ -27,19 +27,19 @@ public class PeersProvider {
     public static Flux<PeersCommunicator> connectToPeers(TrackerConnection trackerConnection,
                                                          String torrentInfoHash) {
         Predicate<Throwable> communicationErrorsToIgnore = (Throwable error) ->
-                error instanceof SocketTimeoutException ||
-                        error instanceof BadResponseException;
+                error instanceof SocketTimeoutException || // the peer is not available.
+                        error instanceof EOFException; // the peer closed the connection while we read/wait for data from him.
 
         return trackerConnection.announce(torrentInfoHash)
                 .flux()
                 .flatMap(AnnounceResponse::getPeers)
-                .log(null, Level.INFO, true, SignalType.ON_NEXT)
+                .distinct()
                 .flatMap((Peer peer) ->
                         InitializePeersCommunication.getInstance().connectToPeer(torrentInfoHash, peer) // send him Handshake request.
                                 .doOnError(communicationErrorsToIgnore, error ->
                                         logger.warn("error signal: (the application failed to connect to a peer." +
-                                                " the application will try to connect to the next available peer)." +
-                                                "\nerror message: " + error.getMessage() + ".\n" +
+                                                " the application will try to connect to the next available peer).\n" +
+                                                "error message: " + error.getMessage() + ".\n" +
                                                 "error type: " + error.getClass().getName()))
                                 .onErrorResume(communicationErrorsToIgnore, error -> Mono.empty()))
                 .log(null, Level.INFO, true, SignalType.ON_NEXT);
