@@ -3,8 +3,8 @@ package main.peer.peerMessages;
 import main.HexByteConverter;
 import org.joou.UByte;
 
+import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 import static org.joou.Unsigned.ubyte;
@@ -31,25 +31,26 @@ public class HandShake {
         // pstr.length() return the number of chars in it without the "/n".
         this.pstrLength = ubyte(protocolVersion.length());
         this.pstr = protocolVersion.getBytes();
-        //this.reserved = ByteBuffer.wrap(new byte[reservedBytesAmount]);
-        this.reserved = HexByteConverter.hexToByte("8000000000130004");
-
+        // original: 8000000000130004
+        // support extended: 00 00 10 00 00 00 00 00
+        // this.reserved = HexByteConverter.hexToByte("8000000000130004");
+        this.reserved = new byte[]{0, 0, 0, 0, 0, 0x10, 0, 0};
         this.torrentInfoHash = torrentInfoHash;
         this.peerId = peerId;
         assert reserved.length == reservedBytesAmount;
     }
 
-    public HandShake(InputStream dataInputStream) throws IOException {
+    public HandShake(DataInputStream dataInputStream) throws IOException {
         byte[] data = new byte[1];
-        dataInputStream.read(data);
+        dataInputStream.readFully(data);
         byte pstrLength = ByteBuffer.wrap(data).get();
         data = new byte[pstrLength + 48];// how much we need to read more.
-        dataInputStream.read(data);
+        dataInputStream.readFully(data);
+
         ByteBuffer byteBuffer = ByteBuffer.allocate(1 + pstrLength + 48);
         byteBuffer.put(pstrLength);
         byteBuffer.put(data);
         HandShake handShake = HandShake.createObjectFromPacket(byteBuffer.array());
-
         this.peerId = handShake.peerId;
         this.pstr = handShake.pstr;
         this.pstrLength = handShake.pstrLength;
@@ -66,7 +67,7 @@ public class HandShake {
      * <p>
      * 0            8-bit           byte        pstrLength
      * 1            pstrlen-bit     bytes       pstr
-     * 1+pstrlen    64-bit           byte        reserved
+     * 1+pstrlen    64-bit          byte        reserved
      * 9+pstrlen    20-bit          String      torrentInfoHash
      * 29+pstrlen   20-bit          String      peerId
      * 49+pstrlen

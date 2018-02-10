@@ -5,8 +5,8 @@ import main.peer.PeerMessageFactory;
 import main.peer.peerMessages.HandShake;
 import main.peer.peerMessages.PeerMessage;
 
+import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -55,10 +55,10 @@ public class RemoteFakePeer extends Peer {
         int receivedMessagesAmount = 0;
         while (!this.closeEverything) {
             try {
-                InputStream inputStream = peerConnection.getInputStream();
+                DataInputStream dataInputStream = new DataInputStream(peerConnection.getInputStream());
                 OutputStream outputStream = peerConnection.getOutputStream();
                 if (receivedMessagesAmount == 0) {
-                    HandShake handShakeReceived = new HandShake(inputStream);
+                    HandShake handShakeReceived = new HandShake(dataInputStream);
                     outputStream.write(handShakeReceived.createPacketFromObject());
                 } else {
                     if (receivedMessagesAmount == 2)
@@ -68,7 +68,7 @@ public class RemoteFakePeer extends Peer {
                         return;
                     }
                     Peer fromPeer = new Peer("localhost", peerConnection.getPort());
-                    PeerMessage peerMessage = PeerMessageFactory.create(fromPeer, this, inputStream);
+                    PeerMessage peerMessage = PeerMessageFactory.create(fromPeer, this, dataInputStream);
                     outputStream.write(peerMessage.createPacketFromObject());
                 }
                 receivedMessagesAmount++;
