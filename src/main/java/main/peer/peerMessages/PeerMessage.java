@@ -88,4 +88,13 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
     public Peer getTo() {
         return to;
     }
+
+    @Override
+    public String toString() {
+        return "PeerMessage{" +
+                "from=" + from +
+                ", to=" + to +
+                ", messageId=" + messageId +
+                '}';
+    }
 }

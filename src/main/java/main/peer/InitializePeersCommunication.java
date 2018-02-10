@@ -9,10 +9,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
-import reactor.core.scheduler.Schedulers;
 
+import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -45,7 +44,7 @@ public class InitializePeersCommunication {
                         e1.printStackTrace();
                     }
                 }
-        }).publishOn(Schedulers.single());
+        });// TODO: publicOn(Single);
     }
 
     public Mono<PeersCommunicator> connectToPeer(String torrentInfoHash, Peer peer) {
@@ -53,40 +52,40 @@ public class InitializePeersCommunication {
             try {
                 Socket peerSocket = new Socket();
                 peerSocket.connect(new InetSocketAddress(peer.getPeerIp(), peer.getPeerPort()), 1000);
+                DataInputStream receiveMessages = new DataInputStream(peerSocket.getInputStream());
                 OutputStream sendHandshake = peerSocket.getOutputStream();
-                InputStream receiveHandshake = peerSocket.getInputStream();
 
                 // firstly, we need to send Handshake message to the peer and receive Handshake back.
                 HandShake handShakeSending = new HandShake(HexByteConverter.hexToByte(torrentInfoHash), AppConfig.getInstance().getPeerId().getBytes());
                 sendHandshake.write(handShakeSending.createPacketFromObject());
-                HandShake handShakeReceived = new HandShake(peerSocket.getInputStream());
+                HandShake handShakeReceived = new HandShake(receiveMessages);
                 String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
                 if (!torrentInfoHash.toLowerCase().equals(receivedTorrentInfoHash.toLowerCase())) {
                     // the peer sent me invalid HandShake message.
                     // by the p2p spec, I need to close to the socket.
-                    receiveHandshake.close();
                     sendHandshake.close();
                     peerSocket.close();
                     sink.error(new BadResponseException("we sent the peer a handshake request" +
                             " and he sent us back handshake response" +
                             " with the wrong torrent-info-hash: " + receivedTorrentInfoHash));
+                    return;
                 } else {
                     // all went well, I accept this connection.
-                    sink.success(new PeersCommunicator(peer, peerSocket));
+                    sink.success(new PeersCommunicator(peer, peerSocket, receiveMessages));
+                    return;
                 }
             } catch (IOException e) {
                 sink.error(e);
-                System.out.println(e.toString());
             }
         });
     }
 
     private PeersCommunicator acceptPeerConnection(Socket peerSocket) throws IOException {
         OutputStream dataOutputStream = peerSocket.getOutputStream();
-        InputStream dataInputStream = peerSocket.getInputStream();
+        DataInputStream dataInputStream = new DataInputStream(peerSocket.getInputStream());
 
         // firstly, we need to receive Handshake message from the peer and send him Handshake back.
-        HandShake handShakeReceived = new HandShake(peerSocket.getInputStream());
+        HandShake handShakeReceived = new HandShake(dataInputStream);
         String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
         if (MyTorrents.myTorrents
                 .stream()
@@ -102,7 +101,7 @@ public class InitializePeersCommunication {
         dataOutputStream.write(handShakeSending.createPacketFromObject());
         // all went well, I accept this connection.
         Peer peer = new Peer(peerSocket.getInetAddress().getHostAddress(), peerSocket.getPort());
-        return new PeersCommunicator(peer, peerSocket);
+        return new PeersCommunicator(peer, peerSocket, dataInputStream);
     }
 
     /**
