@@ -21,4 +21,8 @@ public class HaveMessage extends PeerMessage {
     public HaveMessage(Peer from, Peer to,byte[] peerMessage) {
         super(from, to, peerMessage);
     }
+    @Override
+    public String toString() {
+        return "HaveMessage{} " + super.toString();
+    }
 }

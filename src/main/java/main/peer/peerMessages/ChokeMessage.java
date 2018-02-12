@@ -18,4 +18,8 @@ public class ChokeMessage extends PeerMessage {
     public ChokeMessage(Peer from, Peer to, byte[] peerMessage) {
         super(from, to, peerMessage);
     }
+    @Override
+    public String toString() {
+        return "ChokeMessage{} " + super.toString();
+    }
 }

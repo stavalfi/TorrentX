@@ -17,4 +17,8 @@ public class CancelMessage extends PeerMessage {
     public CancelMessage(Peer from, Peer to, byte[] peerMessage) {
         super(from, to, peerMessage);
     }
+    @Override
+    public String toString() {
+        return "CancelMessage{} " + super.toString();
+    }
 }

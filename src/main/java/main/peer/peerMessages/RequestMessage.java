@@ -26,4 +26,8 @@ public class RequestMessage extends PeerMessage {
     public RequestMessage(Peer from, Peer to, byte[] peerMessage) {
         super(from, to, peerMessage);
     }
+    @Override
+    public String toString() {
+        return "RequestMessage{} " + super.toString();
+    }
 }

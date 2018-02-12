@@ -25,4 +25,10 @@ public class BitFieldMessage extends PeerMessage {
     public BitFieldMessage(Peer from, Peer to,byte[] peerMessage) {
         super(from, to, peerMessage);
     }
+
+
+    @Override
+    public String toString() {
+        return "BitFieldMessage{} " + super.toString();
+    }
 }

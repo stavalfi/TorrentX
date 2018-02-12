@@ -16,4 +16,8 @@ public class NotInterestedMessage extends PeerMessage {
     public NotInterestedMessage(Peer from, Peer to,byte[] peerMessage) {
         super(from, to, peerMessage);
     }
+    @Override
+    public String toString() {
+        return "NotInterestedMessage{} " + super.toString();
+    }
 }
