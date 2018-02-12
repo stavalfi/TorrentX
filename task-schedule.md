@@ -43,10 +43,10 @@
 
 ##### PBI-5: Communicate with a seeder. `IN PROGRESS` 
 
-1. Find the protocol and port which enable us to communicate with a seeder. `IN PROGRESS`
-2. List the methods we can run on a given seeder. `NOT STARTED`
+1. Find the protocol and port which enable us to communicate with a seeder. `DONE`
+2. List the methods we can run on a given seeder. `DONE`
 3. Ask if he have the file specified by the torrent file. `NOT STARTED`
-4. Which parts a seeder have from a file until now. `NOT STARTED`
+4. Which parts a seeder have from a file until now. `DONE`
 5. Download one random part from a seeder. `NOT STARTED`
 
 -----
