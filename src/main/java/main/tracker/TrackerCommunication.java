@@ -26,14 +26,14 @@ class TrackerCommunication {
         return sendRequest(request)
                 // before we map to response bytes to response object, check if the response is ErrorResponse
                 // by actionNumber. If yes, create error-signal, else forward the signal.
-                .handle((DatagramSocket trackerSocket, SynchronousSink<ByteBuffer> sink) ->
-                        getResponse(trackerSocket).subscribe(response -> {
+                .flatMap((DatagramSocket trackerSocket) ->
+                        getResponse(trackerSocket).flatMap(response -> {
                             if (ErrorResponse.isErrorResponse(response.array())) {
                                 ErrorResponse errorResponse = new ErrorResponse(request.getIp(), request.getPort(), response.array());
-                                sink.error(new TrackerErrorResponseException(errorResponse));
+                                return Mono.error(new TrackerErrorResponseException(errorResponse));
                             } else
-                                sink.next(response);
-                        }, sink::error, sink::complete))
+                                return Mono.just(response);
+                        }))
                 .map(createResponse)
                 .handle((Response response, SynchronousSink<Response> sink) -> {
                     if (request.getTransactionId() != response.getTransactionId() ||
