@@ -2,8 +2,8 @@ package com.utils;
 
 import christophedetroyer.torrent.TorrentParser;
 import main.TorrentInfo;
-import main.peer.Peer;
-import main.peer.peerMessages.*;
+import main.peer.PeersCommunicator;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.util.BitSet;
@@ -15,32 +15,30 @@ public class Utils {
         return new TorrentInfo(TorrentParser.parseTorrent(torrentFilesPath));
     }
 
-    public static PeerMessage createFakeMessage(PeerMessageType peerMessageType, Peer from, Peer to) {
+    public static Mono<Void> sendFakeMessage(PeerMessageType peerMessageType, PeersCommunicator peersCommunicator) {
         switch (peerMessageType) {
             case HaveMessage:
-                return new HaveMessage(from, to, 0);
+                return peersCommunicator.sendHaveMessage(0);
             case PortMessage:
-                return new PortMessage(from, to, (short) from.getPeerPort());
+                return peersCommunicator.sendPortMessage((short) peersCommunicator.getMe().getPeerPort());
             case ChokeMessage:
-                return new ChokeMessage(from, to);
+                return peersCommunicator.sendChokeMessage();
             case PieceMessage:
-                return new PieceMessage(from, to, 0, 0, new byte[10]);
+                return peersCommunicator.sendPieceMessage(0, 0, new byte[10]);
             case CancelMessage:
-                return new CancelMessage(from, to, 0, 0, 10);
+                return peersCommunicator.sendCancelMessage(0, 0, 10);
             case KeepAliveMessage:
-                return new KeepAliveMessage(from, to);
+                return peersCommunicator.sendKeepAliveMessage();
             case RequestMessage:
-                return new RequestMessage(from, to, 0, 0, 10);
+                return peersCommunicator.sendRequestMessage(0, 0, 10);
             case UnchokeMessage:
-                return new UnchokeMessage(from, to);
+                return peersCommunicator.sendUnchokeMessage();
             case BitFieldMessage:
-                return new BitFieldMessage(from, to, BitSet.valueOf(new byte[10]));
+                return peersCommunicator.sendBitFieldMessage(BitSet.valueOf(new byte[10]));
             case InterestedMessage:
-                return new InterestedMessage(from, to);
+                return peersCommunicator.sendInterestedMessage();
             case NotInterestedMessage:
-                return new NotInterestedMessage(from, to);
-            case ExtendedMessage:
-                return new ExtendedMessage(from, to, new byte[10]);
+                return peersCommunicator.sendNotInterestedMessage();
             default:
                 throw new IllegalArgumentException(peerMessageType.toString());
         }

@@ -14,4 +14,8 @@ public class PortMessage extends PeerMessage {
     public PortMessage(Peer from, Peer to,byte[] peerMessage) {
         super(from, to, peerMessage);
     }
+    @Override
+    public String toString() {
+        return "PortMessage{} " + super.toString();
+    }
 }

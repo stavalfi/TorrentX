@@ -5,32 +5,29 @@ import main.tracker.response.ConnectResponse;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
+import reactor.core.scheduler.Schedulers;
 
-import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.logging.Level;
+import java.util.stream.Stream;
 
 public class TrackerProvider {
-    public static Flux<TrackerConnection> connectToTrackers(List<Tracker> trackers) {
+    public static Mono<TrackerConnection> connectToTracker(Tracker tracker) {
+        ConnectRequest connectRequest = new ConnectRequest(tracker.getTracker(), tracker.getPort(), 123456);
 
-        // if I get an errorSignal signal containing one of those errors,
-        // then I will communicate with the next tracker in the tracker-list.
-        Predicate<Throwable> communicationErrorsToIgnore = (Throwable error) ->
-                error instanceof SocketTimeoutException ||
-                        error instanceof BadResponseException;
+        Function<ByteBuffer, ConnectResponse> createConnectResponse = (ByteBuffer response) ->
+                new ConnectResponse(tracker.getTracker(), tracker.getPort(), response.array());
 
-        return Flux.fromIterable(trackers)
-                .flatMap(tracker -> {
-                    ConnectRequest connectRequest = new ConnectRequest(tracker.getTracker(), tracker.getPort(), 123456);
-                    Function<ByteBuffer, ConnectResponse> createConnectResponse = (ByteBuffer response) ->
-                            new ConnectResponse(tracker.getTracker(), tracker.getPort(), response.array());
-                    return TrackerCommunication.communicate(connectRequest, createConnectResponse)
-                            .onErrorResume(communicationErrorsToIgnore, error -> Mono.empty());
-                })
+        return TrackerCommunication.communicate(connectRequest, createConnectResponse)
+                .onErrorResume(TrackerExceptions.communicationErrors, error -> Mono.empty())
                 .log(null, Level.INFO, true, SignalType.ON_NEXT)
                 .map(connectResponse -> new TrackerConnection(connectResponse));
+    }
+
+    public static Flux<TrackerConnection> connectToTrackers(Stream<Tracker> trackers) {
+        return Flux.fromStream(trackers)
+                .flatMap(tracker -> connectToTracker(tracker).subscribeOn(Schedulers.elastic()));
     }
 }

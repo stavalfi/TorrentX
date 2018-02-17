@@ -49,21 +49,21 @@ public class InitializePeersCommunication {
 
     public Mono<PeersCommunicator> connectToPeer(String torrentInfoHash, Peer peer) {
         return Mono.create((MonoSink<PeersCommunicator> sink) -> {
+            Socket peerSocket = new Socket();
             try {
-                Socket peerSocket = new Socket();
-                peerSocket.connect(new InetSocketAddress(peer.getPeerIp(), peer.getPeerPort()), 1000);
+                peerSocket.connect(new InetSocketAddress(peer.getPeerIp(), peer.getPeerPort()), 1000 * 10);
                 DataInputStream receiveMessages = new DataInputStream(peerSocket.getInputStream());
-                OutputStream sendHandshake = peerSocket.getOutputStream();
+                OutputStream sendMessages = peerSocket.getOutputStream();
 
                 // firstly, we need to send Handshake message to the peer and receive Handshake back.
                 HandShake handShakeSending = new HandShake(HexByteConverter.hexToByte(torrentInfoHash), AppConfig.getInstance().getPeerId().getBytes());
-                sendHandshake.write(handShakeSending.createPacketFromObject());
+                sendMessages.write(handShakeSending.createPacketFromObject());
                 HandShake handShakeReceived = new HandShake(receiveMessages);
                 String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
                 if (!torrentInfoHash.toLowerCase().equals(receivedTorrentInfoHash.toLowerCase())) {
                     // the peer sent me invalid HandShake message.
                     // by the p2p spec, I need to close to the socket.
-                    sendHandshake.close();
+                    sendMessages.close();
                     peerSocket.close();
                     sink.error(new BadResponseException("we sent the peer a handshake request" +
                             " and he sent us back handshake response" +
@@ -71,11 +71,19 @@ public class InitializePeersCommunication {
                     return;
                 } else {
                     // all went well, I accept this connection.
+//                    Peer me = new Peer("localhost", peerSocket.getLocalPort());
+//                    sendMessages.write(new ExtendedMessage(me, peer).createPacketFromObject());
                     sink.success(new PeersCommunicator(peer, peerSocket, receiveMessages));
                     return;
                 }
             } catch (IOException e) {
                 sink.error(e);
+                try {
+                    peerSocket.close();
+                } catch (IOException e1) {
+                    // TODO: do something with this shit
+                    e1.printStackTrace();
+                }
             }
         });
     }

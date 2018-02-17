@@ -6,7 +6,7 @@ public enum ErrorSignalType {
     SecurityException(java.lang.SecurityException.class),
     BadResponseException(main.tracker.BadResponseException.class),
     SocketException(java.net.SocketException.class),
-    PeerDisconnectedExceptionOMG(java.io.IOException.class);
+    EOFException(java.io.EOFException.class);
 
     final Class<? extends Throwable> errorSignal;
 

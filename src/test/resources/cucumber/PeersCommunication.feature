@@ -12,29 +12,31 @@ Feature: connect to a fake peers and communicate with them.
       | BitFieldMessage | BitFieldMessage    |                 |
       | CancelMessage   | CancelMessage      |                 |
 
-    Then application send to [peer ip: "localhost", peer port: "8980"] and receive the following messages:
+    Then application send to [peer ip: "localhost", peer port: "8981"] and receive the following messages:
       | sendMessageType   | receiveMessageType | errorSignalType |
       | HaveMessage       | HaveMessage        |                 |
       | InterestedMessage | InterestedMessage  |                 |
 
-    Then application send to [peer ip: "localhost", peer port: "8980"] and receive the following messages:
+    Then application send to [peer ip: "localhost", peer port: "8982"] and receive the following messages:
       | sendMessageType      | receiveMessageType   | errorSignalType |
       | KeepAliveMessage     | KeepAliveMessage     |                 |
       | NotInterestedMessage | NotInterestedMessage |                 |
 
-    Then application send to [peer ip: "localhost", peer port: "8980"] and receive the following messages:
+    Then application send to [peer ip: "localhost", peer port: "8983"] and receive the following messages:
       | sendMessageType | receiveMessageType | errorSignalType |
       | PieceMessage    | PieceMessage       |                 |
       | RequestMessage  | RequestMessage     |                 |
 
-    Then application send to [peer ip: "localhost", peer port: "8980"] and receive the following messages:
+    Then application send to [peer ip: "localhost", peer port: "8984"] and receive the following messages:
       | sendMessageType | receiveMessageType | errorSignalType |
       | UnchokeMessage  | UnchokeMessage     |                 |
       | PortMessage     | PortMessage        |                 |
 
   Scenario: we send 3 peer-messages and the connection must be closed by the rules of the fake peers.
-    Then application send to [peer ip: "localhost", peer port: "8980"] and receive the following messages:
-      | sendMessageType | receiveMessageType | errorSignalType              |
-      | BitFieldMessage | BitFieldMessage    |                              |
-      | BitFieldMessage | BitFieldMessage    |                              |
-      | BitFieldMessage |                    | PeerDisconnectedExceptionOMG |
+    Then application send to [peer ip: "localhost", peer port: "8985"] and receive the following messages:
+      | sendMessageType | receiveMessageType | errorSignalType |
+      | BitFieldMessage | BitFieldMessage    |                 |
+      | BitFieldMessage | BitFieldMessage    |                 |
+      # the last request will cause the peer to close the connection and it leads to EOFException which we ignore
+      # inside the receive() flux. so we will get a complete signal from receive().
+      | BitFieldMessage |                    |                 |

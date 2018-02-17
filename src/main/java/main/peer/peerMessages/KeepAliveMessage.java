@@ -15,4 +15,8 @@ public class KeepAliveMessage extends PeerMessage {
     public KeepAliveMessage(Peer from, Peer to, byte[] peerMessage) {
         super(from, to, peerMessage);
     }
+    @Override
+    public String toString() {
+        return "KeepAliveMessage{} " + super.toString();
+    }
 }

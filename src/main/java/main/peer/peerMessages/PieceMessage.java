@@ -22,4 +22,8 @@ public class PieceMessage extends PeerMessage {
     public PieceMessage(Peer from, Peer to,byte[] peerMessage) {
         super(from, to, peerMessage);
     }
+    @Override
+    public String toString() {
+        return "PieceMessage{} " + super.toString();
+    }
 }
