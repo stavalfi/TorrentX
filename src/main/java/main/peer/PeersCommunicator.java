@@ -24,7 +24,8 @@ public class PeersCommunicator implements SendPeerMessage {
         this.peerSocket = peerSocket;
         this.me = new Peer("localhost", peerSocket.getLocalPort());
         this.IWantToCloseConnection = false;
-        this.responses = Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, dataInputStream));
+        this.responses = Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, dataInputStream))
+                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
     }
 
     private void listenForPeerMessages(FluxSink<PeerMessage> sink, DataInputStream dataInputStream) {

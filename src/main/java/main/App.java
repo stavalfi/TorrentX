@@ -1,61 +1,38 @@
 package main;
 
-import christophedetroyer.torrent.Torrent;
 import christophedetroyer.torrent.TorrentParser;
+import lombok.SneakyThrows;
 import main.peer.PeersProvider;
 import main.tracker.TrackerProvider;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Schedulers;
 
-import java.io.EOFException;
-import java.io.IOException;
-import java.net.SocketTimeoutException;
-import java.util.Arrays;
-
 class App {
-    static final String torrentFilePath = "src/main/resources/torrent-file-example.torrent";
 
-    public static void main(String[] args) throws Exception {
-        f2();
-    }
+    private static void f2() throws InterruptedException {
 
-    private static void f2() throws IOException, InterruptedException {
-        TorrentInfo torrentInfo = new TorrentInfo(TorrentParser.parseTorrent(torrentFilePath));
+        TorrentInfo torrentInfo = getTorrentInfo();
 
         TrackerProvider.connectToTrackers(torrentInfo.getTrackerList())
                 .flatMap(trackerConnection ->
                         PeersProvider.connectToPeers(trackerConnection, torrentInfo.getTorrentInfoHash()))
-                .parallel()
-                .runOn(Schedulers.parallel())
-                .flatMap(peersCommunicator ->
-                        peersCommunicator.receive()
-                                .onErrorResume(throwable -> throwable instanceof EOFException ||
-                                        throwable instanceof SocketTimeoutException, throwable -> Mono.empty()))
-                .subscribe(x -> System.out.println("hi1: " + x), x -> System.out.println("hi2: " + x), () -> System.out.println("hi3"));
+                .flatMap(peersCommunicator -> peersCommunicator.receive().subscribeOn(Schedulers.elastic()))
+                .subscribe(System.out::println,
+                        throwable -> System.out.println("error-> we can't be here: " + throwable.toString()));
 
         Thread.sleep(1000 * 1000);
     }
 
-    public static void printTorrentFileInfo(String path) throws IOException {
-        Torrent t1 = TorrentParser.parseTorrent(path);
+    public static void main(String[] args) throws Exception {
 
-        System.out.println("Created By: " + t1.getCreatedBy());
-        System.out.println("Main tracker: " + t1.getAnnounce());
-        if (t1.getAnnounceList() != null) {
-            System.out.println("Tracker List: ");
-            t1.getAnnounceList().forEach(System.out::println);
-        }
-        System.out.println("Comment: " + t1.getComment());
-        System.out.println("Creation Date: " + t1.getCreationDate());
-        System.out.println("Info_hash: " + t1.getInfo_hash());
-        System.out.println("Name: " + t1.getName());
-        System.out.println("Piece Length: " + t1.getPieceLength());
-        System.out.println("Pieces: " + t1.getPieces());
-        System.out.println("Pieces Blob: " + Arrays.toString(t1.getPiecesBlob()));
-        System.out.println("Total Size: " + t1.getTotalSize());
-        System.out.println("Is Single File Torrent: " + t1.isSingleFileTorrent());
-        System.out.println("File List: ");
-        t1.getFileList().forEach(System.out::println);
+        Hooks.onErrorDropped(throwable -> System.out.println("exception thrown after a stream terminated: " + throwable));
+        f2();
+    }
+
+    @SneakyThrows
+    public static TorrentInfo getTorrentInfo() {
+        String torrentFilePath = "src/main/resources/torrent-file-example.torrent";
+        return new TorrentInfo(TorrentParser.parseTorrent(torrentFilePath));
     }
 }
 

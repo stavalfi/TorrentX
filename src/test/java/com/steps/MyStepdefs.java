@@ -1,6 +1,7 @@
 package com.steps;
 
 import com.utils.*;
+import cucumber.api.java.Before;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import main.TorrentInfo;
@@ -16,6 +17,7 @@ import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
 import org.mockito.Mockito;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -34,41 +36,54 @@ public class MyStepdefs {
 
     private List<RemoteFakePeer> remoteFakePeers;
 
+    @Before
+    public void beforeTest() {
+        Hooks.onErrorDropped(throwable -> {
+        });
+    }
+
     @Given("^new torrent file: \"([^\"]*)\".$")
     public void newTorrentFile(String torrentFileName) throws Throwable {
         this.torrentFilePath = torrentFileName;
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
 
-        Mockito.when(this.torrentInfo.getTorrentInfoHash()).thenReturn(torrentInfo.getTorrentInfoHash());
-        Mockito.when(this.torrentInfo.getTrackerList()).thenReturn(torrentInfo.getTrackerList());
+        Mockito.when(this.torrentInfo.getTorrentInfoHash())
+                .thenReturn(torrentInfo.getTorrentInfoHash());
+        Mockito.when(this.torrentInfo.getTrackerList())
+                .thenReturn(torrentInfo.getTrackerList());
     }
 
     @Given("^additional not-responding trackers to the tracker-list.$")
     public void additionalNotRespondingTrackersToTheTrackerListFromFile() throws Throwable {
         TorrentInfo torrentInfo = Utils.readTorrentFile(this.torrentFilePath);
         String torrentHashInfo = torrentInfo.getTorrentInfoHash();
-        torrentInfo.getTrackerList().stream().findFirst().ifPresent(tracker -> {
-            List<Tracker> fakeTrackers = Arrays.asList(
-                    new Tracker("wrongUrl.com", 8090), // wrong url (but valid url) and a random port
-                    new Tracker(tracker.getTracker(), tracker.getPort() + 1) // wrong port
-            );
-            List<Tracker> trackers = new LinkedList<>();
-            trackers.addAll(fakeTrackers);
-            trackers.addAll(torrentInfo.getTrackerList());
-            trackers.addAll(fakeTrackers);
+        torrentInfo.getTrackerList()
+                .stream()
+                .findFirst()
+                .ifPresent(tracker -> {
+                    List<Tracker> fakeTrackers = Arrays.asList(
+                            new Tracker("wrongUrl.com", 8090), // wrong url (but valid url) and a random port
+                            new Tracker(tracker.getTracker(), tracker.getPort() + 1) // wrong port
+                    );
+                    List<Tracker> trackers = new LinkedList<>();
+                    trackers.addAll(fakeTrackers);
+                    trackers.addAll(torrentInfo.getTrackerList());
+                    trackers.addAll(fakeTrackers);
 
-            // define our mock object
-            Mockito.when(this.torrentInfo.getTorrentInfoHash()).thenReturn(torrentHashInfo);
-            Mockito.when(this.torrentInfo.getTrackerList()).thenReturn(trackers);
-        });
+                    // define our mock object
+                    Mockito.when(this.torrentInfo.getTorrentInfoHash()).thenReturn(torrentHashInfo);
+                    Mockito.when(this.torrentInfo.getTrackerList()).thenReturn(trackers);
+                });
     }
 
     @Given("^additional invalid url of a tracker.$")
     public void additionalInvalidUrlOfATrackerOf() throws Throwable {
         TorrentInfo torrentInfo = Utils.readTorrentFile(this.torrentFilePath);
         String torrentHashInfo = torrentInfo.getTorrentInfoHash();
-        Mockito.when(this.torrentInfo.getTorrentInfoHash()).thenReturn(torrentHashInfo);
-        Mockito.when(this.torrentInfo.getTrackerList()).thenReturn(Collections.singletonList(new Tracker("invalid.url.123", 123)));
+        Mockito.when(this.torrentInfo.getTorrentInfoHash())
+                .thenReturn(torrentHashInfo);
+        Mockito.when(this.torrentInfo.getTrackerList())
+                .thenReturn(Collections.singletonList(new Tracker("invalid.url.123", 123)));
     }
 
     @Given("^new torrent file: \"([^\"]*)\" containing the following fake peers:$")
@@ -81,16 +96,12 @@ public class MyStepdefs {
 
     @Then("^application send and receive Handshake from the same random peer.$")
     public void applicationSendAndReceiveHandshakeFromTheSameRandomPeer() throws Throwable {
-
-    }
-
-    @Then("^application send Handshake request to a random peer.$")
-    public void applicationSendCommunicationRequestToARandomPeer() throws Throwable {
         Mono<PeersCommunicator> connectedPeerMono =
                 TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList())
-                        .flatMap((TrackerConnection trackerConnection) ->
-                                PeersProvider.connectToPeers(trackerConnection, this.torrentInfo.getTorrentInfoHash()))
+                        .flatMap((TrackerConnection trackerConnection) -> PeersProvider.connectToPeers(trackerConnection, this.torrentInfo.getTorrentInfoHash()))
+                        .doOnEach(x -> System.out.println("1 " + x))
                         .take(1)
+                        .doOnEach(x -> System.out.println("2 " + x))
                         .single()
                         .cache();
 
@@ -172,12 +183,7 @@ public class MyStepdefs {
                 .map(PeerFakeRequestResponse::getSendMessageType)
                 .flatMap(peerRequestMessage ->
                         peersCommunicatorMono.flux()
-                                .flatMap(peersCommunicator ->
-                                {
-                                    PeerMessage fakeRequest = Utils.createFakeMessage(peerRequestMessage,
-                                            peersCommunicator.getMe(), peersCommunicator.getPeer());
-                                    return peersCommunicator.send(fakeRequest);
-                                }));
+                                .flatMap(peersCommunicator -> Utils.sendFakeMessage(peerRequestMessage, peersCommunicator)));
 
         // check that all the messages sent successfully.
         // note: Mono<Void> never signal onNext. Only error or complete.
@@ -188,7 +194,7 @@ public class MyStepdefs {
         Flux<PeerMessage> peersResponses = peersCommunicatorMono.flux()
                 .flatMap(PeersCommunicator::receive);
 
-        // check if we expect an error.
+        // check if we expect an error signal.
         Optional<ErrorSignalType> errorSignalType =
                 peerFakeRequestResponses
                         .stream()
@@ -196,7 +202,20 @@ public class MyStepdefs {
                         .map(PeerFakeRequestResponse::getErrorSignalType)
                         .findAny();
 
-        if (errorSignalType.isPresent())
+        // check if we expect a complete signal
+        Optional<PeerFakeRequestResponse> completeSignal =
+                peerFakeRequestResponses
+                        .stream()
+                        .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
+                                peerFakeRequestResponse.getReceiveMessageType() == null)
+                        .findAny();
+
+        if (completeSignal.isPresent())
+            StepVerifier.create(peersResponses)
+                    .expectNextCount(peerFakeRequestResponses.size() - 1)
+                    .expectComplete()
+                    .verify();
+        else if (errorSignalType.isPresent())
             StepVerifier.create(peersResponses)
                     .expectNextCount(peerFakeRequestResponses.size() - 1)
                     .expectError(errorSignalType.get().getErrorSignal())
