@@ -97,7 +97,7 @@ public class MyStepdefs {
     @Then("^application send and receive Handshake from the same random peer.$")
     public void applicationSendAndReceiveHandshakeFromTheSameRandomPeer() throws Throwable {
         Mono<PeersCommunicator> connectedPeerMono =
-                TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList())
+                TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList().stream())
                         .flatMap((TrackerConnection trackerConnection) -> PeersProvider.connectToPeers(trackerConnection, this.torrentInfo.getTorrentInfoHash()))
                         .doOnEach(x -> System.out.println("1 " + x))
                         .take(1)
@@ -129,7 +129,7 @@ public class MyStepdefs {
                         error instanceof BadResponseException;
 
         Flux<TrackerResponse> actualTrackerResponseFlux =
-                TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList())
+                TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList().stream())
                         .flatMap(trackerConnection ->
                                 Flux.fromIterable(messages)
                                         .filter(fakeMessage -> fakeMessage.getTrackerRequestType() != TrackerRequestType.Connect)

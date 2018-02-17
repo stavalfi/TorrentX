@@ -13,7 +13,7 @@ class App {
 
         TorrentInfo torrentInfo = getTorrentInfo();
 
-        TrackerProvider.connectToTrackers(torrentInfo.getTrackerList())
+        TrackerProvider.connectToTrackers(torrentInfo.getTrackerList().stream())
                 .flatMap(trackerConnection ->
                         PeersProvider.connectToPeers(trackerConnection, torrentInfo.getTorrentInfoHash()))
                 .flatMap(peersCommunicator -> peersCommunicator.receive().subscribeOn(Schedulers.elastic()))
