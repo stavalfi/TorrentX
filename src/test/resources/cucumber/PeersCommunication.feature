@@ -4,7 +4,7 @@ Feature: connect to a fake peers and communicate with them.
   3. the third response will cause the peer to shutdown the connection and not responding anything.
 
   Background: read torrent file.
-    Given new torrent file: "torrent-file-example1.torrent".
+    Given new torrent file: "torrent-file-example.torrent".
 
   Scenario: we send peer-messages and must receive the same peer-messages back.
     Then application send to [peer ip: "localhost", peer port: "8980"] and receive the following messages:

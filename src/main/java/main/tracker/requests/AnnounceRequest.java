@@ -1,5 +1,7 @@
 package main.tracker.requests;
 
+import main.tracker.Tracker;
+
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -17,20 +19,20 @@ public class AnnounceRequest extends TrackerRequest {
     private final int numWant;
     private final short tcpPort;
 
-    public AnnounceRequest(String ip, int port, long connectionId,
+    public AnnounceRequest(Tracker tracker, long connectionId,
                            byte[] torrentInfoHash, byte[] peerId, int numWant, short tcpPort) {
-        this(ip, port, connectionId, 123456,
+        this(tracker, connectionId, 123456,
                 torrentInfoHash, peerId, 0, 0,
                 0, 0, 0, 0,
                 numWant, tcpPort);
     }
 
 
-    public AnnounceRequest(String ip, int port, long connectionId, int transactionId,
+    public AnnounceRequest(Tracker tracker, long connectionId, int transactionId,
                            byte[] torrentInfoHash, byte[] peerId, long downloaded,
                            long left, long uploaded, int event, int ipAddress,
                            int key, int numWant, short tcpPort) {
-        super(ip, port, 1, transactionId);
+        super(tracker, 1, transactionId);
         this.connectionId = connectionId;
         this.torrentInfoHash = torrentInfoHash;
         this.peerId = peerId;

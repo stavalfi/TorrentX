@@ -33,8 +33,8 @@ public class HandShake {
         this.pstr = protocolVersion.getBytes();
         // original: 8000000000130004
         // support extended: 00 00 10 00 00 00 00 00
-        // this.reserved = HexByteConverter.hexToByte("8000000000130004");
-        this.reserved = new byte[]{0, 0, 0, 0, 0, 0x10, 0, 0};
+//        this.reserved = new byte[]{0, 0, 0, 0, 0, 0x10, 0, 0}; // support extendedMessage
+        this.reserved = new byte[]{0, 0, 0, 0, 0, 0x00, 0, 0}; // doesn't support extendedMessage
         this.torrentInfoHash = torrentInfoHash;
         this.peerId = peerId;
         assert reserved.length == reservedBytesAmount;

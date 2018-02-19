@@ -29,7 +29,7 @@ class TrackerCommunication {
                         receiveResponse(trackerSocket)
                                 .handle((ByteBuffer response, SynchronousSink<ByteBuffer> sink) -> {
                                     if (ErrorResponse.isErrorResponse(response.array())) {
-                                        ErrorResponse errorResponse = new ErrorResponse(request.getIp(), request.getPort(), response.array());
+                                        ErrorResponse errorResponse = new ErrorResponse(request.getTracker(), response.array());
                                         sink.error(new TrackerErrorResponseException(errorResponse));
                                     } else
                                         sink.next(response);
@@ -73,9 +73,9 @@ class TrackerCommunication {
     private static <Request extends TrackerRequest> Mono<DatagramPacket> makeRequest(Request request) {
         return Mono.create(sink -> {
             try {
-                InetAddress trackerIp = InetAddress.getByName(request.getIp());
+                InetAddress trackerIp = InetAddress.getByName(request.getTracker().getTracker());
                 byte[] requestPacket = request.buildRequestPacket().array();
-                DatagramPacket datagramPacket = new DatagramPacket(requestPacket, requestPacket.length, trackerIp, request.getPort());
+                DatagramPacket datagramPacket = new DatagramPacket(requestPacket, requestPacket.length, trackerIp, request.getTracker().getPort());
                 sink.success(datagramPacket);
             } catch (UnknownHostException ex) {
                 // copy the exception details and add the request information

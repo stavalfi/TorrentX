@@ -2,29 +2,41 @@ package main;
 
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
+import main.peer.PeersCommunicator;
 import main.peer.PeersProvider;
 import main.tracker.TrackerProvider;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Schedulers;
+
+import java.util.stream.IntStream;
 
 class App {
 
     private static void f2() throws InterruptedException {
 
         TorrentInfo torrentInfo = getTorrentInfo();
+        System.out.println(torrentInfo);
 
         TrackerProvider.connectToTrackers(torrentInfo.getTrackerList().stream())
-                .flatMap(trackerConnection ->
-                        PeersProvider.connectToPeers(trackerConnection, torrentInfo.getTorrentInfoHash()))
+                .flatMap(trackerConnection -> PeersProvider.connectToPeers(trackerConnection, torrentInfo.getTorrentInfoHash()))
+                .doOnNext(peersCommunicator -> sendHave(torrentInfo, peersCommunicator))
+                .doOnNext(peersCommunicator ->
+                        peersCommunicator.sendRequestMessage(0, 0, 1000).block())
                 .flatMap(peersCommunicator -> peersCommunicator.receive().subscribeOn(Schedulers.elastic()))
-                .subscribe(System.out::println,
-                        throwable -> System.out.println("error-> we can't be here: " + throwable.toString()));
+                .subscribe(System.out::println, System.out::println);
 
         Thread.sleep(1000 * 1000);
     }
 
-    public static void main(String[] args) throws Exception {
+    private static void sendHave(TorrentInfo torrentInfo, PeersCommunicator peersCommunicator) {
+        Flux.fromStream(IntStream.range(1, torrentInfo.getPieces().size()).boxed())
+                .flatMap(peersCommunicator::sendHaveMessage)
+                .collectList()
+                .block();
+    }
 
+    public static void main(String[] args) throws Exception {
         Hooks.onErrorDropped(throwable -> System.out.println("exception thrown after a stream terminated: " + throwable));
         f2();
     }

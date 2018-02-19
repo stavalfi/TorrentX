@@ -1,17 +1,17 @@
 package main.tracker.requests;
 
+import main.tracker.Tracker;
+
 import java.nio.ByteBuffer;
 
 public abstract class TrackerRequest {
-    private final String ip;
-    private final int port;
+    private Tracker tracker;
     private final int actionNumber;
     private final int transactionId;
 
 
-    public TrackerRequest(String ip, int port, int actionNumber, int transactionId) {
-        this.ip = ip;
-        this.port = port;
+    public TrackerRequest(Tracker tracker, int actionNumber, int transactionId) {
+        this.tracker = tracker;
         this.actionNumber = actionNumber;
         this.transactionId = transactionId;
     }
@@ -20,12 +20,8 @@ public abstract class TrackerRequest {
         return actionNumber;
     }
 
-    public String getIp() {
-        return ip;
-    }
-
-    public int getPort() {
-        return port;
+    public Tracker getTracker() {
+        return tracker;
     }
 
     public int getTransactionId() {
@@ -37,8 +33,7 @@ public abstract class TrackerRequest {
     @Override
     public String toString() {
         return "TrackerRequest{" +
-                "ip='" + ip + '\'' +
-                ", port=" + port +
+                "tracker=" + tracker +
                 ", actionNumber=" + actionNumber +
                 ", transactionId=" + transactionId +
                 '}';

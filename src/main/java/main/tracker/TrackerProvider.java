@@ -8,17 +8,16 @@ import reactor.core.publisher.SignalType;
 import reactor.core.scheduler.Schedulers;
 
 import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.stream.Stream;
 
 public class TrackerProvider {
     public static Mono<TrackerConnection> connectToTracker(Tracker tracker) {
-        ConnectRequest connectRequest = new ConnectRequest(tracker.getTracker(), tracker.getPort(), 123456);
+        ConnectRequest connectRequest = new ConnectRequest(tracker, 123456);
 
         Function<ByteBuffer, ConnectResponse> createConnectResponse = (ByteBuffer response) ->
-                new ConnectResponse(tracker.getTracker(), tracker.getPort(), response.array());
+                new ConnectResponse(tracker, response.array());
 
         return TrackerCommunication.communicate(connectRequest, createConnectResponse)
                 .onErrorResume(TrackerExceptions.communicationErrors, error -> Mono.empty())

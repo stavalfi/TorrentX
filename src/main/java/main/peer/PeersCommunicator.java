@@ -82,6 +82,9 @@ public class PeersCommunicator implements SendPeerMessage {
 
     private Mono<Void> send(PeerMessage peerMessage) {
         try {
+            if (peerMessage.getMessageId() == 3) {
+                System.out.println(peerMessage);
+            }
             this.peerSocket.getOutputStream().write(peerMessage.createPacketFromObject());
             return Mono.empty();
         } catch (IOException e) {

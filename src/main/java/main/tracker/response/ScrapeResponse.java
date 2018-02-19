@@ -1,5 +1,7 @@
 package main.tracker.response;
 
+import main.tracker.Tracker;
+
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -8,8 +10,8 @@ public class ScrapeResponse extends TrackerResponse {
 
     private final List<ScrapeResponseForTorrentInfoHash> ScrapeResponseForTorrentInfoHashes;
 
-    public ScrapeResponse(String ip, int port, List<ScrapeResponseForTorrentInfoHash> scrapeResponseForTorrentInfoHashes) {
-        super(ip, port);
+    public ScrapeResponse(Tracker tracker, List<ScrapeResponseForTorrentInfoHash> scrapeResponseForTorrentInfoHashes) {
+        super(tracker);
         ScrapeResponseForTorrentInfoHashes = scrapeResponseForTorrentInfoHashes;
     }
 
@@ -38,8 +40,8 @@ public class ScrapeResponse extends TrackerResponse {
      *                          The order is important and I assume that the answer
      *                          will be with the same order as this list.
      */
-    public ScrapeResponse(String ip, int port, byte[] response, List<byte[]> torrentInfoHashes) {
-        super(ip, port);
+    public ScrapeResponse(Tracker tracker, byte[] response, List<byte[]> torrentInfoHashes) {
+        super(tracker);
         ByteBuffer receiveData = ByteBuffer.wrap(response);
         setActionNumber(receiveData.getInt());
         assert getActionNumber() == 2;

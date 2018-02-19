@@ -62,8 +62,8 @@ public class MyStepdefs {
                 .findFirst()
                 .ifPresent(tracker -> {
                     List<Tracker> fakeTrackers = Arrays.asList(
-                            new Tracker("wrongUrl.com", 8090), // wrong url (but valid url) and a random port
-                            new Tracker(tracker.getTracker(), tracker.getPort() + 1) // wrong port
+                            new Tracker("udp", "wrongUrl.com", 8090), // wrong url (but valid url) and a random port
+                            new Tracker("udp", tracker.getTracker(), tracker.getPort() + 1) // wrong port
                     );
                     List<Tracker> trackers = new LinkedList<>();
                     trackers.addAll(fakeTrackers);
@@ -83,7 +83,7 @@ public class MyStepdefs {
         Mockito.when(this.torrentInfo.getTorrentInfoHash())
                 .thenReturn(torrentHashInfo);
         Mockito.when(this.torrentInfo.getTrackerList())
-                .thenReturn(Collections.singletonList(new Tracker("invalid.url.123", 123)));
+                .thenReturn(Collections.singletonList(new Tracker("udp", "invalid.url.123", 123)));
     }
 
     @Given("^new torrent file: \"([^\"]*)\" containing the following fake peers:$")
