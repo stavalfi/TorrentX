@@ -5,13 +5,40 @@ import lombok.SneakyThrows;
 import main.peer.PeersCommunicator;
 import main.peer.PeersProvider;
 import main.tracker.TrackerProvider;
+import org.springframework.web.client.RestTemplate;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.IntStream;
 
 class App {
+
+
+    private static void f3() {
+        String torrentHashCode = splitByPrecentage("1488d454915d860529903b61adb537012a0fe7c8");
+        String peerId = splitByPrecentage(HexByteConverter.byteToHex(AppConfig.getInstance().getPeerId().getBytes()));
+        String url = "http://torrent.ubuntu.com:6969/announce";
+
+        Map<String, String> vars = new HashMap<String, String>();
+        vars.put("info_hash", torrentHashCode);
+        vars.put("peer_id", peerId);
+        String result = new RestTemplate()
+                .getForObject(url + "?info_hash={info_hash}/", String.class, vars);
+        System.out.println(result);
+    }
+
+    private static String splitByPrecentage(String str) {
+        String newStr = "";
+
+        for (int i = 0; i < str.length(); i += 2)
+            newStr = newStr.concat(str.charAt(i) + "")
+                    .concat(str.charAt(i + 1) + "")
+                    .concat("%");
+        return newStr.substring(0, newStr.length() - 1);
+    }
 
     private static void f2() throws InterruptedException {
 
@@ -38,7 +65,7 @@ class App {
 
     public static void main(String[] args) throws Exception {
         Hooks.onErrorDropped(throwable -> System.out.println("exception thrown after a stream terminated: " + throwable));
-        f2();
+        f3();
     }
 
     @SneakyThrows
@@ -47,6 +74,19 @@ class App {
         return new TorrentInfo(TorrentParser.parseTorrent(torrentFilePath));
     }
 }
+
+//  Main tracker: http://torrent.ubuntu.com:6969/announce
+//  Comment: Ubuntu CD releases.ubuntu.com
+//  Info_hash: 1488d454915d860529903b61adb537012a0fe7c8
+//  Name: ubuntu-16.04.3-desktop-amd64.iso
+//  Piece Length: 524288
+//  Pieces: 3029
+//  Total Size: 1587609600
+//  Is Single File Torrent: true
+//  File List:
+//  Tracker List:
+//  http://torrent.ubuntu.com:6969/announce
+//  http://ipv6.torrent.ubuntu.com:6969/announce
 
 
 //    torrent hash: af1f3dbc5d5baeaf83f812e06aa91bbd7b55cce8
