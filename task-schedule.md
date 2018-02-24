@@ -45,6 +45,8 @@
 
 1. GitHub pull request can be approved if and only if the build is pass in `CircleCI` and `TravisCI`. (Stav)
 
+-----
+
 ##### PBI-6: Learn `Reactor 3` library. `DONE` 
 
 1. Creating a New Sequence. (Stav)
@@ -90,6 +92,8 @@ The API will let us listen for incoming messages and provide us a way to send me
     
 2. Implementing tests. (Stav)
 3. Implementing the API. (Stav)
+
+-----
 
 ##### PBI-10: Design a torrent manager API to handle the download & upload of a specific torrent. `DONE`
 
