@@ -2,7 +2,9 @@ package main.peer;
 
 import main.AppConfig;
 import main.HexByteConverter;
-import main.MyTorrents;
+import main.TorrentInfo;
+import main.file.ActiveTorrent;
+import main.file.MyTorrents;
 import main.peer.peerMessages.HandShake;
 import main.tracker.BadResponseException;
 import reactor.core.publisher.Flux;
@@ -31,10 +33,11 @@ public class InitializePeersCommunication {
             e.printStackTrace();
         }
         this.allPeersCommunicatorFlux = Flux.create((FluxSink<PeersCommunicator> sink) -> {
-            while (!this.listenToPeerConnection.isClosed())
+            while (!this.listenToPeerConnection.isClosed() && !sink.isCancelled())
                 try {
                     Socket peerSocket = this.listenToPeerConnection.accept();
-                    sink.next(acceptPeerConnection(peerSocket));
+                    // the following method will do sink.next if the connect operation succeed.
+                    acceptPeerConnection(peerSocket, sink);
                 } catch (IOException e) {
                     sink.error(e);
                     try {
@@ -88,32 +91,63 @@ public class InitializePeersCommunication {
         });
     }
 
-    private PeersCommunicator acceptPeerConnection(Socket peerSocket) throws IOException {
-        OutputStream dataOutputStream = peerSocket.getOutputStream();
-        DataInputStream dataInputStream = new DataInputStream(peerSocket.getInputStream());
+    private void acceptPeerConnection(Socket peerSocket, FluxSink<PeersCommunicator> sink) {
+        OutputStream dataOutputStream = null;
+        try {
+            dataOutputStream = peerSocket.getOutputStream();
+        } catch (IOException e) {
+            sink.error(e);
+            return;
+        }
+        DataInputStream dataInputStream = null;
+        try {
+            dataInputStream = new DataInputStream(peerSocket.getInputStream());
+        } catch (IOException e) {
+            sink.error(e);
+            return;
+        }
 
         // firstly, we need to receive Handshake message from the peer and send him Handshake back.
-        HandShake handShakeReceived = new HandShake(dataInputStream);
+        HandShake handShakeReceived = null;
+        try {
+            handShakeReceived = new HandShake(dataInputStream);
+        } catch (IOException e) {
+            sink.error(e);
+            return;
+        }
         String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
-        boolean dontHaveThisTorrent = MyTorrents.myTorrents
-                .stream()
-                .noneMatch(torrentInfo ->
-                        torrentInfo.getTorrentInfoHash()
-                                .toLowerCase()
-                                .equals(receivedTorrentInfoHash.toLowerCase()));
+        boolean dontHaveThisTorrent = MyTorrents.getInstance()
+                .getFiles()
+                .map(ActiveTorrent::getTorrentInfo)
+                .map(TorrentInfo::getTorrentInfoHash)
+                .map(String::toLowerCase)
+                .noneMatch(torrentHashInfo ->
+                        torrentHashInfo.equals(receivedTorrentInfoHash.toLowerCase()));
+
         if (dontHaveThisTorrent) {
             // the peer sent me invalid HandShake message.
             // by the p2p spec, I need to close to the socket.
-            dataInputStream.close();
-            dataOutputStream.close();
-            peerSocket.close();
+            try {
+                dataInputStream.close();
+                dataOutputStream.close();
+                peerSocket.close();
+            } catch (IOException exception) {
+                //TODO: do something with this shit.
+            }
+            sink.error(new BadResponseException("peer returned handshake with incorrect torrent-hash-info."));
+            return;
         }
 
         HandShake handShakeSending = new HandShake(handShakeReceived.getTorrentInfoHash(), AppConfig.getInstance().getPeerId().getBytes());
-        dataOutputStream.write(handShakeSending.createPacketFromObject());
+        try {
+            dataOutputStream.write(handShakeSending.createPacketFromObject());
+        } catch (IOException e) {
+            sink.error(e);
+            return;
+        }
         // all went well, I accept this connection.
         Peer peer = new Peer(peerSocket.getInetAddress().getHostAddress(), peerSocket.getPort());
-        return new PeersCommunicator(peer, peerSocket, dataInputStream);
+        sink.next(new PeersCommunicator(peer, peerSocket, dataInputStream));
     }
 
     /**
