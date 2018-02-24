@@ -4,6 +4,8 @@ import main.TorrentInfo;
 
 public interface DownloadControl {
 
+    TorrentInfo getTorrentInfo();
+
     void start();
 
     void resume();
@@ -13,6 +15,4 @@ public interface DownloadControl {
     void stop();
 
     void remove();
-
-    TorrentInfo getTorrentInfo();
 }
