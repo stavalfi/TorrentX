@@ -2,75 +2,36 @@ package main;
 
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
-import main.peer.PeersCommunicator;
-import main.peer.PeersProvider;
-import main.tracker.TrackerProvider;
-import org.springframework.web.client.RestTemplate;
-import reactor.core.publisher.Flux;
+import main.downloader.TorrentDownloader;
 import reactor.core.publisher.Hooks;
-import reactor.core.scheduler.Schedulers;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.stream.IntStream;
 
 class App {
-
-
-    private static void f3() {
-        String torrentHashCode = splitByPrecentage("1488d454915d860529903b61adb537012a0fe7c8");
-        String peerId = splitByPrecentage(HexByteConverter.byteToHex(AppConfig.getInstance().getPeerId().getBytes()));
-        String url = "http://torrent.ubuntu.com:6969/announce";
-
-        Map<String, String> vars = new HashMap<String, String>();
-        vars.put("info_hash", torrentHashCode);
-        vars.put("peer_id", peerId);
-        String result = new RestTemplate()
-                .getForObject(url + "?info_hash={info_hash}/", String.class, vars);
-        System.out.println(result);
-    }
-
-    private static String splitByPrecentage(String str) {
-        String newStr = "";
-
-        for (int i = 0; i < str.length(); i += 2)
-            newStr = newStr.concat(str.charAt(i) + "")
-                    .concat(str.charAt(i + 1) + "")
-                    .concat("%");
-        return newStr.substring(0, newStr.length() - 1);
-    }
-
-    private static void f2() throws InterruptedException {
-
+    private static void f4() {
         TorrentInfo torrentInfo = getTorrentInfo();
-        System.out.println(torrentInfo);
 
-        TrackerProvider.connectToTrackers(torrentInfo.getTrackerList().stream())
-                .flatMap(trackerConnection -> PeersProvider.connectToPeers(trackerConnection, torrentInfo.getTorrentInfoHash()))
-                .doOnNext(peersCommunicator -> sendHave(torrentInfo, peersCommunicator))
-                .doOnNext(peersCommunicator ->
-                        peersCommunicator.sendRequestMessage(0, 0, 1000).block())
-                .flatMap(peersCommunicator -> peersCommunicator.receive().subscribeOn(Schedulers.elastic()))
-                .subscribe(System.out::println, System.out::println);
+        TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo);
 
-        Thread.sleep(1000 * 1000);
-    }
+        torrentDownloader.getPeerResponseFlux()
+                .subscribe(System.out::println, System.out::println, System.out::println);
 
-    private static void sendHave(TorrentInfo torrentInfo, PeersCommunicator peersCommunicator) {
-        Flux.fromStream(IntStream.range(1, torrentInfo.getPieces().size()).boxed())
-                .flatMap(peersCommunicator::sendHaveMessage)
-                .collectList()
-                .block();
+        torrentDownloader.getPeersCommunicatorFlux()
+                .doOnNext(peersCommunicator -> peersCommunicator.sendInterestedMessage().block())
+                .doOnNext(peersCommunicator -> peersCommunicator.sendRequestMessage(0, 0, 16000).block())
+                .subscribe();
+
+        torrentDownloader.start();
     }
 
     public static void main(String[] args) throws Exception {
-        Hooks.onErrorDropped(throwable -> System.out.println("exception thrown after a stream terminated: " + throwable));
-        f3();
+        Hooks.onErrorDropped(throwable -> {
+        });
+        f4();
+        Thread.sleep(1000 * 1000);
     }
 
     @SneakyThrows
     public static TorrentInfo getTorrentInfo() {
-        String torrentFilePath = "src/main/resources/torrent-file-example.torrent";
+        String torrentFilePath = "src/main/resources/torrent-file-example3.torrent";
         return new TorrentInfo(TorrentParser.parseTorrent(torrentFilePath));
     }
 }
@@ -175,3 +136,34 @@ class App {
 //    Peer(ipAddress=192.142.208.111, tcpPort=10373)
 //    Peer(ipAddress=82.212.112.193, tcpPort=35885)
 //    Peer(ipAddress=5.29.96.159, tcpPort=8091)
+
+//    private static void f3() throws MalformedURLException {
+//
+//
+//        System.out.println(HexByteConverter.byteToHex(AppConfig.getInstance().getPeerId().getBytes()));
+//        TorrentInfo torrentInfo = getTorrentInfo();
+//        System.out.println(torrentInfo);
+//        String torrentHashCode = splitByPrecentage("1488d454915d860529903b61adb537012a0fe7c8");
+//        String peerId = splitByPrecentage(HexByteConverter.byteToHex(AppConfig.getInstance().getPeerId().getBytes()));
+//        System.out.println(torrentHashCode);
+//        System.out.println(peerId);
+//        Map<String, String> vars = new HashMap<String, String>();
+//        vars.put("info_hash", torrentHashCode);
+//        vars.put("peer_id", peerId);
+//
+//        String url = "http://torrent.ubuntu.com:6969/announce?info_hash=%14%88%d4%54%91%5d%86%05%29%90%3b%61%ad%b5%37%01%2a%0f%e7%c8&peer_id=%2D%41%5A%35%37%35%30%2D%54%70%6B%58%74%74%5A%4C%66%70%53%48";
+//
+//        String result = new RestTemplate()
+//                .getForObject(url, String.class);
+//        System.out.println(result);
+//    }
+//
+//    private static String splitByPrecentage(String str) {
+//        String newStr = "";
+//
+//        for (int i = 0; i < str.length(); i += 2)
+//            newStr = newStr.concat("%").concat(str.charAt(i) + "")
+//                    .concat(str.charAt(i + 1) + "");
+//
+//        return newStr;
+//    }

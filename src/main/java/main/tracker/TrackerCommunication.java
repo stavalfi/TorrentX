@@ -21,7 +21,6 @@ class TrackerCommunication {
 
     public static <Request extends TrackerRequest, Response extends TrackerResponse>
     Mono<Response> communicate(Request request, Function<ByteBuffer, Response> createResponse) {
-
         return sendRequest(request)
                 // before we map to response bytes to response object, check if the response is ErrorResponse
                 // by actionNumber. If yes, create error-signal, else forward the signal.

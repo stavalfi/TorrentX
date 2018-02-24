@@ -39,8 +39,7 @@ public class TrackerConnection extends Tracker {
                 new AnnounceResponse(this,
                         response.array(), howMuchPeersWeWant);
 
-        return TrackerCommunication.communicate(announceRequest, createResponse)
-                .log(null, Level.INFO, true, SignalType.ON_NEXT);
+        return TrackerCommunication.communicate(announceRequest, createResponse);
     }
 
     public Mono<? extends ScrapeResponse> scrape(List<String> torrentHash) {
@@ -55,8 +54,7 @@ public class TrackerConnection extends Tracker {
         Function<ByteBuffer, ScrapeResponse> createResponse = (ByteBuffer response) ->
                 new ScrapeResponse(this, response.array(), torrentsHashes);
 
-        return TrackerCommunication.communicate(scrapeRequest, createResponse)
-                .log(null, Level.INFO, true, SignalType.ON_NEXT);
+        return TrackerCommunication.communicate(scrapeRequest, createResponse);
     }
 }
 

@@ -5,6 +5,7 @@ import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -25,6 +26,7 @@ public class PeersCommunicator implements SendPeerMessage {
         this.me = new Peer("localhost", peerSocket.getLocalPort());
         this.IWantToCloseConnection = false;
         this.responses = Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, dataInputStream))
+                .subscribeOn(Schedulers.elastic())
                 .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
     }
 

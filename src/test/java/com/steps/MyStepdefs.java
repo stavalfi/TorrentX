@@ -24,7 +24,6 @@ import reactor.test.StepVerifier;
 import java.net.SocketTimeoutException;
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static org.mockito.Mockito.mock;
 
@@ -34,10 +33,8 @@ public class MyStepdefs {
 
     private TorrentInfo torrentInfo = mock(TorrentInfo.class);
 
-    private List<RemoteFakePeer> remoteFakePeers;
-
     @Before
-    public void beforeTest() {
+    public void before() {
         Hooks.onErrorDropped(throwable -> {
         });
     }
@@ -86,19 +83,13 @@ public class MyStepdefs {
                 .thenReturn(Collections.singletonList(new Tracker("udp", "invalid.url.123", 123)));
     }
 
-    @Given("^new torrent file: \"([^\"]*)\" containing the following fake peers:$")
-    public void newTorrentFileContainingTheFollowingFakePeers(String torrentFilePath, List<Peer> peers) throws Throwable {
-        this.remoteFakePeers = peers.stream()
-                .map(RemoteFakePeer::new)
-                .peek(RemoteFakePeer::listen)
-                .collect(Collectors.toList());
-    }
-
     @Then("^application send and receive Handshake from the same random peer.$")
     public void applicationSendAndReceiveHandshakeFromTheSameRandomPeer() throws Throwable {
         Mono<PeersCommunicator> connectedPeerMono =
                 TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList().stream())
-                        .flatMap((TrackerConnection trackerConnection) -> PeersProvider.connectToPeers(trackerConnection, this.torrentInfo.getTorrentInfoHash()))
+                        .flatMap((TrackerConnection trackerConnection) ->
+                                PeersProvider.connectToPeers(this.torrentInfo.getTorrentInfoHash(),
+                                        trackerConnection))
                         .doOnEach(x -> System.out.println("1 " + x))
                         .take(1)
                         .doOnEach(x -> System.out.println("2 " + x))
