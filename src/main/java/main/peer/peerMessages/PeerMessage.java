@@ -56,6 +56,8 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
         if (this.length > 0) {
             buffer.put(this.messageId);
             buffer.put(this.payload);
+        } else {
+            System.out.println("wtf");
         }
 
         return buffer.array();

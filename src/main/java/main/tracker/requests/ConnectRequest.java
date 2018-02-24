@@ -1,5 +1,7 @@
 package main.tracker.requests;
 
+import main.tracker.Tracker;
+
 import java.nio.ByteBuffer;
 
 public class ConnectRequest extends TrackerRequest {
@@ -7,8 +9,8 @@ public class ConnectRequest extends TrackerRequest {
     private final long connectionId = 0x41727101980L;
 
 
-    public ConnectRequest(String ip, int port, int transactionId) {
-        super(ip, port, 0, transactionId);
+    public ConnectRequest(Tracker tracker, int transactionId) {
+        super(tracker, 0, transactionId);
     }
 
     /**

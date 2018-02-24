@@ -1,6 +1,7 @@
 package main.tracker.response;
 
 import main.peer.Peer;
+import main.tracker.Tracker;
 import reactor.core.publisher.Flux;
 
 import java.math.BigInteger;
@@ -35,8 +36,8 @@ public class AnnounceResponse extends TrackerResponse {
      * 24 + 6 * n  16-bit integer  TCP port
      * 20 + 6 * N
      */
-    public AnnounceResponse(String ip, int port, byte[] response, int maxPeersWeWantToGet) {
-        super(ip, port);
+    public AnnounceResponse(Tracker tracker, byte[] response, int maxPeersWeWantToGet) {
+        super(tracker);
         ByteBuffer receiveData = ByteBuffer.wrap(response);
         setActionNumber(receiveData.getInt());
         assert getActionNumber() == 1;

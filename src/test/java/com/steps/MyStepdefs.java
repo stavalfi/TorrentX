@@ -24,7 +24,6 @@ import reactor.test.StepVerifier;
 import java.net.SocketTimeoutException;
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 import static org.mockito.Mockito.mock;
 
@@ -34,10 +33,8 @@ public class MyStepdefs {
 
     private TorrentInfo torrentInfo = mock(TorrentInfo.class);
 
-    private List<RemoteFakePeer> remoteFakePeers;
-
     @Before
-    public void beforeTest() {
+    public void before() {
         Hooks.onErrorDropped(throwable -> {
         });
     }
@@ -62,8 +59,8 @@ public class MyStepdefs {
                 .findFirst()
                 .ifPresent(tracker -> {
                     List<Tracker> fakeTrackers = Arrays.asList(
-                            new Tracker("wrongUrl.com", 8090), // wrong url (but valid url) and a random port
-                            new Tracker(tracker.getTracker(), tracker.getPort() + 1) // wrong port
+                            new Tracker("udp", "wrongUrl.com", 8090), // wrong url (but valid url) and a random port
+                            new Tracker("udp", tracker.getTracker(), tracker.getPort() + 1) // wrong port
                     );
                     List<Tracker> trackers = new LinkedList<>();
                     trackers.addAll(fakeTrackers);
@@ -83,22 +80,16 @@ public class MyStepdefs {
         Mockito.when(this.torrentInfo.getTorrentInfoHash())
                 .thenReturn(torrentHashInfo);
         Mockito.when(this.torrentInfo.getTrackerList())
-                .thenReturn(Collections.singletonList(new Tracker("invalid.url.123", 123)));
-    }
-
-    @Given("^new torrent file: \"([^\"]*)\" containing the following fake peers:$")
-    public void newTorrentFileContainingTheFollowingFakePeers(String torrentFilePath, List<Peer> peers) throws Throwable {
-        this.remoteFakePeers = peers.stream()
-                .map(RemoteFakePeer::new)
-                .peek(RemoteFakePeer::listen)
-                .collect(Collectors.toList());
+                .thenReturn(Collections.singletonList(new Tracker("udp", "invalid.url.123", 123)));
     }
 
     @Then("^application send and receive Handshake from the same random peer.$")
     public void applicationSendAndReceiveHandshakeFromTheSameRandomPeer() throws Throwable {
         Mono<PeersCommunicator> connectedPeerMono =
                 TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList().stream())
-                        .flatMap((TrackerConnection trackerConnection) -> PeersProvider.connectToPeers(trackerConnection, this.torrentInfo.getTorrentInfoHash()))
+                        .flatMap((TrackerConnection trackerConnection) ->
+                                PeersProvider.connectToPeers(this.torrentInfo.getTorrentInfoHash(),
+                                        trackerConnection))
                         .doOnEach(x -> System.out.println("1 " + x))
                         .take(1)
                         .doOnEach(x -> System.out.println("2 " + x))

@@ -21,7 +21,7 @@ public class TrackerConnection extends Tracker {
     private final ConnectResponse connectResponse;
 
     public TrackerConnection(ConnectResponse connectResponse) {
-        super(connectResponse.getIp(), connectResponse.getPort());
+        super(connectResponse.getTracker());
         this.connectResponse = connectResponse;
     }
 
@@ -32,15 +32,14 @@ public class TrackerConnection extends Tracker {
         int howMuchPeersWeWant = 1000;
 
         AnnounceRequest announceRequest =
-                new AnnounceRequest(getTracker(), getPort(), this.connectResponse.getConnectionId(),
+                new AnnounceRequest(this, this.connectResponse.getConnectionId(),
                         HexByteConverter.hexToByte(torrentHash), peerId, howMuchPeersWeWant, (short) portWeListenForPeersRequests);
 
         Function<ByteBuffer, AnnounceResponse> createResponse = (ByteBuffer response) ->
-                new AnnounceResponse(getTracker(), getPort(),
+                new AnnounceResponse(this,
                         response.array(), howMuchPeersWeWant);
 
-        return TrackerCommunication.communicate(announceRequest, createResponse)
-                .log(null, Level.INFO,true, SignalType.ON_NEXT);
+        return TrackerCommunication.communicate(announceRequest, createResponse);
     }
 
     public Mono<? extends ScrapeResponse> scrape(List<String> torrentHash) {
@@ -50,13 +49,12 @@ public class TrackerConnection extends Tracker {
                 .collect(Collectors.toList());
 
         ScrapeRequest scrapeRequest =
-                new ScrapeRequest(getTracker(), getPort(), connectResponse.getConnectionId(), 123456, torrentsHashes);
+                new ScrapeRequest(this, connectResponse.getConnectionId(), 123456, torrentsHashes);
 
         Function<ByteBuffer, ScrapeResponse> createResponse = (ByteBuffer response) ->
-                new ScrapeResponse(getTracker(), getPort(), response.array(), torrentsHashes);
+                new ScrapeResponse(this, response.array(), torrentsHashes);
 
-        return TrackerCommunication.communicate(scrapeRequest, createResponse)
-                .log(null, Level.INFO,true, SignalType.ON_NEXT);
+        return TrackerCommunication.communicate(scrapeRequest, createResponse);
     }
 }
 

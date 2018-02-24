@@ -1,5 +1,7 @@
 package main.tracker.requests;
 
+import main.tracker.Tracker;
+
 import java.nio.ByteBuffer;
 import java.util.List;
 
@@ -7,8 +9,8 @@ public class ScrapeRequest extends TrackerRequest {
     private final long connectionId;
     private final List<byte[]> torrentInfoHashes;
 
-    public ScrapeRequest(String ip, int port, long connectionId, int transactionId, List<byte[]> torrentInfoHashes) {
-        super(ip, port,2, transactionId);
+    public ScrapeRequest(Tracker tracker, long connectionId, int transactionId, List<byte[]> torrentInfoHashes) {
+        super(tracker,2, transactionId);
         this.connectionId = connectionId;
         this.torrentInfoHashes = torrentInfoHashes;
     }

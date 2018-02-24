@@ -2,39 +2,52 @@ package main;
 
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
-import main.peer.PeersProvider;
-import main.tracker.TrackerProvider;
+import main.downloader.TorrentDownloader;
 import reactor.core.publisher.Hooks;
-import reactor.core.scheduler.Schedulers;
 
 class App {
-
-    private static void f2() throws InterruptedException {
-
+    private static void f4() {
         TorrentInfo torrentInfo = getTorrentInfo();
 
-        TrackerProvider.connectToTrackers(torrentInfo.getTrackerList().stream())
-                .flatMap(trackerConnection ->
-                        PeersProvider.connectToPeers(trackerConnection, torrentInfo.getTorrentInfoHash()))
-                .flatMap(peersCommunicator -> peersCommunicator.receive().subscribeOn(Schedulers.elastic()))
-                .subscribe(System.out::println,
-                        throwable -> System.out.println("error-> we can't be here: " + throwable.toString()));
+        TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo);
 
-        Thread.sleep(1000 * 1000);
+        torrentDownloader.getPeerResponseFlux()
+                .subscribe(System.out::println, System.out::println, System.out::println);
+
+        torrentDownloader.getPeersCommunicatorFlux()
+                .doOnNext(peersCommunicator -> peersCommunicator.sendInterestedMessage().block())
+                .doOnNext(peersCommunicator -> peersCommunicator.sendRequestMessage(0, 0, 16000).block())
+                .subscribe();
+
+        torrentDownloader.start();
     }
 
     public static void main(String[] args) throws Exception {
-
-        Hooks.onErrorDropped(throwable -> System.out.println("exception thrown after a stream terminated: " + throwable));
-        f2();
+        Hooks.onErrorDropped(throwable -> {
+        });
+        f4();
+        Thread.sleep(1000 * 1000);
     }
 
     @SneakyThrows
     public static TorrentInfo getTorrentInfo() {
-        String torrentFilePath = "src/main/resources/torrent-file-example.torrent";
+        String torrentFilePath = "src/main/resources/torrent-file-example3.torrent";
         return new TorrentInfo(TorrentParser.parseTorrent(torrentFilePath));
     }
 }
+
+//  Main tracker: http://torrent.ubuntu.com:6969/announce
+//  Comment: Ubuntu CD releases.ubuntu.com
+//  Info_hash: 1488d454915d860529903b61adb537012a0fe7c8
+//  Name: ubuntu-16.04.3-desktop-amd64.iso
+//  Piece Length: 524288
+//  Pieces: 3029
+//  Total Size: 1587609600
+//  Is Single File Torrent: true
+//  File List:
+//  Tracker List:
+//  http://torrent.ubuntu.com:6969/announce
+//  http://ipv6.torrent.ubuntu.com:6969/announce
 
 
 //    torrent hash: af1f3dbc5d5baeaf83f812e06aa91bbd7b55cce8
@@ -123,3 +136,34 @@ class App {
 //    Peer(ipAddress=192.142.208.111, tcpPort=10373)
 //    Peer(ipAddress=82.212.112.193, tcpPort=35885)
 //    Peer(ipAddress=5.29.96.159, tcpPort=8091)
+
+//    private static void f3() throws MalformedURLException {
+//
+//
+//        System.out.println(HexByteConverter.byteToHex(AppConfig.getInstance().getPeerId().getBytes()));
+//        TorrentInfo torrentInfo = getTorrentInfo();
+//        System.out.println(torrentInfo);
+//        String torrentHashCode = splitByPrecentage("1488d454915d860529903b61adb537012a0fe7c8");
+//        String peerId = splitByPrecentage(HexByteConverter.byteToHex(AppConfig.getInstance().getPeerId().getBytes()));
+//        System.out.println(torrentHashCode);
+//        System.out.println(peerId);
+//        Map<String, String> vars = new HashMap<String, String>();
+//        vars.put("info_hash", torrentHashCode);
+//        vars.put("peer_id", peerId);
+//
+//        String url = "http://torrent.ubuntu.com:6969/announce?info_hash=%14%88%d4%54%91%5d%86%05%29%90%3b%61%ad%b5%37%01%2a%0f%e7%c8&peer_id=%2D%41%5A%35%37%35%30%2D%54%70%6B%58%74%74%5A%4C%66%70%53%48";
+//
+//        String result = new RestTemplate()
+//                .getForObject(url, String.class);
+//        System.out.println(result);
+//    }
+//
+//    private static String splitByPrecentage(String str) {
+//        String newStr = "";
+//
+//        for (int i = 0; i < str.length(); i += 2)
+//            newStr = newStr.concat("%").concat(str.charAt(i) + "")
+//                    .concat(str.charAt(i + 1) + "");
+//
+//        return newStr;
+//    }

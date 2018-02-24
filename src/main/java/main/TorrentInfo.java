@@ -1,6 +1,7 @@
 package main;
 
 import christophedetroyer.torrent.Torrent;
+import christophedetroyer.torrent.TorrentFile;
 import main.tracker.Tracker;
 
 import java.util.Date;
@@ -21,8 +22,8 @@ public class TorrentInfo {
     }
 
 
-    public Long getPieceLength() {
-        return this.torrent.getPieceLength();
+    public int getPieceLength() {
+        return Math.toIntExact(this.torrent.getPieceLength());
     }
 
     public byte[] getPiecesBlob() {
@@ -55,14 +56,14 @@ public class TorrentInfo {
 
     public List<Tracker> getTrackerList() {
         // tracker pattern example: udp://tracker.coppersurfer.tk:6969/scrape
-        String trackerPattern = "^udp://(\\d*\\.)?(.*):(\\d*)(.*)?$";
+        String trackerPattern = "^(.*)://(\\d*\\.)?(.*):(\\d*)(.*)?$";
 
         return this.torrent.getAnnounceList()
                 .stream()
                 .filter((String tracker) -> !tracker.equals("udp://9.rarbg.com:2710/scrape")) // problematic tracker !!!!
                 .map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
                 .filter(Matcher::matches)
-                .map((Matcher matcher) -> new Tracker(matcher.group(2), Integer.parseInt(matcher.group(3))))
+                .map((Matcher matcher) -> new Tracker(matcher.group(1), matcher.group(3), Integer.parseInt(matcher.group(4))))
                 .collect(Collectors.toList());
     }
 
@@ -73,29 +74,29 @@ public class TorrentInfo {
     @Override
     public String toString() {
 
-//        return "Created By: " + this.torrent.getCreatedBy() +"\n"+
-//                "Main tracker: " + t1.getAnnounce()
-//
-//        System.out.println("Created By: " + t1.getCreatedBy());
-//        System.out.println("Main tracker: " + t1.getAnnounce());
-//        if (t1.getAnnounceList() != null) {
-//            System.out.println("Tracker List: ");
-//            t1.getAnnounceList().forEach(System.out::println);
-//        }
-//        System.out.println("Comment: " + t1.getComment());
-//        System.out.println("Creation Date: " + t1.getCreationDate());
-//        System.out.println("Info_hash: " + t1.getInfo_hash());
-//        System.out.println("Name: " + t1.getName());
-//        System.out.println("Piece Length: " + t1.getPieceLength());
-//        System.out.println("Pieces: " + t1.getPieces());
-//        System.out.println("Pieces Blob: " + Arrays.toString(t1.getPiecesBlob()));
-//        System.out.println("Total Size: " + t1.getTotalSize());
-//        System.out.println("Is Single File Torrent: " + t1.isSingleFileTorrent());
-//        System.out.println("File List: ");
-//        t1.getFileList().forEach(System.out::println);
+        String trackers = this.torrent.getAnnounceList() != null ?
+                this.torrent.getAnnounceList()
+                        .stream()
+                        .collect(Collectors.joining("\n")) : "";
+
+        String fileList = this.torrent.getFileList() != null ?
+                this.torrent.getFileList()
+                        .stream()
+                        .map(TorrentFile::toString)
+                        .collect(Collectors.joining("\n")) : "";
 
         return "TorrentInfo{" +
-                "torrent=" + torrent +
+                "Created By: " + this.torrent.getCreatedBy() + "\n" +
+                "Main tracker: " + this.torrent.getAnnounce() + "\n" +
+                "Comment: " + this.torrent.getComment() + "\n" +
+                "Info_hash: " + this.torrent.getInfo_hash() + "\n" +
+                "Name: " + this.torrent.getName() + "\n" +
+                "Piece Length: " + this.torrent.getPieceLength() + "\n" +
+                "Pieces: " + this.torrent.getPieces().size() + "\n" +
+                "Total Size: " + this.torrent.getTotalSize() + "\n" +
+                "Is Single File Torrent: " + this.torrent.isSingleFileTorrent() + "\n" +
+                "File List: \n" + fileList +
+                "Tracker List: \n" + trackers + "\n" +
                 '}';
     }
 }

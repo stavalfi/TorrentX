@@ -21,7 +21,6 @@ class TrackerCommunication {
 
     public static <Request extends TrackerRequest, Response extends TrackerResponse>
     Mono<Response> communicate(Request request, Function<ByteBuffer, Response> createResponse) {
-
         return sendRequest(request)
                 // before we map to response bytes to response object, check if the response is ErrorResponse
                 // by actionNumber. If yes, create error-signal, else forward the signal.
@@ -29,7 +28,7 @@ class TrackerCommunication {
                         receiveResponse(trackerSocket)
                                 .handle((ByteBuffer response, SynchronousSink<ByteBuffer> sink) -> {
                                     if (ErrorResponse.isErrorResponse(response.array())) {
-                                        ErrorResponse errorResponse = new ErrorResponse(request.getIp(), request.getPort(), response.array());
+                                        ErrorResponse errorResponse = new ErrorResponse(request.getTracker(), response.array());
                                         sink.error(new TrackerErrorResponseException(errorResponse));
                                     } else
                                         sink.next(response);
@@ -73,9 +72,9 @@ class TrackerCommunication {
     private static <Request extends TrackerRequest> Mono<DatagramPacket> makeRequest(Request request) {
         return Mono.create(sink -> {
             try {
-                InetAddress trackerIp = InetAddress.getByName(request.getIp());
+                InetAddress trackerIp = InetAddress.getByName(request.getTracker().getTracker());
                 byte[] requestPacket = request.buildRequestPacket().array();
-                DatagramPacket datagramPacket = new DatagramPacket(requestPacket, requestPacket.length, trackerIp, request.getPort());
+                DatagramPacket datagramPacket = new DatagramPacket(requestPacket, requestPacket.length, trackerIp, request.getTracker().getPort());
                 sink.success(datagramPacket);
             } catch (UnknownHostException ex) {
                 // copy the exception details and add the request information

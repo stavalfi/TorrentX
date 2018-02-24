@@ -1,5 +1,7 @@
 package main.tracker.response;
 
+import main.tracker.Tracker;
+
 import java.nio.ByteBuffer;
 
 public class ErrorResponse extends TrackerResponse {
@@ -8,8 +10,8 @@ public class ErrorResponse extends TrackerResponse {
     //    int32_t	action	The action, in this case 3, for error. See actions.
     //    int32_t	transaction_id	Must match the transaction_id sent from the client.
     //    int8_t[]	error_string	The rest of the packet is a string describing the error.
-    public ErrorResponse(String ip, int port, byte[] response) {
-        super(ip, port);
+    public ErrorResponse(Tracker tracker, byte[] response) {
+        super(tracker);
         ByteBuffer receiveData = ByteBuffer.wrap(response);
         setActionNumber(receiveData.getInt());
         assert getActionNumber() == 3;

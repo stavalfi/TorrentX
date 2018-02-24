@@ -1,5 +1,7 @@
 package main.tracker.response;
 
+import main.tracker.Tracker;
+
 import java.nio.ByteBuffer;
 
 public class ConnectResponse extends TrackerResponse {
@@ -15,8 +17,8 @@ public class ConnectResponse extends TrackerResponse {
      * 8       64-bit integer  connection_id
      * 16
      */
-    public ConnectResponse(String ip, int port, byte[] response) {
-        super(ip, port);
+    public ConnectResponse(Tracker tracker, byte[] response) {
+        super(tracker);
         ByteBuffer receiveData = ByteBuffer.wrap(response);
         setActionNumber(receiveData.getInt());
         assert getActionNumber() == 0;

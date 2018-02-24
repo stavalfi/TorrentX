@@ -9,53 +9,99 @@
 
 ##### PBI-1: Create work space. `DONE`
 
-1. Git repository – GitHub. `DONE`
-2. Configure branch protection + pull request. `DONE`
-3. Create automatic build: compilation + Units tests + cucumber tests – Travis-CI. `DONE`
+1. Git repository – GitHub.
+2. Configure branch protection + pull request.
+3. Create automatic build: compilation + Units tests + cucumber tests – Travis-CI.
 
 -----
 
 ##### PBI-2: Shachar training. `IN PROGRESS`
 
-1. Git - add,commit,branch,checkout,merge,push,fetch. `IN PROGRESS` (shachar)
-2. Github - pull requests. `IN PROGRESS` (shachar)
-3. Travis-CI - understand what it is and how to run a build. `IN PROGRESS` (shachar)
-4. Cucucmber - feature,scenario,steps,step-definition,debug steps. `IN PROGRESS` (shachar)
+1. Git - add,commit,branch,checkout,merge,push,fetch. `DONE` (Shachar)
+2. Github - pull requests. `DONE` (Shachar)
+3. Travis-CI - understand what it is and how to run a build. `NOT STRATED` (Shachar)
+4. Cucumber - feature,scenario,steps,step-definition,debug steps. `NOT STRATED` (Shachar)
 
 -----
 
 ##### PBI-3: Fully understand torrent file structure. `DONE`
 
-1. List of information types which are saved in a .torrent file. `DONE` (shachar, stav)
-2. Understand how much parts there are for a file. Where can we get this information for each torrent file. `DONE` (shachar, stav)
-3. What library in java we need to use to read and analyze .torrent files. `DONE` (shachar, stav)
+1. List of information types which are saved in a .torrent file. (Shachar, Stav)
+2. Understand how much parts there are for a file. Where can we get this information for each torrent file. (Shachar, Stav)
+3. What library in java we need to use to read and analyze .torrent files. (Shachar, Stav)
 
 -----
 
 ##### PBI-4: Get details about a given tracker. `DONE` 
 
-1. Find the protocol and port which enable us to communicate with a given tracker. `DONE` (stav)
-2. List the methods we can run on a given tracker. `DONE` (stav)
-3. Get list of peers information from this tracker on a specific torrent.  `DONE` (stav)
-4. Extract a peers IP from a seeder information. `DONE` (stav)
+1. Find the protocol and port which enable us to communicate with a given tracker. (Stav)
+2. List the methods we can run on a given tracker. (Stav)
+3. Get list of peers information from this tracker on a specific torrent. (Stav)
+4. Extract a peers IP from a seeder information. (Stav)
 
 -----
 
-##### PBI-5: Communicate with a seeder. `IN PROGRESS` 
+##### PBI-5: Add additional CI - `CircleCI`. `DONE` 
 
-1. Find the protocol and port which enable us to communicate with a seeder. `DONE`
-2. List the methods we can run on a given seeder. `DONE`
-3. Ask if he have the file specified by the torrent file. `NOT STARTED`
-4. Which parts a seeder have from a file until now. `DONE`
-5. Download one random part from a seeder. `NOT STARTED`
+1. GitHub pull request can be approved if and only if the build is pass in `CircleCI` and `TravisCI`. (Stav)
+
+##### PBI-6: Learn `Reactor 3` library. `DONE` 
+
+1. Creating a New Sequence. (Stav)
+2. Transforming an Existing Sequence. (Stav)
+3. Peeking into a Sequence. (Stav)
+4. Handling Errors. (Stav)
+5. Writing tests. (Stav)
 
 -----
 
-##### PBI-5: Others. `DONE`
+##### PBI-7: Design and implement reactive API for providing trackers. `DONE` 
 
-1. Learn how to work with latex.
-2. transform this file to latex.
-3. Create a paper on: `14\12\17`
+1. Design a reactive API which provide trackers we connected to them. (Stav)
+    * Connect
+    * Announce
+    * Scrape
+2. Implementing tests. (Stav)
+3. Implementing the API. (Stav)
+
+------
+##### PBI-8: Learn about peers inside the specification. `DONE` 
+
+1. Find the protocol and port which enable us to communicate with a seeder.
+2. List the methods we can run on a given seeder.
+
+-----
+##### PBI-9: Design and implement reactive API for providing peers. `DONE` 
+
+1. Design a reactive API which provide peers we connected to them. (Stav)
+The API will let us listen for incoming messages and provide us a way to send messages to them.
+    * Handshake
+    * BitField
+    * Cancel
+    * Choke
+    * Have
+    * Interested
+    * KeepAlive
+    * NotInterested
+    * Piece
+    * Port - We are not supporting this at the moment.
+    * Request
+    * Unchoke
+    
+2. Implementing tests. (Stav)
+3. Implementing the API. (Stav)
+
+##### PBI-10: Design a torrent manager API to handle the download & upload of a specific torrent. `DONE`
+
+1. Learn about basic bittorrent algorithms. (Stav)
+2. Design an abstract API for download and upload a torrent. (Stav)
+
+-----
+
+##### PBI-11: Paper - Part 2. `DONE`
+
+1. Learn how to work with latex. (Shachar, Stav)
+2. Create a paper on:  (Shachar, Stav)
     * What are we building.
     * How client torrent application work.
     * What our application do,add,won't do compared to other client torrent applications.

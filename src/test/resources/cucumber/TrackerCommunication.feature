@@ -1,7 +1,7 @@
 Feature: test tracker api calls.
 
   Background: read torrent file.
-    Given new torrent file: "torrent-file-example1.torrent".
+    Given new torrent file: "torrent-file-example3.torrent".
 
   Scenario: find any tracker, from all the trackers, which response to: connect,announce and scrape requests.
     Then application send and receive the following messages from a random tracker:

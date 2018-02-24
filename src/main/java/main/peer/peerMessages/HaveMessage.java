@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 public class HaveMessage extends PeerMessage {
     private static final int length = 5;
     private static final byte messageId = 4;
+    private final int pieceIndex;
 
     /**
      * The payload is the zero-based index
@@ -17,12 +18,20 @@ public class HaveMessage extends PeerMessage {
      */
     public HaveMessage(Peer from, Peer to, int pieceIndex) {
         super(from, to, length, messageId, ByteBuffer.allocate(4).putInt(pieceIndex).array());
+        this.pieceIndex = pieceIndex;
     }
-    public HaveMessage(Peer from, Peer to,byte[] peerMessage) {
+
+    public HaveMessage(Peer from, Peer to, byte[] peerMessage) {
         super(from, to, peerMessage);
+        this.pieceIndex = ByteBuffer.wrap(this.getPayload()).getInt();
     }
+
     @Override
     public String toString() {
         return "HaveMessage{} " + super.toString();
+    }
+
+    public int getPieceIndex() {
+        return pieceIndex;
     }
 }

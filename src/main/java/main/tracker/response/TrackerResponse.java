@@ -1,33 +1,28 @@
 package main.tracker.response;
 
+import main.tracker.Tracker;
+
 public abstract class TrackerResponse {
-    private final String ip;
-    private final int port;
+    private Tracker tracker;
     private int actionNumber;
     private int transactionId;
 
 
-    public TrackerResponse(String ip, int port) {
-        this.ip = ip;
-        this.port = port;
+    public TrackerResponse(Tracker tracker) {
+        this.tracker = tracker;
     }
 
     @Override
     public String toString() {
         return "TrackerResponse{" +
-                "ip='" + ip + '\'' +
-                ", port=" + port +
+                "tracker=" + tracker +
                 ", actionNumber=" + actionNumber +
                 ", transactionId=" + transactionId +
                 '}';
     }
 
-    public String getIp() {
-        return ip;
-    }
-
-    public int getPort() {
-        return port;
+    public Tracker getTracker() {
+        return tracker;
     }
 
     public int getActionNumber() {
