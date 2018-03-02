@@ -1,6 +1,6 @@
 package main.peer;
 
-
+import main.TorrentInfo;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
@@ -13,21 +13,87 @@ import java.net.Socket;
 import java.util.BitSet;
 
 public class PeersCommunicator implements SendPeerMessage {
-    private boolean IWantToCloseConnection;
-    private final Peer me;
-    private final Peer peer;
-    private final Socket peerSocket;
-    private final Flux<PeerMessage> responses;
+    private Peer me;
+    private Peer peer;
+    private BitSet peerPieces;
+    private Socket peerSocket;
+    private boolean isChoked;
+    private boolean isInterestedInMe;
+    private TorrentInfo torrentInfo;
+    private Flux<PeerMessage> responses;
+    private Flux<Double> peerDownloadSpeedFlux;
+    private Flux<Double> peerUploadSpeedFlux;
+    private FluxSink<PieceMessage> outGoingPiecesFluxSink;
 
-    public PeersCommunicator(Peer peer, Socket peerSocket, DataInputStream dataInputStream) {
+    private boolean IWantToCloseConnection;
+
+    public PeersCommunicator(TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
+                             DataInputStream dataInputStream) {
         assert peerSocket != null;
         this.peer = peer;
+        this.isChoked = false;
+        this.isInterestedInMe = false;
         this.peerSocket = peerSocket;
+        this.torrentInfo = torrentInfo;
+        this.peerPieces = new BitSet(torrentInfo.getPieces().size());
         this.me = new Peer("localhost", peerSocket.getLocalPort());
         this.IWantToCloseConnection = false;
         this.responses = Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, dataInputStream))
                 .subscribeOn(Schedulers.elastic())
-                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
+                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
+                .publishOn(Schedulers.single())
+                .doOnNext(peerMessage -> proccessPeerMessage(peerMessage))
+                .subscribeOn(Schedulers.elastic());
+
+        this.peerDownloadSpeedFlux = this.responses
+                .filter(peerMessage -> peerMessage instanceof PieceMessage)
+                .map(PeerMessage::getPayload)
+                .map((byte[] payload) -> payload.length)
+                .map(Double::new);
+
+        this.peerUploadSpeedFlux = Flux.create((FluxSink<PieceMessage> sink) -> this.outGoingPiecesFluxSink = sink)
+                .map(PieceMessage::getPayload)
+                .map((byte[] payload) -> payload.length)
+                .map(Double::new);
+
+    }
+
+    /**
+     * check if this message is relevant for this class.
+     * <p>
+     * this method is synchronized because only one
+     * thread can be here at any moment.
+     *
+     * @param peerMessage
+     */
+    private void proccessPeerMessage(PeerMessage peerMessage) {
+        if (peerMessage instanceof BitFieldMessage) {
+            BitFieldMessage bitFieldMessage = (BitFieldMessage) peerMessage;
+            this.peerPieces.or(bitFieldMessage.getPieces());
+            return;
+        }
+        if (peerMessage instanceof HaveMessage) {
+            HaveMessage haveMessage = (HaveMessage) peerMessage;
+
+            this.peerPieces.set(haveMessage.getPieceIndex());
+            return;
+        }
+        if (peerMessage instanceof ChokeMessage) {
+            this.isChoked = true;
+            return;
+        }
+        if (peerMessage instanceof UnchokeMessage) {
+            this.isChoked = false;
+            return;
+        }
+        if (peerMessage instanceof InterestedMessage) {
+            this.isInterestedInMe = true;
+            return;
+        }
+        if (peerMessage instanceof NotInterestedMessage) {
+            this.isInterestedInMe = false;
+            return;
+        }
     }
 
     private void listenForPeerMessages(FluxSink<PeerMessage> sink, DataInputStream dataInputStream) {
@@ -49,6 +115,10 @@ public class PeersCommunicator implements SendPeerMessage {
         }
     }
 
+    private boolean doesPeerHavePiece(int pieceIndex) {
+        return this.peerPieces.get(pieceIndex);
+    }
+
     /**
      * @return an hot flux!
      */
@@ -62,6 +132,10 @@ public class PeersCommunicator implements SendPeerMessage {
 
     public Peer getMe() {
         return me;
+    }
+
+    public TorrentInfo getTorrentInfo() {
+        return torrentInfo;
     }
 
     public void closeConnection() {
@@ -93,6 +167,16 @@ public class PeersCommunicator implements SendPeerMessage {
             closeConnection();
             return Mono.error(e);
         }
+    }
+
+    @Override
+    public Mono<Void> sendPieceMessage(int index, int begin, byte[] block) {
+        PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(), index, begin, block);
+        return send(pieceMessage)
+                // for calculating the peer upload speed -
+                // I do not care if we failed to send the piece.
+                // so I don't register to doOnError or something like that.
+                .doOnNext(aVoid -> this.outGoingPiecesFluxSink.next(pieceMessage));
     }
 
     @Override
@@ -131,11 +215,6 @@ public class PeersCommunicator implements SendPeerMessage {
     }
 
     @Override
-    public Mono<Void> sendPieceMessage(int index, int begin, byte[] block) {
-        return send(new PieceMessage(this.getMe(), this.getPeer(), index, begin, block));
-    }
-
-    @Override
     public Mono<Void> sendPortMessage(short listenPort) {
         return send(new PortMessage(this.getMe(), this.getPeer(), listenPort));
     }
@@ -148,5 +227,21 @@ public class PeersCommunicator implements SendPeerMessage {
     @Override
     public Mono<Void> sendUnchokeMessage() {
         return send(new UnchokeMessage(this.getMe(), this.getPeer()));
+    }
+
+    public Flux<Double> getPeerDownloadSpeedFlux() {
+        return peerDownloadSpeedFlux;
+    }
+
+    public Flux<Double> getPeerUploadSpeedFlux() {
+        return peerUploadSpeedFlux;
+    }
+
+    public boolean isInterestedInMe() {
+        return isInterestedInMe;
+    }
+
+    public boolean isChoked() {
+        return isChoked;
     }
 }

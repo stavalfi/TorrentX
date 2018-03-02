@@ -3,16 +3,22 @@ package main.tracker;
 import main.TorrentInfo;
 import main.tracker.requests.ConnectRequest;
 import main.tracker.response.ConnectResponse;
+import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.nio.ByteBuffer;
 import java.util.function.Function;
-import java.util.stream.Stream;
 
 public class TrackerProvider {
-    public static Mono<TrackerConnection> connectToTracker(Tracker tracker) {
+    private TorrentInfo torrentInfo;
+
+    public TrackerProvider(TorrentInfo torrentInfo) {
+        this.torrentInfo = torrentInfo;
+    }
+
+    public Mono<TrackerConnection> connectToTracker(Tracker tracker) {
         ConnectRequest connectRequest = new ConnectRequest(tracker, 123456);
 
         Function<ByteBuffer, ConnectResponse> createConnectResponse = (ByteBuffer response) ->
@@ -24,12 +30,13 @@ public class TrackerProvider {
                 .map(connectResponse -> new TrackerConnection(connectResponse));
     }
 
-    public static Flux<TrackerConnection> connectToTrackers(Stream<Tracker> trackers) {
-        return Flux.fromStream(trackers)
-                .flatMap(tracker -> connectToTracker(tracker));
+    public ConnectableFlux<TrackerConnection> connectToTrackers() {
+        return Flux.fromIterable(this.torrentInfo.getTrackerList())
+                .flatMap(tracker -> connectToTracker(tracker))
+                .publish();
     }
 
-    public static Flux<TrackerConnection> connectToTrackers(TorrentInfo torrentInfo) {
-        return TrackerProvider.connectToTrackers(torrentInfo.getTrackerList().stream());
+    public TorrentInfo getTorrentInfo() {
+        return torrentInfo;
     }
 }

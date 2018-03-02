@@ -10,18 +10,16 @@ public class PeerMessageFactory {
     public static PeerMessage create(Peer from, Peer to, DataInputStream dataInputStream) throws IOException {
 
         final int messageLengthSize = 4;
-        byte[] data = new byte[messageLengthSize];
-        dataInputStream.readFully(data);
-        int lengthOfTheRestOfData = ByteBuffer.wrap(data).getInt(); // how much do we need to read more
-        data = new byte[lengthOfTheRestOfData];
+        byte[] data1 = new byte[messageLengthSize];
+        dataInputStream.readFully(data1);
+        int lengthOfTheRestOfData = ByteBuffer.wrap(data1).getInt(); // how much do we need to read more
+        byte[] data2 = new byte[lengthOfTheRestOfData];
 
-        dataInputStream.readFully(data);
+        dataInputStream.readFully(data2);
 
         ByteBuffer byteBuffer = ByteBuffer.allocate(messageLengthSize + lengthOfTheRestOfData);
-        ;
         byteBuffer.putInt(lengthOfTheRestOfData);
-        byteBuffer.put(data);
-
+        byteBuffer.put(data2);
         return create(from, to, byteBuffer.array()); // initialize message object from byte[]
     }
 

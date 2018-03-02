@@ -15,17 +15,27 @@ import reactor.core.scheduler.Schedulers;
 public class PeersProvider {
     private static Logger logger = LoggerFactory.getLogger(PeersProvider.class);
 
-    public static Flux<Peer> getPeers(TrackerConnection trackerConnection,
-                                      String torrentInfoHash) {
-        return trackerConnection.announce(torrentInfoHash)
+    private TorrentInfo torrentInfo;
+    private TrackerProvider trackerProvider;
+    private InitializePeersCommunication initializePeersCommunication;
+
+    public PeersProvider(TorrentInfo torrentInfo, TrackerProvider trackerProvider,
+                         InitializePeersCommunication initializePeersCommunication) {
+        this.torrentInfo = torrentInfo;
+        this.trackerProvider = trackerProvider;
+        this.initializePeersCommunication = initializePeersCommunication;
+    }
+
+    public Flux<Peer> getPeers(TrackerConnection trackerConnection) {
+        return trackerConnection.announce(this.torrentInfo.getTorrentInfoHash())
                 .flux()
                 .flatMap(AnnounceResponse::getPeers);
     }
 
     @SneakyThrows
-    public static Mono<PeersCommunicator> connectToPeer(String torrentInfoHash, Peer peer) {
-        return InitializePeersCommunication.getInstance()
-                .connectToPeer(torrentInfoHash, peer)
+    public Mono<PeersCommunicator> connectToPeer(Peer peer) {
+        return initializePeersCommunication
+                .connectToPeer(peer)
                 .subscribeOn(Schedulers.elastic())
                 .doOnError(PeerExceptions.communicationErrors, error ->
                         logger.warn("error signal: (the application failed to connect to a peer." +
@@ -36,22 +46,32 @@ public class PeersProvider {
                 .onErrorResume(PeerExceptions.communicationErrors, error -> Mono.empty());
     }
 
-    public static Flux<PeersCommunicator> connectToPeers(String torrentInfoHash, TrackerConnection trackerConnection) {
-        return trackerConnection.announce(torrentInfoHash)
+    public Flux<PeersCommunicator> connectToPeers(TrackerConnection trackerConnection) {
+        return trackerConnection.announce(torrentInfo.getTorrentInfoHash())
                 .flux()
                 .flatMap(AnnounceResponse::getPeers)
                 .distinct()
-                .flatMap((Peer peer) -> connectToPeer(torrentInfoHash, peer));
+                .flatMap((Peer peer) -> connectToPeer(peer));
     }
 
-    public static ConnectableFlux<PeersCommunicator> connectToPeers(String torrentInfoHash, Flux<TrackerConnection> trackerConnectionFlux) {
+    public Flux<PeersCommunicator> connectToPeers(ConnectableFlux<TrackerConnection> trackerConnectionFlux) {
         return trackerConnectionFlux
-                .flatMap(trackerConnection -> connectToPeers(torrentInfoHash, trackerConnection))
-                .publish();
+                .flatMap(trackerConnection -> connectToPeers(trackerConnection));
     }
 
-    public static ConnectableFlux<PeersCommunicator> connectToPeers(TorrentInfo torrentInfo) {
-        return connectToPeers(torrentInfo.getTorrentInfoHash(),
-                TrackerProvider.connectToTrackers(torrentInfo));
+    public Flux<PeersCommunicator> connectToPeers() {
+        return connectToPeers(this.trackerProvider.connectToTrackers());
+    }
+
+    public InitializePeersCommunication getInitializePeersCommunication() {
+        return initializePeersCommunication;
+    }
+
+    public TorrentInfo getTorrentInfo() {
+        return torrentInfo;
+    }
+
+    public TrackerProvider getTrackerProvider() {
+        return trackerProvider;
     }
 }

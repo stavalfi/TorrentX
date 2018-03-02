@@ -94,7 +94,7 @@ class TrackerCommunication {
         return Mono.create(sink -> {
             try {
                 DatagramSocket clientSocket = new DatagramSocket();
-                sink.onCancel(() -> clientSocket.close());
+                sink.onDispose(() -> clientSocket.close());
                 clientSocket.send(request);
                 sink.success(clientSocket);
 
@@ -107,7 +107,7 @@ class TrackerCommunication {
     private static Mono<ByteBuffer> receiveResponse(DatagramSocket trackerSocket) {
         return Mono.create(sink -> {
             try {
-                sink.onCancel(() -> trackerSocket.close());
+                sink.onDispose(() -> trackerSocket.close());
                 byte[] receiveData = new byte[1000];
                 DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
                 trackerSocket.setSoTimeout(1000);

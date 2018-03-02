@@ -1,6 +1,7 @@
 package main.peer.peerMessages;
 
 import java.util.Arrays;
+import java.util.Optional;
 
 public enum PeerMessageId {
     bitFieldMessage(5),
@@ -17,10 +18,13 @@ public enum PeerMessageId {
     extendedMessage(20),;
 
     public static PeerMessageId fromValue(int messageId) {
-        return Arrays.stream(PeerMessageId.values())
+        Optional<PeerMessageId> first = Arrays.stream(PeerMessageId.values())
                 .filter((PeerMessageId peerMessageId) -> peerMessageId.getMessageId() == messageId)
-                .findFirst()
-                .get();
+                .findFirst();
+        if (!first.isPresent()) {
+            return null;
+        }
+        return first.get();
     }
 
     private int messageId;
