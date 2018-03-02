@@ -1,32 +1,62 @@
 package main.downloader;
 
+import main.AppConfig;
 import main.TorrentInfo;
+import main.peer.InitializePeersCommunication;
 import main.peer.PeersCommunicator;
 import main.peer.PeersProvider;
 import main.peer.peerMessages.PeerMessage;
-import main.peer.peerMessages.PieceMessage;
+import main.tracker.TrackerConnection;
+import main.tracker.TrackerProvider;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 
-public class TorrentDownloader implements DownloadControl {
+public abstract class TorrentDownloader implements DownloadControl {
 
     private TorrentInfo torrentInfo;
-    private ConnectableFlux<PeersCommunicator> peersCommunicatorFlux;
-    private Flux<PeerMessage> peerResponseFlux; // to read all peer messages.
     private Downloader downloader;
+    private TrackerProvider trackerProvider;
+    private PeersProvider peersProvider;
+    private Flux<Double> torrentDownloadSpeedFlux;
+    private Flux<Double> torrentUploadSpeedFlux;
+    private Flux<PeersCommunicator> peersCommunicatorFlux;
+    private ConnectableFlux<TrackerConnection> trackerConnectionConnectableFlux;
 
-    public TorrentDownloader(TorrentInfo torrentInfo,
-                             ConnectableFlux<PeersCommunicator> peersCommunicatorFlux) {
+    public TorrentDownloader(TorrentInfo torrentInfo, Downloader downloader,
+                             TrackerProvider trackerProvider, PeersProvider peersProvider,
+                             ConnectableFlux<TrackerConnection> trackerConnectionConnectableFlux,
+                             Flux<PeersCommunicator> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
-        this.downloader = new Downloader(this.torrentInfo.getTorrentInfoHash());
+        this.downloader = downloader;
+        this.trackerProvider = trackerProvider;
+        this.peersProvider = peersProvider;
         this.peersCommunicatorFlux = peersCommunicatorFlux;
+        this.trackerConnectionConnectableFlux = trackerConnectionConnectableFlux;
 
-        this.peerResponseFlux = this.peersCommunicatorFlux
-                .flatMap(peersCommunicator -> peersCommunicator.receive());
+        this.torrentDownloadSpeedFlux = this.peersCommunicatorFlux
+                .flatMap(PeersCommunicator::getPeerDownloadSpeedFlux);
+
+        this.torrentUploadSpeedFlux = this.peersCommunicatorFlux
+                .flatMap(PeersCommunicator::getPeerUploadSpeedFlux);
     }
 
-    public TorrentDownloader(TorrentInfo torrentInfo) {
-        this(torrentInfo, PeersProvider.connectToPeers(torrentInfo));
+    public TorrentDownloader(TorrentInfo torrentInfo, Downloader downloader,
+                             ConnectableFlux<TrackerConnection> trackerConnectionConnectableFlux,
+                             PeersProvider peersProvider, TrackerProvider trackerProvider) {
+        this(torrentInfo, downloader, trackerProvider, peersProvider, trackerConnectionConnectableFlux,
+                peersProvider.connectToPeers(trackerConnectionConnectableFlux));
+    }
+
+    public TorrentDownloader(TorrentInfo torrentInfo, Downloader downloader, TrackerProvider trackerProvider) {
+        this(torrentInfo, downloader, trackerProvider.connectToTrackers(),
+                new PeersProvider(torrentInfo, trackerProvider,
+                        new InitializePeersCommunication(torrentInfo,
+                                AppConfig.getInstance().getTcpPortListeningForPeersMessages())),
+                trackerProvider);
+    }
+
+    public TorrentDownloader(TorrentInfo torrentInfo, Downloader downloader) {
+        this(torrentInfo, downloader, new TrackerProvider(torrentInfo));
     }
 
     @Override
@@ -38,43 +68,29 @@ public class TorrentDownloader implements DownloadControl {
         return downloader;
     }
 
-    public Flux<PeerMessage> getPeerResponseFlux() {
-        return this.peerResponseFlux;
-    }
-
-    public ConnectableFlux<PeersCommunicator> getPeersCommunicatorFlux() {
+    protected Flux<PeersCommunicator> getPeersCommunicatorFlux() {
         return peersCommunicatorFlux;
     }
 
-    @Override
-    public void start() {
-        // listen to piece messages to save them in local machine
-        Flux<PieceMessage> pieceMessageFlux = this.peerResponseFlux
-                .filter(peerMessage -> peerMessage instanceof PieceMessage)
-                .cast(PieceMessage.class);
-
-        this.downloader.downloadAsync(pieceMessageFlux);
-
-        this.peersCommunicatorFlux.connect();
+    public Flux<Double> getTorrentDownloadSpeedFlux() {
+        return torrentDownloadSpeedFlux;
     }
 
-    @Override
-    public void resume() {
-
+    public Flux<Double> getTorrentUploadSpeedFlux() {
+        return torrentUploadSpeedFlux;
     }
 
-    @Override
-    public void pause() {
-
+    public ConnectableFlux<TrackerConnection> getTrackerConnectionConnectableFlux() {
+        return trackerConnectionConnectableFlux;
     }
 
-    @Override
-    public void stop() {
-
+    protected PeersProvider getPeersProvider() {
+        return peersProvider;
     }
 
-    @Override
-    public void remove() {
-
+    protected TrackerProvider getTrackerProvider() {
+        return trackerProvider;
     }
+
+    public abstract Flux<PeerMessage> getPeersMessagesFlux();
 }
