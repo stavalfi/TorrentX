@@ -3,7 +3,6 @@ package com.steps;
 import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
-import main.AppConfig;
 import main.TorrentInfo;
 import main.peer.InitializePeersCommunication;
 import main.peer.Peer;
@@ -42,8 +41,7 @@ public class MyStepdefs {
                 .thenReturn(torrentInfo.getTorrentInfoHash());
         Mockito.when(this.torrentInfo.getTrackerList())
                 .thenReturn(torrentInfo.getTrackerList());
-        this.initializePeersCommunication = new InitializePeersCommunication(this.torrentInfo,
-                AppConfig.getInstance().getTcpPortListeningForPeersMessages());
+        this.initializePeersCommunication = new InitializePeersCommunication(this.torrentInfo);
         this.trackerProvider = new TrackerProvider(this.torrentInfo);
         this.peersProvider = new PeersProvider(this.torrentInfo, this.trackerProvider, this.initializePeersCommunication);
     }
@@ -70,8 +68,7 @@ public class MyStepdefs {
                     Mockito.when(this.torrentInfo.getTrackerList()).thenReturn(trackers);
                 });
         this.initializePeersCommunication.stopListenForNewPeers();
-        this.initializePeersCommunication = new InitializePeersCommunication(this.torrentInfo,
-                AppConfig.getInstance().getTcpPortListeningForPeersMessages());
+        this.initializePeersCommunication = new InitializePeersCommunication(this.torrentInfo);
     }
 
     @Given("^additional invalid url of a tracker$")
@@ -128,7 +125,8 @@ public class MyStepdefs {
                                         .flatMap(messageWeNeedToSend -> {
                                             switch (messageWeNeedToSend.getTrackerRequestType()) {
                                                 case Announce:
-                                                    return trackerConnection.announce(this.torrentInfo.getTorrentInfoHash());
+                                                    return trackerConnection.announce(this.torrentInfo.getTorrentInfoHash(),
+                                                            this.initializePeersCommunication.getTcpPort());
                                                 case Scrape:
                                                     return trackerConnection.scrape(Collections.singletonList(this.torrentInfo.getTorrentInfoHash()));
                                                 default:
@@ -162,7 +160,6 @@ public class MyStepdefs {
     @Then("^application send to \\[peer ip: \"([^\"]*)\", peer port: \"([^\"]*)\"\\] and receive the following messages:$")
     public void applicationSendToPeerIpPeerPortAndReceiveTheFollowingMessages(String peerIp, int peerPort,
                                                                               List<PeerFakeRequestResponse> peerFakeRequestResponses) throws Throwable {
-
         RemoteFakePeer remoteFakePeer = new RemoteFakePeer(new Peer(peerIp, peerPort));
         remoteFakePeer.listen();
 
@@ -173,9 +170,8 @@ public class MyStepdefs {
         // send all messages
         Flux<Void> peerRequestsFlux = Flux.fromIterable(peerFakeRequestResponses)
                 .map(PeerFakeRequestResponse::getSendMessageType)
-                .flatMap(peerRequestMessage ->
-                        peersCommunicatorMono.flux()
-                                .flatMap(peersCommunicator -> Utils.sendFakeMessage(peerRequestMessage, peersCommunicator)));
+                .flatMap(peerRequestMessage -> peersCommunicatorMono.flux()
+                        .flatMap(peersCommunicator -> Utils.sendFakeMessage(peerRequestMessage, peersCommunicator)));
 
         // check that all the messages sent successfully.
         // note: Mono<Void> never signal onNext. Only error or complete.
@@ -187,20 +183,16 @@ public class MyStepdefs {
                 .flatMap(PeersCommunicator::receive);
 
         // check if we expect an error signal.
-        Optional<ErrorSignalType> errorSignalType =
-                peerFakeRequestResponses
-                        .stream()
-                        .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() != null)
-                        .map(PeerFakeRequestResponse::getErrorSignalType)
-                        .findAny();
+        Optional<ErrorSignalType> errorSignalType = peerFakeRequestResponses.stream()
+                .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() != null)
+                .map(PeerFakeRequestResponse::getErrorSignalType)
+                .findAny();
 
         // check if we expect a complete signal
-        Optional<PeerFakeRequestResponse> completeSignal =
-                peerFakeRequestResponses
-                        .stream()
-                        .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
-                                peerFakeRequestResponse.getReceiveMessageType() == null)
-                        .findAny();
+        Optional<PeerFakeRequestResponse> completeSignal = peerFakeRequestResponses.stream()
+                .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
+                        peerFakeRequestResponse.getReceiveMessageType() == null)
+                .findAny();
 
         if (completeSignal.isPresent())
             StepVerifier.create(peersResponses)
