@@ -19,7 +19,7 @@
         <suffixPattern>TorrentX: %logger %msg</suffixPattern>
     </appender>
 
-    <logger name="main" level="warn"/>
+    <!--<logger name="main" level="warn"/>-->
 
     <root level="DEBUG">
         <appender-ref ref="STDOUT"/>
