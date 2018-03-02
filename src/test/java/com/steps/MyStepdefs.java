@@ -1,9 +1,9 @@
 package com.steps;
 
 import com.utils.*;
-import cucumber.api.java.Before;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
+import main.AppConfig;
 import main.TorrentInfo;
 import main.peer.InitializePeersCommunication;
 import main.peer.Peer;
@@ -12,12 +12,10 @@ import main.peer.PeersProvider;
 import main.peer.peerMessages.PeerMessage;
 import main.tracker.BadResponseException;
 import main.tracker.Tracker;
-import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
 import org.mockito.Mockito;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -30,16 +28,12 @@ import static org.mockito.Mockito.mock;
 public class MyStepdefs {
 
     private String torrentFilePath;
-
+    private PeersProvider peersProvider;
+    private TrackerProvider trackerProvider;
     private TorrentInfo torrentInfo = mock(TorrentInfo.class);
+    private InitializePeersCommunication initializePeersCommunication;
 
-    @Before
-    public void before() {
-        Hooks.onErrorDropped(throwable -> {
-        });
-    }
-
-    @Given("^new torrent file: \"([^\"]*)\".$")
+    @Given("^new torrent file: \"([^\"]*)\"$")
     public void newTorrentFile(String torrentFileName) throws Throwable {
         this.torrentFilePath = torrentFileName;
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
@@ -48,9 +42,13 @@ public class MyStepdefs {
                 .thenReturn(torrentInfo.getTorrentInfoHash());
         Mockito.when(this.torrentInfo.getTrackerList())
                 .thenReturn(torrentInfo.getTrackerList());
+        this.initializePeersCommunication = new InitializePeersCommunication(this.torrentInfo,
+                AppConfig.getInstance().getTcpPortListeningForPeersMessages());
+        this.trackerProvider = new TrackerProvider(this.torrentInfo);
+        this.peersProvider = new PeersProvider(this.torrentInfo, this.trackerProvider, this.initializePeersCommunication);
     }
 
-    @Given("^additional not-responding trackers to the tracker-list.$")
+    @Given("^additional not-responding trackers to the tracker-list$")
     public void additionalNotRespondingTrackersToTheTrackerListFromFile() throws Throwable {
         TorrentInfo torrentInfo = Utils.readTorrentFile(this.torrentFilePath);
         String torrentHashInfo = torrentInfo.getTorrentInfoHash();
@@ -71,9 +69,12 @@ public class MyStepdefs {
                     Mockito.when(this.torrentInfo.getTorrentInfoHash()).thenReturn(torrentHashInfo);
                     Mockito.when(this.torrentInfo.getTrackerList()).thenReturn(trackers);
                 });
+        this.initializePeersCommunication.stopListenForNewPeers();
+        this.initializePeersCommunication = new InitializePeersCommunication(this.torrentInfo,
+                AppConfig.getInstance().getTcpPortListeningForPeersMessages());
     }
 
-    @Given("^additional invalid url of a tracker.$")
+    @Given("^additional invalid url of a tracker$")
     public void additionalInvalidUrlOfATrackerOf() throws Throwable {
         TorrentInfo torrentInfo = Utils.readTorrentFile(this.torrentFilePath);
         String torrentHashInfo = torrentInfo.getTorrentInfoHash();
@@ -83,25 +84,22 @@ public class MyStepdefs {
                 .thenReturn(Collections.singletonList(new Tracker("udp", "invalid.url.123", 123)));
     }
 
-    @Then("^application send and receive Handshake from the same random peer.$")
+    @Then("^application send and receive Handshake from the same random peer$")
     public void applicationSendAndReceiveHandshakeFromTheSameRandomPeer() throws Throwable {
-        Mono<PeersCommunicator> connectedPeerMono =
-                TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList().stream())
-                        .flatMap((TrackerConnection trackerConnection) ->
-                                PeersProvider.connectToPeers(this.torrentInfo.getTorrentInfoHash(),
-                                        trackerConnection))
-                        .doOnEach(x -> System.out.println("1 " + x))
+        Mono<PeersCommunicator> peersCommunicatorFlux =
+                this.trackerProvider.connectToTrackers()
+                        .refCount(1)
+                        .flatMap(trackerConnection -> this.peersProvider.connectToPeers(trackerConnection))
                         .take(1)
-                        .doOnEach(x -> System.out.println("2 " + x))
                         .single()
-                        .cache();
+                        .doOnNext(PeersCommunicator::closeConnection);
 
-        StepVerifier.create(connectedPeerMono)
+        StepVerifier.create(peersCommunicatorFlux)
                 .expectNextCount(1)
                 .expectComplete()
                 .verify();
 
-        connectedPeerMono.subscribe(PeersCommunicator::closeConnection);
+        this.initializePeersCommunication.stopListenForNewPeers();
     }
 
     @Then("^application send and receive the following messages from a random tracker:$")
@@ -120,7 +118,9 @@ public class MyStepdefs {
                         error instanceof BadResponseException;
 
         Flux<TrackerResponse> actualTrackerResponseFlux =
-                TrackerProvider.connectToTrackers(this.torrentInfo.getTrackerList().stream())
+                this.trackerProvider.connectToTrackers()
+                        .refCount(1)
+                        .log()
                         .flatMap(trackerConnection ->
                                 Flux.fromIterable(messages)
                                         .filter(fakeMessage -> fakeMessage.getTrackerRequestType() != TrackerRequestType.Connect)
@@ -155,6 +155,8 @@ public class MyStepdefs {
                     .expectNextCount(messages.size() - 1)
                     .expectComplete()
                     .verify();
+
+        this.initializePeersCommunication.stopListenForNewPeers();
     }
 
     @Then("^application send to \\[peer ip: \"([^\"]*)\", peer port: \"([^\"]*)\"\\] and receive the following messages:$")
@@ -164,10 +166,9 @@ public class MyStepdefs {
         RemoteFakePeer remoteFakePeer = new RemoteFakePeer(new Peer(peerIp, peerPort));
         remoteFakePeer.listen();
 
-        Mono<PeersCommunicator> peersCommunicatorMono =
-                InitializePeersCommunication.getInstance()
-                        .connectToPeer(this.torrentInfo.getTorrentInfoHash(), remoteFakePeer)
-                        .cache();
+        Mono<PeersCommunicator> peersCommunicatorMono = this.initializePeersCommunication
+                .connectToPeer(remoteFakePeer)
+                .cache();
 
         // send all messages
         Flux<Void> peerRequestsFlux = Flux.fromIterable(peerFakeRequestResponses)
@@ -218,6 +219,7 @@ public class MyStepdefs {
 
         peersCommunicatorMono.subscribe(PeersCommunicator::closeConnection);
         remoteFakePeer.shutdown();
+        this.initializePeersCommunication.stopListenForNewPeers();
     }
 }
 
