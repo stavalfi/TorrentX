@@ -1,6 +1,5 @@
 package main.downloader;
 
-import main.AppConfig;
 import main.TorrentInfo;
 import main.peer.InitializePeersCommunication;
 import main.peer.PeersCommunicator;
@@ -48,10 +47,10 @@ public abstract class TorrentDownloader implements DownloadControl {
     }
 
     public TorrentDownloader(TorrentInfo torrentInfo, Downloader downloader, TrackerProvider trackerProvider) {
-        this(torrentInfo, downloader, trackerProvider.connectToTrackers(),
-                new PeersProvider(torrentInfo, trackerProvider,
-                        new InitializePeersCommunication(torrentInfo,
-                                AppConfig.getInstance().getTcpPortListeningForPeersMessages())),
+        this(torrentInfo,
+                downloader,
+                trackerProvider.connectToTrackers(),
+                new PeersProvider(torrentInfo, trackerProvider, new InitializePeersCommunication(torrentInfo)),
                 trackerProvider);
     }
 

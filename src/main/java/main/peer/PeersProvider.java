@@ -27,7 +27,11 @@ public class PeersProvider {
     }
 
     public Flux<Peer> getPeers(TrackerConnection trackerConnection) {
-        return trackerConnection.announce(this.torrentInfo.getTorrentInfoHash())
+        return trackerConnection.announce(this.torrentInfo.getTorrentInfoHash(),
+                // unimportant note: this method will not cause the application to listen for new peers on this torrent so
+                // the tcpPort we choose here is useless... we only need this for constructing new
+                // InitializePeersCommunication instance.
+                this.initializePeersCommunication.getTcpPort())
                 .flux()
                 .flatMap(AnnounceResponse::getPeers);
     }
@@ -47,7 +51,7 @@ public class PeersProvider {
     }
 
     public Flux<PeersCommunicator> connectToPeers(TrackerConnection trackerConnection) {
-        return trackerConnection.announce(torrentInfo.getTorrentInfoHash())
+        return trackerConnection.announce(torrentInfo.getTorrentInfoHash(), this.initializePeersCommunication.getTcpPort())
                 .flux()
                 .flatMap(AnnounceResponse::getPeers)
                 .distinct()

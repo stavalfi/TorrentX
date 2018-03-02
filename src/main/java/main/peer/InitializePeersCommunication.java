@@ -24,10 +24,10 @@ public class InitializePeersCommunication {
     private ServerSocket listenToPeerConnection;
     private final Flux<PeersCommunicator> allPeersCommunicatorFlux;
 
-    public InitializePeersCommunication(TorrentInfo torrentInfo, int tcpPort) {
+    public InitializePeersCommunication(TorrentInfo torrentInfo) {
         this.torrentInfo = torrentInfo;
         try {
-            this.listenToPeerConnection = new ServerSocket(tcpPort);
+            this.listenToPeerConnection = new ServerSocket(getFreePortOnLocalMachine());
         } catch (IOException e) {
             // TODO: do something with this shit
             e.printStackTrace();
@@ -49,6 +49,10 @@ public class InitializePeersCommunication {
                 }
         })
                 .subscribeOn(Schedulers.elastic());
+    }
+
+    public int getFreePortOnLocalMachine() {
+        return 9097;
     }
 
     public Mono<PeersCommunicator> connectToPeer(Peer peer) {
@@ -153,5 +157,9 @@ public class InitializePeersCommunication {
 
     public void stopListenForNewPeers() throws IOException {
         this.listenToPeerConnection.close();
+    }
+
+    public int getTcpPort() {
+        return this.listenToPeerConnection.getLocalPort();
     }
 }
