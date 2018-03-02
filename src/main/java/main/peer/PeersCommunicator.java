@@ -17,10 +17,10 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     private Peer peer;
     private BitSet peerPieces;
     private Socket peerSocket;
-    private boolean isChoked;
-    private boolean isInterestedInMe;
+    private boolean peerChokesMe;
+    private boolean peerInterestedInMe;
     private TorrentInfo torrentInfo;
-    private Flux<PeerMessage> peerMessageFlux;
+    private Flux<PeerMessage> peerMessageResponseFlux;
     private Flux<Double> peerDownloadSpeedFlux;
     private Flux<Double> peerUploadSpeedFlux;
     private FluxSink<PieceMessage> outGoingPiecesFluxSink;
@@ -46,17 +46,28 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
                              DataInputStream dataInputStream) {
         assert peerSocket != null;
         this.peer = peer;
-        this.isChoked = false;
-        this.isInterestedInMe = false;
+        this.peerChokesMe = false;
+        this.peerInterestedInMe = false;
         this.peerSocket = peerSocket;
         this.torrentInfo = torrentInfo;
         this.peerPieces = new BitSet(torrentInfo.getPieces().size());
         this.me = new Peer("localhost", peerSocket.getLocalPort());
         this.IWantToCloseConnection = false;
 
-        Flux<PeerMessage> peerMessageResponseFlux = Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, dataInputStream))
-                .subscribeOn(Schedulers.elastic())
-                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
+        this.peerMessageResponseFlux =
+                Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, dataInputStream))
+                        // it is important to publish from source on different thread then the
+                        // subscription to this source's thread every time because:
+                        // if not and we subscribe to this specific source multiple times then only the
+                        // first subscription will be activated and the source will never end
+                        .subscribeOn(Schedulers.elastic())
+                        .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
+                        // there are multiple subscribers to this source (every specific peer-message flux).
+                        // all of them must get the same message and not activate this source more then once.
+                        .publish()
+                        // **any** subscriber to **this** source may start the source to produce signals
+                        // to him and everyone else.
+                        .autoConnect(1);
 
         this.bitFieldMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof BitFieldMessage)
@@ -70,7 +81,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
         this.chokeMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof ChokeMessage)
                 .cast(ChokeMessage.class)
-                .doOnNext(chokeMessage -> this.isChoked = true);
+                .doOnNext(chokeMessage -> this.peerChokesMe = true);
 
         this.extendedMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof ExtendedMessage)
@@ -84,7 +95,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
         this.interestedMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof InterestedMessage)
                 .cast(InterestedMessage.class)
-                .doOnNext(interestedMessage -> this.isInterestedInMe = true);
+                .doOnNext(interestedMessage -> this.peerInterestedInMe = true);
 
         this.keepMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof KeepAliveMessage)
@@ -93,7 +104,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
         this.notInterestedMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof NotInterestedMessage)
                 .cast(NotInterestedMessage.class)
-                .doOnNext(notInterestedMessage -> this.isInterestedInMe = false);
+                .doOnNext(notInterestedMessage -> this.peerInterestedInMe = false);
 
         this.pieceMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
@@ -110,12 +121,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
         this.unchokeMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof UnchokeMessage)
                 .cast(UnchokeMessage.class)
-                .doOnNext(unchokeMessage -> this.isChoked = false);
-
-        this.peerMessageFlux = Flux.merge(this.bitFieldMessageResponseFlux, this.cancelMessageResponseFlux, this.chokeMessageResponseFlux,
-                this.extendedMessageResponseFlux, this.haveMessageResponseFlux, this.interestedMessageResponseFlux,
-                this.keepMessageResponseFlux, this.notInterestedMessageResponseFlux, this.pieceMessageResponseFlux,
-                this.portMessageResponseFlux, this.requestMessageResponseFlux, this.unchokeMessageResponseFlux);
+                .doOnNext(unchokeMessage -> this.peerChokesMe = false);
 
         this.peerDownloadSpeedFlux = this.pieceMessageResponseFlux
                 .map(PeerMessage::getPayload)
@@ -127,6 +133,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
                 .map((byte[] payload) -> payload.length)
                 .map(Double::new);
     }
+
 
     private void listenForPeerMessages(FluxSink<PeerMessage> sink, DataInputStream dataInputStream) {
         while (!sink.isCancelled() && !this.peerSocket.isClosed() && this.peerSocket.isConnected()) {
@@ -151,11 +158,8 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
         return this.peerPieces.get(pieceIndex);
     }
 
-    /**
-     * @return an hot flux!
-     */
     public Flux<PeerMessage> receive() {
-        return this.peerMessageFlux;
+        return this.peerMessageResponseFlux;
     }
 
     public Peer getPeer() {
@@ -258,12 +262,12 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
         return peerUploadSpeedFlux;
     }
 
-    public boolean isInterestedInMe() {
-        return isInterestedInMe;
+    public boolean isPeerInterestedInMe() {
+        return peerInterestedInMe;
     }
 
-    public boolean isChoked() {
-        return isChoked;
+    public boolean isPeerChokesMe() {
+        return peerChokesMe;
     }
 
     @Override
