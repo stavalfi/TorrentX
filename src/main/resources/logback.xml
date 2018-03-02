@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>WARN</level>
+            <onMatch>DENY</onMatch>
+            <onMismatch>ACCEPT</onMismatch>
+        </filter>
         <encoder>
             <pattern>
                 %d{HH:mm:ss} [%thread] %-5level - %msg%n\n
@@ -13,6 +18,8 @@
         <facility>USER</facility>
         <suffixPattern>TorrentX: %logger %msg</suffixPattern>
     </appender>
+
+    <logger name="main" level="warn"/>
 
     <root level="DEBUG">
         <appender-ref ref="STDOUT"/>
