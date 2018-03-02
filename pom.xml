@@ -133,13 +133,14 @@
             <version>2.8.47</version>
             <scope>test</scope>
         </dependency>
+
     </dependencies>
     <dependencyManagement>
         <dependencies>
             <dependency>
                 <groupId>io.projectreactor</groupId>
                 <artifactId>reactor-bom</artifactId>
-                <version>Bismuth-RELEASE</version>
+                <version>Bismuth-SR7</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
