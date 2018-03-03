@@ -15,7 +15,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-public class InitializePeersCommunication {
+public class ConnectToPeer {
 
     private TorrentInfo torrentInfo;
     private ServerSocket listenToPeerConnection;
@@ -23,7 +23,7 @@ public class InitializePeersCommunication {
 
     private Integer tcpPort;
 
-    public InitializePeersCommunication(TorrentInfo torrentInfo, Integer tcpPort) {
+    public ConnectToPeer(TorrentInfo torrentInfo, Integer tcpPort) {
         this.torrentInfo = torrentInfo;
         this.tcpPort = tcpPort;
         this.allPeersCommunicatorFlux = Flux.create((FluxSink<PeersCommunicator> sink) -> {

@@ -1,7 +1,7 @@
 package main.downloader;
 
 import main.TorrentInfo;
-import main.peer.InitializePeersCommunication;
+import main.peer.ConnectToPeer;
 import main.peer.PeersCommunicator;
 import main.peer.PeersProvider;
 import main.peer.ReceivePeerMessages;
@@ -107,7 +107,7 @@ public abstract class TorrentDownloader implements DownloadControl, ReceivePeerM
         this(torrentInfo,
                 downloader,
                 trackerProvider.connectToTrackers(),
-                new PeersProvider(torrentInfo, trackerProvider, new InitializePeersCommunication(torrentInfo, -80)),
+                new PeersProvider(torrentInfo, trackerProvider, new ConnectToPeer(torrentInfo, -80)),
                 trackerProvider);
     }
 

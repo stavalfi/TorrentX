@@ -15,17 +15,17 @@ public class PeersProvider {
 
     private TorrentInfo torrentInfo;
     private TrackerProvider trackerProvider;
-    private InitializePeersCommunication initializePeersCommunication;
+    private ConnectToPeer connectToPeer;
 
     public PeersProvider(TorrentInfo torrentInfo, TrackerProvider trackerProvider,
-                         InitializePeersCommunication initializePeersCommunication) {
+                         ConnectToPeer connectToPeer) {
         this.torrentInfo = torrentInfo;
         this.trackerProvider = trackerProvider;
-        this.initializePeersCommunication = initializePeersCommunication;
+        this.connectToPeer = connectToPeer;
     }
 
     public Mono<PeersCommunicator> connectToPeer(Peer peer) {
-        return initializePeersCommunication
+        return connectToPeer
                 .connectToPeer(peer)
                 .subscribeOn(Schedulers.elastic())
                 .doOnError(PeerExceptions.communicationErrors, error ->
@@ -38,7 +38,7 @@ public class PeersProvider {
     }
 
     public Flux<PeersCommunicator> connectToPeers(TrackerConnection trackerConnection) {
-        return trackerConnection.announce(torrentInfo.getTorrentInfoHash(), this.initializePeersCommunication.getTcpPort())
+        return trackerConnection.announce(torrentInfo.getTorrentInfoHash(), this.connectToPeer.getTcpPort())
                 .flux()
                 .flatMap(AnnounceResponse::getPeers)
                 .distinct()
@@ -54,8 +54,8 @@ public class PeersProvider {
         return connectToPeers(this.trackerProvider.connectToTrackers());
     }
 
-    public InitializePeersCommunication getInitializePeersCommunication() {
-        return initializePeersCommunication;
+    public ConnectToPeer getConnectToPeer() {
+        return connectToPeer;
     }
 
     public TorrentInfo getTorrentInfo() {

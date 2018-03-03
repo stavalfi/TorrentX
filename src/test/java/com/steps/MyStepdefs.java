@@ -4,7 +4,7 @@ import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import main.TorrentInfo;
-import main.peer.InitializePeersCommunication;
+import main.peer.ConnectToPeer;
 import main.peer.Peer;
 import main.peer.PeersCommunicator;
 import main.peer.PeersProvider;
@@ -81,10 +81,10 @@ public class MyStepdefs {
         // we won't listen for peers so we use illegal port number.
         int tcpPortToListenForPeers = -80;
 
-        InitializePeersCommunication initializePeersCommunication =
-                new InitializePeersCommunication(this.torrentInfo, tcpPortToListenForPeers);
+        ConnectToPeer connectToPeer =
+                new ConnectToPeer(this.torrentInfo, tcpPortToListenForPeers);
 
-        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider, initializePeersCommunication);
+        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider, connectToPeer);
 
         Mono<PeersCommunicator> peersCommunicatorFlux =
                 trackerProvider.connectToTrackers()
@@ -120,11 +120,11 @@ public class MyStepdefs {
         // we won't listen for peers so we use illegal port number.
         int tcpPortToListenForPeers = -80;
 
-        InitializePeersCommunication initializePeersCommunication =
-                new InitializePeersCommunication(this.torrentInfo, tcpPortToListenForPeers);
+        ConnectToPeer connectToPeer =
+                new ConnectToPeer(this.torrentInfo, tcpPortToListenForPeers);
 
         // we must to do for now and if not we get NullPointerException.
-        initializePeersCommunication.listen().subscribe();
+        connectToPeer.listen().subscribe();
 
         Flux<TrackerResponse> actualTrackerResponseFlux =
                 trackerProvider.connectToTrackers()
@@ -138,7 +138,7 @@ public class MyStepdefs {
                                             switch (messageWeNeedToSend.getTrackerRequestType()) {
                                                 case Announce:
                                                     return trackerConnection.announce(this.torrentInfo.getTorrentInfoHash(),
-                                                            initializePeersCommunication.getTcpPort());
+                                                            connectToPeer.getTcpPort());
                                                 case Scrape:
                                                     return trackerConnection.scrape(Collections.singletonList(this.torrentInfo.getTorrentInfoHash()));
                                                 default:
@@ -176,10 +176,10 @@ public class MyStepdefs {
         // we won't listen for peers so we use illegal port number.
         int tcpPortToListenForPeers = -80;
 
-        InitializePeersCommunication initializePeersCommunication =
-                new InitializePeersCommunication(this.torrentInfo, tcpPortToListenForPeers);
+        ConnectToPeer connectToPeer =
+                new ConnectToPeer(this.torrentInfo, tcpPortToListenForPeers);
 
-        Mono<PeersCommunicator> peersCommunicatorMono = initializePeersCommunication
+        Mono<PeersCommunicator> peersCommunicatorMono = connectToPeer
                 .connectToPeer(remoteFakePeer)
                 .cache();
 
@@ -246,10 +246,10 @@ public class MyStepdefs {
         // we won't listen for peers so we use illegal port number.
         int tcpPortToListenForPeers = -80;
 
-        InitializePeersCommunication initializePeersCommunication =
-                new InitializePeersCommunication(this.torrentInfo, tcpPortToListenForPeers);
+        ConnectToPeer connectToPeer =
+                new ConnectToPeer(this.torrentInfo, tcpPortToListenForPeers);
 
-        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider, initializePeersCommunication);
+        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider, connectToPeer);
 
         ConnectableFlux<TrackerConnection> trackerConnectionConnectableFlux = trackerProvider.connectToTrackers();
         Flux<PeersCommunicator> peersCommunicatorFlux = peersProvider.connectToPeers(trackerConnectionConnectableFlux.autoConnect());
