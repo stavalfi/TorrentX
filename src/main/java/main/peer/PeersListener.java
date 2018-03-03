@@ -5,27 +5,25 @@ import main.HexByteConverter;
 import main.TorrentInfo;
 import main.peer.peerMessages.HandShake;
 import main.tracker.BadResponseException;
-import reactor.core.publisher.*;
+import reactor.core.publisher.ConnectableFlux;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Optional;
 
-public class ConnectToPeer {
-
-    private TorrentInfo torrentInfo;
+public class PeersListener {
+    private Integer tcpPort = 80;
     private ServerSocket listenToPeerConnection;
-    private final ConnectableFlux<PeersCommunicator> allPeersCommunicatorFlux;
+    private ConnectableFlux<PeersCommunicator> allPeersCommunicatorFlux;
 
-    private Integer tcpPort;
+    private PeersListener() {
 
-    public ConnectToPeer(TorrentInfo torrentInfo, Integer tcpPort) {
-        this.torrentInfo = torrentInfo;
-        this.tcpPort = tcpPort;
         this.allPeersCommunicatorFlux = Flux.create((FluxSink<PeersCommunicator> sink) -> {
             try {
                 this.listenToPeerConnection = new ServerSocket(this.tcpPort);
@@ -49,45 +47,6 @@ public class ConnectToPeer {
                 }
         }).subscribeOn(Schedulers.elastic())
                 .publish();
-    }
-
-    public Mono<PeersCommunicator> connectToPeer(Peer peer) {
-        return Mono.create((MonoSink<PeersCommunicator> sink) -> {
-            Socket peerSocket = new Socket();
-            try {
-                peerSocket.connect(new InetSocketAddress(peer.getPeerIp(), peer.getPeerPort()), 1000 * 10);
-                DataInputStream receiveMessages = new DataInputStream(peerSocket.getInputStream());
-                OutputStream sendMessages = peerSocket.getOutputStream();
-
-                // firstly, we need to send Handshake message to the peer and receive Handshake back.
-                HandShake handShakeSending = new HandShake(HexByteConverter.hexToByte(this.torrentInfo.getTorrentInfoHash()), AppConfig.getInstance().getPeerId().getBytes());
-                sendMessages.write(handShakeSending.createPacketFromObject());
-                HandShake handShakeReceived = new HandShake(receiveMessages);
-                String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
-                if (!this.torrentInfo.getTorrentInfoHash().toLowerCase().equals(receivedTorrentInfoHash.toLowerCase())) {
-                    // the peer sent me invalid HandShake message.
-                    // by the p2p spec, I need to close to the socket.
-                    sendMessages.close();
-                    peerSocket.close();
-                    sink.error(new BadResponseException("we sent the peer a handshake request" +
-                            " and he sent us back handshake response" +
-                            " with the wrong torrent-info-hash: " + receivedTorrentInfoHash));
-                    return;
-                } else {
-                    // all went well, I accept this connection.
-                    sink.success(new PeersCommunicator(this.torrentInfo, peer, peerSocket, receiveMessages));
-                    return;
-                }
-            } catch (IOException e) {
-                sink.error(e);
-                try {
-                    peerSocket.close();
-                } catch (IOException e1) {
-                    // TODO: do something with this shit
-                    e1.printStackTrace();
-                }
-            }
-        });
     }
 
     private void acceptPeerConnection(Socket peerSocket, FluxSink<PeersCommunicator> sink) {
@@ -116,7 +75,9 @@ public class ConnectToPeer {
         }
         String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
 
-        if (!this.torrentInfo.getTorrentInfoHash().equals(receivedTorrentInfoHash)) {
+        Optional<TorrentInfo> torrentInfo = haveThisTorrent(receivedTorrentInfoHash);
+
+        if (!torrentInfo.isPresent()) {
             // the peer sent me invalid HandShake message.
             // by the p2p spec, I need to close to the socket.
             try {
@@ -139,25 +100,25 @@ public class ConnectToPeer {
         }
         // all went well, I accept this connection.
         Peer peer = new Peer(peerSocket.getInetAddress().getHostAddress(), peerSocket.getPort());
-        sink.next(new PeersCommunicator(torrentInfo, peer, peerSocket, dataInputStream));
+        sink.next(new PeersCommunicator(torrentInfo.get(), peer, peerSocket, dataInputStream));
     }
 
-    /**
-     * @return hot flux!
-     */
-    public ConnectableFlux<PeersCommunicator> listen() {
-        return this.allPeersCommunicatorFlux;
+    private Optional<TorrentInfo> haveThisTorrent(String receivedTorrentInfoHash) {
+        return Optional.empty();
     }
 
-    /**
-     * @throws IOException          There was a problem closing the socket.
-     * @throws NullPointerException Socket is not initialized because we didn't start to listen for peers yet.
-     */
     public void stopListenForNewPeers() throws IOException, NullPointerException {
         this.listenToPeerConnection.close();
     }
 
     public int getTcpPort() {
         return this.tcpPort;
+    }
+
+
+    private static PeersListener instance = new PeersListener();
+
+    public static PeersListener getInstance() {
+        return instance;
     }
 }
