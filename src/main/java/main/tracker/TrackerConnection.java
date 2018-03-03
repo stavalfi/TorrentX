@@ -53,5 +53,12 @@ public class TrackerConnection extends Tracker {
 
         return TrackerCommunication.communicate(scrapeRequest, createResponse);
     }
+
+    @Override
+    public String toString() {
+        return "TrackerConnection{" +
+                super.toString() +
+                "} ";
+    }
 }
 
