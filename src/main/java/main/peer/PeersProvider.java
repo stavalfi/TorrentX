@@ -1,13 +1,11 @@
 package main.peer;
 
-import lombok.SneakyThrows;
 import main.TorrentInfo;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import main.tracker.response.AnnounceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -26,17 +24,6 @@ public class PeersProvider {
         this.initializePeersCommunication = initializePeersCommunication;
     }
 
-    public Flux<Peer> getPeers(TrackerConnection trackerConnection) {
-        return trackerConnection.announce(this.torrentInfo.getTorrentInfoHash(),
-                // unimportant note: this method will not cause the application to listen for new peers on this torrent so
-                // the tcpPort we choose here is useless... we only need this for constructing new
-                // InitializePeersCommunication instance.
-                this.initializePeersCommunication.getTcpPort())
-                .flux()
-                .flatMap(AnnounceResponse::getPeers);
-    }
-
-    @SneakyThrows
     public Mono<PeersCommunicator> connectToPeer(Peer peer) {
         return initializePeersCommunication
                 .connectToPeer(peer)
@@ -58,7 +45,7 @@ public class PeersProvider {
                 .flatMap((Peer peer) -> connectToPeer(peer));
     }
 
-    public Flux<PeersCommunicator> connectToPeers(ConnectableFlux<TrackerConnection> trackerConnectionFlux) {
+    public Flux<PeersCommunicator> connectToPeers(Flux<TrackerConnection> trackerConnectionFlux) {
         return trackerConnectionFlux
                 .flatMap(trackerConnection -> connectToPeers(trackerConnection));
     }

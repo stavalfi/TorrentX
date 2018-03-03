@@ -20,12 +20,13 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     private boolean peerChokesMe;
     private boolean peerInterestedInMe;
     private TorrentInfo torrentInfo;
-    private Flux<PeerMessage> peerMessageResponseFlux;
     private Flux<Double> peerDownloadSpeedFlux;
     private Flux<Double> peerUploadSpeedFlux;
     private FluxSink<PieceMessage> outGoingPiecesFluxSink;
 
     // receive messages:
+
+    private Flux<PeerMessage> peerMessageResponseFlux;
 
     private Flux<BitFieldMessage> bitFieldMessageResponseFlux;
     private Flux<CancelMessage> cancelMessageResponseFlux;
@@ -68,53 +69,56 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
                         // **any** subscriber to **this** source may start the source to produce signals
                         // to him and everyone else.
                         .autoConnect(1);
+        ;
 
-        this.bitFieldMessageResponseFlux = peerMessageResponseFlux
+        this.bitFieldMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof BitFieldMessage)
                 .cast(BitFieldMessage.class)
                 .doOnNext(bitFieldMessage -> this.peerPieces.or(bitFieldMessage.getPieces()));
 
-        this.cancelMessageResponseFlux = peerMessageResponseFlux
+        this.cancelMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof CancelMessage)
                 .cast(CancelMessage.class);
 
-        this.chokeMessageResponseFlux = peerMessageResponseFlux
+        this.chokeMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof ChokeMessage)
                 .cast(ChokeMessage.class)
                 .doOnNext(chokeMessage -> this.peerChokesMe = true);
 
-        this.extendedMessageResponseFlux = peerMessageResponseFlux
+        this.extendedMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof ExtendedMessage)
                 .cast(ExtendedMessage.class);
 
-        this.haveMessageResponseFlux = peerMessageResponseFlux
+        this.haveMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof HaveMessage)
                 .cast(HaveMessage.class)
                 .doOnNext(haveMessage -> this.peerPieces.set(haveMessage.getPieceIndex()));
 
-        this.interestedMessageResponseFlux = peerMessageResponseFlux
+        this.interestedMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof InterestedMessage)
                 .cast(InterestedMessage.class)
                 .doOnNext(interestedMessage -> this.peerInterestedInMe = true);
 
-        this.keepMessageResponseFlux = peerMessageResponseFlux
+        this.keepMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof KeepAliveMessage)
                 .cast(KeepAliveMessage.class);
 
-        this.notInterestedMessageResponseFlux = peerMessageResponseFlux
+        this.notInterestedMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof NotInterestedMessage)
                 .cast(NotInterestedMessage.class)
                 .doOnNext(notInterestedMessage -> this.peerInterestedInMe = false);
 
-        this.pieceMessageResponseFlux = peerMessageResponseFlux
+        this.pieceMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
-                .cast(PieceMessage.class);
+                .doOnNext(pieceMessage -> System.out.println("1 we got new piece!!!!"))
+                .cast(PieceMessage.class)
+                .doOnNext(pieceMessage -> System.out.println("2 we got new piece!!!!"));
 
-        this.portMessageResponseFlux = peerMessageResponseFlux
+        this.portMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof PortMessage)
                 .cast(PortMessage.class);
 
-        this.requestMessageResponseFlux = peerMessageResponseFlux
+        this.requestMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof RequestMessage)
                 .cast(RequestMessage.class);
 
@@ -158,10 +162,6 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
         return this.peerPieces.get(pieceIndex);
     }
 
-    public Flux<PeerMessage> receive() {
-        return this.peerMessageResponseFlux;
-    }
-
     public Peer getPeer() {
         return peer;
     }
@@ -184,10 +184,10 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
         }
     }
 
-    private Mono<Void> send(PeerMessage peerMessage) {
+    private Mono<PeersCommunicator> send(PeerMessage peerMessage) {
         try {
             this.peerSocket.getOutputStream().write(peerMessage.createPacketFromObject());
-            return Mono.empty();
+            return Mono.just(this);
         } catch (IOException e) {
             closeConnection();
             return Mono.error(e);
@@ -195,62 +195,65 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     }
 
     @Override
-    public Mono<Void> sendPieceMessage(int index, int begin, byte[] block) {
+    public Mono<PeersCommunicator> sendPieceMessage(int index, int begin, byte[] block) {
         PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(), index, begin, block);
         return send(pieceMessage)
                 // for calculating the peer upload speed -
                 // I do not care if we failed to send the piece.
                 // so I don't register to doOnError or something like that.
-                .doOnNext(aVoid -> this.outGoingPiecesFluxSink.next(pieceMessage));
+                .doOnNext(peersCommunicator -> {
+                    if (this.outGoingPiecesFluxSink != null)
+                        this.outGoingPiecesFluxSink.next(pieceMessage);
+                });
     }
 
     @Override
-    public Mono<Void> sendBitFieldMessage(BitSet peaces) {
+    public Mono<PeersCommunicator> sendBitFieldMessage(BitSet peaces) {
         return send(new BitFieldMessage(this.getMe(), this.getPeer(), peaces));
     }
 
     @Override
-    public Mono<Void> sendCancelMessage(int index, int begin, int length) {
+    public Mono<PeersCommunicator> sendCancelMessage(int index, int begin, int length) {
         return send(new CancelMessage(this.getMe(), this.getPeer(), index, begin, length));
     }
 
     @Override
-    public Mono<Void> sendChokeMessage() {
+    public Mono<PeersCommunicator> sendChokeMessage() {
         return send(new ChokeMessage(this.getMe(), this.getPeer()));
     }
 
     @Override
-    public Mono<Void> sendHaveMessage(int pieceIndex) {
+    public Mono<PeersCommunicator> sendHaveMessage(int pieceIndex) {
         return send(new HaveMessage(this.getMe(), this.getPeer(), pieceIndex));
     }
 
     @Override
-    public Mono<Void> sendInterestedMessage() {
+    public Mono<PeersCommunicator> sendInterestedMessage() {
         return send(new InterestedMessage(this.getMe(), this.getPeer()));
     }
 
     @Override
-    public Mono<Void> sendKeepAliveMessage() {
+    public Mono<PeersCommunicator> sendKeepAliveMessage() {
         return send(new KeepAliveMessage(this.getMe(), this.getPeer()));
     }
 
     @Override
-    public Mono<Void> sendNotInterestedMessage() {
+    public Mono<PeersCommunicator> sendNotInterestedMessage() {
         return send(new NotInterestedMessage(this.getMe(), this.getPeer()));
     }
 
     @Override
-    public Mono<Void> sendPortMessage(short listenPort) {
+    public Mono<PeersCommunicator> sendPortMessage(short listenPort) {
         return send(new PortMessage(this.getMe(), this.getPeer(), listenPort));
     }
 
     @Override
-    public Mono<Void> sendRequestMessage(int index, int begin, int length) {
+    public Mono<PeersCommunicator> sendRequestMessage(int index, int begin, int length) {
         return send(new RequestMessage(this.getMe(), this.getPeer(), index, begin, length));
     }
 
     @Override
-    public Mono<Void> sendUnchokeMessage() {
+    public Mono<PeersCommunicator> sendUnchokeMessage() {
         return send(new UnchokeMessage(this.getMe(), this.getPeer()));
     }
 
@@ -268,6 +271,11 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
 
     public boolean isPeerChokesMe() {
         return peerChokesMe;
+    }
+
+    @Override
+    public Flux<PeerMessage> getPeerMessageResponseFlux() {
+        return this.peerMessageResponseFlux;
     }
 
     @Override

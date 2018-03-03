@@ -15,7 +15,7 @@ public class Utils {
         return new TorrentInfo(TorrentParser.parseTorrent(torrentFilesPath));
     }
 
-    public static Mono<Void> sendFakeMessage(PeerMessageType peerMessageType, PeersCommunicator peersCommunicator) {
+    public static Mono<PeersCommunicator> sendFakeMessage(PeerMessageType peerMessageType, PeersCommunicator peersCommunicator) {
         switch (peerMessageType) {
             case HaveMessage:
                 return peersCommunicator.sendHaveMessage(0);

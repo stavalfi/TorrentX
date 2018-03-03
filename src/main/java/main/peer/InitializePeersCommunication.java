@@ -5,10 +5,7 @@ import main.HexByteConverter;
 import main.TorrentInfo;
 import main.peer.peerMessages.HandShake;
 import main.tracker.BadResponseException;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.MonoSink;
+import reactor.core.publisher.*;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
@@ -22,17 +19,20 @@ public class InitializePeersCommunication {
 
     private TorrentInfo torrentInfo;
     private ServerSocket listenToPeerConnection;
-    private final Flux<PeersCommunicator> allPeersCommunicatorFlux;
+    private final ConnectableFlux<PeersCommunicator> allPeersCommunicatorFlux;
 
-    public InitializePeersCommunication(TorrentInfo torrentInfo) {
+    private Integer tcpPort;
+
+    public InitializePeersCommunication(TorrentInfo torrentInfo, Integer tcpPort) {
         this.torrentInfo = torrentInfo;
-        try {
-            this.listenToPeerConnection = new ServerSocket(getFreePortOnLocalMachine());
-        } catch (IOException e) {
-            // TODO: do something with this shit
-            e.printStackTrace();
-        }
+        this.tcpPort = tcpPort;
         this.allPeersCommunicatorFlux = Flux.create((FluxSink<PeersCommunicator> sink) -> {
+            try {
+                this.listenToPeerConnection = new ServerSocket(this.tcpPort);
+            } catch (IOException e) {
+                // TODO: do something with this shit
+                e.printStackTrace();
+            }
             while (!this.listenToPeerConnection.isClosed() && !sink.isCancelled())
                 try {
                     Socket peerSocket = this.listenToPeerConnection.accept();
@@ -47,12 +47,8 @@ public class InitializePeersCommunication {
                         e1.printStackTrace();
                     }
                 }
-        })
-                .subscribeOn(Schedulers.elastic());
-    }
-
-    public int getFreePortOnLocalMachine() {
-        return 9097;
+        }).subscribeOn(Schedulers.elastic())
+                .publish();
     }
 
     public Mono<PeersCommunicator> connectToPeer(Peer peer) {
@@ -79,8 +75,6 @@ public class InitializePeersCommunication {
                     return;
                 } else {
                     // all went well, I accept this connection.
-//                    Peer me = new Peer("localhost", peerSocket.getLocalPort());
-//                    sendMessages.write(new ExtendedMessage(me, peer).createPacketFromObject());
                     sink.success(new PeersCommunicator(this.torrentInfo, peer, peerSocket, receiveMessages));
                     return;
                 }
@@ -151,15 +145,19 @@ public class InitializePeersCommunication {
     /**
      * @return hot flux!
      */
-    public Flux<PeersCommunicator> listen() {
+    public ConnectableFlux<PeersCommunicator> listen() {
         return this.allPeersCommunicatorFlux;
     }
 
-    public void stopListenForNewPeers() throws IOException {
+    /**
+     * @throws IOException          There was a problem closing the socket.
+     * @throws NullPointerException Socket is not initialized because we didn't start to listen for peers yet.
+     */
+    public void stopListenForNewPeers() throws IOException, NullPointerException {
         this.listenToPeerConnection.close();
     }
 
     public int getTcpPort() {
-        return this.listenToPeerConnection.getLocalPort();
+        return this.tcpPort;
     }
 }

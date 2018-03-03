@@ -3,7 +3,6 @@ package main.downloader;
 import main.TorrentInfo;
 import main.peer.PeersCommunicator;
 import main.peer.PeersProvider;
-import main.peer.peerMessages.PeerMessage;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import reactor.core.publisher.ConnectableFlux;
@@ -27,14 +26,24 @@ public class TorrentDownloaderImpl extends TorrentDownloader {
         super(torrentInfo, downloader);
     }
 
-    @Override
-    public Flux<PeerMessage> getPeersMessagesFlux() {
-        return super.getPeersCommunicatorFlux()
-                .flatMap(PeersCommunicator::receive);
+    private void algorithm() {
+        this.getPeersCommunicatorFlux()
+                .subscribe(peersCommunicator -> {
+                    peersCommunicator.sendInterestedMessage()
+                            .subscribe(null, null, () -> {
+                                peersCommunicator.getHaveMessageResponseFlux()
+                                        .flatMap(aVoid -> peersCommunicator.getHaveMessageResponseFlux())
+                                        .take(1)
+                                        .flatMap(haveMessage ->
+                                                peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, 16000))
+                                        .subscribe();
+                            });
+                });
     }
 
     @Override
     public void start() {
+        algorithm();
         this.getTrackerConnectionConnectableFlux().connect();
     }
 
