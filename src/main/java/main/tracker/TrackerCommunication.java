@@ -45,7 +45,7 @@ class TrackerCommunication {
                     sink.next(response);
                 })
                 .doOnError(TrackerExceptions.communicationErrors, error ->
-                        logger.warn("error signal: (the application will maybe try to send" +
+                        logger.debug("error signal: (the application will maybe try to send" +
                                 " the request again to the same tracker)." +
                                 "\nerror message: " + error.getMessage() + ".\n" +
                                 "error type: " + error.getClass().getName()))
@@ -53,7 +53,7 @@ class TrackerCommunication {
                 // which is defined in sendRequest method.
                 .retry(1, TrackerExceptions.communicationErrors)
                 .doOnError(TrackerExceptions.communicationErrors, error ->
-                        logger.warn("error signal: (the application retried to send" +
+                        logger.debug("error signal: (the application retried to send" +
                                 " a request to the same tracker again and failed)." +
                                 "\nerror message: " + error.getMessage() + ".\n" +
                                 "error type: " + error.getClass().getName()))
