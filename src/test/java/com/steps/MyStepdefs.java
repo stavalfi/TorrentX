@@ -1,12 +1,13 @@
 package com.steps;
 
 import com.utils.*;
+import cucumber.api.java.Before;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import main.TorrentInfo;
-import main.peer.ConnectToPeer;
 import main.peer.Peer;
 import main.peer.PeersCommunicator;
+import main.peer.PeersListener;
 import main.peer.PeersProvider;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -18,9 +19,12 @@ import main.tracker.response.TrackerResponse;
 import org.mockito.Mockito;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.io.IOException;
+import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.*;
 import java.util.function.Predicate;
@@ -31,6 +35,22 @@ public class MyStepdefs {
 
     private String torrentFilePath;
     private TorrentInfo torrentInfo = mock(TorrentInfo.class);
+
+
+    @Before
+    public void fuck() {
+        Hooks.onNextDropped(object -> {
+            if (object instanceof Socket) {
+                Socket socket = (Socket) object;
+                System.out.println("closing socket of: " + socket.getInetAddress().getHostAddress() + " " + socket.getPort());
+                try {
+                    socket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
 
     @Given("^new torrent file: \"([^\"]*)\"$")
     public void newTorrentFile(String torrentFileName) throws Throwable {
@@ -77,14 +97,7 @@ public class MyStepdefs {
     @Then("^application send and receive Handshake from the same random peer$")
     public void applicationSendAndReceiveHandshakeFromTheSameRandomPeer() throws Throwable {
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
-
-        // we won't listen for peers so we use illegal port number.
-        int tcpPortToListenForPeers = -80;
-
-        ConnectToPeer connectToPeer =
-                new ConnectToPeer(this.torrentInfo, tcpPortToListenForPeers);
-
-        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider, connectToPeer);
+        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider);
 
         Mono<PeersCommunicator> peersCommunicatorFlux =
                 trackerProvider.connectToTrackers()
@@ -117,15 +130,6 @@ public class MyStepdefs {
 
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
 
-        // we won't listen for peers so we use illegal port number.
-        int tcpPortToListenForPeers = -80;
-
-        ConnectToPeer connectToPeer =
-                new ConnectToPeer(this.torrentInfo, tcpPortToListenForPeers);
-
-        // we must to do for now and if not we get NullPointerException.
-        connectToPeer.listen().subscribe();
-
         Flux<TrackerResponse> actualTrackerResponseFlux =
                 trackerProvider.connectToTrackers()
                         .refCount(1)
@@ -138,7 +142,7 @@ public class MyStepdefs {
                                             switch (messageWeNeedToSend.getTrackerRequestType()) {
                                                 case Announce:
                                                     return trackerConnection.announce(this.torrentInfo.getTorrentInfoHash(),
-                                                            connectToPeer.getTcpPort());
+                                                            PeersListener.getInstance().getTcpPort());
                                                 case Scrape:
                                                     return trackerConnection.scrape(Collections.singletonList(this.torrentInfo.getTorrentInfoHash()));
                                                 default:
@@ -173,13 +177,10 @@ public class MyStepdefs {
         RemoteFakePeer remoteFakePeer = new RemoteFakePeer(new Peer(peerIp, peerPort));
         remoteFakePeer.listen();
 
-        // we won't listen for peers so we use illegal port number.
-        int tcpPortToListenForPeers = -80;
+        TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
+        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider);
 
-        ConnectToPeer connectToPeer =
-                new ConnectToPeer(this.torrentInfo, tcpPortToListenForPeers);
-
-        Mono<PeersCommunicator> peersCommunicatorMono = connectToPeer
+        Mono<PeersCommunicator> peersCommunicatorMono = peersProvider
                 .connectToPeer(remoteFakePeer)
                 .cache();
 
@@ -242,14 +243,7 @@ public class MyStepdefs {
     @Then("^application receive at list one random block of a random piece$")
     public void applicationReceiveAtListOneRandomBlockOfARandomPiece() throws Throwable {
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
-
-        // we won't listen for peers so we use illegal port number.
-        int tcpPortToListenForPeers = -80;
-
-        ConnectToPeer connectToPeer =
-                new ConnectToPeer(this.torrentInfo, tcpPortToListenForPeers);
-
-        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider, connectToPeer);
+        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider);
 
         ConnectableFlux<TrackerConnection> trackerConnectionConnectableFlux = trackerProvider.connectToTrackers();
         Flux<PeersCommunicator> peersCommunicatorFlux = peersProvider.connectToPeers(trackerConnectionConnectableFlux.autoConnect());
