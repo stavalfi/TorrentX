@@ -110,9 +110,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
 
         this.pieceMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
-                .doOnNext(pieceMessage -> System.out.println("1 we got new piece!!!!"))
-                .cast(PieceMessage.class)
-                .doOnNext(pieceMessage -> System.out.println("2 we got new piece!!!!"));
+                .cast(PieceMessage.class);
 
         this.portMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof PortMessage)
