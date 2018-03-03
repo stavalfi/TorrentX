@@ -51,13 +51,11 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
         buffer.putInt(this.length);
         // when receiving a peerMessage,
         // I first check what is the value of "length".
-        // if length==0 then I don't read any more bytes.
+        // if length == 0 then I don't read any more bytes.
         // so there is no reason to send dummy bytes.
         if (this.length > 0) {
             buffer.put(this.messageId);
             buffer.put(this.payload);
-        } else {
-            System.out.println("wtf");
         }
 
         return buffer.array();

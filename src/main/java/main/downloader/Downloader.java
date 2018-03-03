@@ -1,21 +1,22 @@
 package main.downloader;
 
+import main.file.ActiveTorrent;
 import main.peer.peerMessages.PieceMessage;
 import reactor.core.publisher.Flux;
 
 public class Downloader {
 
-    private String torrentInfoHash;
+    private ActiveTorrent activeTorrent;
 
-    public Downloader(String torrentInfoHash) {
-        this.torrentInfoHash = torrentInfoHash;
+    public Downloader(ActiveTorrent activeTorrent) {
+        this.activeTorrent = activeTorrent;
     }
 
-    public String getTorrentInfoHash() {
-        return torrentInfoHash;
+    public ActiveTorrent getActiveTorrent() {
+        return activeTorrent;
     }
 
-    public void downloadAsync(Flux<PieceMessage> peerResponsesFlux) {
-
+    public Flux<Integer> downloadAsync(Flux<PieceMessage> peerResponsesFlux) {
+        return Flux.never();
     }
 }

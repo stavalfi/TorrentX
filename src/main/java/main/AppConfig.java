@@ -2,7 +2,6 @@ package main;
 
 public class AppConfig {
     private String peerId = "-AZ5750-TpkXttZLfpSH";
-    private int tcpPortListeningForPeersMessages = 8071;
 
     private static AppConfig instance = new AppConfig();
 
@@ -16,9 +15,5 @@ public class AppConfig {
 
     public String getPeerId() {
         return peerId;
-    }
-
-    public int getTcpPortListeningForPeersMessages() {
-        return tcpPortListeningForPeersMessages;
     }
 }

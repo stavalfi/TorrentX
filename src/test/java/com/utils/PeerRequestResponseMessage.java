@@ -1,18 +1,13 @@
 package com.utils;
 
-public class PeerFakeRequestResponse {
+public class PeerRequestResponseMessage {
     private final PeerMessageType sendMessageType;
     private final PeerMessageType receiveMessageType;
-    private final ErrorSignalType errorSignalType;
 
-    public PeerFakeRequestResponse(PeerMessageType sendMessageType, PeerMessageType receiveMessageType, ErrorSignalType errorSignalType) {
+    public PeerRequestResponseMessage(PeerMessageType sendMessageType,
+                                      PeerMessageType receiveMessageType) {
         this.sendMessageType = sendMessageType;
         this.receiveMessageType = receiveMessageType;
-        this.errorSignalType = errorSignalType;
-    }
-
-    public ErrorSignalType getErrorSignalType() {
-        return errorSignalType;
     }
 
     public PeerMessageType getSendMessageType() {

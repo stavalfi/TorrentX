@@ -34,7 +34,7 @@ public class RemoteFakePeer extends Peer {
     }
 
     public void listen() {
-        new Thread(() -> {
+        Thread thread = new Thread(() -> {
             try {
                 while (!this.closeEverything) {
                     Socket newPeerConnection = this.listenToPeerConnection.accept();
@@ -48,7 +48,9 @@ public class RemoteFakePeer extends Peer {
                 // e.printStackTrace();
                 shutdown();
             }
-        }).start();
+        });
+        thread.setName("Fake Peer - wait for connections & messages");
+        thread.start();
     }
 
     private void waitForMessagesFromPeer(Socket peerConnection) {

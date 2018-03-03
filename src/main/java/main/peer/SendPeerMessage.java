@@ -5,25 +5,25 @@ import reactor.core.publisher.Mono;
 import java.util.BitSet;
 
 public interface SendPeerMessage {
-    Mono<Void> sendBitFieldMessage(BitSet peaces);
+    Mono<PeersCommunicator> sendBitFieldMessage(BitSet peaces);
 
-    Mono<Void> sendCancelMessage(int index, int begin, int length);
+    Mono<PeersCommunicator> sendCancelMessage(int index, int begin, int length);
 
-    Mono<Void> sendChokeMessage();
+    Mono<PeersCommunicator> sendChokeMessage();
 
-    Mono<Void> sendHaveMessage(int pieceIndex);
+    Mono<PeersCommunicator> sendHaveMessage(int pieceIndex);
 
-    Mono<Void> sendInterestedMessage();
+    Mono<PeersCommunicator> sendInterestedMessage();
 
-    Mono<Void> sendKeepAliveMessage();
+    Mono<PeersCommunicator> sendKeepAliveMessage();
 
-    Mono<Void> sendNotInterestedMessage();
+    Mono<PeersCommunicator> sendNotInterestedMessage();
 
-    Mono<Void> sendPieceMessage(int index, int begin, byte[] block);
+    Mono<PeersCommunicator> sendPieceMessage(int index, int begin, byte[] block);
 
-    Mono<Void> sendPortMessage(short listenPort);
+    Mono<PeersCommunicator> sendPortMessage(short listenPort);
 
-    Mono<Void> sendRequestMessage(int index, int begin, int length);
+    Mono<PeersCommunicator> sendRequestMessage(int index, int begin, int length);
 
-    Mono<Void> sendUnchokeMessage();
+    Mono<PeersCommunicator> sendUnchokeMessage();
 }

@@ -2,29 +2,30 @@ package main;
 
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
+import main.downloader.Downloader;
 import main.downloader.TorrentDownloader;
-import reactor.core.publisher.Hooks;
+import main.downloader.TorrentDownloaderImpl;
+import main.file.ActiveTorrent;
 
 class App {
+
+    // TODO: get all signals which created after a stream disposed or canceled and free their resources!!!
+
     private static void f4() {
+
         TorrentInfo torrentInfo = getTorrentInfo();
 
-        TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo);
+        ActiveTorrent activeTorrent = new ActiveTorrent(torrentInfo, null);
+        Downloader downloader = new Downloader(activeTorrent);
+        TorrentDownloader torrentDownloader = new TorrentDownloaderImpl(torrentInfo, downloader);
 
-        torrentDownloader.getPeerResponseFlux()
+        torrentDownloader.getPieceMessageResponseFlux()
                 .subscribe(System.out::println, System.out::println, System.out::println);
-
-        torrentDownloader.getPeersCommunicatorFlux()
-                .doOnNext(peersCommunicator -> peersCommunicator.sendInterestedMessage().block())
-                .doOnNext(peersCommunicator -> peersCommunicator.sendRequestMessage(0, 0, 16000).block())
-                .subscribe();
 
         torrentDownloader.start();
     }
 
     public static void main(String[] args) throws Exception {
-        Hooks.onErrorDropped(throwable -> {
-        });
         f4();
         Thread.sleep(1000 * 1000);
     }
@@ -167,3 +168,81 @@ class App {
 //
 //        return newStr;
 //    }
+
+//    final CountDownLatch latch = new CountDownLatch(2);
+//    TcpServer server = TcpServer.create(8091);
+//    ObjectMapper m = new ObjectMapper();
+//
+//        server.newHandler((in, out) -> {
+//                in.receive()
+//                .asByteArray()
+//                .map(bb -> {
+//                try {
+//                return m.readValue(bb, Person.class);
+//        } catch (IOException io) {
+//        throw Exceptions.propagate(io);
+//        }
+//        })
+//        .subscribe(data -> {
+//        System.out.println("server got something!!: " + data);
+//        });
+//
+//        return out.sendString(Mono.just("Hi"))
+//        .neverComplete();
+//        }).subscribe();
+//
+//final TcpClient client = TcpClient.create(opts -> opts.host("localhost").port(8091));
+//
+//        client.newHandler((in, out) -> {
+//        //in
+//        in.receive()
+//        .asByteArray()
+//        .map(bb -> {
+//        try {
+//        return m.readValue(bb, String.class);
+//        } catch (IOException io) {
+//        throw Exceptions.propagate(io);
+//        }
+//        })
+//        .subscribe(data -> {
+//        System.out.println("client got something!!: " + data);
+//        });
+//
+//        //out
+//        return out.send(Flux.just(new Person(111))
+//        .map(s -> {
+//        try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
+//        m.writeValue(os, s);
+//        return out.alloc()
+//        .buffer()
+//        .writeBytes(os.toByteArray());
+//        } catch (IOException ioe) {
+//        throw Exceptions.propagate(ioe);
+//        }
+//        }));
+////			return Mono.empty();
+//        }).subscribe();
+//        System.out.println("finish");
+////assertTrue("Latch was counted down", latch.await(5, TimeUnit.SECONDS));
+//
+////        connectedClient.dispose();
+////        connectedServer.dispose();
+
+//class Person {
+//    int x;
+//
+//    public Person(int x) {
+//        this.x = x;
+//    }
+//
+//    public int getX() {
+//        return x;
+//    }
+//
+//    @Override
+//    public String toString() {
+//        return "Person{" +
+//                "x=" + x +
+//                '}';
+//    }
+//}
