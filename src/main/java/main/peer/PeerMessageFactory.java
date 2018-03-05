@@ -8,7 +8,6 @@ import java.nio.ByteBuffer;
 
 public class PeerMessageFactory {
     public static PeerMessage create(Peer from, Peer to, DataInputStream dataInputStream) throws IOException {
-
         final int messageLengthSize = 4;
         byte[] data1 = new byte[messageLengthSize];
         dataInputStream.readFully(data1);

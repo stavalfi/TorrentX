@@ -11,8 +11,8 @@ import reactor.core.publisher.FluxSink;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Optional;
@@ -32,34 +32,34 @@ public class PeersListener {
                 e.printStackTrace();
             }
             while (!this.listenToPeerConnection.isClosed() && !sink.isCancelled())
-                        try {
-                            Socket peerSocket = this.listenToPeerConnection.accept();
-                            // the following method will do sink.next if the connect operation succeed.
-                            acceptPeerConnection(peerSocket, sink);
-                        } catch (IOException e) {
-                            sink.error(e);
-                            try {
+                try {
+                    Socket peerSocket = this.listenToPeerConnection.accept();
+                    // the following method will do sink.next if the connect operation succeed.
+                    acceptPeerConnection(peerSocket, sink);
+                } catch (IOException e) {
+                    try {
                         this.listenToPeerConnection.close();
                     } catch (IOException e1) {
                         // TODO: do something with this shit
                         e1.printStackTrace();
                     }
+                    sink.error(e);
                 }
         }).subscribeOn(Schedulers.elastic())
                 .publish();
     }
 
     private void acceptPeerConnection(Socket peerSocket, FluxSink<PeersCommunicator> sink) {
-        OutputStream dataOutputStream = null;
+        DataOutputStream peerDataOutputStream = null;
         try {
-            dataOutputStream = peerSocket.getOutputStream();
+            peerDataOutputStream = new DataOutputStream(peerSocket.getOutputStream());
         } catch (IOException e) {
             sink.error(e);
             return;
         }
-        DataInputStream dataInputStream = null;
+        DataInputStream peerDataInputStream = null;
         try {
-            dataInputStream = new DataInputStream(peerSocket.getInputStream());
+            peerDataInputStream = new DataInputStream(peerSocket.getInputStream());
         } catch (IOException e) {
             sink.error(e);
             return;
@@ -68,7 +68,7 @@ public class PeersListener {
         // firstly, we need to receive Handshake message from the peer and send him Handshake back.
         HandShake handShakeReceived = null;
         try {
-            handShakeReceived = new HandShake(dataInputStream);
+            handShakeReceived = new HandShake(peerDataInputStream);
         } catch (IOException e) {
             sink.error(e);
             return;
@@ -81,8 +81,8 @@ public class PeersListener {
             // the peer sent me invalid HandShake message.
             // by the p2p spec, I need to close to the socket.
             try {
-                dataInputStream.close();
-                dataOutputStream.close();
+                peerDataInputStream.close();
+                peerDataOutputStream.close();
                 peerSocket.close();
             } catch (IOException exception) {
                 //TODO: do something with this shit.
@@ -93,14 +93,14 @@ public class PeersListener {
 
         HandShake handShakeSending = new HandShake(handShakeReceived.getTorrentInfoHash(), AppConfig.getInstance().getPeerId().getBytes());
         try {
-            dataOutputStream.write(handShakeSending.createPacketFromObject());
+            peerDataOutputStream.write(handShakeSending.createPacketFromObject());
         } catch (IOException e) {
             sink.error(e);
             return;
         }
         // all went well, I accept this connection.
         Peer peer = new Peer(peerSocket.getInetAddress().getHostAddress(), peerSocket.getPort());
-        sink.next(new PeersCommunicator(torrentInfo.get(), peer, peerSocket, dataInputStream));
+        sink.next(new PeersCommunicator(torrentInfo.get(), peer, peerSocket, peerDataInputStream, peerDataOutputStream));
     }
 
     private Optional<TorrentInfo> haveThisTorrent(String receivedTorrentInfoHash) {

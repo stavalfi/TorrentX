@@ -38,7 +38,7 @@ class TrackerCommunication {
                     if (request.getTransactionId() != response.getTransactionId() ||
                             request.getActionNumber() != response.getActionNumber())
                         sink.error(new BadResponseException("response's transaction-id is" +
-                            " not equal to the request's transaction-id."));
+                                " not equal to the request's transaction-id."));
                     else if (request.getActionNumber() != response.getActionNumber())
                         sink.error(new BadResponseException("response's action-number is" +
                                 " not equal to the request's action-number."));
@@ -92,12 +92,14 @@ class TrackerCommunication {
 
     private static Mono<DatagramSocket> sendRequestMono(DatagramPacket request) {
         return Mono.create(sink -> {
+            DatagramSocket clientSocket = null;
             try {
-                DatagramSocket clientSocket = new DatagramSocket();
+                clientSocket = new DatagramSocket();
                 clientSocket.send(request);
                 sink.success(clientSocket);
 
             } catch (IOException exception) {
+                clientSocket.close();
                 sink.error(exception);
             }
         });

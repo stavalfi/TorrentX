@@ -2,27 +2,28 @@ package main;
 
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
-import main.downloader.Downloader;
-import main.downloader.TorrentDownloader;
-import main.downloader.TorrentDownloaderImpl;
-import main.file.ActiveTorrent;
+import main.tracker.TrackerProvider;
 
 class App {
 
-    // TODO: get all signals which created after a stream disposed or canceled and free their resources!!!
 
     private static void f4() {
 
         TorrentInfo torrentInfo = getTorrentInfo();
-
-        ActiveTorrent activeTorrent = new ActiveTorrent(torrentInfo, null);
-        Downloader downloader = new Downloader(activeTorrent);
-        TorrentDownloader torrentDownloader = new TorrentDownloaderImpl(torrentInfo, downloader);
-
-        torrentDownloader.getPieceMessageResponseFlux()
-                .subscribe(System.out::println, System.out::println, System.out::println);
-
-        torrentDownloader.start();
+        new TrackerProvider(torrentInfo)
+                .connectToTrackersFlux()
+                .autoConnect()
+                .limitRequest(1)
+                .subscribe(System.out::println, Throwable::printStackTrace, () -> System.out.println("finish!!!!"));
+//
+//        ActiveTorrent activeTorrent = new ActiveTorrent(torrentInfo, null);
+//        Downloader downloader = new Downloader(activeTorrent);
+//        TorrentDownloader torrentDownloader = new TorrentDownloaderImpl(torrentInfo, downloader);
+//
+//        torrentDownloader.getPieceMessageResponseFlux()
+//                .subscribe(System.out::println, System.out::println, System.out::println);
+//
+//        torrentDownloader.start();
     }
 
     public static void main(String[] args) throws Exception {

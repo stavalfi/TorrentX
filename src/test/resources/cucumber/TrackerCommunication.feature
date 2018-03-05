@@ -10,6 +10,9 @@ Feature: test tracker api calls
       | Announce           |                 |
       | Scrape             |                 |
 
+    ##########################################
+  ##############################################
+    ### TODO: Need to fix the following tests:
 
   Scenario: communicating with collection of trackers which contain a not-responding trackers
     Given additional not-responding trackers to the tracker-list
@@ -18,7 +21,7 @@ Feature: test tracker api calls
       | Connect            |                 |
 
   Scenario: communicating with collection of trackers which contain invalid urls of trackers
-    Given additional invalid url of a tracker
+    Given only one invalid url of a tracker
     Then application send and receive the following messages from a random tracker:
       | trackerRequestType | errorSignalType      |
       | Connect            | UnknownHostException |

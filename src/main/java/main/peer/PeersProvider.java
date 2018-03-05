@@ -16,8 +16,8 @@ import reactor.core.publisher.MonoSink;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
@@ -35,10 +35,17 @@ public class PeersProvider {
     public Mono<PeersCommunicator> connectToPeerMono(Peer peer) {
         return Mono.create((MonoSink<PeersCommunicator> sink) -> {
             Socket peerSocket = new Socket();
+            sink.onCancel(() -> {
+                try {
+                    peerSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
             try {
                 peerSocket.connect(new InetSocketAddress(peer.getPeerIp(), peer.getPeerPort()), 1000 * 10);
                 DataInputStream receiveMessages = new DataInputStream(peerSocket.getInputStream());
-                OutputStream sendMessages = peerSocket.getOutputStream();
+                DataOutputStream sendMessages = new DataOutputStream(peerSocket.getOutputStream());
 
                 // firstly, we need to send Handshake message to the peer and receive Handshake back.
                 HandShake handShakeSending = new HandShake(HexByteConverter.hexToByte(this.torrentInfo.getTorrentInfoHash()), AppConfig.getInstance().getPeerId().getBytes());
@@ -56,17 +63,19 @@ public class PeersProvider {
                     return;
                 } else {
                     // all went well, I accept this connection.
-                    sink.success(new PeersCommunicator(this.torrentInfo, peer, peerSocket, receiveMessages));
+                    PeersCommunicator peersCommunicator = new PeersCommunicator(this.torrentInfo, peer,
+                            peerSocket, receiveMessages, sendMessages);
+                    sink.success(peersCommunicator);
                     return;
                 }
             } catch (IOException e) {
-                sink.error(e);
                 try {
                     peerSocket.close();
                 } catch (IOException e1) {
                     // TODO: do something with this shit
                     e1.printStackTrace();
                 }
+                sink.error(e);
             }
         }).subscribeOn(Schedulers.elastic())
                 .doOnError(PeerExceptions.communicationErrors, error -> {

@@ -5,9 +5,11 @@ import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.MonoSink;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.BitSet;
@@ -23,6 +25,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     private Flux<Double> peerDownloadSpeedFlux;
     private Flux<Double> peerUploadSpeedFlux;
     private FluxSink<PieceMessage> outGoingPiecesFluxSink;
+    private DataOutputStream peerDataOutputStream;
 
     // receive messages:
 
@@ -41,10 +44,8 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     private Flux<RequestMessage> requestMessageResponseFlux;
     private Flux<UnchokeMessage> unchokeMessageResponseFlux;
 
-    private boolean IWantToCloseConnection;
-
     public PeersCommunicator(TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
-                             DataInputStream dataInputStream) {
+                             DataInputStream dataInputStream, DataOutputStream peerDataOutputStream) {
         assert peerSocket != null;
         this.peer = peer;
         this.peerChokesMe = false;
@@ -53,7 +54,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
         this.torrentInfo = torrentInfo;
         this.peerPieces = new BitSet(torrentInfo.getPieces().size());
         this.me = new Peer("localhost", peerSocket.getLocalPort());
-        this.IWantToCloseConnection = false;
+        this.peerDataOutputStream = peerDataOutputStream;
 
         this.peerMessageResponseFlux =
                 Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, dataInputStream))
@@ -62,7 +63,6 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
                         // if not and we subscribe to this specific source multiple times then only the
                         // first subscription will be activated and the source will never end
                         .subscribeOn(Schedulers.elastic())
-
                         .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                         // there are multiple subscribers to this source (every specific peer-message flux).
                         // all of them must get the same message and not activate this source more then once.
@@ -139,13 +139,20 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
 
 
     private void listenForPeerMessages(FluxSink<PeerMessage> sink, DataInputStream dataInputStream) {
-        while (!sink.isCancelled() && !this.peerSocket.isClosed() && this.peerSocket.isConnected()) {
+        sink.onCancel(() -> {
+            try {
+                dataInputStream.close();
+                closeConnection();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+        boolean cancelled = sink.isCancelled();
+        while (!cancelled) {
             try {
                 PeerMessage peerMessage = PeerMessageFactory.create(this.peer, this.me, dataInputStream);
                 sink.next(peerMessage);
             } catch (IOException e) {
-                if (!this.IWantToCloseConnection) // only if it wasn't because of me.
-                    sink.error(e);
                 try {
                     dataInputStream.close();
                     closeConnection();
@@ -153,6 +160,8 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
                     // TODO: do something better... it's a fatal problem with my design!!!
                     e1.printStackTrace();
                 }
+                sink.error(e);
+                return;
             }
         }
     }
@@ -174,8 +183,8 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     }
 
     public void closeConnection() {
-        this.IWantToCloseConnection = true;
         try {
+            this.peerDataOutputStream.close();
             this.peerSocket.close();
         } catch (IOException exception) {
             // TODO: do something better... it's a fatal problem with my design!!!
@@ -184,13 +193,15 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     }
 
     private Mono<PeersCommunicator> send(PeerMessage peerMessage) {
-        try {
-            this.peerSocket.getOutputStream().write(peerMessage.createPacketFromObject());
-            return Mono.just(this);
-        } catch (IOException e) {
-            closeConnection();
-            return Mono.error(e);
-        }
+        return Mono.create((MonoSink<PeersCommunicator> monoSink) -> {
+            try {
+                this.peerDataOutputStream.write(peerMessage.createPacketFromObject());
+                monoSink.success(this);
+            } catch (IOException e) {
+                closeConnection();
+                monoSink.error(e);
+            }
+        }).onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
     }
 
     @Override
