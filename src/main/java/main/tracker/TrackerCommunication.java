@@ -20,12 +20,12 @@ class TrackerCommunication {
     private static Logger logger = LoggerFactory.getLogger(TrackerCommunication.class);
 
     public static <Request extends TrackerRequest, Response extends TrackerResponse>
-    Mono<Response> communicate(Request request, Function<ByteBuffer, Response> createResponse) {
-        return sendRequest(request)
+    Mono<Response> communicateMono(Request request, Function<ByteBuffer, Response> createResponse) {
+        return sendRequestMono(request)
                 // before we map to response bytes to response object, check if the response is ErrorResponse
                 // by actionNumber. If yes, create error-signal, else forward the signal.
                 .flatMap((DatagramSocket trackerSocket) ->
-                        receiveResponse(trackerSocket)
+                        receiveResponseMono(trackerSocket)
                                 .handle((ByteBuffer response, SynchronousSink<ByteBuffer> sink) -> {
                                     if (ErrorResponse.isErrorResponse(response.array())) {
                                         ErrorResponse errorResponse = new ErrorResponse(request.getTracker(), response.array());
@@ -38,11 +38,11 @@ class TrackerCommunication {
                     if (request.getTransactionId() != response.getTransactionId() ||
                             request.getActionNumber() != response.getActionNumber())
                         sink.error(new BadResponseException("response's transaction-id is" +
-                                " not equal to the request's transaction-id."));
-                    if (request.getActionNumber() != response.getActionNumber())
+                            " not equal to the request's transaction-id."));
+                    else if (request.getActionNumber() != response.getActionNumber())
                         sink.error(new BadResponseException("response's action-number is" +
                                 " not equal to the request's action-number."));
-                    sink.next(response);
+                    else sink.next(response);
                 })
                 .doOnError(TrackerExceptions.communicationErrors, error ->
                         logger.debug("error signal: (the application will maybe try to send" +
@@ -50,7 +50,7 @@ class TrackerCommunication {
                                 "\nerror message: " + error.getMessage() + ".\n" +
                                 "error type: " + error.getClass().getName()))
                 // the retry operation will run the first, ever created, publisher again
-                // which is defined in sendRequest method.
+                // which is defined in sendRequestMono method.
                 .retry(1, TrackerExceptions.communicationErrors)
                 .doOnError(TrackerExceptions.communicationErrors, error ->
                         logger.debug("error signal: (the application retried to send" +
@@ -64,17 +64,17 @@ class TrackerCommunication {
                                 "error type: " + error.getClass().getName()));
     }
 
-    private static <Request extends TrackerRequest> Mono<DatagramSocket> sendRequest(Request request) {
-        return makeRequest(request)
-                .flatMap(TrackerCommunication::sendRequest);
+    private static <Request extends TrackerRequest> Mono<DatagramSocket> sendRequestMono(Request request) {
+        return makeRequestMono(request)
+                .flatMap(TrackerCommunication::sendRequestMono);
     }
 
-    private static <Request extends TrackerRequest> Mono<DatagramPacket> makeRequest(Request request) {
+    private static <Request extends TrackerRequest> Mono<DatagramPacket> makeRequestMono(Request request) {
         return Mono.create(sink -> {
             try {
-                InetAddress trackerIp = InetAddress.getByName(request.getTracker().getTracker());
+                InetAddress trackerIp = InetAddress.getByName(request.getTracker().getTrackerUrl());
                 byte[] requestPacket = request.buildRequestPacket().array();
-                DatagramPacket datagramPacket = new DatagramPacket(requestPacket, requestPacket.length, trackerIp, request.getTracker().getPort());
+                DatagramPacket datagramPacket = new DatagramPacket(requestPacket, requestPacket.length, trackerIp, request.getTracker().getUdpPort());
                 sink.success(datagramPacket);
             } catch (UnknownHostException ex) {
                 // copy the exception details and add the request information
@@ -90,7 +90,7 @@ class TrackerCommunication {
         });
     }
 
-    private static Mono<DatagramSocket> sendRequest(DatagramPacket request) {
+    private static Mono<DatagramSocket> sendRequestMono(DatagramPacket request) {
         return Mono.create(sink -> {
             try {
                 DatagramSocket clientSocket = new DatagramSocket();
@@ -103,7 +103,7 @@ class TrackerCommunication {
         });
     }
 
-    private static Mono<ByteBuffer> receiveResponse(DatagramSocket trackerSocket) {
+    private static Mono<ByteBuffer> receiveResponseMono(DatagramSocket trackerSocket) {
         return Mono.create(sink -> {
             try {
                 byte[] receiveData = new byte[1000];

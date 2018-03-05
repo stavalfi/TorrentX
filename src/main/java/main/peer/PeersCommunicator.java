@@ -62,6 +62,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
                         // if not and we subscribe to this specific source multiple times then only the
                         // first subscription will be activated and the source will never end
                         .subscribeOn(Schedulers.elastic())
+
                         .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                         // there are multiple subscribers to this source (every specific peer-message flux).
                         // all of them must get the same message and not activate this source more then once.

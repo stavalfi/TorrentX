@@ -52,17 +52,17 @@
   \begin{flushleft}
 
     BitTorrent is a peer-to-peer protocol, which means that the computers in a BitTorrent “swarm” (a group of computers downloading and uploading the same torrent) transfer data between each other without the need for a central server, where all the information passes through a particular server.
-    The tracker server keeps track of where file copies reside on peer machines, which ones are available at the time of the clients request, and helps coordinate efficient transmission and reassembly of the copied file.
+    The trackerUrl server keeps track of where file copies reside on peer machines, which ones are available at the time of the clients request, and helps coordinate efficient transmission and reassembly of the copied file.
 
   \end{flushleft}
   \begin{flushleft}
 
-    A server who is responsible for saving the leechers (threads which  are attempting to download a torrent) and seeders (leechers who finished downloading the torrent) information is called a tracker. When a new leecher wants to download, it sends a request to one of the available trackers in the torrent file and asks for all the peers (leechers and seeders). This request is called announcement.
+    A server who is responsible for saving the leechers (threads which  are attempting to download a torrent) and seeders (leechers who finished downloading the torrent) information is called a trackerUrl. When a new leecher wants to download, it sends a request to one of the available trackers in the torrent file and asks for all the peers (leechers and seeders). This request is called announcement.
 
   \end{flushleft}
   \begin{flushleft}
 
-    It is important to note that the tracker is referring to every peer by peer-public-ip.
+    It is important to note that the trackerUrl is referring to every peer by peer-public-ip.
 
   \end{flushleft}
   \begin{flushleft}
@@ -72,7 +72,7 @@
   \end{flushleft}
   \begin{flushleft}
 
-    Once a leecher is getting a response from the tracker about a request to a specific torrent's peer list, the leecher's BitTorrent client software downloads the pieces of the files. Each file in the torrent is divided into small information chunks called pieces. Each piece in the torrent has a same size except the last piece. A piece size is defined in the torrent file. All in all, We can conclude that peers exchange piece of multiple torrents concurrently in a distributed system.
+    Once a leecher is getting a response from the trackerUrl about a request to a specific torrent's peer list, the leecher's BitTorrent client software downloads the pieces of the files. Each file in the torrent is divided into small information chunks called pieces. Each piece in the torrent has a same size except the last piece. A piece size is defined in the torrent file. All in all, We can conclude that peers exchange piece of multiple torrents concurrently in a distributed system.
 
   \end{flushleft}
 
@@ -154,9 +154,9 @@
   \end{flushleft}
   \begin{flushleft}
 
-    Because multiple machines listen to the same port in the same network, we need to be able to get a response from the WAN to the LAN. In short, \textbf{NAT} is a method of remapping a public IP address and a port number to a private ip address and a port number and vice versa. The majority of NATs map multiple private hosts to one publicly exposed IP address. In a typical configuration, a local network uses one of the designated private IP addresses. A router on that network has a private address in that address space. The router is also connected to the Internet with a public address. As traffic passes from the local network to the Internet, the source address in each packet is translated on the fly from a private address to the public address. The router tracks basic data about each active connection (particularly the destination address and port). When a reply returns to the router, it uses the connection tracking data it stored during The outbound phase to determine the private address on the internal network to which to forward the reply. the system works fine until you want to give people on the outside Internet access to files. When they try to reach the computer through the public IP address they actually reach the router and the router doesn't know how to forward the connection to the appropriate computer, this way a leecher can not find the computer that has the file unless it's been told how to do so.
+    Because multiple machines listen to the same udpPort in the same network, we need to be able to get a response from the WAN to the LAN. In short, \textbf{NAT} is a method of remapping a public IP address and a udpPort number to a private ip address and a udpPort number and vice versa. The majority of NATs map multiple private hosts to one publicly exposed IP address. In a typical configuration, a local network uses one of the designated private IP addresses. A router on that network has a private address in that address space. The router is also connected to the Internet with a public address. As traffic passes from the local network to the Internet, the source address in each packet is translated on the fly from a private address to the public address. The router tracks basic data about each active connection (particularly the destination address and udpPort). When a reply returns to the router, it uses the connection tracking data it stored during The outbound phase to determine the private address on the internal network to which to forward the reply. the system works fine until you want to give people on the outside Internet access to files. When they try to reach the computer through the public IP address they actually reach the router and the router doesn't know how to forward the connection to the appropriate computer, this way a leecher can not find the computer that has the file unless it's been told how to do so.
 
-    A Bittorrent client application listens to a specific port in every machine. To be able to add this port to the NAT in its router, one must use \textbf{universal plug in play (UPnP)} to avoid manually adding a port and a IP address to the NAT. The UPNP is a way to configure the NAT in any programming language. Telling the router which computer to forward a connection to is called \textbf{port forwarding}, each server based application has a port number it works through, its port number is very useful in giving the router the information it needs to forward a connection.
+    A Bittorrent client application listens to a specific udpPort in every machine. To be able to add this udpPort to the NAT in its router, one must use \textbf{universal plug in play (UPnP)} to avoid manually adding a udpPort and a IP address to the NAT. The UPNP is a way to configure the NAT in any programming language. Telling the router which computer to forward a connection to is called \textbf{udpPort forwarding}, each server based application has a udpPort number it works through, its udpPort number is very useful in giving the router the information it needs to forward a connection.
 
   \end{flushleft}
 
@@ -213,7 +213,7 @@
   \end{flushleft}
   \section*{Sources}
   \begin{flushleft}
-    1. \href{http://www.rasterbar.com/products/libtorrent/udp_tracker_protocol.html}{udp tracker protocol}
+    1. \href{http://www.rasterbar.com/products/libtorrent/udp_tracker_protocol.html}{udp trackerUrl protocol}
 
 
     2. \href{https://wiki.theory.org/index.php/BitTorrentSpecification}{Bit Torrent Specification}

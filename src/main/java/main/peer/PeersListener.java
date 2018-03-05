@@ -20,11 +20,11 @@ import java.util.Optional;
 public class PeersListener {
     private Integer tcpPort = 80;
     private ServerSocket listenToPeerConnection;
-    private ConnectableFlux<PeersCommunicator> allPeersCommunicatorFlux;
+    private ConnectableFlux<PeersCommunicator> peersConnectedToMeFlux;
 
     private PeersListener() {
 
-        this.allPeersCommunicatorFlux = Flux.create((FluxSink<PeersCommunicator> sink) -> {
+        this.peersConnectedToMeFlux = Flux.create((FluxSink<PeersCommunicator> sink) -> {
             try {
                 this.listenToPeerConnection = new ServerSocket(this.tcpPort);
             } catch (IOException e) {
@@ -32,13 +32,13 @@ public class PeersListener {
                 e.printStackTrace();
             }
             while (!this.listenToPeerConnection.isClosed() && !sink.isCancelled())
-                try {
-                    Socket peerSocket = this.listenToPeerConnection.accept();
-                    // the following method will do sink.next if the connect operation succeed.
-                    acceptPeerConnection(peerSocket, sink);
-                } catch (IOException e) {
-                    sink.error(e);
-                    try {
+                        try {
+                            Socket peerSocket = this.listenToPeerConnection.accept();
+                            // the following method will do sink.next if the connect operation succeed.
+                            acceptPeerConnection(peerSocket, sink);
+                        } catch (IOException e) {
+                            sink.error(e);
+                            try {
                         this.listenToPeerConnection.close();
                     } catch (IOException e1) {
                         // TODO: do something with this shit
@@ -120,5 +120,9 @@ public class PeersListener {
 
     public static PeersListener getInstance() {
         return instance;
+    }
+
+    public ConnectableFlux<PeersCommunicator> getPeersConnectedToMeFlux() {
+        return peersConnectedToMeFlux;
     }
 }

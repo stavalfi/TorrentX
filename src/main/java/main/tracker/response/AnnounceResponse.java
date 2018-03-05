@@ -21,13 +21,13 @@ public class AnnounceResponse extends TrackerResponse {
     private final int seedersAmount;
     private final List<Peer> peers;
 
-    public Flux<Peer> getPeers() {
+    public Flux<Peer> getPeersFlux() {
         return Flux.fromStream(peers.stream());
     }
 
     /**
      * Offset      Size            Name            Value
-     * 0           32-bit integer  action          1 // scrape
+     * 0           32-bit integer  action          1 // scrapeMono
      * 4           32-bit integer  transaction_id
      * 8           32-bit integer  interval
      * 12          32-bit integer  leechersAmount

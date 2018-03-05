@@ -32,7 +32,7 @@ public class PeersProvider {
         this.trackerProvider = trackerProvider;
     }
 
-    public Mono<PeersCommunicator> connectToPeer(Peer peer) {
+    public Mono<PeersCommunicator> connectToPeerMono(Peer peer) {
         return Mono.create((MonoSink<PeersCommunicator> sink) -> {
             Socket peerSocket = new Socket();
             try {
@@ -80,23 +80,22 @@ public class PeersProvider {
                 .onErrorResume(PeerExceptions.communicationErrors, error -> Mono.empty());
     }
 
-    public Flux<PeersCommunicator> connectToPeers(TrackerConnection trackerConnection) {
-        return trackerConnection.announce(torrentInfo.getTorrentInfoHash(), PeersListener.getInstance().getTcpPort())
+    public Flux<Peer> connectToPeers(TrackerConnection trackerConnection) {
+        return trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), PeersListener.getInstance().getTcpPort())
                 .flux()
-                .flatMap(AnnounceResponse::getPeers)
-                .distinct()
-                .flatMap((Peer peer) -> connectToPeer(peer))
-
-                .doOnNext(peersCommunicator -> System.out.println("connected to peer: " + peersCommunicator.toString()));
+                .flatMap(AnnounceResponse::getPeersFlux);
     }
 
     public Flux<PeersCommunicator> connectToPeers(Flux<TrackerConnection> trackerConnectionFlux) {
         return trackerConnectionFlux
-                .flatMap(trackerConnection -> connectToPeers(trackerConnection));
+                .flatMap(trackerConnection -> connectToPeers(trackerConnection))
+                .distinct()
+                .flatMap((Peer peer) -> connectToPeerMono(peer))
+                .doOnNext(peersCommunicator -> System.out.println("connected to peer: " + peersCommunicator.toString()));
     }
 
     public Flux<PeersCommunicator> connectToPeers() {
-        return connectToPeers(this.trackerProvider.connectToTrackers());
+        return connectToPeers(this.trackerProvider.connectToTrackersFlux());
     }
 
     public TorrentInfo getTorrentInfo() {

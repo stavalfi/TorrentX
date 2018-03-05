@@ -105,7 +105,7 @@ public abstract class TorrentDownloader implements DownloadControl, ReceivePeerM
     public TorrentDownloader(TorrentInfo torrentInfo, Downloader downloader, TrackerProvider trackerProvider) {
         this(torrentInfo,
                 downloader,
-                trackerProvider.connectToTrackers(),
+                trackerProvider.connectToTrackersFlux(),
                 new PeersProvider(torrentInfo, trackerProvider),
                 trackerProvider);
     }

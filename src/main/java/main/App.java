@@ -52,12 +52,12 @@ class App {
 
 
 //    torrent hash: af1f3dbc5d5baeaf83f812e06aa91bbd7b55cce8
-//    udp://tracker.coppersurfer.tk:6969/scrape
-//    udp://9.rarbg.com:2710/scrape
+//    udp://tracker.coppersurfer.tk:6969/scrapeMono
+//    udp://9.rarbg.com:2710/scrapeMono
 //    udp://p4p.arenabg.com:1337
 //    udp://tracker.leechers-paradise.org:6969
 //    udp://tracker.internetwarriors.net:1337
-//    udp://tracker.opentrackr.org:1337/scrape
+//    udp://tracker.opentrackr.org:1337/scrapeMono
 
 //    Peer(ipAddress=35.160.55.32, tcpPort=8104)
 //    Peer(ipAddress=52.59.116.245, tcpPort=8114)

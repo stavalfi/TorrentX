@@ -11,10 +11,7 @@ import main.peer.PeersListener;
 import main.peer.PeersProvider;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
-import main.tracker.BadResponseException;
-import main.tracker.Tracker;
-import main.tracker.TrackerConnection;
-import main.tracker.TrackerProvider;
+import main.tracker.*;
 import main.tracker.response.TrackerResponse;
 import org.mockito.Mockito;
 import reactor.core.publisher.ConnectableFlux;
@@ -73,7 +70,7 @@ public class MyStepdefs {
         this.torrentInfo.getTrackerList()
                 .stream()
                 .findFirst()
-                .ifPresent(tracker -> fakeTrackers.add(new Tracker("udp", tracker.getTracker(), tracker.getPort() + 1))); // wrong port
+                .ifPresent(tracker -> fakeTrackers.add(new Tracker("udp", tracker.getTrackerUrl(), tracker.getUdpPort() + 1))); // wrong port
 
         List<Tracker> trackers = new LinkedList<>();
         trackers.addAll(fakeTrackers);
@@ -99,17 +96,17 @@ public class MyStepdefs {
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
         PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider);
 
-        Mono<PeersCommunicator> peersCommunicatorFlux =
-                trackerProvider.connectToTrackers()
-                        .refCount(1)
-                        .flatMap(trackerConnection -> peersProvider.connectToPeers(trackerConnection))
-                        .take(1)
-                        .single();
+//        Mono<PeersCommunicator> peersCommunicatorFlux =
+//                trackerProvider.connectToTrackersFlux()
+//                        .refCount(1)
+//                        .flatMap(trackerConnection -> peersProvider.connectToPeers(trackerConnection))
+//                        .take(1)
+//                        .single();
 
-        StepVerifier.create(peersCommunicatorFlux)
-                .expectNextCount(1)
-                .expectComplete()
-                .verify();
+//        StepVerifier.create(peersCommunicatorFlux)
+//                .expectNextCount(1)
+//                .expectComplete()
+//                .verify();
     }
 
     @Then("^application send and receive the following messages from a random tracker:$")
@@ -122,33 +119,27 @@ public class MyStepdefs {
                     " (we are not using it in the tests but " +
                     "it should be there before any other request).");
 
-        // if I get an errorSignal signal containing one of those errors,
-        // then I will communicate with the next tracker in the tracker-list.
-        Predicate<Throwable> communicationErrorsToIgnore = (Throwable error) ->
-                error instanceof SocketTimeoutException ||
-                        error instanceof BadResponseException;
-
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
 
         Flux<TrackerResponse> actualTrackerResponseFlux =
-                trackerProvider.connectToTrackers()
-                        .refCount(1)
+                trackerProvider.connectToTrackersFlux()
+                        .autoConnect()
                         .log()
                         .flatMap(trackerConnection ->
                                 Flux.fromIterable(messages)
                                         .filter(fakeMessage -> fakeMessage.getTrackerRequestType() != TrackerRequestType.Connect)
-                                        // given a tracker, communicate with him and get the signal containing the response.
+                                        // given a tracker, communicateMono with him and get the signal containing the response.
                                         .flatMap(messageWeNeedToSend -> {
                                             switch (messageWeNeedToSend.getTrackerRequestType()) {
                                                 case Announce:
-                                                    return trackerConnection.announce(this.torrentInfo.getTorrentInfoHash(),
+                                                    return trackerConnection.announceMono(this.torrentInfo.getTorrentInfoHash(),
                                                             PeersListener.getInstance().getTcpPort());
                                                 case Scrape:
-                                                    return trackerConnection.scrape(Collections.singletonList(this.torrentInfo.getTorrentInfoHash()));
+                                                    return trackerConnection.scrapeMono(Collections.singletonList(this.torrentInfo.getTorrentInfoHash()));
                                                 default:
                                                     throw new IllegalArgumentException(messageWeNeedToSend.getTrackerRequestType().toString());
                                             }
-                                        }).onErrorResume(communicationErrorsToIgnore, error -> Mono.empty()))
+                                        }).onErrorResume(TrackerExceptions.communicationErrors, error -> Mono.empty()))
                         // unimportant note: take is an operation which send "cancel"
                         // signal if the flux contain more elements then we want.
                         .take(messages.size() - 1);
@@ -181,7 +172,7 @@ public class MyStepdefs {
         PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider);
 
         Mono<PeersCommunicator> peersCommunicatorMono = peersProvider
-                .connectToPeer(remoteFakePeer)
+                .connectToPeerMono(remoteFakePeer)
                 .cache();
 
         // send all messages
@@ -245,8 +236,11 @@ public class MyStepdefs {
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
         PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider);
 
-        ConnectableFlux<TrackerConnection> trackerConnectionConnectableFlux = trackerProvider.connectToTrackers();
-        Flux<PeersCommunicator> peersCommunicatorFlux = peersProvider.connectToPeers(trackerConnectionConnectableFlux.autoConnect());
+        Flux<TrackerConnection> trackerConnectionConnectableFlux =
+                trackerProvider.connectToTrackersFlux()
+                        .autoConnect();
+        Flux<PeersCommunicator> peersCommunicatorFlux =
+                peersProvider.connectToPeers(trackerConnectionConnectableFlux);
 
         int requestBlockSize = 16000;
 
@@ -255,7 +249,8 @@ public class MyStepdefs {
                 .flatMap(peersCommunicator ->
                         peersCommunicator.getHaveMessageResponseFlux()
                                 .flatMap(haveMessage ->
-                                        peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
+                                        peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(),
+                                                0, requestBlockSize)))
                 .flatMap(PeersCommunicator::getPieceMessageResponseFlux)
                 .take(1)
                 .single();
