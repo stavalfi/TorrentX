@@ -11,10 +11,12 @@ import main.peer.PeersListener;
 import main.peer.PeersProvider;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
-import main.tracker.*;
+import main.tracker.Tracker;
+import main.tracker.TrackerConnection;
+import main.tracker.TrackerExceptions;
+import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
 import org.mockito.Mockito;
-import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
@@ -22,9 +24,7 @@ import reactor.test.StepVerifier;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.net.SocketTimeoutException;
 import java.util.*;
-import java.util.function.Predicate;
 
 import static org.mockito.Mockito.mock;
 
@@ -96,17 +96,17 @@ public class MyStepdefs {
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
         PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider);
 
-//        Mono<PeersCommunicator> peersCommunicatorFlux =
-//                trackerProvider.connectToTrackersFlux()
-//                        .refCount(1)
-//                        .flatMap(trackerConnection -> peersProvider.connectToPeers(trackerConnection))
-//                        .take(1)
-//                        .single();
+        Mono<PeersCommunicator> peersCommunicatorFlux =
+                trackerProvider.connectToTrackersFlux()
+                        .refCount(1)
+                        .transform(trackerConnectionFlux -> peersProvider.getPeersFromTrackerFlux(trackerConnectionFlux))
+                        .limitRequest(1)
+                        .single();
 
-//        StepVerifier.create(peersCommunicatorFlux)
-//                .expectNextCount(1)
-//                .expectComplete()
-//                .verify();
+        StepVerifier.create(peersCommunicatorFlux)
+                .expectNextCount(1)
+                .expectComplete()
+                .verify();
     }
 
     @Then("^application send and receive the following messages from a random tracker:$")
@@ -142,7 +142,7 @@ public class MyStepdefs {
                                         }).onErrorResume(TrackerExceptions.communicationErrors, error -> Mono.empty()))
                         // unimportant note: take is an operation which send "cancel"
                         // signal if the flux contain more elements then we want.
-                        .take(messages.size() - 1);
+                        .limitRequest(messages.size() - 1);
 
         // check the responses
         // check if there is an **expected** error signal:
@@ -240,7 +240,7 @@ public class MyStepdefs {
                 trackerProvider.connectToTrackersFlux()
                         .autoConnect();
         Flux<PeersCommunicator> peersCommunicatorFlux =
-                peersProvider.connectToPeers(trackerConnectionConnectableFlux);
+                peersProvider.getPeersFromTrackerFlux(trackerConnectionConnectableFlux);
 
         int requestBlockSize = 16000;
 
@@ -252,7 +252,7 @@ public class MyStepdefs {
                                         peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(),
                                                 0, requestBlockSize)))
                 .flatMap(PeersCommunicator::getPieceMessageResponseFlux)
-                .take(1)
+                .limitRequest(1)
                 .single();
 
         StepVerifier.create(receiveSingleBlockMono)

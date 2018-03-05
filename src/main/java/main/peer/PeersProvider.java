@@ -70,7 +70,7 @@ public class PeersProvider {
             }
         }).subscribeOn(Schedulers.elastic())
                 .doOnError(PeerExceptions.communicationErrors, error -> {
-                    System.out.println("failed to connect to peer: " + peer.toString() + ", reason: " + error.getClass().getName());
+                    System.out.println("failed to connect to peer: " + peer.toString() + ", reason: " + error.getClass().getName() + ", error message: " + error.getMessage());
                     logger.debug("error signal: (the application failed to connect to a peer." +
                             " the application will try to connect to the next available peer).\n" +
                             "peer: " + peer.toString() + "\n" +
@@ -80,22 +80,22 @@ public class PeersProvider {
                 .onErrorResume(PeerExceptions.communicationErrors, error -> Mono.empty());
     }
 
-    public Flux<Peer> connectToPeers(TrackerConnection trackerConnection) {
+    public Flux<Peer> getPeersFromTrackerFlux(TrackerConnection trackerConnection) {
         return trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), PeersListener.getInstance().getTcpPort())
                 .flux()
                 .flatMap(AnnounceResponse::getPeersFlux);
     }
 
-    public Flux<PeersCommunicator> connectToPeers(Flux<TrackerConnection> trackerConnectionFlux) {
+    public Flux<PeersCommunicator> getPeersFromTrackerFlux(Flux<TrackerConnection> trackerConnectionFlux) {
         return trackerConnectionFlux
-                .flatMap(trackerConnection -> connectToPeers(trackerConnection))
+                .flatMap(trackerConnection -> getPeersFromTrackerFlux(trackerConnection))
                 .distinct()
                 .flatMap((Peer peer) -> connectToPeerMono(peer))
                 .doOnNext(peersCommunicator -> System.out.println("connected to peer: " + peersCommunicator.toString()));
     }
 
-    public Flux<PeersCommunicator> connectToPeers() {
-        return connectToPeers(this.trackerProvider.connectToTrackersFlux());
+    public Flux<PeersCommunicator> getPeersFromTrackerFlux() {
+        return getPeersFromTrackerFlux(this.trackerProvider.connectToTrackersFlux());
     }
 
     public TorrentInfo getTorrentInfo() {
