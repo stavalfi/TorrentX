@@ -1,15 +1,14 @@
 package com.steps;
 
-import com.utils.PeerFakeRequestResponse;
-import com.utils.TrackerFakeRequestResponseMessage;
-import com.utils.TrackerRequestType;
-import com.utils.Utils;
+import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import main.TorrentInfo;
+import main.peer.Peer;
 import main.peer.PeersCommunicator;
 import main.peer.PeersListener;
 import main.peer.PeersProvider;
+import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.tracker.Tracker;
 import main.tracker.TrackerConnection;
@@ -23,6 +22,8 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.mockito.Mockito.mock;
 
@@ -32,14 +33,14 @@ public class MyStepdefs {
         Hooks.onOperatorDebug();
     }
 
-    private String torrentFilePath;
     private TorrentInfo torrentInfo = mock(TorrentInfo.class);
 
     @Given("^new torrent file: \"([^\"]*)\"$")
     public void newTorrentFile(String torrentFileName) throws Throwable {
-        this.torrentFilePath = torrentFileName;
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
 
+        Mockito.when(this.torrentInfo.getTorrentFilePath())
+                .thenReturn(torrentInfo.getTorrentFilePath());
         Mockito.when(this.torrentInfo.getTorrentInfoHash())
                 .thenReturn(torrentInfo.getTorrentInfoHash());
         Mockito.when(this.torrentInfo.getTrackerList())
@@ -69,10 +70,6 @@ public class MyStepdefs {
 
     @Given("^only one invalid url of a tracker$")
     public void additionalInvalidUrlOfATrackerOf() throws Throwable {
-        TorrentInfo torrentInfo = Utils.readTorrentFile(this.torrentFilePath);
-        String torrentHashInfo = torrentInfo.getTorrentInfoHash();
-        Mockito.when(this.torrentInfo.getTorrentInfoHash())
-                .thenReturn(torrentHashInfo);
         Mockito.when(this.torrentInfo.getTrackerList())
                 .thenReturn(Collections.singletonList(new Tracker("udp", "invalid.url.123", 123)));
     }
@@ -84,9 +81,9 @@ public class MyStepdefs {
 
         Mono<PeersCommunicator> peersCommunicatorFlux =
                 trackerProvider.connectToTrackersFlux()
-                        .refCount(1)
-                        .transform(trackerConnectionFlux -> peersProvider.getPeersFromTrackerFlux(trackerConnectionFlux))
-                        .limitRequest(1)
+                        .autoConnect()
+                        .transform(trackerConnectionFlux -> peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionFlux))
+                        .take(1)
                         .single();
 
         StepVerifier.create(peersCommunicatorFlux)
@@ -103,33 +100,12 @@ public class MyStepdefs {
         if (isMessagesFormatGood)
             throw new IllegalArgumentException("messages list must contain `connect` request" +
                     " (we are not using it in the tests but " +
-                    "it should be there before any other request).");
-
-        // check the responses
-        // check if there is an **expected** error signal:
-        Optional<TrackerFakeRequestResponseMessage> expectedErrorSignal = messages
-                .stream()
-                .filter(message -> message.getErrorSignalType() != null)
-                .findAny();
+                    "it should be there before any other request for readability of the scenario).");
 
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
 
-        if (messages.size() == 1) {
-            if (expectedErrorSignal.isPresent())
-                StepVerifier.create(trackerProvider.connectToTrackersFlux().autoConnect().limitRequest(1))
-                        .expectError(expectedErrorSignal.get().getErrorSignalType().getErrorSignal())
-                        .verify();
-            else
-                StepVerifier.create(trackerProvider.connectToTrackersFlux().autoConnect().limitRequest(1))
-                        .expectNextCount(1)
-                        .expectComplete()
-                        .verify();
-            return;
-        }
-
         Flux<TrackerResponse> actualTrackerResponseFlux = trackerProvider.connectToTrackersFlux()
                 .autoConnect()
-                .doOnNext(trackerConnection -> System.out.println("connected to tracker: " + trackerConnection))
                 .flatMap(trackerConnection ->
                         Flux.fromIterable(messages)
                                 .filter(fakeMessage -> fakeMessage.getTrackerRequestType() != TrackerRequestType.Connect)
@@ -145,8 +121,18 @@ public class MyStepdefs {
                                             throw new IllegalArgumentException(messageWeNeedToSend.getTrackerRequestType().toString());
                                     }
                                 }).onErrorResume(TrackerExceptions.communicationErrors, error -> Mono.empty()))
-                .limitRequest(messages.size() - 1);
+                // we take one less because we won't get connectResponse here. We got it inside
+                // trackerProvider.connectToTrackersFlux() for each tracker we tried to connect to.
+                .take(messages.size() - 1);
 
+        // check the responses
+        // check if there is an **expected** error signal:
+        Optional<TrackerFakeRequestResponseMessage> expectedErrorSignal = messages
+                .stream()
+                .filter(message -> message.getErrorSignalType() != null)
+                .findAny();
+
+        // we expect to get error signal before any next signal!!! the scenario must support it!
         if (expectedErrorSignal.isPresent())
             StepVerifier.create(actualTrackerResponseFlux)
                     .expectError(expectedErrorSignal.get().getErrorSignalType().getErrorSignal())
@@ -161,60 +147,56 @@ public class MyStepdefs {
     @Then("^application send to \\[peer ip: \"([^\"]*)\", peer port: \"([^\"]*)\"\\] and receive the following messages:$")
     public void applicationSendToPeerIpPeerPortAndReceiveTheFollowingMessages(String peerIp, int peerPort,
                                                                               List<PeerFakeRequestResponse> peerFakeRequestResponses) throws Throwable {
-//        RemoteFakePeer remoteFakePeer = new RemoteFakePeer(new Peer(peerIp, peerPort));
-//        remoteFakePeer.listen();
-//
-//        TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
-//        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider);
-//
-//        Mono<PeersCommunicator> peersCommunicatorMono = peersProvider
-//                .connectToPeerMono(remoteFakePeer)
-//                .cache();
-//
-//        // send all messages
-//        Flux<PeersCommunicator> peerRequestsFlux = Flux.fromIterable(peerFakeRequestResponses)
-//                .map(PeerFakeRequestResponse::getSendMessageType)
-//                .flatMap(peerRequestMessage -> peersCommunicatorMono.flux()
-//                        .flatMap(peersCommunicator -> Utils.sendFakeMessage(peerRequestMessage, peersCommunicator)));
-//
-//        // check that all the messages sent successfully.
-//        StepVerifier.create(peerRequestsFlux)
-//                .expectNextCount(peerFakeRequestResponses.size())
-//                .verifyComplete();
-//
-//        // receive all responses from peers.
-//        Flux<PeerMessage> peersResponses = peersCommunicatorMono.flux()
-//                .flatMap(PeersCommunicator::getPeerMessageResponseFlux);
-//
-//        // check if we expect an error signal.
-//        Optional<ErrorSignalType> errorSignalType = peerFakeRequestResponses.stream()
-//                .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() != null)
-//                .map(PeerFakeRequestResponse::getErrorSignalType)
-//                .findAny();
-//
-//        // check if we expect a complete signal
-//        Optional<PeerFakeRequestResponse> completeSignal = peerFakeRequestResponses.stream()
-//                .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
-//                        peerFakeRequestResponse.getReceiveMessageType() == null)
-//                .findAny();
-//
-//        if (completeSignal.isPresent())
-//            StepVerifier.create(peersResponses)
-//                    .expectNextCount(peerFakeRequestResponses.size() - 1)
-//                    .expectComplete()
-//                    .verify();
-//        else if (errorSignalType.isPresent())
-//            StepVerifier.create(peersResponses)
-//                    .expectNextCount(peerFakeRequestResponses.size() - 1)
-//                    .expectError(errorSignalType.get().getErrorSignal())
-//                    .verify();
-//        else
-//            StepVerifier.create(peersResponses.take(peerFakeRequestResponses.size()))
-//                    .expectNextCount(peerFakeRequestResponses.size())
-//                    .verifyComplete();
-//
-//        peersCommunicatorMono.subscribe(PeersCommunicator::closeConnection);
-//        remoteFakePeer.shutdown();
+        RemoteFakePeer remoteFakePeer = new RemoteFakePeer(new Peer(peerIp, peerPort));
+        remoteFakePeer.listen();
+
+        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, new TrackerProvider(this.torrentInfo));
+
+        List<PeerMessageType> peerMessageTypeList = peerFakeRequestResponses.stream()
+                .map(PeerFakeRequestResponse::getSendMessageType)
+                .collect(Collectors.toList());
+
+        // check if we expect an error signal.
+        Optional<ErrorSignalType> errorSignalType = peerFakeRequestResponses.stream()
+                .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() != null)
+                .map(PeerFakeRequestResponse::getErrorSignalType)
+                .findAny();
+
+        // check if we expect a complete signal
+        Optional<PeerFakeRequestResponse> completeSignal = peerFakeRequestResponses.stream()
+                .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
+                        peerFakeRequestResponse.getReceiveMessageType() == null)
+                .findAny();
+
+        Mono<Object[]> peerResponsesMono = peersProvider.connectToPeerMono(remoteFakePeer)
+                .flatMap(peersCommunicator -> {
+                    List<Mono<PeersCommunicator>> sendPeerMessageMonoStream = peerMessageTypeList.stream()
+                            .map(peerRequestMessage -> Utils.sendFakeMessage(peersCommunicator, peerRequestMessage))
+                            .collect(Collectors.toList());
+                    return Mono.zip(sendPeerMessageMonoStream, peersCommunicators -> peersCommunicator);
+                })
+                .flux()
+                .flatMap(peersCommunicator -> {
+                    List<Flux<? extends PeerMessage>> peerMessageFluxList = peerMessageTypeList.stream()
+                            .map(peerMessageType -> Utils.getSpecificMessageResponseFluxByMessageType(peersCommunicator, peerMessageType))
+                            .collect(Collectors.toList());
+                    int listSize = peerMessageFluxList.size();
+                    if (completeSignal.isPresent())
+                        // we won't get any response for the last flux so we won't listen to it.
+                        return Flux.zip(peerMessageFluxList.subList(0, listSize - 2), Function.identity())
+                                .doOnNext(peerResponses -> peersCommunicator.closeConnection());
+                    // there will be an error signal or only next signals. either way, we will listen to all fluxes.
+                    return Flux.zip(peerMessageFluxList, Function.identity())
+                            .doOnNext(peerResponses -> peersCommunicator.closeConnection());
+                })
+                .take(1)
+                .single();
+
+        StepVerifier.create(peerResponsesMono)
+                .expectNextCount(1)
+                .verifyComplete();
+
+        remoteFakePeer.shutdown();
     }
 
     @Then("^application interested in all peers$")
@@ -234,28 +216,23 @@ public class MyStepdefs {
 
         Flux<TrackerConnection> trackerConnectionConnectableFlux =
                 trackerProvider.connectToTrackersFlux()
-                        .autoConnect(2);
-        Flux<PeersCommunicator> peersCommunicatorFlux =
-                peersProvider.getPeersFromTrackerFlux(trackerConnectionConnectableFlux);
-
+                        .autoConnect(1);
 
         int requestBlockSize = 16000;
 
-
-        Mono<PieceMessage> receiveSingleBlockMono = peersCommunicatorFlux
+        Mono<AbstractMap.SimpleImmutableEntry<PeersCommunicator, PieceMessage>> receiveSingleBlockMono = peersProvider
+                .getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                 .flatMap(peersCommunicator -> peersCommunicator.sendInterestedMessage())
-                .flatMap(peersCommunicator ->
-                        peersCommunicator.getHaveMessageResponseFlux()
-                                .flatMap(haveMessage ->
-                                        peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(),
-                                                0, requestBlockSize)))
-                .flatMap(PeersCommunicator::getPieceMessageResponseFlux)
-                .doOnEach(something -> System.out.println("1: " + something))
-                .limitRequest(1)
+                .flatMap(peersCommunicator -> peersCommunicator.getHaveMessageResponseFlux()
+                        .take(1)
+                        .flatMap(haveMessage -> peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
+                .flatMap(peersCommunicator -> peersCommunicator.getPieceMessageResponseFlux()
+                        .map(pieceMessage -> new AbstractMap.SimpleImmutableEntry<>(peersCommunicator, pieceMessage)))
+                .take(1)
                 .single();
 
         StepVerifier.create(receiveSingleBlockMono)
-                .expectNextCount(1)
+                .consumeNextWith(next -> next.getKey().closeConnection())
                 .verifyComplete();
     }
 }
