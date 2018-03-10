@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SynchronousSink;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -71,7 +72,7 @@ class TrackerCommunication {
     }
 
     private static <Request extends TrackerRequest> Mono<DatagramPacket> makeRequestMono(Request request) {
-        return Mono.create(sink -> {
+        return Mono.<DatagramPacket>create(sink -> {
             try {
                 InetAddress trackerIp = InetAddress.getByName(request.getTracker().getTrackerUrl());
                 byte[] requestPacket = request.buildRequestPacket().array();
@@ -88,7 +89,7 @@ class TrackerCommunication {
                 error.setStackTrace(ex.getStackTrace());
                 sink.error(error);
             }
-        });
+        }).subscribeOn(Schedulers.elastic());
     }
 
     private static Mono<DatagramSocket> sendRequestMono(DatagramPacket request) {
