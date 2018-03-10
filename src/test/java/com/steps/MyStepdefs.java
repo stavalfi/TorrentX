@@ -220,19 +220,19 @@ public class MyStepdefs {
 
         int requestBlockSize = 16000;
 
-        Mono<AbstractMap.SimpleImmutableEntry<PeersCommunicator, PieceMessage>> receiveSingleBlockMono = peersProvider
+        Mono<PieceMessage> receiveSinglePieceMono = peersProvider
                 .getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                 .flatMap(peersCommunicator -> peersCommunicator.sendInterestedMessage())
                 .flatMap(peersCommunicator -> peersCommunicator.getHaveMessageResponseFlux()
                         .take(1)
                         .flatMap(haveMessage -> peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
-                .flatMap(peersCommunicator -> peersCommunicator.getPieceMessageResponseFlux()
-                        .map(pieceMessage -> new AbstractMap.SimpleImmutableEntry<>(peersCommunicator, pieceMessage)))
+                .flatMap(peersCommunicator -> peersCommunicator.getPieceMessageResponseFlux())
+                .doOnNext(pieceMessage -> pieceMessage.getPeersCommunicator().closeConnection())
                 .take(1)
                 .single();
 
-        StepVerifier.create(receiveSingleBlockMono)
-                .consumeNextWith(next -> next.getKey().closeConnection())
+        StepVerifier.create(receiveSinglePieceMono)
+                .expectNextCount(1)
                 .verifyComplete();
     }
 }
