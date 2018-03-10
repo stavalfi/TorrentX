@@ -101,4 +101,8 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
                 ", messageId=" + messageId +
                 '}';
     }
+
+    public PeersCommunicator getPeersCommunicator() {
+        return peersCommunicator;
+    }
 }
