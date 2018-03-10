@@ -29,7 +29,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
 
     // receive messages:
 
-    private Flux<PeerMessage> peerMessageResponseFlux;
+    private Flux<? extends PeerMessage> peerMessageResponseFlux;
 
     private Flux<BitFieldMessage> bitFieldMessageResponseFlux;
     private Flux<CancelMessage> cancelMessageResponseFlux;
@@ -58,11 +58,11 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
 
         this.peerMessageResponseFlux =
                 Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, dataInputStream))
+                        .subscribeOn(Schedulers.elastic())
                         // it is important to publish from source on different thread then the
                         // subscription to this source's thread every time because:
                         // if not and we subscribe to this specific source multiple times then only the
                         // first subscription will be activated and the source will never end
-                        .subscribeOn(Schedulers.elastic())
                         .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                         // there are multiple subscribers to this source (every specific peer-message flux).
                         // all of them must get the same message and not activate this source more then once.
@@ -70,7 +70,6 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
                         // **any** subscriber to **this** source may start the source to produce signals
                         // to him and everyone else.
                         .autoConnect(1);
-        ;
 
         this.bitFieldMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof BitFieldMessage)
@@ -139,16 +138,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
 
 
     private void listenForPeerMessages(FluxSink<PeerMessage> sink, DataInputStream dataInputStream) {
-        sink.onCancel(() -> {
-            try {
-                dataInputStream.close();
-                closeConnection();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        });
-        boolean cancelled = sink.isCancelled();
-        while (!cancelled) {
+        while (!sink.isCancelled()) {
             try {
                 PeerMessage peerMessage = PeerMessageFactory.create(this.peer, this.me, dataInputStream);
                 sink.next(peerMessage);
@@ -160,7 +150,8 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
                     // TODO: do something better... it's a fatal problem with my design!!!
                     e1.printStackTrace();
                 }
-                sink.error(e);
+                if (!sink.isCancelled())
+                    sink.error(e);
                 return;
             }
         }
@@ -201,7 +192,8 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
                 closeConnection();
                 monoSink.error(e);
             }
-        }).onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
+        }).subscribeOn(Schedulers.elastic())
+                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
     }
 
     @Override
@@ -284,7 +276,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     }
 
     @Override
-    public Flux<PeerMessage> getPeerMessageResponseFlux() {
+    public Flux<? extends PeerMessage> getPeerMessageResponseFlux() {
         return this.peerMessageResponseFlux;
     }
 
