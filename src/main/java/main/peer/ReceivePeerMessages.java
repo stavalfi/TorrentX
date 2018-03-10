@@ -4,7 +4,7 @@ import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 
 public interface ReceivePeerMessages {
-    Flux<PeerMessage> getPeerMessageResponseFlux();
+    Flux<? extends PeerMessage> getPeerMessageResponseFlux();
 
     Flux<BitFieldMessage> getBitFieldMessageResponseFlux();
 

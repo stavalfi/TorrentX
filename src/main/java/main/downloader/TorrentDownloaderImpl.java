@@ -33,7 +33,7 @@ public class TorrentDownloaderImpl extends TorrentDownloader {
                             .subscribe(null, null, () -> {
                                 peersCommunicator.getHaveMessageResponseFlux()
                                         .flatMap(aVoid -> peersCommunicator.getHaveMessageResponseFlux())
-                                        .limitRequest(1)
+                                        .take(1)
                                         .flatMap(haveMessage ->
                                                 peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, 16000))
                                         .subscribe();
