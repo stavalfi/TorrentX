@@ -140,7 +140,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     private void listenForPeerMessages(FluxSink<PeerMessage> sink, DataInputStream dataInputStream) {
         while (!sink.isCancelled()) {
             try {
-                PeerMessage peerMessage = PeerMessageFactory.create(this.peer, this.me, dataInputStream);
+                PeerMessage peerMessage = PeerMessageFactory.create(this,this.peer, this.me, dataInputStream);
                 sink.next(peerMessage);
             } catch (IOException e) {
                 try {
@@ -198,7 +198,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
 
     @Override
     public Mono<PeersCommunicator> sendPieceMessage(int index, int begin, byte[] block) {
-        PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(), index, begin, block);
+        PieceMessage pieceMessage = new PieceMessage(this, this.getMe(), this.getPeer(), index, begin, block);
         return send(pieceMessage)
                 // for calculating the peer upload speed -
                 // I do not care if we failed to send the piece.
@@ -211,52 +211,52 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
 
     @Override
     public Mono<PeersCommunicator> sendBitFieldMessage(BitSet peaces) {
-        return send(new BitFieldMessage(this.getMe(), this.getPeer(), peaces));
+        return send(new BitFieldMessage(this,this.getMe(), this.getPeer(), peaces));
     }
 
     @Override
     public Mono<PeersCommunicator> sendCancelMessage(int index, int begin, int length) {
-        return send(new CancelMessage(this.getMe(), this.getPeer(), index, begin, length));
+        return send(new CancelMessage(this,this.getMe(), this.getPeer(), index, begin, length));
     }
 
     @Override
     public Mono<PeersCommunicator> sendChokeMessage() {
-        return send(new ChokeMessage(this.getMe(), this.getPeer()));
+        return send(new ChokeMessage(this,this.getMe(), this.getPeer()));
     }
 
     @Override
     public Mono<PeersCommunicator> sendHaveMessage(int pieceIndex) {
-        return send(new HaveMessage(this.getMe(), this.getPeer(), pieceIndex));
+        return send(new HaveMessage(this,this.getMe(), this.getPeer(), pieceIndex));
     }
 
     @Override
     public Mono<PeersCommunicator> sendInterestedMessage() {
-        return send(new InterestedMessage(this.getMe(), this.getPeer()));
+        return send(new InterestedMessage(this,this.getMe(), this.getPeer()));
     }
 
     @Override
     public Mono<PeersCommunicator> sendKeepAliveMessage() {
-        return send(new KeepAliveMessage(this.getMe(), this.getPeer()));
+        return send(new KeepAliveMessage(this,this.getMe(), this.getPeer()));
     }
 
     @Override
     public Mono<PeersCommunicator> sendNotInterestedMessage() {
-        return send(new NotInterestedMessage(this.getMe(), this.getPeer()));
+        return send(new NotInterestedMessage(this,this.getMe(), this.getPeer()));
     }
 
     @Override
     public Mono<PeersCommunicator> sendPortMessage(short listenPort) {
-        return send(new PortMessage(this.getMe(), this.getPeer(), listenPort));
+        return send(new PortMessage(this,this.getMe(), this.getPeer(), listenPort));
     }
 
     @Override
     public Mono<PeersCommunicator> sendRequestMessage(int index, int begin, int length) {
-        return send(new RequestMessage(this.getMe(), this.getPeer(), index, begin, length));
+        return send(new RequestMessage(this,this.getMe(), this.getPeer(), index, begin, length));
     }
 
     @Override
     public Mono<PeersCommunicator> sendUnchokeMessage() {
-        return send(new UnchokeMessage(this.getMe(), this.getPeer()));
+        return send(new UnchokeMessage(this,this.getMe(), this.getPeer()));
     }
 
     public Flux<Double> getPeerDownloadSpeedFlux() {

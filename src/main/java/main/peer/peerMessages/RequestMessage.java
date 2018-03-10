@@ -1,6 +1,7 @@
 package main.peer.peerMessages;
 
 import main.peer.Peer;
+import main.peer.PeersCommunicator;
 
 import java.nio.ByteBuffer;
 
@@ -16,15 +17,15 @@ public class RequestMessage extends PeerMessage {
      * @param begin  integer (4 bytes) specifying the zero-based byte offset within the piece.
      * @param length integer (4 bytes) specifying the requested length.
      */
-    public RequestMessage(Peer from, Peer to, int index, int begin, int length) {
-        super(from, to, RequestMessage.length, messageId, ByteBuffer.allocate(12)
+    public RequestMessage(PeersCommunicator peersCommunicator, Peer from, Peer to, int index, int begin, int length) {
+        super(peersCommunicator, to, from, RequestMessage.length, messageId, ByteBuffer.allocate(12)
                 .putInt(index)
                 .putInt(begin)
                 .putInt(length).array());
     }
 
-    public RequestMessage(Peer from, Peer to, byte[] peerMessage) {
-        super(from, to, peerMessage);
+    public RequestMessage(PeersCommunicator peersCommunicator,Peer from, Peer to, byte[] peerMessage) {
+        super(peersCommunicator, to, peerMessage, from);
     }
     @Override
     public String toString() {
