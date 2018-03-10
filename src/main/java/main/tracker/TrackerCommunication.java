@@ -44,11 +44,11 @@ class TrackerCommunication {
                                 " not equal to the request's action-number."));
                     else sink.next(response);
                 })
-                .doOnError(TrackerExceptions.communicationErrors, error ->
+                .doOnError(TrackerExceptions.communicationErrors, throwable ->
                         logger.debug("error signal: (the application will maybe try to send" +
                                 " the request again to the same tracker)." +
-                                "\nerror message: " + error.getMessage() + ".\n" +
-                                "error type: " + error.getClass().getName()))
+                                "\nerror message: " + throwable.getMessage() + ".\n" +
+                                "error type: " + throwable.getClass().getName()))
                 // the retry operation will run the first, ever created, publisher again
                 // which is defined in sendRequestMono method.
                 .retry(1, TrackerExceptions.communicationErrors)
@@ -57,11 +57,12 @@ class TrackerCommunication {
                                 " a request to the same tracker again and failed)." +
                                 "\nerror message: " + error.getMessage() + ".\n" +
                                 "error type: " + error.getClass().getName()))
-                .doOnError(TrackerExceptions.communicationErrors.negate(), error ->
+                .onErrorResume(TrackerExceptions.communicationErrors, throwable -> Mono.empty())
+                .doOnError(TrackerExceptions.communicationErrors.negate(), throwable ->
                         logger.error("error signal: (the application doesn't try to send" +
                                 " a request again after this error)." +
-                                "\nerror message: " + error.getMessage() + ".\n" +
-                                "error type: " + error.getClass().getName()));
+                                "\nerror message: " + throwable.getMessage() + ".\n" +
+                                "error type: " + throwable.getClass().getName()));
     }
 
     private static <Request extends TrackerRequest> Mono<DatagramSocket> sendRequestMono(Request request) {
