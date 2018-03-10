@@ -9,5 +9,6 @@ public class TrackerExceptions {
             // not equal to the request's transaction-id. or response's action-number is
             // not equal to the request's action-number.
             throwable instanceof BadResponseException ||
+
                     throwable instanceof SocketTimeoutException;
 }

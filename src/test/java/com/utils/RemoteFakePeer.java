@@ -70,7 +70,7 @@ public class RemoteFakePeer extends Peer {
                         return;
                     }
                     Peer fromPeer = new Peer("localhost", peerConnection.getPort());
-                    PeerMessage peerMessage = PeerMessageFactory.create(fromPeer, this, dataInputStream);
+                    PeerMessage peerMessage = PeerMessageFactory.create(null, fromPeer, this, dataInputStream);
                     outputStream.write(peerMessage.createPacketFromObject());
                 }
                 receivedMessagesAmount++;

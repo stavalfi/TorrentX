@@ -7,8 +7,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class PeerMessageFactory {
-    public static PeerMessage create(Peer from, Peer to, DataInputStream dataInputStream) throws IOException {
-
+    public static PeerMessage create(PeersCommunicator peersCommunicator,Peer from, Peer to, DataInputStream dataInputStream) throws IOException {
         final int messageLengthSize = 4;
         byte[] data1 = new byte[messageLengthSize];
         dataInputStream.readFully(data1);
@@ -20,36 +19,36 @@ public class PeerMessageFactory {
         ByteBuffer byteBuffer = ByteBuffer.allocate(messageLengthSize + lengthOfTheRestOfData);
         byteBuffer.putInt(lengthOfTheRestOfData);
         byteBuffer.put(data2);
-        return create(from, to, byteBuffer.array()); // initialize message object from byte[]
+        return create(peersCommunicator,from, to, byteBuffer.array()); // initialize message object from byte[]
     }
 
-    public static PeerMessage create(Peer from, Peer to, byte[] peerMessage) {
+    public static PeerMessage create(PeersCommunicator peersCommunicator,Peer from, Peer to, byte[] peerMessage) {
         PeerMessageId messageId = PeerMessageId.fromValue(PeerMessage.getMessageId(peerMessage));
         switch (messageId) {
             case bitFieldMessage:
-                return new BitFieldMessage(from, to, peerMessage);
+                return new BitFieldMessage(peersCommunicator,from, to, peerMessage);
             case cancelMessage:
-                return new CancelMessage(from, to, peerMessage);
+                return new CancelMessage(peersCommunicator,from, to, peerMessage);
             case chokeMessage:
-                return new ChokeMessage(from, to, peerMessage);
+                return new ChokeMessage(peersCommunicator,from, to, peerMessage);
             case haveMessage:
-                return new HaveMessage(from, to, peerMessage);
+                return new HaveMessage(peersCommunicator,from, to, peerMessage);
             case interestedMessage:
-                return new InterestedMessage(from, to, peerMessage);
+                return new InterestedMessage(peersCommunicator,from, to, peerMessage);
             case keepAliveMessage:
-                return new KeepAliveMessage(from, to, peerMessage);
+                return new KeepAliveMessage(peersCommunicator,from, to, peerMessage);
             case notInterestedMessage:
-                return new NotInterestedMessage(from, to, peerMessage);
+                return new NotInterestedMessage(peersCommunicator,from, to, peerMessage);
             case pieceMessage:
-                return new PieceMessage(from, to, peerMessage);
+                return new PieceMessage(peersCommunicator,from, to, peerMessage);
             case portMessage:
-                return new PortMessage(from, to, peerMessage);
+                return new PortMessage(peersCommunicator,from, to, peerMessage);
             case requestMessage:
-                return new RequestMessage(from, to, peerMessage);
+                return new RequestMessage(peersCommunicator,from, to, peerMessage);
             case unchokeMessage:
-                return new UnchokeMessage(from, to, peerMessage);
+                return new UnchokeMessage(peersCommunicator,from, to, peerMessage);
             case extendedMessage:
-                return new ExtendedMessage(from, to, peerMessage);
+                return new ExtendedMessage(peersCommunicator,from, to, peerMessage);
             default:
                 throw new IllegalArgumentException("illegal message-id: " + messageId);
         }

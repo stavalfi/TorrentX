@@ -12,17 +12,17 @@
             </pattern>
         </encoder>
     </appender>
-    <appender name="PAPERTRAIL" class="ch.qos.logback.classic.net.SyslogAppender">
-        <syslogHost>logs6.papertrailapp.com</syslogHost>
-        <port>14223</port>
-        <facility>USER</facility>
-        <suffixPattern>TorrentX: %logger %msg</suffixPattern>
-    </appender>
+    <!--<appender name="PAPERTRAIL" class="ch.qos.logback.classic.net.SyslogAppender">-->
+        <!--<syslogHost>logs6.papertrailapp.com</syslogHost>-->
+        <!--<udpPort>14223</udpPort>-->
+        <!--<facility>USER</facility>-->
+        <!--<suffixPattern>TorrentX: %logger %msg</suffixPattern>-->
+    <!--</appender>-->
 
     <!--<logger name="main" level="warn"/>-->
 
     <root level="INFO">
         <appender-ref ref="STDOUT"/>
-        <appender-ref ref="PAPERTRAIL"/>
+        <!--<appender-ref ref="PAPERTRAIL"/>-->
     </root>
 </configuration>

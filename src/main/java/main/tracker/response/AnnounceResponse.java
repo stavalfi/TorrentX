@@ -3,6 +3,8 @@ package main.tracker.response;
 import main.peer.Peer;
 import main.tracker.Tracker;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.math.BigInteger;
 import java.net.InetAddress;
@@ -21,13 +23,14 @@ public class AnnounceResponse extends TrackerResponse {
     private final int seedersAmount;
     private final List<Peer> peers;
 
-    public Flux<Peer> getPeers() {
-        return Flux.fromStream(peers.stream());
+    public Flux<Peer> getPeersFlux() {
+        return Flux.fromIterable(this.peers)
+                .flatMap(peer -> Mono.just(peer).subscribeOn(Schedulers.elastic()));
     }
 
     /**
      * Offset      Size            Name            Value
-     * 0           32-bit integer  action          1 // scrape
+     * 0           32-bit integer  action          1 // scrapeMono
      * 4           32-bit integer  transaction_id
      * 8           32-bit integer  interval
      * 12          32-bit integer  leechersAmount

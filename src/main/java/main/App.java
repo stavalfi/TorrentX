@@ -6,26 +6,23 @@ import main.downloader.Downloader;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaderImpl;
 import main.file.ActiveTorrent;
+import reactor.core.publisher.Hooks;
 
 class App {
-
-    // TODO: get all signals which created after a stream disposed or canceled and free their resources!!!
-
     private static void f4() {
-
         TorrentInfo torrentInfo = getTorrentInfo();
-
         ActiveTorrent activeTorrent = new ActiveTorrent(torrentInfo, null);
         Downloader downloader = new Downloader(activeTorrent);
         TorrentDownloader torrentDownloader = new TorrentDownloaderImpl(torrentInfo, downloader);
 
-        torrentDownloader.getPieceMessageResponseFlux()
-                .subscribe(System.out::println, System.out::println, System.out::println);
+        torrentDownloader.getPeerMessageResponseFlux()
+                .subscribe(System.out::println, Throwable::printStackTrace, System.out::println);
 
         torrentDownloader.start();
     }
 
     public static void main(String[] args) throws Exception {
+        Hooks.onOperatorDebug();
         f4();
         Thread.sleep(1000 * 1000);
     }
@@ -33,7 +30,7 @@ class App {
     @SneakyThrows
     public static TorrentInfo getTorrentInfo() {
         String torrentFilePath = "src/main/resources/torrent-file-example3.torrent";
-        return new TorrentInfo(TorrentParser.parseTorrent(torrentFilePath));
+        return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
     }
 }
 
@@ -52,12 +49,12 @@ class App {
 
 
 //    torrent hash: af1f3dbc5d5baeaf83f812e06aa91bbd7b55cce8
-//    udp://tracker.coppersurfer.tk:6969/scrape
-//    udp://9.rarbg.com:2710/scrape
+//    udp://tracker.coppersurfer.tk:6969/scrapeMono
+//    udp://9.rarbg.com:2710/scrapeMono
 //    udp://p4p.arenabg.com:1337
 //    udp://tracker.leechers-paradise.org:6969
 //    udp://tracker.internetwarriors.net:1337
-//    udp://tracker.opentrackr.org:1337/scrape
+//    udp://tracker.opentrackr.org:1337/scrapeMono
 
 //    Peer(ipAddress=35.160.55.32, tcpPort=8104)
 //    Peer(ipAddress=52.59.116.245, tcpPort=8114)
@@ -137,112 +134,3 @@ class App {
 //    Peer(ipAddress=192.142.208.111, tcpPort=10373)
 //    Peer(ipAddress=82.212.112.193, tcpPort=35885)
 //    Peer(ipAddress=5.29.96.159, tcpPort=8091)
-
-//    private static void f3() throws MalformedURLException {
-//
-//
-//        System.out.println(HexByteConverter.byteToHex(AppConfig.getInstance().getPeerId().getBytes()));
-//        TorrentInfo torrentInfo = getTorrentInfo();
-//        System.out.println(torrentInfo);
-//        String torrentHashCode = splitByPrecentage("1488d454915d860529903b61adb537012a0fe7c8");
-//        String peerId = splitByPrecentage(HexByteConverter.byteToHex(AppConfig.getInstance().getPeerId().getBytes()));
-//        System.out.println(torrentHashCode);
-//        System.out.println(peerId);
-//        Map<String, String> vars = new HashMap<String, String>();
-//        vars.put("info_hash", torrentHashCode);
-//        vars.put("peer_id", peerId);
-//
-//        String url = "http://torrent.ubuntu.com:6969/announce?info_hash=%14%88%d4%54%91%5d%86%05%29%90%3b%61%ad%b5%37%01%2a%0f%e7%c8&peer_id=%2D%41%5A%35%37%35%30%2D%54%70%6B%58%74%74%5A%4C%66%70%53%48";
-//
-//        String result = new RestTemplate()
-//                .getForObject(url, String.class);
-//        System.out.println(result);
-//    }
-//
-//    private static String splitByPrecentage(String str) {
-//        String newStr = "";
-//
-//        for (int i = 0; i < str.length(); i += 2)
-//            newStr = newStr.concat("%").concat(str.charAt(i) + "")
-//                    .concat(str.charAt(i + 1) + "");
-//
-//        return newStr;
-//    }
-
-//    final CountDownLatch latch = new CountDownLatch(2);
-//    TcpServer server = TcpServer.create(8091);
-//    ObjectMapper m = new ObjectMapper();
-//
-//        server.newHandler((in, out) -> {
-//                in.receive()
-//                .asByteArray()
-//                .map(bb -> {
-//                try {
-//                return m.readValue(bb, Person.class);
-//        } catch (IOException io) {
-//        throw Exceptions.propagate(io);
-//        }
-//        })
-//        .subscribe(data -> {
-//        System.out.println("server got something!!: " + data);
-//        });
-//
-//        return out.sendString(Mono.just("Hi"))
-//        .neverComplete();
-//        }).subscribe();
-//
-//final TcpClient client = TcpClient.create(opts -> opts.host("localhost").port(8091));
-//
-//        client.newHandler((in, out) -> {
-//        //in
-//        in.receive()
-//        .asByteArray()
-//        .map(bb -> {
-//        try {
-//        return m.readValue(bb, String.class);
-//        } catch (IOException io) {
-//        throw Exceptions.propagate(io);
-//        }
-//        })
-//        .subscribe(data -> {
-//        System.out.println("client got something!!: " + data);
-//        });
-//
-//        //out
-//        return out.send(Flux.just(new Person(111))
-//        .map(s -> {
-//        try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
-//        m.writeValue(os, s);
-//        return out.alloc()
-//        .buffer()
-//        .writeBytes(os.toByteArray());
-//        } catch (IOException ioe) {
-//        throw Exceptions.propagate(ioe);
-//        }
-//        }));
-////			return Mono.empty();
-//        }).subscribe();
-//        System.out.println("finish");
-////assertTrue("Latch was counted down", latch.await(5, TimeUnit.SECONDS));
-//
-////        connectedClient.dispose();
-////        connectedServer.dispose();
-
-//class Person {
-//    int x;
-//
-//    public Person(int x) {
-//        this.x = x;
-//    }
-//
-//    public int getX() {
-//        return x;
-//    }
-//
-//    @Override
-//    public String toString() {
-//        return "Person{" +
-//                "x=" + x +
-//                '}';
-//    }
-//}

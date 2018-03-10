@@ -5,9 +5,11 @@ import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.MonoSink;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.BitSet;
@@ -23,10 +25,11 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     private Flux<Double> peerDownloadSpeedFlux;
     private Flux<Double> peerUploadSpeedFlux;
     private FluxSink<PieceMessage> outGoingPiecesFluxSink;
+    private DataOutputStream peerDataOutputStream;
 
     // receive messages:
 
-    private Flux<PeerMessage> peerMessageResponseFlux;
+    private Flux<? extends PeerMessage> peerMessageResponseFlux;
 
     private Flux<BitFieldMessage> bitFieldMessageResponseFlux;
     private Flux<CancelMessage> cancelMessageResponseFlux;
@@ -41,10 +44,8 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     private Flux<RequestMessage> requestMessageResponseFlux;
     private Flux<UnchokeMessage> unchokeMessageResponseFlux;
 
-    private boolean IWantToCloseConnection;
-
     public PeersCommunicator(TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
-                             DataInputStream dataInputStream) {
+                             DataInputStream dataInputStream, DataOutputStream peerDataOutputStream) {
         assert peerSocket != null;
         this.peer = peer;
         this.peerChokesMe = false;
@@ -53,15 +54,15 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
         this.torrentInfo = torrentInfo;
         this.peerPieces = new BitSet(torrentInfo.getPieces().size());
         this.me = new Peer("localhost", peerSocket.getLocalPort());
-        this.IWantToCloseConnection = false;
+        this.peerDataOutputStream = peerDataOutputStream;
 
         this.peerMessageResponseFlux =
                 Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, dataInputStream))
+                        .subscribeOn(Schedulers.elastic())
                         // it is important to publish from source on different thread then the
                         // subscription to this source's thread every time because:
                         // if not and we subscribe to this specific source multiple times then only the
                         // first subscription will be activated and the source will never end
-                        .subscribeOn(Schedulers.elastic())
                         .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                         // there are multiple subscribers to this source (every specific peer-message flux).
                         // all of them must get the same message and not activate this source more then once.
@@ -69,7 +70,6 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
                         // **any** subscriber to **this** source may start the source to produce signals
                         // to him and everyone else.
                         .autoConnect(1);
-        ;
 
         this.bitFieldMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof BitFieldMessage)
@@ -138,13 +138,11 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
 
 
     private void listenForPeerMessages(FluxSink<PeerMessage> sink, DataInputStream dataInputStream) {
-        while (!sink.isCancelled() && !this.peerSocket.isClosed() && this.peerSocket.isConnected()) {
+        while (!sink.isCancelled()) {
             try {
-                PeerMessage peerMessage = PeerMessageFactory.create(this.peer, this.me, dataInputStream);
+                PeerMessage peerMessage = PeerMessageFactory.create(this,this.peer, this.me, dataInputStream);
                 sink.next(peerMessage);
             } catch (IOException e) {
-                if (!this.IWantToCloseConnection) // only if it wasn't because of me.
-                    sink.error(e);
                 try {
                     dataInputStream.close();
                     closeConnection();
@@ -152,6 +150,9 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
                     // TODO: do something better... it's a fatal problem with my design!!!
                     e1.printStackTrace();
                 }
+                if (!sink.isCancelled())
+                    sink.error(e);
+                return;
             }
         }
     }
@@ -173,8 +174,8 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     }
 
     public void closeConnection() {
-        this.IWantToCloseConnection = true;
         try {
+            this.peerDataOutputStream.close();
             this.peerSocket.close();
         } catch (IOException exception) {
             // TODO: do something better... it's a fatal problem with my design!!!
@@ -183,18 +184,21 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     }
 
     private Mono<PeersCommunicator> send(PeerMessage peerMessage) {
-        try {
-            this.peerSocket.getOutputStream().write(peerMessage.createPacketFromObject());
-            return Mono.just(this);
-        } catch (IOException e) {
-            closeConnection();
-            return Mono.error(e);
-        }
+        return Mono.create((MonoSink<PeersCommunicator> monoSink) -> {
+            try {
+                this.peerDataOutputStream.write(peerMessage.createPacketFromObject());
+                monoSink.success(this);
+            } catch (IOException e) {
+                closeConnection();
+                monoSink.error(e);
+            }
+        }).subscribeOn(Schedulers.elastic())
+                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
     }
 
     @Override
     public Mono<PeersCommunicator> sendPieceMessage(int index, int begin, byte[] block) {
-        PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(), index, begin, block);
+        PieceMessage pieceMessage = new PieceMessage(this, this.getMe(), this.getPeer(), index, begin, block);
         return send(pieceMessage)
                 // for calculating the peer upload speed -
                 // I do not care if we failed to send the piece.
@@ -207,52 +211,52 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
 
     @Override
     public Mono<PeersCommunicator> sendBitFieldMessage(BitSet peaces) {
-        return send(new BitFieldMessage(this.getMe(), this.getPeer(), peaces));
+        return send(new BitFieldMessage(this,this.getMe(), this.getPeer(), peaces));
     }
 
     @Override
     public Mono<PeersCommunicator> sendCancelMessage(int index, int begin, int length) {
-        return send(new CancelMessage(this.getMe(), this.getPeer(), index, begin, length));
+        return send(new CancelMessage(this,this.getMe(), this.getPeer(), index, begin, length));
     }
 
     @Override
     public Mono<PeersCommunicator> sendChokeMessage() {
-        return send(new ChokeMessage(this.getMe(), this.getPeer()));
+        return send(new ChokeMessage(this,this.getMe(), this.getPeer()));
     }
 
     @Override
     public Mono<PeersCommunicator> sendHaveMessage(int pieceIndex) {
-        return send(new HaveMessage(this.getMe(), this.getPeer(), pieceIndex));
+        return send(new HaveMessage(this,this.getMe(), this.getPeer(), pieceIndex));
     }
 
     @Override
     public Mono<PeersCommunicator> sendInterestedMessage() {
-        return send(new InterestedMessage(this.getMe(), this.getPeer()));
+        return send(new InterestedMessage(this,this.getMe(), this.getPeer()));
     }
 
     @Override
     public Mono<PeersCommunicator> sendKeepAliveMessage() {
-        return send(new KeepAliveMessage(this.getMe(), this.getPeer()));
+        return send(new KeepAliveMessage(this,this.getMe(), this.getPeer()));
     }
 
     @Override
     public Mono<PeersCommunicator> sendNotInterestedMessage() {
-        return send(new NotInterestedMessage(this.getMe(), this.getPeer()));
+        return send(new NotInterestedMessage(this,this.getMe(), this.getPeer()));
     }
 
     @Override
     public Mono<PeersCommunicator> sendPortMessage(short listenPort) {
-        return send(new PortMessage(this.getMe(), this.getPeer(), listenPort));
+        return send(new PortMessage(this,this.getMe(), this.getPeer(), listenPort));
     }
 
     @Override
     public Mono<PeersCommunicator> sendRequestMessage(int index, int begin, int length) {
-        return send(new RequestMessage(this.getMe(), this.getPeer(), index, begin, length));
+        return send(new RequestMessage(this,this.getMe(), this.getPeer(), index, begin, length));
     }
 
     @Override
     public Mono<PeersCommunicator> sendUnchokeMessage() {
-        return send(new UnchokeMessage(this.getMe(), this.getPeer()));
+        return send(new UnchokeMessage(this,this.getMe(), this.getPeer()));
     }
 
     public Flux<Double> getPeerDownloadSpeedFlux() {
@@ -272,7 +276,7 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
     }
 
     @Override
-    public Flux<PeerMessage> getPeerMessageResponseFlux() {
+    public Flux<? extends PeerMessage> getPeerMessageResponseFlux() {
         return this.peerMessageResponseFlux;
     }
 

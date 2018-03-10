@@ -1,6 +1,7 @@
 package main.peer.peerMessages;
 
 import main.peer.Peer;
+import main.peer.PeersCommunicator;
 
 import java.util.BitSet;
 
@@ -19,13 +20,13 @@ public class BitFieldMessage extends PeerMessage {
      *               and set bits indicate a valid and available piece.
      *               Spare bits at the end are set to zero.
      */
-    public BitFieldMessage(Peer from, Peer to, BitSet pieces) {
-        super(from, to, 1 + pieces.toByteArray().length, messageId, pieces.toByteArray());
+    public BitFieldMessage(PeersCommunicator peersCommunicator, Peer from, Peer to, BitSet pieces) {
+        super(peersCommunicator, to, from, 1 + pieces.toByteArray().length, messageId, pieces.toByteArray());
         this.pieces = pieces;
     }
 
-    public BitFieldMessage(Peer from, Peer to, byte[] peerMessage) {
-        super(from, to, peerMessage);
+    public BitFieldMessage(PeersCommunicator peersCommunicator,Peer from, Peer to, byte[] peerMessage) {
+        super(peersCommunicator, to, peerMessage, from);
         this.pieces = BitSet.valueOf(super.getPayload());
     }
 

@@ -1,6 +1,7 @@
 package main.peer.peerMessages;
 
 import main.peer.Peer;
+import main.peer.PeersCommunicator;
 
 import java.nio.ByteBuffer;
 
@@ -16,13 +17,13 @@ public class HaveMessage extends PeerMessage {
      *
      * @param pieceIndex is the piece (not block, which is a piece inside a piece) we tell the other peers we have.
      */
-    public HaveMessage(Peer from, Peer to, int pieceIndex) {
-        super(from, to, length, messageId, ByteBuffer.allocate(4).putInt(pieceIndex).array());
+    public HaveMessage(PeersCommunicator peersCommunicator, Peer from, Peer to, int pieceIndex) {
+        super(peersCommunicator, to, from, length, messageId, ByteBuffer.allocate(4).putInt(pieceIndex).array());
         this.pieceIndex = pieceIndex;
     }
 
-    public HaveMessage(Peer from, Peer to, byte[] peerMessage) {
-        super(from, to, peerMessage);
+    public HaveMessage(PeersCommunicator peersCommunicator,Peer from, Peer to, byte[] peerMessage) {
+        super(peersCommunicator, to, peerMessage, from);
         this.pieceIndex = ByteBuffer.wrap(this.getPayload()).getInt();
     }
 

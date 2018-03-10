@@ -2,38 +2,38 @@ package main.tracker;
 
 public class Tracker {
     private String connectionType;
-    private String tracker;
-    private int port;
+    private String trackerUrl;
+    private int udpPort;
 
-    public Tracker(String connectionType, String tracker, int port) {
+    public Tracker(String connectionType, String trackerUrl, int udpPort) {
         this.connectionType = connectionType;
-        this.tracker = tracker;
-        this.port = port;
+        this.trackerUrl = trackerUrl;
+        this.udpPort = udpPort;
     }
 
-    public Tracker(Tracker tracker) {
-        this.connectionType = tracker.connectionType;
-        this.tracker = tracker.tracker;
-        this.port = tracker.port;
+    public Tracker(Tracker trackerUrl) {
+        this.connectionType = trackerUrl.connectionType;
+        this.trackerUrl = trackerUrl.trackerUrl;
+        this.udpPort = trackerUrl.udpPort;
     }
 
     public String getConnectionType() {
         return connectionType;
     }
 
-    public String getTracker() {
-        return tracker;
+    public String getTrackerUrl() {
+        return trackerUrl;
     }
 
-    public int getPort() {
-        return port;
+    public int getUdpPort() {
+        return udpPort;
     }
 
     @Override
     public String toString() {
         return "Tracker{" +
-                "tracker='" + tracker + '\'' +
-                ", port=" + port +
+                "trackerUrl='" + trackerUrl + '\'' +
+                ", udpPort=" + udpPort +
                 '}';
     }
 }

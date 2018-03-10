@@ -16,8 +16,8 @@ import reactor.core.publisher.MonoSink;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
@@ -32,13 +32,20 @@ public class PeersProvider {
         this.trackerProvider = trackerProvider;
     }
 
-    public Mono<PeersCommunicator> connectToPeer(Peer peer) {
+    public Mono<PeersCommunicator> connectToPeerMono(Peer peer) {
         return Mono.create((MonoSink<PeersCommunicator> sink) -> {
             Socket peerSocket = new Socket();
+            sink.onCancel(() -> {
+                try {
+                    peerSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
             try {
                 peerSocket.connect(new InetSocketAddress(peer.getPeerIp(), peer.getPeerPort()), 1000 * 10);
                 DataInputStream receiveMessages = new DataInputStream(peerSocket.getInputStream());
-                OutputStream sendMessages = peerSocket.getOutputStream();
+                DataOutputStream sendMessages = new DataOutputStream(peerSocket.getOutputStream());
 
                 // firstly, we need to send Handshake message to the peer and receive Handshake back.
                 HandShake handShakeSending = new HandShake(HexByteConverter.hexToByte(this.torrentInfo.getTorrentInfoHash()), AppConfig.getInstance().getPeerId().getBytes());
@@ -56,47 +63,45 @@ public class PeersProvider {
                     return;
                 } else {
                     // all went well, I accept this connection.
-                    sink.success(new PeersCommunicator(this.torrentInfo, peer, peerSocket, receiveMessages));
+                    PeersCommunicator peersCommunicator = new PeersCommunicator(this.torrentInfo, peer,
+                            peerSocket, receiveMessages, sendMessages);
+                    sink.success(peersCommunicator);
                     return;
                 }
             } catch (IOException e) {
-                sink.error(e);
                 try {
                     peerSocket.close();
                 } catch (IOException e1) {
                     // TODO: do something with this shit
                     e1.printStackTrace();
                 }
+                sink.error(e);
             }
         }).subscribeOn(Schedulers.elastic())
-                .doOnError(PeerExceptions.communicationErrors, error -> {
-                    System.out.println("failed to connect to peer: " + peer.toString() + ", reason: " + error.getClass().getName());
-                    logger.debug("error signal: (the application failed to connect to a peer." +
-                            " the application will try to connect to the next available peer).\n" +
-                            "peer: " + peer.toString() + "\n" +
-                            "error message: " + error.getMessage() + ".\n" +
-                            "error type: " + error.getClass().getName());
-                })
+                .doOnError(PeerExceptions.communicationErrors, throwable -> logger.debug("error signal: (the application failed to connect to a peer." +
+                        " the application will try to connect to the next available peer).\n" +
+                        "peer: " + peer.toString() + "\n" +
+                        "error message: " + throwable.getMessage() + ".\n" +
+                        "error type: " + throwable.getClass().getName()))
                 .onErrorResume(PeerExceptions.communicationErrors, error -> Mono.empty());
     }
 
-    public Flux<PeersCommunicator> connectToPeers(TrackerConnection trackerConnection) {
-        return trackerConnection.announce(torrentInfo.getTorrentInfoHash(), PeersListener.getInstance().getTcpPort())
+    public Flux<Peer> getPeersFromTrackerFlux(TrackerConnection trackerConnection) {
+        return trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), PeersListener.getInstance().getTcpPort())
                 .flux()
-                .flatMap(AnnounceResponse::getPeers)
-                .distinct()
-                .flatMap((Peer peer) -> connectToPeer(peer))
-
-                .doOnNext(peersCommunicator -> System.out.println("connected to peer: " + peersCommunicator.toString()));
+                // getPeersFlux return flux of N peers on different N threads. ;)
+                .flatMap(AnnounceResponse::getPeersFlux);
     }
 
-    public Flux<PeersCommunicator> connectToPeers(Flux<TrackerConnection> trackerConnectionFlux) {
+    public Flux<PeersCommunicator> getPeersCommunicatorFromTrackerFlux(Flux<TrackerConnection> trackerConnectionFlux) {
         return trackerConnectionFlux
-                .flatMap(trackerConnection -> connectToPeers(trackerConnection));
+                .flatMap(trackerConnection -> getPeersFromTrackerFlux(trackerConnection))
+                .distinct()
+                .flatMap((Peer peer) -> connectToPeerMono(peer));
     }
 
-    public Flux<PeersCommunicator> connectToPeers() {
-        return connectToPeers(this.trackerProvider.connectToTrackers());
+    public Flux<PeersCommunicator> getPeersCommunicatorFromTrackerFlux() {
+        return getPeersCommunicatorFromTrackerFlux(this.trackerProvider.connectToTrackersFlux());
     }
 
     public TorrentInfo getTorrentInfo() {

@@ -2,7 +2,7 @@
 ### Feature 1: Getting started. `IN PROGRESS`
 
 1. Understand what .torrent files are.
-2. How to communicate with a tracker.
+2. How to communicate with a trackerUrl.
 3. How to communicate with a peer. 
 4. Paper - Introduction and related work.
 -----
@@ -32,11 +32,11 @@
 
 -----
 
-##### PBI-4: Get details about a given tracker. `DONE` 
+##### PBI-4: Get details about a given trackerUrl. `DONE` 
 
-1. Find the protocol and port which enable us to communicate with a given tracker. (Stav)
-2. List the methods we can run on a given tracker. (Stav)
-3. Get list of peers information from this tracker on a specific torrent. (Stav)
+1. Find the protocol and udpPort which enable us to communicate with a given trackerUrl. (Stav)
+2. List the methods we can run on a given trackerUrl. (Stav)
+3. Get list of peers information from this trackerUrl on a specific torrent. (Stav)
 4. Extract a peers IP from a seeder information. (Stav)
 
 -----
@@ -69,7 +69,7 @@
 ------
 ##### PBI-8: Learn about peers inside the specification. `DONE` 
 
-1. Find the protocol and port which enable us to communicate with a seeder.
+1. Find the protocol and udpPort which enable us to communicate with a seeder.
 2. List the methods we can run on a given seeder.
 
 -----

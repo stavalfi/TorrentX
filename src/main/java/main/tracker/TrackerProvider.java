@@ -6,7 +6,6 @@ import main.tracker.response.ConnectResponse;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.nio.ByteBuffer;
 import java.util.function.Function;
@@ -18,21 +17,19 @@ public class TrackerProvider {
         this.torrentInfo = torrentInfo;
     }
 
-    public Mono<TrackerConnection> connectToTracker(Tracker tracker) {
+    public Mono<TrackerConnection> connectToTrackerMono(Tracker tracker) {
         ConnectRequest connectRequest = new ConnectRequest(tracker, 123456);
 
         Function<ByteBuffer, ConnectResponse> createConnectResponse = (ByteBuffer response) ->
                 new ConnectResponse(tracker, response.array());
-
-        return TrackerCommunication.communicate(connectRequest, createConnectResponse)
-                .subscribeOn(Schedulers.elastic())
+        return TrackerCommunication.communicateMono(connectRequest, createConnectResponse)
                 .onErrorResume(TrackerExceptions.communicationErrors, error -> Mono.empty())
                 .map(connectResponse -> new TrackerConnection(connectResponse));
     }
 
-    public ConnectableFlux<TrackerConnection> connectToTrackers() {
+    public ConnectableFlux<TrackerConnection> connectToTrackersFlux() {
         return Flux.fromIterable(this.torrentInfo.getTrackerList())
-                .flatMap(tracker -> connectToTracker(tracker))
+                .flatMap(tracker -> connectToTrackerMono(tracker))
                 .publish();
     }
 

@@ -23,7 +23,7 @@ public class TrackerConnection extends Tracker {
         this.connectResponse = connectResponse;
     }
 
-    public Mono<? extends AnnounceResponse> announce(String torrentHash, int tcpPort) {
+    public Mono<? extends AnnounceResponse> announceMono(String torrentHash, int tcpPort) {
 
         byte[] peerId = AppConfig.getInstance().getPeerId().getBytes();
         int howMuchPeersWeWant = 1000;
@@ -36,10 +36,10 @@ public class TrackerConnection extends Tracker {
                 new AnnounceResponse(this,
                         response.array(), howMuchPeersWeWant);
 
-        return TrackerCommunication.communicate(announceRequest, createResponse);
+        return TrackerCommunication.communicateMono(announceRequest, createResponse);
     }
 
-    public Mono<? extends ScrapeResponse> scrape(List<String> torrentHash) {
+    public Mono<? extends ScrapeResponse> scrapeMono(List<String> torrentHash) {
 
         List<byte[]> torrentsHashes = torrentHash.stream()
                 .map(HexByteConverter::hexToByte)
@@ -51,7 +51,7 @@ public class TrackerConnection extends Tracker {
         Function<ByteBuffer, ScrapeResponse> createResponse = (ByteBuffer response) ->
                 new ScrapeResponse(this, response.array(), torrentsHashes);
 
-        return TrackerCommunication.communicate(scrapeRequest, createResponse);
+        return TrackerCommunication.communicateMono(scrapeRequest, createResponse);
     }
 
     @Override

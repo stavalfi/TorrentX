@@ -50,9 +50,9 @@ public class AnnounceRequest extends TrackerRequest {
      * offset == bytes not bits!!!!!!
      * Offset  Size    Name    Value
      * 0       64-bit integer  connection_id    same connection_id // the connectionId we received from the server after we successfully connected
-     * 8       32-bit integer  action          1                   // scrape
+     * 8       32-bit integer  action          1                   // scrapeMono
      * 12      32-bit integer  transaction_id                      // we randomly decide
-     * 16      20-byte string  info_hash  torrent_info_hash // the hash of the torrent we want to scrape on
+     * 16      20-byte string  info_hash  torrent_info_hash // the hash of the torrent we want to scrapeMono on
      * 36      20-byte string  peer_id  my-peer-id-!??!!?! how do I get it omg?
      * 56      64-bit integer  downloaded 0? // The number of byte you've downloaded in this session.
      * 64      64-bit integer  left     0? //The number of bytes you have left to download until you're finished.
@@ -69,7 +69,7 @@ public class AnnounceRequest extends TrackerRequest {
 
         ByteBuffer sendData = ByteBuffer.allocate(98); // we need 98 bits at list
         sendData.putLong(this.connectionId); // connection_id
-        sendData.putInt(getActionNumber()); // action we want to perform - scrape
+        sendData.putInt(getActionNumber()); // action we want to perform - scrapeMono
         sendData.putInt(getTransactionId()); // transaction_id - random int we make (32 bits)
         sendData.put(this.torrentInfoHash); //info_hash (20 bits)
         sendData.put(this.peerId); // peer_id (20 bits)
