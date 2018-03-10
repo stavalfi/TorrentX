@@ -11,9 +11,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class TorrentInfo {
+    private String torrentFilePath;
     private final Torrent torrent;
 
-    public TorrentInfo(Torrent torrent) {
+    public TorrentInfo(String torrentFilePath, Torrent torrent) {
+        this.torrentFilePath = torrentFilePath;
         this.torrent = torrent;
     }
 
@@ -98,5 +100,9 @@ public class TorrentInfo {
                 "File List: \n" + fileList +
                 "Tracker List: \n" + trackers + "\n" +
                 '}';
+    }
+
+    public String getTorrentFilePath() {
+        return torrentFilePath;
     }
 }
