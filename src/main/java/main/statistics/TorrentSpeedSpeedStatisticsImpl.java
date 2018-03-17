@@ -6,6 +6,7 @@ import reactor.core.publisher.Flux;
 
 public class TorrentSpeedSpeedStatisticsImpl implements SpeedStatistics {
 
+    private double rateInMillSeconds = 1000;
     private TorrentInfo torrentInfo;
 
     private Flux<Double> downloadSpeedFlux;
@@ -39,6 +40,11 @@ public class TorrentSpeedSpeedStatisticsImpl implements SpeedStatistics {
 
     public TorrentInfo getTorrentInfo() {
         return torrentInfo;
+    }
+
+    @Override
+    public double getRateInMillSeconds() {
+        return this.rateInMillSeconds;
     }
 
     public Flux<Double> getDownloadSpeedFlux() {
