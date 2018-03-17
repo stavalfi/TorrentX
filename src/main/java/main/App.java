@@ -4,27 +4,18 @@ import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
 import main.downloader.DefaultTorrentDownloader;
 import main.downloader.TorrentDownloader;
-import main.peer.PeersCommunicator;
-import main.peer.peerMessages.PieceMessage;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 
 class App {
     private static void f4() {
-
-
         TorrentDownloader torrentDownloader = new DefaultTorrentDownloader(getTorrentInfo(), "C:/torrent-downloaded/");
 
-        torrentDownloader.getTorrentSpeedStatistics()
-                .getDownloadSpeedFlux()
+        torrentDownloader.getBittorrentAlgorithm()
+                .receiveTorrentMessagesMessagesFlux()
+                .getPeerMessageResponseFlux()
                 .subscribe(System.out::println, Throwable::printStackTrace, System.out::println);
 
         torrentDownloader.getDownloadControl().start();
-    }
-
-    private static Flux<PieceMessage> toPieceMessageFlux(Flux<PeersCommunicator> peersCommunicatorFlux) {
-
-        return null;
     }
 
     public static void main(String[] args) throws Exception {
@@ -35,7 +26,7 @@ class App {
 
     @SneakyThrows
     public static TorrentInfo getTorrentInfo() {
-        String torrentFilePath = "src/main/resources/torrent-file.system-example3.torrent";
+        String torrentFilePath = "src/main/resources/torrent-file-example3.torrent";
         return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
     }
 }
