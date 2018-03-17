@@ -2,23 +2,21 @@ package main;
 
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
-import main.downloader.Downloader;
+import main.downloader.DefaultTorrentDownloader;
 import main.downloader.TorrentDownloader;
-import main.downloader.TorrentDownloaderImpl;
-import main.file.ActiveTorrent;
 import reactor.core.publisher.Hooks;
 
 class App {
     private static void f4() {
-        TorrentInfo torrentInfo = getTorrentInfo();
-        ActiveTorrent activeTorrent = new ActiveTorrent(torrentInfo, null);
-        Downloader downloader = new Downloader(activeTorrent);
-        TorrentDownloader torrentDownloader = new TorrentDownloaderImpl(torrentInfo, downloader);
 
-        torrentDownloader.getPeerMessageResponseFlux()
+
+        TorrentDownloader torrentDownloader = new DefaultTorrentDownloader(getTorrentInfo(), "C:/torrent-downloaded/");
+
+        torrentDownloader.getTorrentSpeedStatistics()
+                .getDownloadSpeedFlux()
                 .subscribe(System.out::println, Throwable::printStackTrace, System.out::println);
 
-        torrentDownloader.start();
+        torrentDownloader.getDownloadControl().start();
     }
 
     public static void main(String[] args) throws Exception {
@@ -29,7 +27,7 @@ class App {
 
     @SneakyThrows
     public static TorrentInfo getTorrentInfo() {
-        String torrentFilePath = "src/main/resources/torrent-file-example3.torrent";
+        String torrentFilePath = "src/main/resources/torrent-file.system-example3.torrent";
         return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
     }
 }

@@ -77,7 +77,7 @@ public class MyStepdefs {
     @Then("^application send and receive Handshake from the same random peer$")
     public void applicationSendAndReceiveHandshakeFromTheSameRandomPeer() throws Throwable {
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
-        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider);
+        PeersProvider peersProvider = new PeersProvider(this.torrentInfo);
 
         Mono<PeersCommunicator> peersCommunicatorFlux =
                 trackerProvider.connectToTrackersFlux()
@@ -144,13 +144,13 @@ public class MyStepdefs {
                     .verify();
     }
 
-    @Then("^application send to \\[peer ip: \"([^\"]*)\", peer port: \"([^\"]*)\"\\] and receive the following messages:$")
+    @Then("^application send to \\[peer ip: \"([^\"]*)\", peer port: \"([^\"]*)\"] and receive the following messages:$")
     public void applicationSendToPeerIpPeerPortAndReceiveTheFollowingMessages(String peerIp, int peerPort,
                                                                               List<PeerFakeRequestResponse> peerFakeRequestResponses) throws Throwable {
         RemoteFakePeer remoteFakePeer = new RemoteFakePeer(new Peer(peerIp, peerPort));
         remoteFakePeer.listen();
 
-        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, new TrackerProvider(this.torrentInfo));
+        PeersProvider peersProvider = new PeersProvider(this.torrentInfo);
 
         List<PeerMessageType> peerMessageTypeList = peerFakeRequestResponses.stream()
                 .map(PeerFakeRequestResponse::getSendMessageType)
@@ -212,7 +212,7 @@ public class MyStepdefs {
     @Then("^application receive at list one random block of a random piece$")
     public void applicationReceiveAtListOneRandomBlockOfARandomPiece() throws Throwable {
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
-        PeersProvider peersProvider = new PeersProvider(this.torrentInfo, trackerProvider);
+        PeersProvider peersProvider = new PeersProvider(this.torrentInfo);
 
         Flux<TrackerConnection> trackerConnectionConnectableFlux =
                 trackerProvider.connectToTrackersFlux()

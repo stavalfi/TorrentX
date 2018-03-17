@@ -2,6 +2,7 @@ package main.peer;
 
 import main.TorrentInfo;
 import main.peer.peerMessages.*;
+import main.statistics.SpeedStatistics;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
@@ -14,7 +15,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.BitSet;
 
-public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
+public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages,SpeedStatistics {
     private Peer me;
     private Peer peer;
     private BitSet peerPieces;
@@ -259,11 +260,11 @@ public class PeersCommunicator implements SendPeerMessage, ReceivePeerMessages {
         return send(new UnchokeMessage(this,this.getMe(), this.getPeer()));
     }
 
-    public Flux<Double> getPeerDownloadSpeedFlux() {
+    public Flux<Double> getDownloadSpeedFlux() {
         return peerDownloadSpeedFlux;
     }
 
-    public Flux<Double> getPeerUploadSpeedFlux() {
+    public Flux<Double> getUploadSpeedFlux() {
         return peerUploadSpeedFlux;
     }
 

@@ -8,11 +8,11 @@ public interface DownloadControl {
 
     void start();
 
+    void stop();
+
     void resume();
 
     void pause();
-
-    void stop();
 
     void remove();
 }

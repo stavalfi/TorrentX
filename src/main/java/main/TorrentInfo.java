@@ -19,6 +19,11 @@ public class TorrentInfo {
         this.torrent = torrent;
     }
 
+    public TorrentInfo(TorrentInfo torrentInfo) {
+        this.torrentFilePath = torrentInfo.getTorrentFilePath();
+        this.torrent = torrentInfo.torrent;
+    }
+
     public String getName() {
         return this.torrent.getName();
     }
