@@ -4,6 +4,9 @@ import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
 import main.downloader.DefaultTorrentDownloader;
 import main.downloader.TorrentDownloader;
+import main.peer.PeersCommunicator;
+import main.peer.peerMessages.PieceMessage;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 
 class App {
@@ -17,6 +20,11 @@ class App {
                 .subscribe(System.out::println, Throwable::printStackTrace, System.out::println);
 
         torrentDownloader.getDownloadControl().start();
+    }
+
+    private static Flux<PieceMessage> toPieceMessageFlux(Flux<PeersCommunicator> peersCommunicatorFlux) {
+
+        return null;
     }
 
     public static void main(String[] args) throws Exception {

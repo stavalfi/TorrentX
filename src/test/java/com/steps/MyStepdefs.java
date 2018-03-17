@@ -223,11 +223,13 @@ public class MyStepdefs {
         Mono<PieceMessage> receiveSinglePieceMono = peersProvider
                 .getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                 .flatMap(peersCommunicator -> peersCommunicator.sendInterestedMessage())
-                .flatMap(peersCommunicator -> peersCommunicator.getHaveMessageResponseFlux()
+                .flatMap(peersCommunicator -> peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux()
                         .take(1)
                         .flatMap(haveMessage -> peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
-                .flatMap(peersCommunicator -> peersCommunicator.getPieceMessageResponseFlux())
-                .doOnNext(pieceMessage -> pieceMessage.getPeersCommunicator().closeConnection())
+                .flatMap(peersCommunicator ->
+                        peersCommunicator.receivePeerMessages()
+                                .getPieceMessageResponseFlux()
+                                .doOnNext(pieceMessage -> peersCommunicator.closeConnection()))
                 .take(1)
                 .single();
 

@@ -1,7 +1,6 @@
 package main.peer.peerMessages;
 
 import main.peer.Peer;
-import main.peer.PeersCommunicator;
 
 import java.nio.ByteBuffer;
 
@@ -14,14 +13,14 @@ public class PieceMessage extends PeerMessage {
      * @param begin integer specifying the zero-based byte offset within the piece
      * @param block block of data, which is a subset of the piece specified by index.
      */
-    public PieceMessage(PeersCommunicator peersCommunicator, Peer from, Peer to, int index, int begin, byte[] block) {
-        super(peersCommunicator, to, from, 9 + block.length, messageId, ByteBuffer.allocate(4 + 4 + block.length)
+    public PieceMessage(Peer from, Peer to, int index, int begin, byte[] block) {
+        super(to, from, 9 + block.length, messageId, ByteBuffer.allocate(4 + 4 + block.length)
                                                             .putInt(index)
                                                             .putInt(begin)
                                                             .put(block).array());
     }
-    public PieceMessage(PeersCommunicator peersCommunicator,Peer from, Peer to,byte[] peerMessage) {
-        super(peersCommunicator, to, peerMessage, from);
+    public PieceMessage(Peer from, Peer to,byte[] peerMessage) {
+        super(to, peerMessage, from);
     }
     @Override
     public String toString() {

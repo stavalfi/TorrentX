@@ -6,7 +6,6 @@ import main.file.system.ActiveTorrents;
 import main.file.system.DownloaderImpl;
 import main.peer.PeersCommunicator;
 import main.peer.PeersProvider;
-import main.peer.ReceivePeerMessages;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.tracker.TrackerConnection;
@@ -29,7 +28,9 @@ public class DefaultTorrentDownloader extends TorrentDownloader {
         super(torrentInfo,
                 new BittorrentAlgorithmImpl(torrentInfo, peersCommunicatorFlux),
                 new DownloadControlImpl(torrentInfo, trackerConnectionFlux),
-                new DownloaderImpl(ActiveTorrents.getInstance().createActiveTorrentMono(torrentInfo, downloadPath), peersCommunicatorFlux.flatMap(ReceivePeerMessages::getPieceMessageResponseFlux)),
+                new DownloaderImpl(ActiveTorrents.getInstance().createActiveTorrentMono(torrentInfo, downloadPath),
+                        peersCommunicatorFlux.flatMap(peersCommunicator ->
+                                peersCommunicator.receiveMessages.getPieceMessageResponseFlux())),
                 new TorrentSpeedSpeedStatisticsImpl(torrentInfo, peersCommunicatorFlux.cast(SpeedStatistics.class)));
         this.trackerProvider = trackerProvider;
         this.peersProvider = peersProvider;
