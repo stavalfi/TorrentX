@@ -2,23 +2,20 @@ package main;
 
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
-import main.downloader.Downloader;
+import main.downloader.DefaultTorrentDownloader;
 import main.downloader.TorrentDownloader;
-import main.downloader.TorrentDownloaderImpl;
-import main.file.ActiveTorrent;
 import reactor.core.publisher.Hooks;
 
 class App {
     private static void f4() {
-        TorrentInfo torrentInfo = getTorrentInfo();
-        ActiveTorrent activeTorrent = new ActiveTorrent(torrentInfo, null);
-        Downloader downloader = new Downloader(activeTorrent);
-        TorrentDownloader torrentDownloader = new TorrentDownloaderImpl(torrentInfo, downloader);
+        TorrentDownloader torrentDownloader = new DefaultTorrentDownloader(getTorrentInfo(), "C:/torrent-downloaded/");
 
-        torrentDownloader.getPeerMessageResponseFlux()
+        torrentDownloader.getBittorrentAlgorithm()
+                .receiveTorrentMessagesMessagesFlux()
+                .getPeerMessageResponseFlux()
                 .subscribe(System.out::println, Throwable::printStackTrace, System.out::println);
 
-        torrentDownloader.start();
+        torrentDownloader.getDownloadControl().start();
     }
 
     public static void main(String[] args) throws Exception {

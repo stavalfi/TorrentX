@@ -1,7 +1,6 @@
 package main.peer.peerMessages;
 
 import main.peer.Peer;
-import main.peer.PeersCommunicator;
 
 import java.nio.ByteBuffer;
 
@@ -9,13 +8,11 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
 
     private final Peer from;
     private final Peer to;
-    private final PeersCommunicator peersCommunicator;
     private final int length; // 4 bytes - the length in bytes of sizeof(messageId) + sizeof(payload)
     private final byte messageId; // 1 byte
     private final byte[] payload;
 
-    public PeerMessage(PeersCommunicator peersCommunicator, Peer to, Peer from, int length, byte messageId, byte[] payload) {
-        this.peersCommunicator = peersCommunicator;
+    public PeerMessage(Peer to, Peer from, int length, byte messageId, byte[] payload) {
         this.length = length;
         this.messageId = messageId;
         this.payload = payload;
@@ -23,8 +20,7 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
         this.to = to;
     }
 
-    public PeerMessage(PeersCommunicator peersCommunicator, Peer to, byte[] peerMessage, Peer from) {
-        this.peersCommunicator = peersCommunicator;
+    public PeerMessage(Peer to, byte[] peerMessage, Peer from) {
         this.from = from;
         this.to = to;
         ByteBuffer buffer = ByteBuffer.wrap(peerMessage);
@@ -100,9 +96,5 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
                 ", to=" + to +
                 ", messageId=" + messageId +
                 '}';
-    }
-
-    public PeersCommunicator getPeersCommunicator() {
-        return peersCommunicator;
     }
 }

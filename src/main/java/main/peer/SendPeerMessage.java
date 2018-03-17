@@ -1,5 +1,7 @@
 package main.peer;
 
+import main.peer.peerMessages.PeerMessage;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.BitSet;
@@ -26,4 +28,6 @@ public interface SendPeerMessage {
     Mono<PeersCommunicator> sendRequestMessage(int index, int begin, int length);
 
     Mono<PeersCommunicator> sendUnchokeMessage();
+
+    Flux<PeerMessage> getSentMessagesFlux();
 }

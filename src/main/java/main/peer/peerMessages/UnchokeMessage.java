@@ -1,7 +1,6 @@
 package main.peer.peerMessages;
 
 import main.peer.Peer;
-import main.peer.PeersCommunicator;
 
 import java.nio.ByteBuffer;
 
@@ -12,12 +11,12 @@ public class UnchokeMessage extends PeerMessage {
     /**
      * The unchoke message is fixed-length and has no payload.
      */
-    public UnchokeMessage(PeersCommunicator peersCommunicator, Peer from, Peer to) {
-        super(peersCommunicator, to, from, length, messageId, ByteBuffer.allocate(0).array());
+    public UnchokeMessage(Peer from, Peer to) {
+        super(to, from, length, messageId, ByteBuffer.allocate(0).array());
     }
 
-    public UnchokeMessage(PeersCommunicator peersCommunicator, Peer from, Peer to, byte[] peerMessage) {
-        super(peersCommunicator, to, peerMessage, from);
+    public UnchokeMessage(Peer from, Peer to, byte[] peerMessage) {
+        super(to, peerMessage, from);
     }
 
     @Override

@@ -49,27 +49,27 @@ public class Utils {
     public static Flux<? extends PeerMessage> getSpecificMessageResponseFluxByMessageType(PeersCommunicator peersCommunicator, PeerMessageType peerMessageType) {
         switch (peerMessageType) {
             case HaveMessage:
-                return peersCommunicator.getHaveMessageResponseFlux();
+                return peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux();
             case PortMessage:
-                return peersCommunicator.getPortMessageResponseFlux();
+                return peersCommunicator.receivePeerMessages().getPortMessageResponseFlux();
             case ChokeMessage:
-                return peersCommunicator.getChokeMessageResponseFlux();
+                return peersCommunicator.receivePeerMessages().getChokeMessageResponseFlux();
             case PieceMessage:
-                return peersCommunicator.getPieceMessageResponseFlux();
+                return peersCommunicator.receivePeerMessages().getPieceMessageResponseFlux();
             case CancelMessage:
-                return peersCommunicator.getCancelMessageResponseFlux();
+                return peersCommunicator.receivePeerMessages().getCancelMessageResponseFlux();
             case KeepAliveMessage:
-                return peersCommunicator.getKeepMessageResponseFlux();
+                return peersCommunicator.receivePeerMessages().getKeepMessageResponseFlux();
             case RequestMessage:
-                return peersCommunicator.getRequestMessageResponseFlux();
+                return peersCommunicator.receivePeerMessages().getRequestMessageResponseFlux();
             case UnchokeMessage:
-                return peersCommunicator.getUnchokeMessageResponseFlux();
+                return peersCommunicator.receivePeerMessages().getUnchokeMessageResponseFlux();
             case BitFieldMessage:
-                return peersCommunicator.getBitFieldMessageResponseFlux();
+                return peersCommunicator.receivePeerMessages().getBitFieldMessageResponseFlux();
             case InterestedMessage:
-                return peersCommunicator.getInterestedMessageResponseFlux();
+                return peersCommunicator.receivePeerMessages().getInterestedMessageResponseFlux();
             case NotInterestedMessage:
-                return peersCommunicator.getNotInterestedMessageResponseFlux();
+                return peersCommunicator.receivePeerMessages().getNotInterestedMessageResponseFlux();
             default:
                 throw new IllegalArgumentException(peerMessageType.toString());
         }

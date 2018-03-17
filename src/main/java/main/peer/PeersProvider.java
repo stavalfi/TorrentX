@@ -6,7 +6,6 @@ import main.TorrentInfo;
 import main.peer.peerMessages.HandShake;
 import main.tracker.BadResponseException;
 import main.tracker.TrackerConnection;
-import main.tracker.TrackerProvider;
 import main.tracker.response.AnnounceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,11 +24,9 @@ public class PeersProvider {
     private static Logger logger = LoggerFactory.getLogger(PeersProvider.class);
 
     private TorrentInfo torrentInfo;
-    private TrackerProvider trackerProvider;
 
-    public PeersProvider(TorrentInfo torrentInfo, TrackerProvider trackerProvider) {
+    public PeersProvider(TorrentInfo torrentInfo) {
         this.torrentInfo = torrentInfo;
-        this.trackerProvider = trackerProvider;
     }
 
     public Mono<PeersCommunicator> connectToPeerMono(Peer peer) {
@@ -60,13 +57,11 @@ public class PeersProvider {
                     sink.error(new BadResponseException("we sent the peer a handshake request" +
                             " and he sent us back handshake response" +
                             " with the wrong torrent-info-hash: " + receivedTorrentInfoHash));
-                    return;
                 } else {
                     // all went well, I accept this connection.
                     PeersCommunicator peersCommunicator = new PeersCommunicator(this.torrentInfo, peer,
                             peerSocket, receiveMessages, sendMessages);
                     sink.success(peersCommunicator);
-                    return;
                 }
             } catch (IOException e) {
                 try {
@@ -100,15 +95,7 @@ public class PeersProvider {
                 .flatMap((Peer peer) -> connectToPeerMono(peer));
     }
 
-    public Flux<PeersCommunicator> getPeersCommunicatorFromTrackerFlux() {
-        return getPeersCommunicatorFromTrackerFlux(this.trackerProvider.connectToTrackersFlux());
-    }
-
     public TorrentInfo getTorrentInfo() {
         return torrentInfo;
-    }
-
-    public TrackerProvider getTrackerProvider() {
-        return trackerProvider;
     }
 }
