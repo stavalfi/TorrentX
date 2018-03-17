@@ -20,19 +20,19 @@ public class ActiveTorrents {
     }
 
     public Mono<ActiveTorrent> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath) {
-        return Mono.never();
+        return Mono.empty();
     }
 
     public Mono<Optional<ActiveTorrent>> deleteActiveTorrentOnlyMono(String torrentInfoHash) {
-        return Mono.never();
+        return Mono.empty();
     }
 
     public Mono<Optional<ActiveTorrent>> deleteActiveTorrentAndFileMono(String torrentInfoHash) {
-        return Mono.never();
+        return Mono.empty();
     }
 
     public Mono<Optional<ActiveTorrent>> deleteFileOnlyMono(String torrentInfoHash) {
-        return Mono.never();
+        return Mono.empty();
     }
 
     public Mono<Optional<ActiveTorrent>> findActiveTorrentByHashMono(String torrentInfoHash) {
@@ -62,7 +62,7 @@ public class ActiveTorrents {
         // as implied here: https://stackoverflow.com/questions/45396252/concurrency-of-randomaccessfile-in-java/45490504
         // something can go wrong if multiple threads try to read/write concurrently.
         public synchronized Mono<ActiveTorrent> writeBlock(PieceMessage pieceMessage) {
-            throw new NotImplementedException();
+            return Mono.empty();
         }
 
 
@@ -71,7 +71,7 @@ public class ActiveTorrents {
         public synchronized Mono<byte[]> readBlock(RequestMessage requestMessage) {
             //if (!havePiece(pieceIndex))
             //Mono.error(new IllegalStateException("requested block of pieced we don't have yet: " + pieceIndex));
-            return Mono.never();
+            return Mono.empty();
         }
 
         public boolean havePiece(int pieceIndex) {

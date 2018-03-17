@@ -4,23 +4,29 @@ import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import main.TorrentInfo;
+import main.file.system.ActiveTorrents;
+import main.file.system.ActiveTorrents.ActiveTorrent;
 import main.peer.Peer;
 import main.peer.PeersCommunicator;
 import main.peer.PeersListener;
 import main.peer.PeersProvider;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
+import main.peer.peerMessages.RequestMessage;
 import main.tracker.Tracker;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerExceptions;
 import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
+import org.junit.Assert;
 import org.mockito.Mockito;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 
+import java.io.File;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -236,6 +242,129 @@ public class MyStepdefs {
         StepVerifier.create(receiveSinglePieceMono)
                 .expectNextCount(1)
                 .verifyComplete();
+    }
+
+    @Then("^application create active-torrent for: \"([^\"]*)\",\"([^\"]*)\"$")
+    public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+
+        Mono<ActiveTorrents.ActiveTorrent> activeTorrentMono =
+                ActiveTorrents.getInstance()
+                        .createActiveTorrentMono(torrentInfo, downloadLocation);
+
+        StepVerifier.create(activeTorrentMono)
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
+    public void activeTorrentExistForTorrent(boolean isActiveTorrentExist, String torrentFileName) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+
+        Mono<Optional<ActiveTorrent>> activeTorrentMono =
+                ActiveTorrents.getInstance()
+                        .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash());
+
+        StepVerifier.create(activeTorrentMono)
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @Then("^files of torrent: \"([^\"]*)\" exist: \"([^\"]*)\" in \"([^\"]*)\"$")
+    public void torrentExistIn(String torrentFileName, String torrentFilesExist, String downloadLocation) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+
+        File file = new File(downloadLocation + torrentInfo.getName());
+
+        Assert.assertTrue("file does not eixst in local file system.", file.exists());
+        Assert.assertTrue("the file is not a directory.", file.isDirectory());
+    }
+
+    @Then("^application delete active-torrent: \"([^\"]*)\" and file: \"([^\"]*)\"$")
+    public void applicationDeleteActiveTorrentAndFile(String torrentFileName, String downloadLocation) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+
+        Mono<Optional<ActiveTorrent>> deleteTorrentTaskMono =
+                ActiveTorrents.getInstance()
+                        .deleteActiveTorrentAndFileMono(torrentInfo.getTorrentInfoHash())
+                        .map(Optional::get)
+                        // assert that the files of this torrent is not exist
+                        .doOnNext(activeTorrent -> {
+                            File file = new File(downloadLocation + torrentInfo.getName());
+                            Assert.assertFalse("file eixst in local file system after we deleted it.", file.exists());
+                        })
+                        // check if this active torrent is not exist
+                        .flatMap(activeTorrent -> ActiveTorrents.getInstance()
+                                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash()))
+                        .filter(Optional::isPresent)
+                        .doOnNext(activeTorrent -> Assert.fail("active torret is stille exist after we deleted it."));
+
+        StepVerifier.create(deleteTorrentTaskMono)
+                // if the active torrent is deleted then filter won't pass anything.
+                .verifyComplete();
+    }
+
+    @Then("^application save random blocks from different threads inside torrent: \"([^\"]*)\" in \"([^\"]*)\" and check it saved$")
+    public void applicationSaveARandomBlockInsideTorrentInAndCheckItSaved(String torrentFileName,
+                                                                          String downloadLocation,
+                                                                          List<BlockOfPiece> blockList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+
+        Function<Integer, byte[]> toByteArray = length -> {
+            byte[] bytes = new byte[length];
+            byte content = 0;
+            for (int i = 0; i < length; i++, content++)
+                bytes[i] = content;
+            return bytes;
+        };
+
+        Mono<ActiveTorrent> activeTorrentMono = ActiveTorrents.getInstance()
+                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
+                .map(Optional::get)
+                .subscribeOn(Schedulers.elastic());
+
+        Flux<byte[]> readFlux = Flux.fromIterable(blockList)
+                .map(blockOfPiece -> new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
+                        toByteArray.apply(blockOfPiece.getLength())))
+                .flatMap(pieceMessage -> activeTorrentMono
+                        .flatMap(activeTorrent -> activeTorrent.writeBlock(pieceMessage).subscribeOn(Schedulers.elastic()))
+                        // assert that the content is written.
+                        .flatMap(activeTorrent -> {
+                            RequestMessage requestMessage =
+                                    new RequestMessage(null, null,
+                                            pieceMessage.getIndex(),
+                                            pieceMessage.getBegin(),
+                                            pieceMessage.getBlock().length);
+                            return activeTorrent.readBlock(requestMessage)
+                                    .subscribeOn(Schedulers.elastic());
+                        })
+                        .doOnNext(readByteArray -> {
+                            String message = "the content I wrote is not equal to the content I read to the file";
+                            Assert.assertArrayEquals(message, readByteArray, pieceMessage.getBlock());
+                        }));
+
+        StepVerifier.create(readFlux)
+                .expectNextCount(blockList.size())
+                .verifyComplete();
+    }
+
+    @Then("^completed pieces are for torrent: \"([^\"]*)\":$")
+    public void completedPiecesAreForTorrent(String torrentFileName, List<Integer> completedPiecesIndexList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+
+        Mono<ActiveTorrent> activeTorrentMono = ActiveTorrents.getInstance()
+                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
+                .map(Optional::get)
+                .doOnNext(activeTorrent ->
+                        completedPiecesIndexList.forEach(completedPiecesIndex -> {
+                            String message = "the piece is not completed but it should be.";
+                            Assert.assertTrue(message, activeTorrent.havePiece(completedPiecesIndex));
+                        }));
+
+        StepVerifier.create(activeTorrentMono)
+                .expectNextCount(1)
+                .verifyComplete();
+
     }
 }
 
