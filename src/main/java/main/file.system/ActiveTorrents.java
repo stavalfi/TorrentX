@@ -1,13 +1,15 @@
 package main.file.system;
 
 import main.TorrentInfo;
+import main.peer.peerMessages.PieceMessage;
+import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
 import java.util.BitSet;
+import java.util.Optional;
 
 public class ActiveTorrents {
 
@@ -18,34 +20,28 @@ public class ActiveTorrents {
     }
 
     public Mono<ActiveTorrent> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath) {
-        new ActiveTorrent(torrentInfo, downloadPath, null, null);
         return Mono.never();
     }
 
-    public Mono<ActiveTorrent> deleteActiveTorrentOnlyMono(TorrentInfo torrentInfo, String downloadPath) {
-        new ActiveTorrent(torrentInfo, downloadPath, null, null);
+    public Mono<Optional<ActiveTorrent>> deleteActiveTorrentOnlyMono(String torrentInfoHash) {
         return Mono.never();
     }
 
-    public Mono<ActiveTorrent> deleteActiveTorrentAndFileMono(TorrentInfo torrentInfo, String downloadPath) {
-        new ActiveTorrent(torrentInfo, downloadPath, null, null);
+    public Mono<Optional<ActiveTorrent>> deleteActiveTorrentAndFileMono(String torrentInfoHash) {
         return Mono.never();
     }
 
-    public Mono<ActiveTorrent> deleteFileOnlyMono(TorrentInfo torrentInfo, String filePath) {
-        new ActiveTorrent(torrentInfo, filePath, null, null);
+    public Mono<Optional<ActiveTorrent>> deleteFileOnlyMono(String torrentInfoHash) {
+        return Mono.never();
+    }
+
+    public Mono<Optional<ActiveTorrent>> findActiveTorrentByHashMono(String torrentInfoHash) {
         return Mono.never();
     }
 
     public Flux<ActiveTorrent> getAllActiveTorrentsFlux() {
         return Flux.never();
     }
-
-
-    public Mono<ActiveTorrent> getActiveTorrentByHashMono(String torrentInfoHash) {
-        return Mono.never();
-    }
-
 
     public class ActiveTorrent extends TorrentInfo {
         private final String downloadPath;
@@ -63,13 +59,18 @@ public class ActiveTorrents {
             return this.bitSet;
         }
 
-        public Mono<ActiveTorrent> saveBlock(int pieceIndex, int offset, byte[] block) {
+        // as implied here: https://stackoverflow.com/questions/45396252/concurrency-of-randomaccessfile-in-java/45490504
+        // something can go wrong if multiple threads try to read/write concurrently.
+        public synchronized Mono<ActiveTorrent> writeBlock(PieceMessage pieceMessage) {
             throw new NotImplementedException();
         }
 
-        public Mono<ByteBuffer> readBlock(int pieceIndex, int offset) {
-            if (!havePiece(pieceIndex))
-                Mono.error(new IllegalStateException("requested block of pieced we don't have yet: " + pieceIndex));
+
+        // as implied here: https://stackoverflow.com/questions/45396252/concurrency-of-randomaccessfile-in-java/45490504
+        // something can go wrong if multiple threads try to read/write concurrently.
+        public synchronized Mono<byte[]> readBlock(RequestMessage requestMessage) {
+            //if (!havePiece(pieceIndex))
+            //Mono.error(new IllegalStateException("requested block of pieced we don't have yet: " + pieceIndex));
             return Mono.never();
         }
 
