@@ -19,8 +19,8 @@ Feature: test tracker api calls
   Scenario: communicating with collection of trackers which contain invalid urls of trackers
     Given only one invalid url of a tracker
     Then application send and receive the following messages from a random tracker:
-      | trackerRequestType | errorSignalType      |
-      | Connect            | UnknownHostException |
+      | trackerRequestType | errorSignalType |
+      | Connect            |                 |
 
 
 
