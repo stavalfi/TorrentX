@@ -13,6 +13,8 @@ import main.peer.PeersProvider;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
+import main.statistics.SpeedStatistics;
+import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.tracker.Tracker;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerExceptions;
@@ -25,8 +27,10 @@ import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
+import reactor.util.function.Tuple2;
 
 import java.io.File;
+import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -365,6 +369,59 @@ public class MyStepdefs {
                 .expectNextCount(1)
                 .verifyComplete();
 
+    }
+
+    private SpeedStatistics torrentDownloadSpeedStatistics;
+
+    @Given("^size of incoming messages every \"([^\"]*)\" mill-seconds from a peer:$")
+    public void sizeOfIncomingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> incomingMessageSizeList) throws Throwable {
+        Flux<? extends PeerMessage> receivedMessageMessages = Flux.fromIterable(incomingMessageSizeList)
+                .delayElements(Duration.ofMillis(delay))
+                .map(incomingMessageSize -> new PieceMessage(null, null, new byte[incomingMessageSize]));
+        Flux<? extends PeerMessage> sentSentMessages = Flux.empty();
+        this.torrentDownloadSpeedStatistics =
+                new TorrentSpeedSpeedStatisticsImpl(this.torrentInfo, receivedMessageMessages, sentSentMessages);
+    }
+
+    @Then("^download statistics every 100 mill-seconds are from a peer:$")
+    public void downloadStatisticsEveryMillSecondsAreFromAPeer(List<Double> downloadSpeedStatistics) throws Throwable {
+
+        Flux<Tuple2<Double, Double>> speedComparisionFlux = Flux.zip(this.torrentDownloadSpeedStatistics.getDownloadSpeedFlux(),
+                Flux.fromIterable(downloadSpeedStatistics))
+                .doOnNext(values -> {
+                    String message = "speed expected and actual are not equal";
+                    Assert.assertEquals(message, values.getT1(), values.getT2());
+                });
+
+        StepVerifier.create(speedComparisionFlux)
+                .expectNextCount(downloadSpeedStatistics.size())
+                .verifyComplete();
+    }
+
+    private SpeedStatistics torrentUploadSpeedStatistics;
+
+    @Given("^size of outgoing messages every \"([^\"]*)\" mill-seconds from a peer:$")
+    public void outgoingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> outgoingMessageSizeList) throws Throwable {
+        Flux<? extends PeerMessage> receivedMessageMessages = Flux.fromIterable(outgoingMessageSizeList)
+                .delayElements(Duration.ofMillis(delay))
+                .map(outgoingMessageSize -> new PieceMessage(null, null, new byte[outgoingMessageSize]));
+        Flux<? extends PeerMessage> sentSentMessages = Flux.empty();
+        this.torrentUploadSpeedStatistics =
+                new TorrentSpeedSpeedStatisticsImpl(this.torrentInfo, receivedMessageMessages, sentSentMessages);
+    }
+
+    @Then("^upload statistics every 100 mill-seconds are from a peer:$")
+    public void uploadStatisticsEveryMillSecondsAreFromAPeer(List<Double> uploadSpeedStatistics) throws Throwable {
+        Flux<Tuple2<Double, Double>> speedComparisionFlux = Flux.zip(this.torrentUploadSpeedStatistics.getDownloadSpeedFlux(),
+                Flux.fromIterable(uploadSpeedStatistics))
+                .doOnNext(values -> {
+                    String message = "speed expected and actual are not equal";
+                    Assert.assertEquals(message, values.getT1(), values.getT2());
+                });
+
+        StepVerifier.create(speedComparisionFlux)
+                .expectNextCount(uploadSpeedStatistics.size())
+                .verifyComplete();
     }
 }
 
