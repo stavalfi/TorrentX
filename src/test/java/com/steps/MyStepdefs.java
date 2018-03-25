@@ -1,11 +1,12 @@
 package com.steps;
 
+import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import main.TorrentInfo;
+import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
-import main.file.system.ActiveTorrents.ActiveTorrent;
 import main.peer.Peer;
 import main.peer.PeersCommunicator;
 import main.peer.PeersListener;
@@ -34,6 +35,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.mockito.Mockito.mock;
 
@@ -252,7 +254,7 @@ public class MyStepdefs {
     public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
 
-        Mono<ActiveTorrents.ActiveTorrent> activeTorrentMono =
+        Mono<ActiveTorrent> activeTorrentMono =
                 ActiveTorrents.getInstance()
                         .createActiveTorrentMono(torrentInfo, downloadLocation);
 
@@ -275,13 +277,24 @@ public class MyStepdefs {
     }
 
     @Then("^files of torrent: \"([^\"]*)\" exist: \"([^\"]*)\" in \"([^\"]*)\"$")
-    public void torrentExistIn(String torrentFileName, String torrentFilesExist, String downloadLocation) throws Throwable {
+    public void torrentExistIn(String torrentFileName, boolean torrentFilesExist, String downloadLocation) throws Throwable {
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
 
-        File file = new File(downloadLocation + torrentInfo.getName());
+        Stream<File> fileStream = torrentInfo.getFileList()
+                .stream()
+                .map(TorrentFile::getFileDirs)
+                .map(List::stream)
+                .map((Stream<String> incompleteFilePath) -> incompleteFilePath.collect(Collectors.joining("/")))
+                .map((String incompleteFilePath) -> downloadLocation.concat(incompleteFilePath))
+                .map((String completeFilePath) -> new File(completeFilePath));
 
-        Assert.assertTrue("file does not eixst in local file system.", file.exists());
-        Assert.assertTrue("the file is not a directory.", file.isDirectory());
+        if (torrentFilesExist)
+            fileStream.peek(file -> Assert.assertTrue("file does not exist: " + file.getPath(), file.exists()))
+                    .peek(file -> Assert.assertTrue("file is a directory: " + file.getPath(), !file.isDirectory()))
+                    .peek(file -> Assert.assertTrue("we can't read from the file: " + file.getPath(), file.canRead()))
+                    .forEach(file -> Assert.assertTrue("we can't write to the file: " + file.getPath(), file.canWrite()));
+        else
+            fileStream.forEach(file -> Assert.assertTrue("file exist: " + file.getPath(), file.exists()));
     }
 
     @Then("^application delete active-torrent: \"([^\"]*)\" and file: \"([^\"]*)\"$")
@@ -314,7 +327,7 @@ public class MyStepdefs {
                                                                           List<BlockOfPiece> blockList) throws Throwable {
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
 
-        Function<Integer, byte[]> toByteArray = length -> {
+        Function<Integer, byte[]> toRandomByteArray = length -> {
             byte[] bytes = new byte[length];
             byte content = 0;
             for (int i = 0; i < length; i++, content++)
@@ -329,18 +342,17 @@ public class MyStepdefs {
 
         Flux<byte[]> readFlux = Flux.fromIterable(blockList)
                 .map(blockOfPiece -> new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
-                        toByteArray.apply(blockOfPiece.getLength())))
+                        toRandomByteArray.apply(blockOfPiece.getLength())))
                 .flatMap(pieceMessage -> activeTorrentMono
                         .flatMap(activeTorrent -> activeTorrent.writeBlock(pieceMessage).subscribeOn(Schedulers.elastic()))
                         // assert that the content is written.
-                        .flatMap(activeTorrent -> {
+                        .map(activeTorrent -> {
                             RequestMessage requestMessage =
                                     new RequestMessage(null, null,
                                             pieceMessage.getIndex(),
                                             pieceMessage.getBegin(),
                                             pieceMessage.getBlock().length);
-                            return activeTorrent.readBlock(requestMessage)
-                                    .subscribeOn(Schedulers.elastic());
+                            return Utils.readFromFile(torrentInfo, downloadLocation, requestMessage);
                         })
                         .doOnNext(readByteArray -> {
                             String message = "the content I wrote is not equal to the content I read to the file";
@@ -375,10 +387,14 @@ public class MyStepdefs {
 
     @Given("^size of incoming messages every \"([^\"]*)\" mill-seconds from a peer:$")
     public void sizeOfIncomingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> incomingMessageSizeList) throws Throwable {
+
         Flux<? extends PeerMessage> receivedMessageMessages = Flux.fromIterable(incomingMessageSizeList)
                 .delayElements(Duration.ofMillis(delay))
-                .map(incomingMessageSize -> new PieceMessage(null, null, new byte[incomingMessageSize]));
+                .map(incomingMessageSize ->
+                        new PieceMessage(null, null, 0, 0, new byte[incomingMessageSize]));
+
         Flux<? extends PeerMessage> sentSentMessages = Flux.empty();
+
         this.torrentDownloadSpeedStatistics =
                 new TorrentSpeedSpeedStatisticsImpl(this.torrentInfo, receivedMessageMessages, sentSentMessages);
     }
@@ -386,12 +402,13 @@ public class MyStepdefs {
     @Then("^download statistics every 100 mill-seconds are from a peer:$")
     public void downloadStatisticsEveryMillSecondsAreFromAPeer(List<Double> downloadSpeedStatistics) throws Throwable {
 
-        Flux<Tuple2<Double, Double>> speedComparisionFlux = Flux.zip(this.torrentDownloadSpeedStatistics.getDownloadSpeedFlux(),
-                Flux.fromIterable(downloadSpeedStatistics))
-                .doOnNext(values -> {
-                    String message = "speed expected and actual are not equal";
-                    Assert.assertEquals(message, values.getT1(), values.getT2());
-                });
+        Flux<Tuple2<Double, Double>> speedComparisionFlux =
+                Flux.zip(Flux.fromIterable(downloadSpeedStatistics),
+                        this.torrentDownloadSpeedStatistics.getDownloadSpeedFlux())
+                        .doOnNext(values -> {
+                            String message = "download speed expected and actual are not equal";
+                            Assert.assertEquals(message, values.getT1(), values.getT2());
+                        });
 
         StepVerifier.create(speedComparisionFlux)
                 .expectNextCount(downloadSpeedStatistics.size())
@@ -404,7 +421,9 @@ public class MyStepdefs {
     public void outgoingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> outgoingMessageSizeList) throws Throwable {
         Flux<? extends PeerMessage> receivedMessageMessages = Flux.fromIterable(outgoingMessageSizeList)
                 .delayElements(Duration.ofMillis(delay))
-                .map(outgoingMessageSize -> new PieceMessage(null, null, new byte[outgoingMessageSize]));
+                .map(outgoingMessageSize ->
+                        new PieceMessage(null, null, 0, 0, new byte[outgoingMessageSize]));
+
         Flux<? extends PeerMessage> sentSentMessages = Flux.empty();
         this.torrentUploadSpeedStatistics =
                 new TorrentSpeedSpeedStatisticsImpl(this.torrentInfo, receivedMessageMessages, sentSentMessages);
@@ -412,12 +431,13 @@ public class MyStepdefs {
 
     @Then("^upload statistics every 100 mill-seconds are from a peer:$")
     public void uploadStatisticsEveryMillSecondsAreFromAPeer(List<Double> uploadSpeedStatistics) throws Throwable {
-        Flux<Tuple2<Double, Double>> speedComparisionFlux = Flux.zip(this.torrentUploadSpeedStatistics.getDownloadSpeedFlux(),
-                Flux.fromIterable(uploadSpeedStatistics))
-                .doOnNext(values -> {
-                    String message = "speed expected and actual are not equal";
-                    Assert.assertEquals(message, values.getT1(), values.getT2());
-                });
+        Flux<Tuple2<Double, Double>> speedComparisionFlux =
+                Flux.zip(Flux.fromIterable(uploadSpeedStatistics),
+                        this.torrentUploadSpeedStatistics.getDownloadSpeedFlux())
+                        .doOnNext(values -> {
+                            String message = "upload speed expected and actual are not equal";
+                            Assert.assertEquals(message, values.getT1(), values.getT2());
+                        });
 
         StepVerifier.create(speedComparisionFlux)
                 .expectNextCount(uploadSpeedStatistics.size())

@@ -1,14 +1,23 @@
 package com.utils;
 
+import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
+import lombok.SneakyThrows;
 import main.TorrentInfo;
+import main.file.system.ActiveTorrentFile;
 import main.peer.PeersCommunicator;
 import main.peer.peerMessages.PeerMessage;
+import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class Utils {
     public static TorrentInfo readTorrentFile(String torrentFilePath) throws IOException {
@@ -73,5 +82,63 @@ public class Utils {
             default:
                 throw new IllegalArgumentException(peerMessageType.toString());
         }
+    }
+
+    public static long folderSize(File directory) {
+        long length = 0;
+        for (File file : directory.listFiles()) {
+            if (file.isFile())
+                length += file.length();
+            else
+                length += folderSize(file);
+        }
+        return length;
+    }
+
+    @SneakyThrows
+    public static byte[] readFromFile(TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
+        List<TorrentFile> fileList = torrentInfo.getFileList();
+
+        List<ActiveTorrentFile> activeTorrentFileList = new ArrayList<>();
+        String fullFilePath = downloadPath + "/" + torrentInfo.getName() + "/";
+        long position = 0;
+        for (TorrentFile torrentFile : fileList) {
+            String completeFilePath = torrentFile.getFileDirs()
+                    .stream()
+                    .collect(Collectors.joining("/", fullFilePath, ""));
+            long from = position;
+            long to = position + torrentFile.getFileLength();
+            position = to;
+
+            ActiveTorrentFile activeTorrentFile = new ActiveTorrentFile(completeFilePath, from, to);
+            activeTorrentFileList.add(activeTorrentFile);
+        }
+
+        // read from the file
+
+        byte[] result = new byte[requestMessage.getBlockLength()];
+        int resultFreeIndex = 0;
+        long from = requestMessage.getIndex() * torrentInfo.getPieceLength() + requestMessage.getBegin();
+        long to = requestMessage.getIndex() * torrentInfo.getPieceLength() + requestMessage.getBegin() + requestMessage.getBlockLength();
+
+        for (ActiveTorrentFile activeTorrentFile : activeTorrentFileList) {
+            if (activeTorrentFile.getFrom() <= from && from <= activeTorrentFile.getTo()) {
+                RandomAccessFile randomAccessFile = new RandomAccessFile(activeTorrentFile.getDownloadPath(), "rw");
+                randomAccessFile.seek(from);
+                if (activeTorrentFile.getTo() < to) {
+                    byte[] tempResult = new byte[(int) (activeTorrentFile.getTo() - from)];
+                    randomAccessFile.read(tempResult);
+                    for (int i = 0; i < tempResult.length; i++)
+                        result[resultFreeIndex++] = tempResult[i];
+                } else {
+                    byte[] tempResult = new byte[(int) (to - from)];
+                    randomAccessFile.read(tempResult);
+                    for (int i = 0; i < tempResult.length; i++)
+                        result[resultFreeIndex++] = tempResult[i];
+                    return result;
+                }
+            }
+        }
+        throw new Exception("we shouldn't be here - never!");
     }
 }
