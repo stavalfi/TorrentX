@@ -6,16 +6,16 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public class DownloaderImpl implements Downloader {
-    private Mono<ActiveTorrents.ActiveTorrent> activeTorrentMono;
+    private Mono<ActiveTorrent> activeTorrentMono;
     private final Flux<PieceMessage> peerResponsesFlux;
 
-    public DownloaderImpl(Mono<ActiveTorrents.ActiveTorrent> activeTorrentMono,
+    public DownloaderImpl(Mono<ActiveTorrent> activeTorrentMono,
                           Flux<PieceMessage> peerResponsesFlux) {
         this.activeTorrentMono = activeTorrentMono;
         this.peerResponsesFlux = peerResponsesFlux;
     }
 
-    public Mono<ActiveTorrents.ActiveTorrent> getActiveTorrentMono() {
+    public Mono<ActiveTorrent> getActiveTorrentMono() {
         return activeTorrentMono;
     }
 

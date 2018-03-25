@@ -41,7 +41,7 @@ public class TorrentInfo {
         return this.torrent.getPieces();
     }
 
-    public Long getTotalSize() {
+    public long getTotalSize() {
         return this.torrent.getTotalSize();
     }
 
@@ -78,6 +78,10 @@ public class TorrentInfo {
         return this.torrent.getInfo_hash();
     }
 
+    public List<TorrentFile> getFileList() {
+        return this.torrent.getFileList();
+    }
+
     @Override
     public String toString() {
 
@@ -102,9 +106,8 @@ public class TorrentInfo {
                 "Pieces: " + this.torrent.getPieces().size() + "\n" +
                 "Total Size: " + this.torrent.getTotalSize() + "\n" +
                 "Is Single File Torrent: " + this.torrent.isSingleFileTorrent() + "\n" +
-                "File List: \n" + fileList +
-                "Tracker List: \n" + trackers + "\n" +
-                '}';
+                "File List:\n" + fileList + "\n" +
+                "Tracker List: \n" + trackers;
     }
 
     public String getTorrentFilePath() {
