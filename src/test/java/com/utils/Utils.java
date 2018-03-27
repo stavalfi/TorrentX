@@ -100,7 +100,9 @@ public class Utils {
         List<TorrentFile> fileList = torrentInfo.getFileList();
 
         List<ActiveTorrentFile> activeTorrentFileList = new ArrayList<>();
-        String fullFilePath = downloadPath + "/" + torrentInfo.getName() + "/";
+        String fullFilePath = downloadPath + "/";
+        if (!torrentInfo.isSingleFileTorrent())
+            fullFilePath += torrentInfo.getName() + "/";
         long position = 0;
         for (TorrentFile torrentFile : fileList) {
             String completeFilePath = torrentFile.getFileDirs()
@@ -123,7 +125,7 @@ public class Utils {
 
         for (ActiveTorrentFile activeTorrentFile : activeTorrentFileList) {
             if (activeTorrentFile.getFrom() <= from && from <= activeTorrentFile.getTo()) {
-                RandomAccessFile randomAccessFile = new RandomAccessFile(activeTorrentFile.getDownloadPath(), "rw");
+                RandomAccessFile randomAccessFile = new RandomAccessFile(activeTorrentFile.getFilePath(), "rw");
                 randomAccessFile.seek(from);
                 if (activeTorrentFile.getTo() < to) {
                     byte[] tempResult = new byte[(int) (activeTorrentFile.getTo() - from)];
@@ -140,5 +142,31 @@ public class Utils {
             }
         }
         throw new Exception("we shouldn't be here - never!");
+    }
+
+    public static void deleteDownloadFolder() {
+        // delete download folder
+        try {
+            File file = new File(System.getProperty("user.dir") + "/torrents-test");
+            boolean deleted = deleteDirectory(file);
+            if (!deleted)
+                System.out.println("could not delete torrent-test folder: " +
+                        System.getProperty("user.dir") + "/torrents-test");
+        } catch (Exception e) {
+        }
+    }
+
+    private static boolean deleteDirectory(File directoryToBeDeleted) {
+        File[] allContents = directoryToBeDeleted.listFiles();
+        if (allContents != null) {
+            for (File file : allContents) {
+                if (!deleteDirectory(file)) {
+                    System.out.println("could not delete: "+
+                            file.getAbsolutePath());
+                    return false;
+                }
+            }
+        }
+        return directoryToBeDeleted.delete();
     }
 }
