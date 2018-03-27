@@ -4,6 +4,7 @@ import christophedetroyer.torrent.Torrent;
 import christophedetroyer.torrent.TorrentFile;
 import main.tracker.Tracker;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -28,6 +29,9 @@ public class TorrentInfo {
         return this.torrent.getName();
     }
 
+    public boolean isSingleFileTorrent() {
+        return this.torrent.isSingleFileTorrent();
+    }
 
     public int getPieceLength() {
         return Math.toIntExact(this.torrent.getPieceLength());
@@ -79,6 +83,9 @@ public class TorrentInfo {
     }
 
     public List<TorrentFile> getFileList() {
+        if (isSingleFileTorrent()) {
+            return Collections.singletonList(new TorrentFile(getTotalSize(), Collections.singletonList(getName())));
+        }
         return this.torrent.getFileList();
     }
 
