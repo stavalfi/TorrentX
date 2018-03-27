@@ -1,11 +1,11 @@
 package main.downloader;
 
-public class TorrentPiece {
+public class TorrentPieceChanged {
     private int pieceIndex;
     private String pieceHashCode;
     private TorrentPieceStatus torrentPieceStatus;
 
-    public TorrentPiece(int pieceIndex, String pieceHashCode, TorrentPieceStatus torrentPieceStatus) {
+    public TorrentPieceChanged(int pieceIndex, String pieceHashCode, TorrentPieceStatus torrentPieceStatus) {
         this.pieceIndex = pieceIndex;
         this.pieceHashCode = pieceHashCode;
         this.torrentPieceStatus = torrentPieceStatus;

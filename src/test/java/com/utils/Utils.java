@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 
 public class Utils {
     public static TorrentInfo readTorrentFile(String torrentFilePath) throws IOException {
-        String torrentFilesPath = "src/test/resources/" + torrentFilePath;
+        String torrentFilesPath = "src/test/resources/torrents/" + torrentFilePath;
 
         return new TorrentInfo(torrentFilesPath, TorrentParser.parseTorrent(torrentFilesPath));
     }
