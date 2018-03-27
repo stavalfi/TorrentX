@@ -4,13 +4,13 @@ import reactor.core.publisher.Mono;
 
 import java.io.RandomAccessFile;
 
-public class ActiveTorrentFile {
-    private String downloadPath;
+public class ActiveTorrentFile implements TorrentFile {
+    private String filePath;
     private long from, to; // not closed range: [from,to).
     private RandomAccessFile randomAccessFile;
 
-    public ActiveTorrentFile(String downloadPath, long from, long to) {
-        this.downloadPath = downloadPath;
+    public ActiveTorrentFile(String filePath, long from, long to) {
+        this.filePath = filePath;
         this.from = from;
         this.to = to;
     }
@@ -21,10 +21,6 @@ public class ActiveTorrentFile {
 
     public long getTo() {
         return to;
-    }
-
-    public String getDownloadPath() {
-        return downloadPath;
     }
 
     // as implied here: https://stackoverflow.com/questions/45396252/concurrency-of-randomaccessfile-in-java/45490504
@@ -42,4 +38,13 @@ public class ActiveTorrentFile {
         return Mono.empty();
     }
 
+    @Override
+    public String getFilePath() {
+        return this.filePath;
+    }
+
+    @Override
+    public long getLength() {
+        return this.to - this.from;
+    }
 }
