@@ -1,9 +1,9 @@
 package main.file.system;
 
-import main.downloader.TorrentPiece;
+import main.downloader.TorrentPieceChanged;
 import main.peer.peerMessages.PieceMessage;
 import reactor.core.publisher.Flux;
 
 public interface Downloader {
-    Flux<TorrentPiece> downloadAsync(Flux<PieceMessage> peerResponsesFlux);
+    Flux<TorrentPieceChanged> downloadAsync(Flux<PieceMessage> peerResponsesFlux);
 }

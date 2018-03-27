@@ -8,26 +8,49 @@ import java.nio.ByteBuffer;
 public class RequestMessage extends PeerMessage {
     private static int length = 13;
     private static final byte messageId = 6;
+    private int index;
+    private int begin;
+    private int blockLength;
 
     /**
      * The payload contains the following information: (in this order)
      *
-     * @param index  integer (4 bytes) specifying the zero-based piece index.
-     * @param begin  integer (4 bytes) specifying the zero-based byte offset within the piece.
-     * @param length integer (4 bytes) specifying the requested length.
+     * @param index       integer (4 bytes) specifying the zero-based piece index.
+     * @param begin       integer (4 bytes) specifying the zero-based byte offset within the piece.
+     * @param blockLength integer (4 bytes) specifying the requested length.
      */
-    public RequestMessage(Peer from, Peer to, int index, int begin, int length) {
-        super( to, from, RequestMessage.length, messageId, ByteBuffer.allocate(12)
+    public RequestMessage(Peer from, Peer to, int index, int begin, int blockLength) {
+        super(to, from, RequestMessage.length, messageId, ByteBuffer.allocate(12)
                 .putInt(index)
                 .putInt(begin)
                 .putInt(length).array());
+        this.index = index;
+        this.begin = begin;
+        this.blockLength = blockLength;
     }
 
     public RequestMessage(Peer from, Peer to, byte[] peerMessage) {
         super(to, peerMessage, from);
+        ByteBuffer byteBuffer = ByteBuffer.wrap(super.getPayload());
+        this.index = byteBuffer.getInt();
+        this.begin = byteBuffer.getInt();
+        this.blockLength = byteBuffer.getInt();
     }
+
     @Override
     public String toString() {
         return "RequestMessage{} " + super.toString();
+    }
+
+    public int getIndex() {
+        return index;
+    }
+
+    public int getBegin() {
+        return begin;
+    }
+
+    public int getBlockLength() {
+        return blockLength;
     }
 }

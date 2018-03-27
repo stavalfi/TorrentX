@@ -3,13 +3,78 @@ package main.file.system;
 import main.TorrentInfo;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+import reactor.core.scheduler.Schedulers;
 
+import java.io.File;
+import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.util.BitSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 
 public class ActiveTorrents {
+
+    private CopyOnWriteArrayList<ActiveTorrent> activeTorrentList = new CopyOnWriteArrayList<>();
+
+    public Mono<ActiveTorrent> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath) {
+        // TODO: check if this torrent exist in db.
+        return createFolders(torrentInfo, downloadPath)
+                .flatMap(activeTorrents -> createFiles(torrentInfo, downloadPath))
+                .map(activeTorrents -> new ActiveTorrent(torrentInfo, downloadPath))
+                .doOnNext(activeTorrent ->
+                        // save this torrent information in db.
+                        this.activeTorrentList.add(activeTorrent));
+    }
+
+    public Mono<Optional<ActiveTorrent>> deleteActiveTorrentOnlyMono(String torrentInfoHash) {
+        return findActiveTorrentByHashMono(torrentInfoHash)
+                .filter(Optional::isPresent)
+                .flatMap(activeTorrent -> {
+                    this.activeTorrentList = this.activeTorrentList.stream()
+                            .filter(activeTorrent1 -> !activeTorrent1.getTorrentInfoHash().equals(torrentInfoHash))
+                            .collect(Collectors.toCollection(CopyOnWriteArrayList::new));
+                    return Mono.just(activeTorrent);
+                }).subscribeOn(Schedulers.elastic());
+    }
+
+    public Mono<Optional<ActiveTorrent>> deleteFileOnlyMono(String torrentInfoHash) {
+        return findActiveTorrentByHashMono(torrentInfoHash)
+                .filter(Optional::isPresent)
+                .doOnNext(activeTorrent -> {
+                    activeTorrent.get()
+                            .getTorrentFiles()
+                            .stream()
+                            .map(TorrentFile::getFilePath)
+                            .map(File::new)
+                            .forEach(this::completelyDeleteFolder);
+                    String filePath = activeTorrent.get().getDownloadPath() + "/" + activeTorrent.get().getName();
+                    File mainFile = new File(filePath);
+                    completelyDeleteFolder(mainFile);
+                });
+    }
+
+    private boolean completelyDeleteFolder(File directoryToBeDeleted) {
+        File[] allContents = directoryToBeDeleted.listFiles();
+        if (allContents != null) {
+            for (File file : allContents) {
+                completelyDeleteFolder(file);
+            }
+        }
+        return directoryToBeDeleted.delete();
+    }
+
+    public Mono<Optional<ActiveTorrent>> findActiveTorrentByHashMono(String torrentInfoHash) {
+        Optional<ActiveTorrent> first = this.activeTorrentList.stream()
+                .filter(activeTorrent -> activeTorrent.getTorrentInfoHash().equals(torrentInfoHash))
+                .findFirst();
+        return Mono.just(first);
+    }
+
+    public Flux<ActiveTorrent> getActiveTorrentsFlux() {
+        // TODO: get and load all torrents from db.
+        return Flux.fromIterable(this.activeTorrentList);
+    }
 
     private static ActiveTorrents instance = new ActiveTorrents();
 
@@ -17,77 +82,59 @@ public class ActiveTorrents {
         return instance;
     }
 
-    public Mono<ActiveTorrent> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath) {
-        new ActiveTorrent(torrentInfo, downloadPath, null, null);
-        return Mono.never();
+    private Mono<ActiveTorrents> createFolders(TorrentInfo torrentInfo, String downloadPath) {
+        // create main folder for the download of the torrent.
+        String mainFolder = !torrentInfo.isSingleFileTorrent() ?
+                downloadPath + "/" + torrentInfo.getName() + "/" :
+                downloadPath + "/";
+        return Mono.create(sink -> {
+            createFolder(mainFolder);
+
+            // create sub folders for the download of the torrent
+            torrentInfo.getFileList()
+                    .stream()
+                    .map(christophedetroyer.torrent.TorrentFile::getFileDirs)
+                    .filter(folders -> folders.size() > 1)
+                    .map(folders -> folders.subList(0, folders.size() - 2))
+                    .map(List::stream)
+                    .map(stringStream -> stringStream.collect(Collectors.joining("/", mainFolder, "")))
+                    .forEach(folderPath -> createFolder(folderPath));
+            sink.success(this);
+        });
     }
 
-    public Mono<ActiveTorrent> deleteActiveTorrentOnlyMono(TorrentInfo torrentInfo, String downloadPath) {
-        new ActiveTorrent(torrentInfo, downloadPath, null, null);
-        return Mono.never();
+    private Mono<ActiveTorrents> createFiles(TorrentInfo torrentInfo, String downloadPath) {
+        String mainFolder = !torrentInfo.isSingleFileTorrent() ?
+                downloadPath + "/" + torrentInfo.getName() + "/" :
+                downloadPath + "/";
+        // create files in each folder.
+        return Mono.<ActiveTorrents>create(sink -> {
+            for (christophedetroyer.torrent.TorrentFile torrentFile : torrentInfo.getFileList()) {
+                String filePath = torrentFile
+                        .getFileDirs()
+                        .stream()
+                        .collect(Collectors.joining("/", mainFolder, ""));
+                try {
+                    createFile(filePath, torrentFile.getFileLength());
+                } catch (IOException e) {
+                    sink.error(e);
+                    return;
+                }
+            }
+            sink.success(this);
+        }).doOnError(throwable -> completelyDeleteFolder(new File(mainFolder)));
     }
 
-    public Mono<ActiveTorrent> deleteActiveTorrentAndFileMono(TorrentInfo torrentInfo, String downloadPath) {
-        new ActiveTorrent(torrentInfo, downloadPath, null, null);
-        return Mono.never();
+    private void createFolder(String path) {
+        File file = new File(path);
+        file.getParentFile().mkdirs();
+        file.mkdirs();
     }
 
-    public Mono<ActiveTorrent> deleteFileOnlyMono(TorrentInfo torrentInfo, String filePath) {
-        new ActiveTorrent(torrentInfo, filePath, null, null);
-        return Mono.never();
+    private void createFile(String filePathToCreate, long length) throws IOException {
+        RandomAccessFile randomAccessFile = new RandomAccessFile(filePathToCreate, "rw");
+        randomAccessFile.setLength(length);
     }
 
-    public Flux<ActiveTorrent> getAllActiveTorrentsFlux() {
-        return Flux.never();
-    }
-
-
-    public Mono<ActiveTorrent> getActiveTorrentByHashMono(String torrentInfoHash) {
-        return Mono.never();
-    }
-
-
-    public class ActiveTorrent extends TorrentInfo {
-        private final String downloadPath;
-        private final RandomAccessFile randomAccessFile;
-        private final BitSet bitSet;
-
-        private ActiveTorrent(TorrentInfo torrentInfo, String downloadPath, RandomAccessFile randomAccessFile, BitSet bitSet) {
-            super(torrentInfo);
-            this.downloadPath = downloadPath;
-            this.randomAccessFile = randomAccessFile;
-            this.bitSet = bitSet;
-        }
-
-        public BitSet getBitSet() {
-            return this.bitSet;
-        }
-
-        public Mono<ActiveTorrent> saveBlock(int pieceIndex, int offset, byte[] block) {
-            throw new NotImplementedException();
-        }
-
-        public Mono<ByteBuffer> readBlock(int pieceIndex, int offset) {
-            if (!havePiece(pieceIndex))
-                Mono.error(new IllegalStateException("requested block of pieced we don't have yet: " + pieceIndex));
-            return Mono.never();
-        }
-
-        public boolean havePiece(int pieceIndex) {
-            throw new NotImplementedException();
-        }
-
-        public Mono<ActiveTorrent> updatePieceAsCompleted(int pieceIndex) {
-            return Mono.<ActiveTorrent>create(sink -> {
-                this.bitSet.set(pieceIndex);
-                Mono.just(this);
-            }).doOnSuccess(activeTorrent -> {
-                // update in mongo db
-            });
-        }
-
-        public String getDownloadPath() {
-            return downloadPath;
-        }
-    }
 }
+

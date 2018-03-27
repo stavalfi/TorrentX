@@ -4,6 +4,7 @@ import christophedetroyer.torrent.Torrent;
 import christophedetroyer.torrent.TorrentFile;
 import main.tracker.Tracker;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -28,6 +29,9 @@ public class TorrentInfo {
         return this.torrent.getName();
     }
 
+    public boolean isSingleFileTorrent() {
+        return this.torrent.isSingleFileTorrent();
+    }
 
     public int getPieceLength() {
         return Math.toIntExact(this.torrent.getPieceLength());
@@ -41,7 +45,7 @@ public class TorrentInfo {
         return this.torrent.getPieces();
     }
 
-    public Long getTotalSize() {
+    public long getTotalSize() {
         return this.torrent.getTotalSize();
     }
 
@@ -78,6 +82,13 @@ public class TorrentInfo {
         return this.torrent.getInfo_hash();
     }
 
+    public List<TorrentFile> getFileList() {
+        if (isSingleFileTorrent()) {
+            return Collections.singletonList(new TorrentFile(getTotalSize(), Collections.singletonList(getName())));
+        }
+        return this.torrent.getFileList();
+    }
+
     @Override
     public String toString() {
 
@@ -102,9 +113,8 @@ public class TorrentInfo {
                 "Pieces: " + this.torrent.getPieces().size() + "\n" +
                 "Total Size: " + this.torrent.getTotalSize() + "\n" +
                 "Is Single File Torrent: " + this.torrent.isSingleFileTorrent() + "\n" +
-                "File List: \n" + fileList +
-                "Tracker List: \n" + trackers + "\n" +
-                '}';
+                "File List:\n" + fileList + "\n" +
+                "Tracker List: \n" + trackers;
     }
 
     public String getTorrentFilePath() {

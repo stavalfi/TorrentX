@@ -1,7 +1,7 @@
 package main.algorithms;
 
 import main.TorrentInfo;
-import main.downloader.TorrentPiece;
+import main.downloader.TorrentPieceChanged;
 import main.peer.PeersCommunicator;
 import main.peer.ReceiveMessages;
 import main.peer.ReceiveMessagesImpl;
@@ -28,7 +28,7 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
     }
 
     @Override
-    public Flux<TorrentPiece> downloadAsync() {
+    public Flux<TorrentPieceChanged> downloadAsync() {
         return Flux.never();
     }
 

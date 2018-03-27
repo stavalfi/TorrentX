@@ -1,36 +1,51 @@
 package com.steps;
 
+import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import main.TorrentInfo;
+import main.file.system.ActiveTorrent;
+import main.file.system.ActiveTorrents;
 import main.peer.Peer;
 import main.peer.PeersCommunicator;
 import main.peer.PeersListener;
 import main.peer.PeersProvider;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
+import main.peer.peerMessages.RequestMessage;
+import main.statistics.SpeedStatistics;
+import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.tracker.Tracker;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerExceptions;
 import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
+import org.junit.Assert;
 import org.mockito.Mockito;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
+import reactor.util.function.Tuple2;
 
+import java.io.File;
+import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.mockito.Mockito.mock;
 
 public class MyStepdefs {
 
     static {
+        // active debug mode in reactor
         Hooks.onOperatorDebug();
+        // delete download folder
+        Utils.deleteDownloadFolder();
     }
 
     private TorrentInfo torrentInfo = mock(TorrentInfo.class);
@@ -235,6 +250,232 @@ public class MyStepdefs {
 
         StepVerifier.create(receiveSinglePieceMono)
                 .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @Then("^application create active-torrent for: \"([^\"]*)\",\"([^\"]*)\"$")
+    public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+
+        String mainFolderPath = System.getProperty("user.dir") + "/" + downloadLocation;
+        Mono<ActiveTorrent> activeTorrentMono =
+                ActiveTorrents.getInstance()
+                        .createActiveTorrentMono(torrentInfo, mainFolderPath);
+
+        StepVerifier.create(activeTorrentMono)
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
+    public void activeTorrentExistForTorrent(boolean isActiveTorrentExist, String torrentFileName) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+
+        Mono<Optional<ActiveTorrent>> activeTorrentMono =
+                ActiveTorrents.getInstance()
+                        .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash());
+
+        StepVerifier.create(activeTorrentMono)
+                .consumeNextWith(activeTorrent -> {
+                    String message = "activeTorrent object needs to be present:" + isActiveTorrentExist + ", but the opposite is heppening.";
+                    Assert.assertEquals(message, activeTorrent.isPresent(), isActiveTorrentExist);
+                })
+                .verifyComplete();
+    }
+
+    @Then("^files of torrent: \"([^\"]*)\" exist: \"([^\"]*)\" in \"([^\"]*)\"$")
+    public void torrentExistIn(String torrentFileName, boolean torrentFilesExist, String downloadLocation) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+        String fullFilePath = !torrentInfo.isSingleFileTorrent() ?
+                System.getProperty("user.dir") + "/" + downloadLocation + torrentInfo.getName() + "/" :
+                System.getProperty("user.dir") + "/" + downloadLocation;
+        List<String> filePathList = torrentInfo.getFileList()
+                .stream()
+                .map(TorrentFile::getFileDirs)
+                .map(List::stream)
+                .map((Stream<String> incompleteFilePath) ->
+                        incompleteFilePath.collect(Collectors.joining("/", fullFilePath, "")))
+                .collect(Collectors.toList());
+
+        if (torrentFilesExist) {
+            String mainFilePath = System.getProperty("user.dir") + "/" + downloadLocation + torrentInfo.getName() + "/";
+            File mainFile = new File(mainFilePath);
+            if (torrentInfo.isSingleFileTorrent())
+                Assert.assertTrue("file is directory but it doesn't need to be: " + mainFile.getPath(),
+                        !mainFile.isDirectory());
+            else
+                Assert.assertTrue("file is not a directory but it needs to be: " + mainFile.getPath(),
+                        mainFile.isDirectory());
+            Flux<File> zip = Flux.zip(Flux.fromIterable(torrentInfo.getFileList()), Flux.fromIterable(filePathList),
+                    (torrentFile, path) -> {
+                        File file = new File(path);
+                        Assert.assertEquals("file not in the right length: " + file.getPath(),
+                                file.length(), (long) torrentFile.getFileLength());
+                        return file;
+                    })
+                    .doOnNext(file -> Assert.assertTrue("file does not exist: " + file.getPath(), file.exists()))
+                    .doOnNext(file -> Assert.assertTrue("we can't read from the file: " + file.getPath(), file.canRead()))
+                    .doOnNext(file -> Assert.assertTrue("we can't write to the file: " + file.getPath(), file.canWrite()));
+            StepVerifier.create(zip)
+                    .expectNextCount(filePathList.size())
+                    .verifyComplete();
+        } else
+            filePathList.stream()
+                    .map((String completeFilePath) -> new File(completeFilePath))
+                    .forEach(file -> Assert.assertTrue("file exist: " + file.getPath(), !file.exists()));
+    }
+
+    @Then("^application delete active-torrent: \"([^\"]*)\": \"([^\"]*)\" and file: \"([^\"]*)\": \"([^\"]*)\"$")
+    public void applicationDeleteActiveTorrentAndFile(String torrentFileName, boolean deleteActiveTorrent,
+                                                      String downloadLocation, boolean deleteTorrentFiles) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+
+        Mono<Optional<ActiveTorrent>> deletionTaskMono;
+        if (deleteActiveTorrent && deleteTorrentFiles)
+            deletionTaskMono = ActiveTorrents.getInstance()
+                    .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                    .flatMap(activeTorrent -> ActiveTorrents.getInstance()
+                            .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()));
+        else if (deleteActiveTorrent) // deleteActiveTorrent && !deleteTorrentFiles
+            deletionTaskMono = ActiveTorrents.getInstance()
+                    .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash());
+        else // !deleteActiveTorrent && deleteTorrentFiles
+            deletionTaskMono = ActiveTorrents.getInstance()
+                    .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash());
+
+        StepVerifier.create(deletionTaskMono)
+                .consumeNextWith(activeTorrent -> {
+                    String message = "activeTorrent object wasn't exist.";
+                    Assert.assertTrue(message, activeTorrent.isPresent());
+                })
+                .verifyComplete();
+    }
+
+    @Then("^application save random blocks from different threads inside torrent: \"([^\"]*)\" in \"([^\"]*)\" and check it saved$")
+    public void applicationSaveARandomBlockInsideTorrentInAndCheckItSaved(String torrentFileName,
+                                                                          String downloadLocation,
+                                                                          List<BlockOfPiece> blockList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+
+        Function<Integer, byte[]> toRandomByteArray = (Integer length) -> {
+            byte[] bytes = new byte[length];
+            byte content = 0;
+            for (int i = 0; i < length; i++, content++)
+                bytes[i] = content;
+            return bytes;
+        };
+
+        Mono<ActiveTorrent> activeTorrentMono = ActiveTorrents.getInstance()
+                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
+                .map(Optional::get)
+                .subscribeOn(Schedulers.elastic());
+
+        Flux<byte[]> readFlux = Flux.fromIterable(blockList)
+                .map(blockOfPiece -> {
+                    if (blockOfPiece.getLength() != null)
+                        return new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
+                                toRandomByteArray.apply(blockOfPiece.getLength()));
+                    return new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
+                            toRandomByteArray.apply(torrentInfo.getPieceLength() - blockOfPiece.getFrom()));
+                })
+                .flatMap(pieceMessage -> activeTorrentMono
+                        .flatMap(activeTorrent -> activeTorrent.writeBlock(pieceMessage).subscribeOn(Schedulers.elastic()))
+                        // assert that the content is written.
+                        .map(activeTorrent -> {
+                            RequestMessage requestMessage =
+                                    new RequestMessage(null, null,
+                                            pieceMessage.getIndex(),
+                                            pieceMessage.getBegin(),
+                                            pieceMessage.getBlock().length);
+                            return Utils.readFromFile(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation, requestMessage);
+                        })
+                        .doOnNext(readByteArray -> {
+                            String message = "the content I wrote is not equal to the content I read to the file";
+                            Assert.assertArrayEquals(message, readByteArray, pieceMessage.getBlock());
+                        }));
+
+        StepVerifier.create(readFlux)
+                .expectNextCount(blockList.size())
+                .verifyComplete();
+    }
+
+    @Then("^completed pieces are for torrent: \"([^\"]*)\":$")
+    public void completedPiecesAreForTorrent(String torrentFileName, List<Integer> completedPiecesIndexList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+
+        Mono<ActiveTorrent> activeTorrentMono = ActiveTorrents.getInstance()
+                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
+                .map(Optional::get)
+                .doOnNext(activeTorrent ->
+                        completedPiecesIndexList.forEach(completedPiecesIndex -> {
+                            String message = "the piece is not completed but it should be.";
+                            Assert.assertTrue(message, activeTorrent.havePiece(completedPiecesIndex));
+                        }));
+
+        StepVerifier.create(activeTorrentMono)
+                .expectNextCount(1)
+                .verifyComplete();
+
+    }
+
+    private SpeedStatistics torrentDownloadSpeedStatistics;
+
+    @Given("^size of incoming messages every \"([^\"]*)\" mill-seconds from a peer:$")
+    public void sizeOfIncomingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> incomingMessageSizeList) throws Throwable {
+
+        Flux<? extends PeerMessage> receivedMessageMessages = Flux.fromIterable(incomingMessageSizeList)
+                .delayElements(Duration.ofMillis(delay))
+                .map(incomingMessageSize ->
+                        new PieceMessage(null, null, 0, 0, new byte[incomingMessageSize]));
+
+        Flux<? extends PeerMessage> sentSentMessages = Flux.empty();
+
+        this.torrentDownloadSpeedStatistics =
+                new TorrentSpeedSpeedStatisticsImpl(this.torrentInfo, receivedMessageMessages, sentSentMessages);
+    }
+
+    @Then("^download statistics every 100 mill-seconds are from a peer:$")
+    public void downloadStatisticsEveryMillSecondsAreFromAPeer(List<Double> downloadSpeedStatistics) throws Throwable {
+
+        Flux<Tuple2<Double, Double>> speedComparisionFlux =
+                Flux.zip(Flux.fromIterable(downloadSpeedStatistics),
+                        this.torrentDownloadSpeedStatistics.getDownloadSpeedFlux())
+                        .doOnNext(values -> {
+                            String message = "download speed expected and actual are not equal";
+                            Assert.assertEquals(message, values.getT1(), values.getT2());
+                        });
+
+        StepVerifier.create(speedComparisionFlux)
+                .expectNextCount(downloadSpeedStatistics.size())
+                .verifyComplete();
+    }
+
+    private SpeedStatistics torrentUploadSpeedStatistics;
+
+    @Given("^size of outgoing messages every \"([^\"]*)\" mill-seconds from a peer:$")
+    public void outgoingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> outgoingMessageSizeList) throws Throwable {
+        Flux<? extends PeerMessage> receivedMessageMessages = Flux.fromIterable(outgoingMessageSizeList)
+                .delayElements(Duration.ofMillis(delay))
+                .map(outgoingMessageSize ->
+                        new PieceMessage(null, null, 0, 0, new byte[outgoingMessageSize]));
+
+        Flux<? extends PeerMessage> sentSentMessages = Flux.empty();
+        this.torrentUploadSpeedStatistics =
+                new TorrentSpeedSpeedStatisticsImpl(this.torrentInfo, receivedMessageMessages, sentSentMessages);
+    }
+
+    @Then("^upload statistics every 100 mill-seconds are from a peer:$")
+    public void uploadStatisticsEveryMillSecondsAreFromAPeer(List<Double> uploadSpeedStatistics) throws Throwable {
+        Flux<Tuple2<Double, Double>> speedComparisionFlux =
+                Flux.zip(Flux.fromIterable(uploadSpeedStatistics),
+                        this.torrentUploadSpeedStatistics.getDownloadSpeedFlux())
+                        .doOnNext(values -> {
+                            String message = "upload speed expected and actual are not equal";
+                            Assert.assertEquals(message, values.getT1(), values.getT2());
+                        });
+
+        StepVerifier.create(speedComparisionFlux)
+                .expectNextCount(uploadSpeedStatistics.size())
                 .verifyComplete();
     }
 }

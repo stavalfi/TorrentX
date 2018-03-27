@@ -36,6 +36,13 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
         }
     }
 
+    public int getMessageLength() {
+        // int length; // 4 bytes - the length in bytes of sizeof(messageId) + sizeof(payload)
+        // byte messageId; // 1 byte
+        // byte[] payload;
+        return 5 + this.payload.length;
+    }
+
     @Override
     public int compareTo(PeerMessage peerMessage) {
         if (this.messageId > peerMessage.getMessageId())

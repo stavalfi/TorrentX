@@ -2,13 +2,14 @@ package main;
 
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
-import main.downloader.DefaultTorrentDownloader;
 import main.downloader.TorrentDownloader;
+import main.file.system.ActiveTorrent;
+import main.file.system.ActiveTorrents;
 import reactor.core.publisher.Hooks;
 
 class App {
     private static void f4() {
-        TorrentDownloader torrentDownloader = new DefaultTorrentDownloader(getTorrentInfo(), "C:/torrent-downloaded/");
+        TorrentDownloader torrentDownloader = TorrentDownloader.defaultTorrentDownloader(getActiveTorrent());
 
         torrentDownloader.getBittorrentAlgorithm()
                 .receiveTorrentMessagesMessagesFlux()
@@ -25,9 +26,14 @@ class App {
     }
 
     @SneakyThrows
-    public static TorrentInfo getTorrentInfo() {
-        String torrentFilePath = "src/main/resources/torrent-file-example3.torrent";
-        return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
+    public static ActiveTorrent getActiveTorrent() {
+        String torrentFilePath = "src/main/resources/torrents/torrent-file-example3.torrent";
+        String downloadPath = System.getProperty("user.dir") + "/torrents-test";
+        TorrentInfo torrentInfo = new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
+        ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
+                .createActiveTorrentMono(torrentInfo, downloadPath)
+                .block();
+        return activeTorrent;
     }
 }
 
