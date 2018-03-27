@@ -3,6 +3,7 @@ package main.file.system;
 import main.TorrentInfo;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SynchronousSink;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.*;
@@ -17,14 +18,19 @@ public class ActiveTorrents {
 
     public Mono<ActiveTorrent> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath) {
         // TODO: check if this torrent exist in db.
-        return Mono.<ActiveTorrent>just(new ActiveTorrent(torrentInfo, downloadPath))
-                .subscribeOn(Schedulers.elastic())
-                .doOnNext(activeTorrent -> {
+        return createFolders(torrentInfo, downloadPath)
+                .flatMap(activeTorrents -> createFiles(torrentInfo, downloadPath))
+                .handle((ActiveTorrents activeTorrents, SynchronousSink<ActiveTorrent> handler) -> {
+                    try {
+                        ActiveTorrent activeTorrent = new ActiveTorrent(torrentInfo, downloadPath);
+                        handler.next(activeTorrent);
+                    } catch (FileNotFoundException e) {
+                        handler.error(e);
+                    }
+                }).doOnNext(activeTorrent -> {
                     // save this torrent information in db.
                     this.activeTorrentList.add(activeTorrent);
-                }).flatMap(activeTorrent -> createFolders(torrentInfo, downloadPath)
-                        .flatMap(activeTorrents -> createFiles(torrentInfo, downloadPath))
-                        .map(activeTorrents -> activeTorrent));
+                });
     }
 
     public Mono<Optional<ActiveTorrent>> deleteActiveTorrentOnlyMono(String torrentInfoHash) {

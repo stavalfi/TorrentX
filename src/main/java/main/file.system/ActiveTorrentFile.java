@@ -1,7 +1,7 @@
 package main.file.system;
 
-import reactor.core.publisher.Mono;
-
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 
 public class ActiveTorrentFile implements TorrentFile {
@@ -9,10 +9,11 @@ public class ActiveTorrentFile implements TorrentFile {
     private long from, to; // not closed range: [from,to).
     private RandomAccessFile randomAccessFile;
 
-    public ActiveTorrentFile(String filePath, long from, long to) {
+    public ActiveTorrentFile(String filePath, long from, long to) throws FileNotFoundException {
         this.filePath = filePath;
         this.from = from;
         this.to = to;
+        this.randomAccessFile = new RandomAccessFile(filePath, "rw");
     }
 
     public long getFrom() {
@@ -25,17 +26,19 @@ public class ActiveTorrentFile implements TorrentFile {
 
     // as implied here: https://stackoverflow.com/questions/45396252/concurrency-of-randomaccessfile-in-java/45490504
     // something can go wrong if multiple threads try to read/write concurrently.
-    public synchronized Mono<ActiveTorrent> writeBlock(int begin, byte[] block) {
-        return Mono.empty();
+    public synchronized void writeBlock(long begin, byte[] block, int arrayIndexFrom, int howMuchToWriteFromArray) throws IOException {
+        this.randomAccessFile.seek(begin);
+        this.randomAccessFile.write(block, arrayIndexFrom, howMuchToWriteFromArray);
     }
 
 
     // as implied here: https://stackoverflow.com/questions/45396252/concurrency-of-randomaccessfile-in-java/45490504
     // something can go wrong if multiple threads try to read/write concurrently.
-    public synchronized Mono<byte[]> readBlock(int begin, int blockLength) {
-        //if (!havePiece(pieceIndex))
-        //Mono.error(new IllegalStateException("requested block of pieced we don't have yet: " + pieceIndex));
-        return Mono.empty();
+    public synchronized byte[] readBlock(long begin, int blockLength) throws IOException {
+        this.randomAccessFile.seek(begin);
+        byte[] result = new byte[blockLength];
+        this.randomAccessFile.read(result);
+        return result;
     }
 
     @Override
