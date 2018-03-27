@@ -257,9 +257,10 @@ public class MyStepdefs {
     public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
 
+        String mainFolderPath = System.getProperty("user.dir") + "/" + downloadLocation;
         Mono<ActiveTorrent> activeTorrentMono =
                 ActiveTorrents.getInstance()
-                        .createActiveTorrentMono(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation);
+                        .createActiveTorrentMono(torrentInfo, mainFolderPath);
 
         StepVerifier.create(activeTorrentMono)
                 .expectNextCount(1)
@@ -356,7 +357,7 @@ public class MyStepdefs {
                                                                           List<BlockOfPiece> blockList) throws Throwable {
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
 
-        Function<Integer, byte[]> toRandomByteArray = length -> {
+        Function<Integer, byte[]> toRandomByteArray = (Integer length) -> {
             byte[] bytes = new byte[length];
             byte content = 0;
             for (int i = 0; i < length; i++, content++)
@@ -370,8 +371,13 @@ public class MyStepdefs {
                 .subscribeOn(Schedulers.elastic());
 
         Flux<byte[]> readFlux = Flux.fromIterable(blockList)
-                .map(blockOfPiece -> new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
-                        toRandomByteArray.apply(blockOfPiece.getLength())))
+                .map(blockOfPiece -> {
+                    if (blockOfPiece.getLength() != null)
+                        return new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
+                                toRandomByteArray.apply(blockOfPiece.getLength()));
+                    return new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
+                            toRandomByteArray.apply(torrentInfo.getPieceLength() - blockOfPiece.getFrom()));
+                })
                 .flatMap(pieceMessage -> activeTorrentMono
                         .flatMap(activeTorrent -> activeTorrent.writeBlock(pieceMessage).subscribeOn(Schedulers.elastic()))
                         // assert that the content is written.
