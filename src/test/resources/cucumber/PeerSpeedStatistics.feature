@@ -38,16 +38,16 @@ Feature: inject incoming and outgoing messages to test the statistics
       | 0   |
       | 0   |
 
-  Scenario: inject outgoing messages every 100 milli-seconds and test the statistics
-    Given size of outgoing messages every "100" mill-seconds from a peer:
-      | 100 |
-      | 100 |
-      | 100 |
-
-    Then upload statistics every 100 mill-seconds are from a peer:
-      | 100 |
-      | 100 |
-      | 100 |
+#  Scenario: inject outgoing messages every 100 milli-seconds and test the statistics
+#    Given size of outgoing messages every "100" mill-seconds from a peer:
+#      | 100 |
+#      | 100 |
+#      | 100 |
+#
+#    Then upload statistics every 100 mill-seconds are from a peer:
+#      | 100 |
+#      | 100 |
+#      | 100 |
 
   Scenario: inject outgoing messages not every 100 milli-seconds and test the statistics
     Given size of outgoing messages every "100" mill-seconds from a peer:
