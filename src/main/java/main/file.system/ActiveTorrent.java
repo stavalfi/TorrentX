@@ -2,12 +2,15 @@ package main.file.system;
 
 import christophedetroyer.torrent.TorrentFile;
 import main.TorrentInfo;
+import main.downloader.TorrentPieceChanged;
+import main.downloader.TorrentPieceStatus;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -20,13 +23,16 @@ public class ActiveTorrent extends TorrentInfo {
     private final BitSet piecesStatus;
     private final long[] piecesPartialStatus;
     private final String downloadPath;
+    private Flux<TorrentPieceChanged> torrentPieceChangedFlux;
+    private FluxSink<TorrentPieceChanged> torrentPieceChangedFluxSink;
 
-    public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath) throws FileNotFoundException {
+    public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath) {
         super(torrentInfo);
         this.downloadPath = downloadPath;
         this.piecesStatus = new BitSet(getPieces().size());
         this.piecesPartialStatus = new long[getPieces().size()];
         this.activeTorrentFileList = createActiveTorrentFileList(torrentInfo, downloadPath);
+        this.torrentPieceChangedFlux = Flux.create(sink -> this.torrentPieceChangedFluxSink = sink);
     }
 
     public List<? extends main.file.system.TorrentFile> getTorrentFiles() {
@@ -59,6 +65,13 @@ public class ActiveTorrent extends TorrentInfo {
                     if (from == to)
                         break;
                 }
+            if (this.torrentPieceChangedFluxSink != null &&
+                    this.piecesPartialStatus[pieceMessage.getIndex()] == 0) {
+                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
+                        this.getPieces().get(pieceMessage.getIndex()),
+                        TorrentPieceStatus.DOWNLOADING);
+                this.torrentPieceChangedFluxSink.next(torrentPieceChanged);
+            }
 
             // update pieces partial status array:
             // WARNING: this line *only* must be synchronized among multiple threads!
@@ -68,7 +81,12 @@ public class ActiveTorrent extends TorrentInfo {
             // there maybe multiple writes of the same pieceRequest during one execution...
             if (this.piecesPartialStatus[pieceMessage.getIndex()] >= this.getPieceLength()) {
                 this.piecesStatus.set(pieceMessage.getIndex());
-                System.out.println("piece completed: " + pieceMessage.getIndex());
+                if (this.torrentPieceChangedFluxSink != null) {
+                    TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
+                            this.getPieces().get(pieceMessage.getIndex()),
+                            TorrentPieceStatus.COMPLETED);
+                    this.torrentPieceChangedFluxSink.next(torrentPieceChanged);
+                }
             }
             sink.success(this);
         }).subscribeOn(Schedulers.single());
@@ -122,7 +140,7 @@ public class ActiveTorrent extends TorrentInfo {
         });
     }
 
-    private List<ActiveTorrentFile> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) throws FileNotFoundException {
+    private List<ActiveTorrentFile> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) {
         String mainFolder = !torrentInfo.isSingleFileTorrent() ?
                 downloadPath + "/" + torrentInfo.getName() + "/" :
                 downloadPath + "/";
@@ -145,5 +163,9 @@ public class ActiveTorrent extends TorrentInfo {
 
     public String getDownloadPath() {
         return downloadPath;
+    }
+
+    public Flux<TorrentPieceChanged> getTorrentPieceChangedFlux() {
+        return torrentPieceChangedFlux;
     }
 }
