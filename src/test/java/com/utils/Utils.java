@@ -130,13 +130,13 @@ public class Utils {
                 if (activeTorrentFile.getTo() < to) {
                     byte[] tempResult = new byte[(int) (activeTorrentFile.getTo() - from)];
                     randomAccessFile.read(tempResult);
-                    for (int i = 0; i < tempResult.length; i++)
-                        result[resultFreeIndex++] = tempResult[i];
+                    for (byte aTempResult : tempResult)
+                        result[resultFreeIndex++] = aTempResult;
                 } else {
                     byte[] tempResult = new byte[(int) (to - from)];
                     randomAccessFile.read(tempResult);
-                    for (int i = 0; i < tempResult.length; i++)
-                        result[resultFreeIndex++] = tempResult[i];
+                    for (byte aTempResult : tempResult)
+                        result[resultFreeIndex++] = aTempResult;
                     return result;
                 }
             }
@@ -148,11 +148,14 @@ public class Utils {
         // delete download folder
         try {
             File file = new File(System.getProperty("user.dir") + "/torrents-test");
-            boolean deleted = deleteDirectory(file);
-            if (!deleted)
-                System.out.println("could not delete torrent-test folder: " +
-                        System.getProperty("user.dir") + "/torrents-test");
+            if (file.exists()) {
+                boolean deleted = deleteDirectory(file);
+                if (!deleted)
+                    System.out.println("could not delete torrent-test folder: " +
+                            System.getProperty("user.dir") + "/torrents-test");
+            }
         } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -161,7 +164,7 @@ public class Utils {
         if (allContents != null) {
             for (File file : allContents) {
                 if (!deleteDirectory(file)) {
-                    System.out.println("could not delete: "+
+                    System.out.println("could not delete: " +
                             file.getAbsolutePath());
                     return false;
                 }
