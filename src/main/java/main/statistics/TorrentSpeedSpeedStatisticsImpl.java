@@ -4,6 +4,7 @@ import main.TorrentInfo;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.List;
@@ -26,9 +27,11 @@ public class TorrentSpeedSpeedStatisticsImpl implements SpeedStatistics {
 
         this.torrentInfo = torrentInfo;
 
-        Flux<Double> intervalFlux = Flux.interval(Duration.ofMillis(this.rateInMillSeconds))
-                .map(interval -> 0)
-                .map(Double::new);
+        Flux<Double> intervalFlux =
+                Flux.interval(Duration.ofMillis(this.rateInMillSeconds))
+                        .subscribeOn(Schedulers.elastic())
+                        .map(interval -> 0)
+                        .map(Double::new);
 
         Function<Flux<? extends PeerMessage>, Flux<Double>> pieceMessageTosize =
                 messageFlux -> messageFlux
