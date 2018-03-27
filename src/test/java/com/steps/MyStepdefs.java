@@ -42,7 +42,10 @@ import static org.mockito.Mockito.mock;
 public class MyStepdefs {
 
     static {
+        // active debug mode in reactor
         Hooks.onOperatorDebug();
+        // delete download folder
+        Utils.deleteDownloadFolder();
     }
 
     private TorrentInfo torrentInfo = mock(TorrentInfo.class);
@@ -256,7 +259,7 @@ public class MyStepdefs {
 
         Mono<ActiveTorrent> activeTorrentMono =
                 ActiveTorrents.getInstance()
-                        .createActiveTorrentMono(torrentInfo, downloadLocation);
+                        .createActiveTorrentMono(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation);
 
         StepVerifier.create(activeTorrentMono)
                 .expectNextCount(1)
@@ -279,22 +282,36 @@ public class MyStepdefs {
     @Then("^files of torrent: \"([^\"]*)\" exist: \"([^\"]*)\" in \"([^\"]*)\"$")
     public void torrentExistIn(String torrentFileName, boolean torrentFilesExist, String downloadLocation) throws Throwable {
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
-
-        Stream<File> fileStream = torrentInfo.getFileList()
+        String fullFilePath = !torrentInfo.isSingleFileTorrent() ?
+                System.getProperty("user.dir") + "/" + downloadLocation + torrentInfo.getName() + "/" :
+                System.getProperty("user.dir") + "/" + downloadLocation;
+        List<String> filePathList = torrentInfo.getFileList()
                 .stream()
                 .map(TorrentFile::getFileDirs)
                 .map(List::stream)
-                .map((Stream<String> incompleteFilePath) -> incompleteFilePath.collect(Collectors.joining("/")))
-                .map((String incompleteFilePath) -> downloadLocation.concat(incompleteFilePath))
-                .map((String completeFilePath) -> new File(completeFilePath));
+                .map((Stream<String> incompleteFilePath) ->
+                        incompleteFilePath.collect(Collectors.joining("/", fullFilePath, "")))
+                .collect(Collectors.toList());
 
-        if (torrentFilesExist)
-            fileStream.peek(file -> Assert.assertTrue("file does not exist: " + file.getPath(), file.exists()))
-                    .peek(file -> Assert.assertTrue("file is a directory: " + file.getPath(), !file.isDirectory()))
-                    .peek(file -> Assert.assertTrue("we can't read from the file: " + file.getPath(), file.canRead()))
-                    .forEach(file -> Assert.assertTrue("we can't write to the file: " + file.getPath(), file.canWrite()));
-        else
-            fileStream.forEach(file -> Assert.assertTrue("file exist: " + file.getPath(), file.exists()));
+        if (torrentFilesExist) {
+            Flux<File> zip = Flux.zip(Flux.fromIterable(torrentInfo.getFileList()), Flux.fromIterable(filePathList),
+                    (torrentFile, path) -> {
+                        File file = new File(path);
+                        Assert.assertEquals("file not in the right length: " + file.getPath(),
+                                file.length(), (long) torrentFile.getFileLength());
+                        return file;
+                    })
+                    .doOnNext(file -> Assert.assertTrue("file does not exist: " + file.getPath(), file.exists()))
+                    .doOnNext(file -> Assert.assertTrue("file is a directory: " + file.getPath(), !file.isDirectory()))
+                    .doOnNext(file -> Assert.assertTrue("we can't read from the file: " + file.getPath(), file.canRead()))
+                    .doOnNext(file -> Assert.assertTrue("we can't write to the file: " + file.getPath(), file.canWrite()));
+            StepVerifier.create(zip)
+                    .expectNextCount(filePathList.size())
+                    .verifyComplete();
+        } else
+            filePathList.stream()
+                    .map((String completeFilePath) -> new File(completeFilePath))
+                    .forEach(file -> Assert.assertTrue("file exist: " + file.getPath(), file.exists()));
     }
 
     @Then("^application delete active-torrent: \"([^\"]*)\" and file: \"([^\"]*)\"$")
@@ -303,11 +320,11 @@ public class MyStepdefs {
 
         Mono<Optional<ActiveTorrent>> deleteTorrentTaskMono =
                 ActiveTorrents.getInstance()
-                        .deleteActiveTorrentAndFileMono(torrentInfo.getTorrentInfoHash())
+                        .deleteActiveTorrentAndFilesMono(torrentInfo.getTorrentInfoHash())
                         .map(Optional::get)
                         // assert that the files of this torrent is not exist
                         .doOnNext(activeTorrent -> {
-                            File file = new File(downloadLocation + torrentInfo.getName());
+                            File file = new File(System.getProperty("user.dir") + "/" + downloadLocation + torrentInfo.getName());
                             Assert.assertFalse("file eixst in local file system after we deleted it.", file.exists());
                         })
                         // check if this active torrent is not exist
@@ -352,7 +369,7 @@ public class MyStepdefs {
                                             pieceMessage.getIndex(),
                                             pieceMessage.getBegin(),
                                             pieceMessage.getBlock().length);
-                            return Utils.readFromFile(torrentInfo, downloadLocation, requestMessage);
+                            return Utils.readFromFile(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation, requestMessage);
                         })
                         .doOnNext(readByteArray -> {
                             String message = "the content I wrote is not equal to the content I read to the file";
