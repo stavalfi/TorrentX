@@ -6,9 +6,9 @@ Feature: create get and delete active torrents
     Then files of torrent: "<torrent>" exist: "true" in "<downloadLocation>"
 
     Examples:
-      | torrent                       | downloadLocation  |
-      | torrent-file-example1.torrent | C:\torrents-test\ |
-      | torrent-file-example2.torrent | C:\torrents-test\ |
+      | torrent                       | downloadLocation |
+      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example2.torrent | torrents-test/   |
 
   Scenario Outline: we delete active torrent only
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -16,9 +16,9 @@ Feature: create get and delete active torrents
     Then files of torrent: "<torrent>" exist: "true" in "<downloadLocation>"
 
     Examples:
-      | torrent                       | downloadLocation  |
-      | torrent-file-example1.torrent | C:\torrents-test\ |
-      | torrent-file-example2.torrent | C:\torrents-test\ |
+      | torrent                       | downloadLocation |
+      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example2.torrent | torrents-test/   |
 
   Scenario Outline: we delete active torrent and file
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -27,9 +27,9 @@ Feature: create get and delete active torrents
     Then files of torrent: "<torrent>" exist: "false" in "<downloadLocation>"
 
     Examples:
-      | torrent                       | downloadLocation  |
-      | torrent-file-example1.torrent | C:\torrents-test\ |
-      | torrent-file-example2.torrent | C:\torrents-test\ |
+      | torrent                       | downloadLocation |
+      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example2.torrent | torrents-test/   |
 
   Scenario Outline: we save random blocks inside files and if a piece filled, we check it has been marked as downloaded
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -51,8 +51,8 @@ Feature: create get and delete active torrents
       | 2 |
 
     Examples:
-      | torrent                       | downloadLocation  |
-      | torrent-file-example1.torrent | C:\torrents-test\ |
+      | torrent                       | downloadLocation |
+      | torrent-file-example1.torrent | torrents-test/   |
 
   Scenario Outline: we save piece of active torrent
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -66,5 +66,5 @@ Feature: create get and delete active torrents
       | 0 |
 
     Examples:
-      | torrent                       | downloadLocation  |
-      | torrent-file-example1.torrent | C:\torrents-test\ |
+      | torrent                       | downloadLocation |
+      | torrent-file-example1.torrent | torrents-test/   |
