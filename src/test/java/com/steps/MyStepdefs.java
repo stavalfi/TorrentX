@@ -275,7 +275,10 @@ public class MyStepdefs {
                         .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash());
 
         StepVerifier.create(activeTorrentMono)
-                .expectNextCount(1)
+                .consumeNextWith(activeTorrent -> {
+                    String message = "activeTorrent object needs to be present:" + isActiveTorrentExist + ", but the opposite is heppening.";
+                    Assert.assertEquals(message, activeTorrent.isPresent(), isActiveTorrentExist);
+                })
                 .verifyComplete();
     }
 
@@ -294,6 +297,14 @@ public class MyStepdefs {
                 .collect(Collectors.toList());
 
         if (torrentFilesExist) {
+            String mainFilePath = System.getProperty("user.dir") + "/" + downloadLocation + torrentInfo.getName() + "/";
+            File mainFile = new File(mainFilePath);
+            if (torrentInfo.isSingleFileTorrent())
+                Assert.assertTrue("file is directory but it doesn't need to be: " + mainFile.getPath(),
+                        !mainFile.isDirectory());
+            else
+                Assert.assertTrue("file is not a directory but it needs to be: " + mainFile.getPath(),
+                        mainFile.isDirectory());
             Flux<File> zip = Flux.zip(Flux.fromIterable(torrentInfo.getFileList()), Flux.fromIterable(filePathList),
                     (torrentFile, path) -> {
                         File file = new File(path);
@@ -302,7 +313,6 @@ public class MyStepdefs {
                         return file;
                     })
                     .doOnNext(file -> Assert.assertTrue("file does not exist: " + file.getPath(), file.exists()))
-                    .doOnNext(file -> Assert.assertTrue("file is a directory: " + file.getPath(), !file.isDirectory()))
                     .doOnNext(file -> Assert.assertTrue("we can't read from the file: " + file.getPath(), file.canRead()))
                     .doOnNext(file -> Assert.assertTrue("we can't write to the file: " + file.getPath(), file.canWrite()));
             StepVerifier.create(zip)
@@ -311,30 +321,32 @@ public class MyStepdefs {
         } else
             filePathList.stream()
                     .map((String completeFilePath) -> new File(completeFilePath))
-                    .forEach(file -> Assert.assertTrue("file exist: " + file.getPath(), file.exists()));
+                    .forEach(file -> Assert.assertTrue("file exist: " + file.getPath(), !file.exists()));
     }
 
-    @Then("^application delete active-torrent: \"([^\"]*)\" and file: \"([^\"]*)\"$")
-    public void applicationDeleteActiveTorrentAndFile(String torrentFileName, String downloadLocation) throws Throwable {
+    @Then("^application delete active-torrent: \"([^\"]*)\": \"([^\"]*)\" and file: \"([^\"]*)\": \"([^\"]*)\"$")
+    public void applicationDeleteActiveTorrentAndFile(String torrentFileName, boolean deleteActiveTorrent,
+                                                      String downloadLocation, boolean deleteTorrentFiles) throws Throwable {
         TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
 
-        Mono<Optional<ActiveTorrent>> deleteTorrentTaskMono =
-                ActiveTorrents.getInstance()
-                        .deleteActiveTorrentAndFilesMono(torrentInfo.getTorrentInfoHash())
-                        .map(Optional::get)
-                        // assert that the files of this torrent is not exist
-                        .doOnNext(activeTorrent -> {
-                            File file = new File(System.getProperty("user.dir") + "/" + downloadLocation + torrentInfo.getName());
-                            Assert.assertFalse("file eixst in local file system after we deleted it.", file.exists());
-                        })
-                        // check if this active torrent is not exist
-                        .flatMap(activeTorrent -> ActiveTorrents.getInstance()
-                                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash()))
-                        .filter(Optional::isPresent)
-                        .doOnNext(activeTorrent -> Assert.fail("active torret is stille exist after we deleted it."));
+        Mono<Optional<ActiveTorrent>> deletionTaskMono;
+        if (deleteActiveTorrent && deleteTorrentFiles)
+            deletionTaskMono = ActiveTorrents.getInstance()
+                    .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                    .flatMap(activeTorrent -> ActiveTorrents.getInstance()
+                            .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()));
+        else if (deleteActiveTorrent) // deleteActiveTorrent && !deleteTorrentFiles
+            deletionTaskMono = ActiveTorrents.getInstance()
+                    .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash());
+        else // !deleteActiveTorrent && deleteTorrentFiles
+            deletionTaskMono = ActiveTorrents.getInstance()
+                    .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash());
 
-        StepVerifier.create(deleteTorrentTaskMono)
-                // if the active torrent is deleted then filter won't pass anything.
+        StepVerifier.create(deletionTaskMono)
+                .consumeNextWith(activeTorrent -> {
+                    String message = "activeTorrent object wasn't exist.";
+                    Assert.assertTrue(message, activeTorrent.isPresent());
+                })
                 .verifyComplete();
     }
 

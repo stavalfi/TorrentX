@@ -14,9 +14,11 @@ public class ActiveTorrent extends TorrentInfo {
 
     private final List<ActiveTorrentFile> activeTorrentFileList;
     private final BitSet bitSet;
+    private final String downloadPath;
 
     public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath) {
         super(torrentInfo);
+        this.downloadPath = downloadPath;
         this.bitSet = getPiecesStatus();
         this.activeTorrentFileList = createActiveTorrentFileList(torrentInfo, downloadPath);
     }
@@ -69,5 +71,9 @@ public class ActiveTorrent extends TorrentInfo {
             position += torrentFile.getFileLength();
         }
         return activeTorrentFileList;
+    }
+
+    public String getDownloadPath() {
+        return downloadPath;
     }
 }

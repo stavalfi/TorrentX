@@ -21,16 +21,10 @@ public class ActiveTorrents {
                 .subscribeOn(Schedulers.elastic())
                 .doOnNext(activeTorrent -> {
                     // save this torrent information in db.
-                    activeTorrentList.add(activeTorrent);
+                    this.activeTorrentList.add(activeTorrent);
                 }).flatMap(activeTorrent -> createFolders(torrentInfo, downloadPath)
                         .flatMap(activeTorrents -> createFiles(torrentInfo, downloadPath))
                         .map(activeTorrents -> activeTorrent));
-    }
-
-    public Mono<Optional<ActiveTorrent>> deleteActiveTorrentAndFilesMono(String torrentInfoHash) {
-        // delete activeTorrent from list
-        return deleteActiveTorrentOnlyMono(torrentInfoHash)
-                .flatMap(activeTorrent -> deleteFileOnlyMono(torrentInfoHash));
     }
 
     public Mono<Optional<ActiveTorrent>> deleteActiveTorrentOnlyMono(String torrentInfoHash) {
@@ -47,12 +41,17 @@ public class ActiveTorrents {
     public Mono<Optional<ActiveTorrent>> deleteFileOnlyMono(String torrentInfoHash) {
         return findActiveTorrentByHashMono(torrentInfoHash)
                 .filter(Optional::isPresent)
-                .doOnNext(activeTorrent -> activeTorrent.get()
-                        .getTorrentFiles()
-                        .stream()
-                        .map(TorrentFile::getFilePath)
-                        .map(File::new)
-                        .forEach(this::completelyDeleteFolder));
+                .doOnNext(activeTorrent -> {
+                    activeTorrent.get()
+                            .getTorrentFiles()
+                            .stream()
+                            .map(TorrentFile::getFilePath)
+                            .map(File::new)
+                            .forEach(this::completelyDeleteFolder);
+                    String filePath = activeTorrent.get().getDownloadPath() + "/" + activeTorrent.get().getName();
+                    File mainFile = new File(filePath);
+                    completelyDeleteFolder(mainFile);
+                });
     }
 
     private boolean completelyDeleteFolder(File directoryToBeDeleted) {
