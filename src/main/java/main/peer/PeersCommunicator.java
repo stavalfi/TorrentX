@@ -1,5 +1,6 @@
 package main.peer;
 
+import main.App;
 import main.TorrentInfo;
 import main.peer.peerMessages.*;
 import main.statistics.SpeedStatistics;
@@ -8,7 +9,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -82,7 +82,7 @@ public class PeersCommunicator implements SendPeerMessage {
                 closeConnection();
                 monoSink.error(e);
             }
-        }).subscribeOn(Schedulers.elastic())
+        }).subscribeOn(App.MyScheduler)
                 .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
     }
 

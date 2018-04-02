@@ -1,5 +1,6 @@
 package main.tracker;
 
+import main.App;
 import main.tracker.requests.TrackerRequest;
 import main.tracker.response.ErrorResponse;
 import main.tracker.response.TrackerResponse;
@@ -7,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SynchronousSink;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
@@ -89,7 +89,7 @@ class TrackerCommunication {
                 error.setStackTrace(ex.getStackTrace());
                 sink.error(error);
             }
-        }).subscribeOn(Schedulers.elastic());
+        }).subscribeOn(App.MyScheduler);
     }
 
     private static Mono<DatagramSocket> sendRequestMono(DatagramPacket request) {
