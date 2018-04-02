@@ -12,7 +12,7 @@ Feature: create get and delete active torrents
 
   Scenario Outline: we delete active torrent only
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
-    Then application delete active-torrent: "<torrent>": "true" and file: "<downloadLocation>": "false"
+    Then application delete active-torrent: "<torrent>": "true" and file: "false"
     Then files of torrent: "<torrent>" exist: "true" in "<downloadLocation>"
     Then active-torrent exist: "false" for torrent: "<torrent>"
 
@@ -23,7 +23,7 @@ Feature: create get and delete active torrents
 
   Scenario Outline: we delete torrent files only
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
-    Then application delete active-torrent: "<torrent>": "false" and file: "<downloadLocation>": "true"
+    Then application delete active-torrent: "<torrent>": "false" and file: "true"
     Then files of torrent: "<torrent>" exist: "false" in "<downloadLocation>"
     Then active-torrent exist: "true" for torrent: "<torrent>"
 
@@ -34,7 +34,7 @@ Feature: create get and delete active torrents
 
   Scenario Outline: we delete active torrent and file
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
-    Then application delete active-torrent: "<torrent>": "true" and file: "<downloadLocation>": "true"
+    Then application delete active-torrent: "<torrent>": "true" and file: "true"
     Then active-torrent exist: "false" for torrent: "<torrent>"
     Then files of torrent: "<torrent>" exist: "false" in "<downloadLocation>"
     Then active-torrent exist: "false" for torrent: "<torrent>"

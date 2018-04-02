@@ -1,11 +1,11 @@
 package main.peer;
 
+import main.App;
 import main.TorrentInfo;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -33,7 +33,7 @@ public class ReceiveMessagesImpl implements ReceiveMessages {
         this.torrentInfo = torrentInfo;
         this.peerMessageResponseFlux =
                 Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, me, peer, dataInputStream))
-                        .subscribeOn(Schedulers.elastic())
+                        .subscribeOn(App.MyScheduler)
                         // it is important to publish from source on different thread then the
                         // subscription to this source's thread every time because:
                         // if not and we subscribe to this specific source multiple times then only the
@@ -95,7 +95,8 @@ public class ReceiveMessagesImpl implements ReceiveMessages {
                 .cast(UnchokeMessage.class);
     }
 
-    public ReceiveMessagesImpl(TorrentInfo torrentInfo, Flux<ReceiveMessages> peersMessageResponseFlux) {
+    public ReceiveMessagesImpl(TorrentInfo torrentInfo,
+                               Flux<ReceiveMessages> peersMessageResponseFlux) {
         this.torrentInfo = torrentInfo;
         this.peerMessageResponseFlux = peersMessageResponseFlux
                 .flatMap(ReceiveMessages::getPeerMessageResponseFlux);

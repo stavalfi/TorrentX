@@ -1,5 +1,6 @@
 package main.peer;
 
+import main.App;
 import main.AppConfig;
 import main.HexByteConverter;
 import main.TorrentInfo;
@@ -8,7 +9,6 @@ import main.tracker.BadResponseException;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -18,7 +18,7 @@ import java.net.Socket;
 import java.util.Optional;
 
 public class PeersListener {
-    private Integer tcpPort = 80;
+    private Integer tcpPort = 9191;
     private ServerSocket listenToPeerConnection;
     private ConnectableFlux<PeersCommunicator> peersConnectedToMeFlux;
 
@@ -45,7 +45,7 @@ public class PeersListener {
                     }
                     sink.error(e);
                 }
-        }).subscribeOn(Schedulers.elastic())
+        }).subscribeOn(App.MyScheduler)
                 .publish();
     }
 

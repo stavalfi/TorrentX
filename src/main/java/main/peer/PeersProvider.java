@@ -1,5 +1,6 @@
 package main.peer;
 
+import main.App;
 import main.AppConfig;
 import main.HexByteConverter;
 import main.TorrentInfo;
@@ -9,10 +10,10 @@ import main.tracker.TrackerConnection;
 import main.tracker.response.AnnounceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -72,7 +73,7 @@ public class PeersProvider {
                 }
                 sink.error(e);
             }
-        }).subscribeOn(Schedulers.elastic())
+        }).subscribeOn(App.MyScheduler)
                 .doOnError(PeerExceptions.communicationErrors, throwable -> logger.debug("error signal: (the application failed to connect to a peer." +
                         " the application will try to connect to the next available peer).\n" +
                         "peer: " + peer.toString() + "\n" +
@@ -88,11 +89,12 @@ public class PeersProvider {
                 .flatMap(AnnounceResponse::getPeersFlux);
     }
 
-    public Flux<PeersCommunicator> getPeersCommunicatorFromTrackerFlux(Flux<TrackerConnection> trackerConnectionFlux) {
+    public ConnectableFlux<PeersCommunicator> getPeersCommunicatorFromTrackerFlux(Flux<TrackerConnection> trackerConnectionFlux) {
         return trackerConnectionFlux
                 .flatMap(trackerConnection -> getPeersFromTrackerFlux(trackerConnection))
                 .distinct()
-                .flatMap((Peer peer) -> connectToPeerMono(peer));
+                .flatMap((Peer peer) -> connectToPeerMono(peer))
+                .publish();
     }
 
     public TorrentInfo getTorrentInfo() {

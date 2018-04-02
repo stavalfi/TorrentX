@@ -1,13 +1,12 @@
 package main.file.system;
 
 import christophedetroyer.torrent.TorrentFile;
+import main.App;
 import main.TorrentInfo;
 import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -23,8 +22,6 @@ public class ActiveTorrent extends TorrentInfo {
     private final BitSet piecesStatus;
     private final long[] piecesPartialStatus;
     private final String downloadPath;
-    private Flux<TorrentPieceChanged> torrentPieceChangedFlux;
-    private FluxSink<TorrentPieceChanged> torrentPieceChangedFluxSink;
 
     public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath) {
         super(torrentInfo);
@@ -32,7 +29,6 @@ public class ActiveTorrent extends TorrentInfo {
         this.piecesStatus = new BitSet(getPieces().size());
         this.piecesPartialStatus = new long[getPieces().size()];
         this.activeTorrentFileList = createActiveTorrentFileList(torrentInfo, downloadPath);
-        this.torrentPieceChangedFlux = Flux.create(sink -> this.torrentPieceChangedFluxSink = sink);
     }
 
     public List<? extends main.file.system.TorrentFile> getTorrentFiles() {
@@ -43,8 +39,8 @@ public class ActiveTorrent extends TorrentInfo {
         return this.piecesStatus;
     }
 
-    public Mono<ActiveTorrent> writeBlock(PieceMessage pieceMessage) {
-        return Mono.<ActiveTorrent>create(sink -> {
+    public Mono<TorrentPieceChanged> writeBlock(PieceMessage pieceMessage) {
+        return Mono.<TorrentPieceChanged>create(sink -> {
             long from = pieceMessage.getIndex() * this.getPieceLength() + pieceMessage.getBegin();
             long to = pieceMessage.getIndex() * this.getPieceLength()
                     + pieceMessage.getBegin() + pieceMessage.getBlock().length;
@@ -65,13 +61,6 @@ public class ActiveTorrent extends TorrentInfo {
                     if (from == to)
                         break;
                 }
-            if (this.torrentPieceChangedFluxSink != null &&
-                    this.piecesPartialStatus[pieceMessage.getIndex()] == 0) {
-                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
-                        this.getPieces().get(pieceMessage.getIndex()),
-                        TorrentPieceStatus.DOWNLOADING);
-                this.torrentPieceChangedFluxSink.next(torrentPieceChanged);
-            }
 
             // update pieces partial status array:
             // WARNING: this line *only* must be synchronized among multiple threads!
@@ -81,14 +70,16 @@ public class ActiveTorrent extends TorrentInfo {
             // there maybe multiple writes of the same pieceRequest during one execution...
             if (this.piecesPartialStatus[pieceMessage.getIndex()] >= this.getPieceLength()) {
                 this.piecesStatus.set(pieceMessage.getIndex());
-                if (this.torrentPieceChangedFluxSink != null) {
-                    TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
-                            this.getPieces().get(pieceMessage.getIndex()),
-                            TorrentPieceStatus.COMPLETED);
-                    this.torrentPieceChangedFluxSink.next(torrentPieceChanged);
-                }
+                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
+                        this.getPieces().get(pieceMessage.getIndex()),
+                        TorrentPieceStatus.COMPLETED);
+                sink.success(torrentPieceChanged);
+            } else {
+                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
+                        this.getPieces().get(pieceMessage.getIndex()),
+                        TorrentPieceStatus.DOWNLOADING);
+                sink.success(torrentPieceChanged);
             }
-            sink.success(this);
         }).subscribeOn(Schedulers.single());
     }
 
@@ -124,7 +115,7 @@ public class ActiveTorrent extends TorrentInfo {
                     }
                 }
             }
-        }).subscribeOn(Schedulers.elastic());
+        }).subscribeOn(App.MyScheduler);
     }
 
     public boolean havePiece(int pieceIndex) {
@@ -163,9 +154,5 @@ public class ActiveTorrent extends TorrentInfo {
 
     public String getDownloadPath() {
         return downloadPath;
-    }
-
-    public Flux<TorrentPieceChanged> getTorrentPieceChangedFlux() {
-        return torrentPieceChangedFlux;
     }
 }

@@ -1,5 +1,6 @@
 package main.tracker;
 
+import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.function.Predicate;
@@ -12,5 +13,7 @@ public class TrackerExceptions {
             throwable instanceof BadResponseException ||
                     // host is not reachable by it's url
                     throwable instanceof UnknownHostException ||
+                    // Network is unreachable ????
+                    throwable instanceof IOException ||
                     throwable instanceof SocketTimeoutException;
 }

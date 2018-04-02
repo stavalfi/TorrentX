@@ -1,6 +1,6 @@
 package main.peer;
 
-public class Peer {
+public class Peer implements Comparable<Peer> {
     private final String peerIp;
     private final int peerPort;
 
@@ -41,5 +41,17 @@ public class Peer {
                 "peerIp='" + peerIp + '\'' +
                 ", peerPort=" + peerPort +
                 '}';
+    }
+
+    @Override
+    public int compareTo(Peer o) {
+        if (this.peerIp.compareTo(o.getPeerIp()) != 0)
+            return this.peerIp.compareTo(o.getPeerIp());
+        else if (this.peerPort < o.peerPort)
+            return -1;
+        else if (this.peerPort > o.peerPort)
+            return 1;
+        else
+            return 0;
     }
 }

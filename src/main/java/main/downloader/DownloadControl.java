@@ -15,4 +15,6 @@ public interface DownloadControl {
     void pause();
 
     void remove();
+
+    boolean isDownloading();
 }
