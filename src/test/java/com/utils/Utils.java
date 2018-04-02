@@ -4,7 +4,9 @@ import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
 import main.TorrentInfo;
+import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrentFile;
+import main.file.system.ActiveTorrents;
 import main.peer.PeersCommunicator;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.RequestMessage;
@@ -20,10 +22,16 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class Utils {
-    public static TorrentInfo readTorrentFile(String torrentFilePath) throws IOException {
+    public static TorrentInfo createTorrentInfo(String torrentFilePath) throws IOException {
         String torrentFilesPath = "src/test/resources/torrents/" + torrentFilePath;
-
         return new TorrentInfo(torrentFilesPath, TorrentParser.parseTorrent(torrentFilesPath));
+    }
+
+    public static ActiveTorrent createActiveTorrent(String torrentFilePath, String downloadLocation) throws IOException {
+        String downloadPath = System.getProperty("user.dir") + "/" + downloadLocation;
+        return ActiveTorrents.getInstance()
+                .createActiveTorrentMono(createTorrentInfo(torrentFilePath), downloadPath)
+                .block();
     }
 
     public static Mono<PeersCommunicator> sendFakeMessage(PeersCommunicator peersCommunicator, PeerMessageType peerMessageType) {
@@ -147,7 +155,7 @@ public class Utils {
     public static void deleteDownloadFolder() {
         // delete download folder
         try {
-            File file = new File(System.getProperty("user.dir") + "/torrents-test");
+            File file = new File(System.getProperty("user.dir") + "/torrents-test/");
             if (file.exists()) {
                 boolean deleted = deleteDirectory(file);
                 if (!deleted)

@@ -4,7 +4,9 @@ import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
+import main.App;
 import main.TorrentInfo;
+import main.downloader.TorrentDownloader;
 import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
 import main.peer.Peer;
@@ -17,7 +19,6 @@ import main.peer.peerMessages.RequestMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.tracker.Tracker;
-import main.tracker.TrackerConnection;
 import main.tracker.TrackerExceptions;
 import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
@@ -26,13 +27,13 @@ import org.mockito.Mockito;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 import reactor.util.function.Tuple2;
 
 import java.io.File;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -44,15 +45,16 @@ public class MyStepdefs {
     static {
         // active debug mode in reactor
         Hooks.onOperatorDebug();
-        // delete download folder
+        // delete download folder from last test
         Utils.deleteDownloadFolder();
     }
 
     private TorrentInfo torrentInfo = mock(TorrentInfo.class);
+    private static final String DEFAULT_DOWNLOAD_LOCATION = "torrents-test/";
 
     @Given("^new torrent file: \"([^\"]*)\"$")
     public void newTorrentFile(String torrentFileName) throws Throwable {
-        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         Mockito.when(this.torrentInfo.getTorrentFilePath())
                 .thenReturn(torrentInfo.getTorrentFilePath());
@@ -97,7 +99,9 @@ public class MyStepdefs {
         Mono<PeersCommunicator> peersCommunicatorFlux =
                 trackerProvider.connectToTrackersFlux()
                         .autoConnect()
-                        .transform(trackerConnectionFlux -> peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionFlux))
+                        .as(trackerConnectionFlux ->
+                                peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionFlux)
+                                        .autoConnect())
                         .take(1)
                         .single();
 
@@ -229,24 +233,24 @@ public class MyStepdefs {
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
         PeersProvider peersProvider = new PeersProvider(this.torrentInfo);
 
-        Flux<TrackerConnection> trackerConnectionConnectableFlux =
-                trackerProvider.connectToTrackersFlux()
-                        .autoConnect(1);
-
         int requestBlockSize = 16000;
 
-        Mono<PieceMessage> receiveSinglePieceMono = peersProvider
-                .getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                .flatMap(peersCommunicator -> peersCommunicator.sendInterestedMessage())
-                .flatMap(peersCommunicator -> peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux()
+        Mono<PieceMessage> receiveSinglePieceMono =
+                trackerProvider.connectToTrackersFlux()
+                        .autoConnect()
+                        .as(trackerConnectionFlux -> peersProvider
+                                .getPeersCommunicatorFromTrackerFlux(trackerConnectionFlux))
+                        .autoConnect()
+                        .flatMap(peersCommunicator -> peersCommunicator.sendInterestedMessage())
+                        .flatMap(peersCommunicator -> peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux()
+                                .take(1)
+                                .flatMap(haveMessage -> peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
+                        .flatMap(peersCommunicator ->
+                                peersCommunicator.receivePeerMessages()
+                                        .getPieceMessageResponseFlux()
+                                        .doOnNext(pieceMessage -> peersCommunicator.closeConnection()))
                         .take(1)
-                        .flatMap(haveMessage -> peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
-                .flatMap(peersCommunicator ->
-                        peersCommunicator.receivePeerMessages()
-                                .getPieceMessageResponseFlux()
-                                .doOnNext(pieceMessage -> peersCommunicator.closeConnection()))
-                .take(1)
-                .single();
+                        .single();
 
         StepVerifier.create(receiveSinglePieceMono)
                 .expectNextCount(1)
@@ -255,21 +259,12 @@ public class MyStepdefs {
 
     @Then("^application create active-torrent for: \"([^\"]*)\",\"([^\"]*)\"$")
     public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {
-        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
-
-        String mainFolderPath = System.getProperty("user.dir") + "/" + downloadLocation;
-        Mono<ActiveTorrent> activeTorrentMono =
-                ActiveTorrents.getInstance()
-                        .createActiveTorrentMono(torrentInfo, mainFolderPath);
-
-        StepVerifier.create(activeTorrentMono)
-                .expectNextCount(1)
-                .verifyComplete();
+        Utils.createActiveTorrent(torrentFileName, downloadLocation);
     }
 
     @Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
     public void activeTorrentExistForTorrent(boolean isActiveTorrentExist, String torrentFileName) throws Throwable {
-        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         Mono<Optional<ActiveTorrent>> activeTorrentMono =
                 ActiveTorrents.getInstance()
@@ -278,14 +273,14 @@ public class MyStepdefs {
         StepVerifier.create(activeTorrentMono)
                 .consumeNextWith(activeTorrent -> {
                     String message = "activeTorrent object needs to be present:" + isActiveTorrentExist + ", but the opposite is heppening.";
-                    Assert.assertEquals(message, activeTorrent.isPresent(), isActiveTorrentExist);
+                    Assert.assertEquals(message, isActiveTorrentExist, activeTorrent.isPresent());
                 })
                 .verifyComplete();
     }
 
     @Then("^files of torrent: \"([^\"]*)\" exist: \"([^\"]*)\" in \"([^\"]*)\"$")
     public void torrentExistIn(String torrentFileName, boolean torrentFilesExist, String downloadLocation) throws Throwable {
-        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         String fullFilePath = !torrentInfo.isSingleFileTorrent() ?
                 System.getProperty("user.dir") + "/" + downloadLocation + torrentInfo.getName() + "/" :
                 System.getProperty("user.dir") + "/" + downloadLocation;
@@ -310,7 +305,7 @@ public class MyStepdefs {
                     (torrentFile, path) -> {
                         File file = new File(path);
                         Assert.assertEquals("file not in the right length: " + file.getPath(),
-                                file.length(), (long) torrentFile.getFileLength());
+                                (long) torrentFile.getFileLength(), file.length());
                         return file;
                     })
                     .doOnNext(file -> Assert.assertTrue("file does not exist: " + file.getPath(), file.exists()))
@@ -325,23 +320,27 @@ public class MyStepdefs {
                     .forEach(file -> Assert.assertTrue("file exist: " + file.getPath(), !file.exists()));
     }
 
-    @Then("^application delete active-torrent: \"([^\"]*)\": \"([^\"]*)\" and file: \"([^\"]*)\": \"([^\"]*)\"$")
+    @Then("^application delete active-torrent: \"([^\"]*)\": \"([^\"]*)\" and file: \"([^\"]*)\"$")
     public void applicationDeleteActiveTorrentAndFile(String torrentFileName, boolean deleteActiveTorrent,
-                                                      String downloadLocation, boolean deleteTorrentFiles) throws Throwable {
-        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+                                                      boolean deleteTorrentFiles) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        Mono<Optional<ActiveTorrent>> deletionTaskMono;
-        if (deleteActiveTorrent && deleteTorrentFiles)
-            deletionTaskMono = ActiveTorrents.getInstance()
-                    .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
-                    .flatMap(activeTorrent -> ActiveTorrents.getInstance()
-                            .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()));
-        else if (deleteActiveTorrent) // deleteActiveTorrent && !deleteTorrentFiles
-            deletionTaskMono = ActiveTorrents.getInstance()
-                    .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash());
-        else // !deleteActiveTorrent && deleteTorrentFiles
-            deletionTaskMono = ActiveTorrents.getInstance()
-                    .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash());
+        Mono<Optional<ActiveTorrent>> deletionTaskMono = ActiveTorrents.getInstance()
+                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
+                .as(activeTorrentMono -> {
+                    if (deleteTorrentFiles)
+                        return activeTorrentMono.flatMap(activeTorrent ->
+                                ActiveTorrents.getInstance()
+                                        .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash()));
+                    return activeTorrentMono;
+                })
+                .as(activeTorrentMono -> {
+                    if (deleteActiveTorrent)
+                        return activeTorrentMono.flatMap(activeTorrent ->
+                                ActiveTorrents.getInstance()
+                                        .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()));
+                    return activeTorrentMono;
+                });
 
         StepVerifier.create(deletionTaskMono)
                 .consumeNextWith(activeTorrent -> {
@@ -355,7 +354,7 @@ public class MyStepdefs {
     public void applicationSaveARandomBlockInsideTorrentInAndCheckItSaved(String torrentFileName,
                                                                           String downloadLocation,
                                                                           List<BlockOfPiece> blockList) throws Throwable {
-        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         Function<Integer, byte[]> toRandomByteArray = (Integer length) -> {
             byte[] bytes = new byte[length];
@@ -368,7 +367,7 @@ public class MyStepdefs {
         Mono<ActiveTorrent> activeTorrentMono = ActiveTorrents.getInstance()
                 .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
                 .map(Optional::get)
-                .subscribeOn(Schedulers.elastic());
+                .subscribeOn(App.MyScheduler);
 
         Flux<byte[]> readFlux = Flux.fromIterable(blockList)
                 .map(blockOfPiece -> {
@@ -379,7 +378,7 @@ public class MyStepdefs {
                             toRandomByteArray.apply(torrentInfo.getPieceLength() - blockOfPiece.getFrom()));
                 })
                 .flatMap(pieceMessage -> activeTorrentMono
-                        .flatMap(activeTorrent -> activeTorrent.writeBlock(pieceMessage).subscribeOn(Schedulers.elastic()))
+                        .flatMap(activeTorrent -> activeTorrent.writeBlock(pieceMessage).subscribeOn(App.MyScheduler))
                         // assert that the content is written.
                         .map(activeTorrent -> {
                             RequestMessage requestMessage =
@@ -401,7 +400,7 @@ public class MyStepdefs {
 
     @Then("^completed pieces are for torrent: \"([^\"]*)\":$")
     public void completedPiecesAreForTorrent(String torrentFileName, List<Integer> completedPiecesIndexList) throws Throwable {
-        TorrentInfo torrentInfo = Utils.readTorrentFile(torrentFileName);
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         Mono<ActiveTorrent> activeTorrentMono = ActiveTorrents.getInstance()
                 .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
@@ -477,6 +476,59 @@ public class MyStepdefs {
         StepVerifier.create(speedComparisionFlux)
                 .expectNextCount(uploadSpeedStatistics.size())
                 .verifyComplete();
+    }
+
+    @Then("^application connect to all peers and assert that we connected to them - for torrent: \"([^\"]*)\"$")
+    public void applicationConnectToAllPeersAndAssertThatWeConnectedToThemForTorrent(String torrentFileName) throws Throwable {
+        ActiveTorrent activeTorrent = Utils.createActiveTorrent(torrentFileName, DEFAULT_DOWNLOAD_LOCATION);
+
+        TorrentDownloader torrentDownloader = TorrentDownloader.defaultTorrentDownloader(activeTorrent);
+
+        // consume new peers and new responses from 1.5 seconds.
+        // filter distinct peers from the responses, and assert
+        // that both the list of peers are equal.
+
+        Flux<Peer> connectedPeersFlux = torrentDownloader.getPeersCommunicatorFlux()
+                .map(PeersCommunicator::getPeer)
+                .timeout(Duration.ofMillis(1500))
+                .buffer(Duration.ofMillis(1500))
+                .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
+                .doOnNext(x -> System.out.println("connected until now: " + x))
+                .take(3)
+                .flatMap(Flux::fromIterable)
+                .sort();
+
+        Flux<Peer> peersFromResponsesMono = torrentDownloader.getBittorrentAlgorithm()
+                .receiveTorrentMessagesMessagesFlux()
+                .getPeerMessageResponseFlux()
+                .map(PeerMessage::getFrom)
+                .distinct()
+                .timeout(Duration.ofMillis(1500))
+                .buffer(Duration.ofMillis(1500))
+                .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
+                .doOnNext(x -> System.out.println("responses from until now: " + x))
+                .take(2)
+                .flatMap(Flux::fromIterable)
+                .sort()
+                // I'm going to get this peers again AFTER:
+                // torrentDownloader.getDownloadControl().start();
+                .replay()
+                .autoConnect();
+
+        // for recording all the peers without blocking the main thread.
+        peersFromResponsesMono.subscribe();
+
+        // start when someone subscribe.
+        torrentDownloader.getDownloadControl().start();
+
+        List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
+        List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
+
+        peersFromResponses.stream()
+                .filter(peer -> connectedPeers.contains(peer))
+                .findFirst()
+                .ifPresent(peer -> Assert.fail("We received from the following peer" +
+                        " messages but he doesn't exist in the conencted peers flux: " + peer));
     }
 }
 
