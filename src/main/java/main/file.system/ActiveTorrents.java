@@ -1,9 +1,9 @@
 package main.file.system;
 
+import main.App;
 import main.TorrentInfo;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,12 +19,22 @@ public class ActiveTorrents {
 
     public Mono<ActiveTorrent> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath) {
         // TODO: check if this torrent exist in db.
-        return createFolders(torrentInfo, downloadPath)
+        Mono<ActiveTorrent> createActiveTorrentMono = createFolders(torrentInfo, downloadPath)
                 .flatMap(activeTorrents -> createFiles(torrentInfo, downloadPath))
                 .map(activeTorrents -> new ActiveTorrent(torrentInfo, downloadPath))
                 .doOnNext(activeTorrent ->
                         // save this torrent information in db.
                         this.activeTorrentList.add(activeTorrent));
+
+        // firstly, check if there is an active-torrent exist already.
+        // if yes, return it, else create one using the above Mono: "createActiveTorrentMono"
+        return findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
+                .flatMap(activeTorrentOptional -> {
+                    if (activeTorrentOptional.isPresent())
+                        return Mono.just(activeTorrentOptional.get());
+                    else
+                        return createActiveTorrentMono;
+                });
     }
 
     public Mono<Optional<ActiveTorrent>> deleteActiveTorrentOnlyMono(String torrentInfoHash) {
@@ -35,7 +45,7 @@ public class ActiveTorrents {
                             .filter(activeTorrent1 -> !activeTorrent1.getTorrentInfoHash().equals(torrentInfoHash))
                             .collect(Collectors.toCollection(CopyOnWriteArrayList::new));
                     return Mono.just(activeTorrent);
-                }).subscribeOn(Schedulers.elastic());
+                }).subscribeOn(App.MyScheduler);
     }
 
     public Mono<Optional<ActiveTorrent>> deleteFileOnlyMono(String torrentInfoHash) {
