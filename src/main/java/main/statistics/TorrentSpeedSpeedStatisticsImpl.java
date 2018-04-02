@@ -1,5 +1,6 @@
 package main.statistics;
 
+import main.App;
 import main.TorrentInfo;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -42,7 +43,7 @@ public class TorrentSpeedSpeedStatisticsImpl implements SpeedStatistics {
         Function<Flux<? extends PeerMessage>, Flux<Double>> messagesToSpeedFlux =
                 pieceMessageToSize.andThen(pieceMessageSizeFlux ->
                         Flux.merge(pieceMessageSizeFlux, intervalFlux)
-                                .buffer(Duration.ofMillis(this.rateInMillSeconds))
+                                .buffer(Duration.ofMillis(this.rateInMillSeconds), App.MyScheduler)
                                 .map(List::stream)
                                 .map(doubleStream -> doubleStream.mapToDouble(Double::doubleValue))
                                 .map(DoubleStream::sum));

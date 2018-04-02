@@ -6,9 +6,8 @@ import main.file.system.ActiveTorrent;
 import main.file.system.Downloader;
 import main.file.system.DownloaderImpl;
 import main.peer.PeersCommunicator;
+import main.peer.PeersListener;
 import main.peer.PeersProvider;
-import main.peer.ReceiveMessages;
-import main.peer.peerMessages.PieceMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.tracker.TrackerConnection;
@@ -88,20 +87,27 @@ public class TorrentDownloader {
     public static TorrentDownloader defaultTorrentDownloader(ActiveTorrent activeTorrent) {
         TrackerProvider trackerProvider = new TrackerProvider(activeTorrent);
         PeersProvider peersProvider = new PeersProvider(activeTorrent);
-        ConnectableFlux<TrackerConnection> trackerConnectionConnectableFlux =
-                trackerProvider.connectToTrackersFlux();
-        Flux<PeersCommunicator> peersCommunicatorFlux =
-                peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux);
+
+        Flux<TrackerConnection> trackerConnectionConnectableFlux =
+                trackerProvider.connectToTrackersFlux()
+                        .autoConnect();
+
+        ConnectableFlux<PeersCommunicator> peersCommunicatorFlux =
+                Flux.merge(PeersListener.getInstance().getPeersConnectedToMeFlux().autoConnect(),
+                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux).autoConnect())
+                        .publish();
+
+        DownloadControl downloadControl = new DownloadControlImpl(activeTorrent,peersCommunicatorFlux);
 
         BittorrentAlgorithm bittorrentAlgorithm =
-                new BittorrentAlgorithmImpl(activeTorrent, peersCommunicatorFlux);
-        DownloadControl downloadControl =
-                new DownloadControlImpl(activeTorrent, trackerConnectionConnectableFlux);
-        Flux<PieceMessage> peerResponsesFlux = peersCommunicatorFlux
-                .map(PeersCommunicator::receivePeerMessages)
-                .flatMap(ReceiveMessages::getPieceMessageResponseFlux);
-        Downloader downloader = new DownloaderImpl(activeTorrent, peerResponsesFlux);
+                new BittorrentAlgorithmImpl(activeTorrent, downloadControl, peersCommunicatorFlux);
+
+        Downloader downloader = new DownloaderImpl(activeTorrent, bittorrentAlgorithm
+                .receiveTorrentMessagesMessagesFlux()
+                .getPieceMessageResponseFlux());
+
         Flux<SpeedStatistics> peerSpeedStatisticsFlux = peersCommunicatorFlux.map(PeersCommunicator::getPeerSpeedStatistics);
+
         SpeedStatistics torrentSpeedStatistics =
                 new TorrentSpeedSpeedStatisticsImpl(activeTorrent, peerSpeedStatisticsFlux);
 

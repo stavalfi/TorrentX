@@ -1,6 +1,7 @@
 package main.algorithms;
 
 import main.TorrentInfo;
+import main.downloader.DownloadControl;
 import main.downloader.TorrentPieceChanged;
 import main.peer.PeersCommunicator;
 import main.peer.ReceiveMessages;
@@ -9,13 +10,16 @@ import reactor.core.publisher.Flux;
 
 public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
     private TorrentInfo torrentInfo;
+    private DownloadControl downloadControl;
     private Flux<PeersCommunicator> peersCommunicatorFlux;
 
     private ReceiveMessages receiveTorrentMessagesMessagesFlux;
 
     public BittorrentAlgorithmImpl(TorrentInfo torrentInfo,
-                                   final Flux<PeersCommunicator> peersCommunicatorFlux) {
+                                   DownloadControl downloadControl,
+                                   Flux<PeersCommunicator> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
+        this.downloadControl = downloadControl;
         this.peersCommunicatorFlux = peersCommunicatorFlux;
         Flux<ReceiveMessages> receiveMessagesFlux = peersCommunicatorFlux
                 .map(PeersCommunicator::receivePeerMessages);
