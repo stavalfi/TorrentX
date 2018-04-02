@@ -6,8 +6,12 @@ import main.downloader.TorrentDownloader;
 import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
 import reactor.core.publisher.Hooks;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
-class App {
+public class App {
+    public static Scheduler MyScheduler = Schedulers.elastic();
+
     private static void f4() {
         TorrentDownloader torrentDownloader = TorrentDownloader.defaultTorrentDownloader(getActiveTorrent());
 
