@@ -44,7 +44,7 @@ Feature: create get and delete active torrents
       | torrent-file-example1.torrent | torrents-test/   |
       | torrent-file-example2.torrent | torrents-test/   |
 
-  Scenario Outline: we save random blocks inside files and if a piece filled, we check it has been marked as downloaded
+  Scenario Outline: we save random blocks inside files and if a piece completely downloaded, we check it has been marked as downloaded
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
     Then application save random blocks from different threads inside torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
@@ -81,3 +81,12 @@ Feature: create get and delete active torrents
     Examples:
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test/   |
+
+  Scenario Outline: we save the last piece of active torrent
+    Then application create active-torrent for: "<torrent>","<downloadLocation>"
+    Then application save all the last piece of torrent: "<torrent>","<downloadLocation>"
+
+    Examples:
+      | torrent                       | downloadLocation |
+      | torrent-file-example1.torrent | torrents-test/   |
+
