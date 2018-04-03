@@ -45,7 +45,7 @@ public class ActiveTorrent extends TorrentInfo implements Downloader {
     }
 
     @Override
-    public BitFieldMessage getPiecesStatus(Peer from, Peer to) {
+    public BitFieldMessage getAllPiecesStatus(Peer from, Peer to) {
         return new BitFieldMessage(from, to, this.piecesStatus);
     }
 

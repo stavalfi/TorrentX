@@ -20,7 +20,7 @@ public interface Downloader {
 
     Mono<PieceMessage> readBlock(RequestMessage requestMessage);
 
-    BitFieldMessage getPiecesStatus(Peer from, Peer to);
+    BitFieldMessage getAllPiecesStatus(Peer from, Peer to);
 
     List<? extends TorrentFile> getTorrentFiles();
 
