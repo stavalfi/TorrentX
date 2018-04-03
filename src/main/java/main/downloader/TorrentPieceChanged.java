@@ -22,4 +22,13 @@ public class TorrentPieceChanged {
     public int getPieceIndex() {
         return pieceIndex;
     }
+
+    @Override
+    public String toString() {
+        return "TorrentPieceChanged{" +
+                "pieceIndex=" + pieceIndex +
+                ", pieceHashCode='" + pieceHashCode + '\'' +
+                ", torrentPieceStatus=" + torrentPieceStatus +
+                '}';
+    }
 }

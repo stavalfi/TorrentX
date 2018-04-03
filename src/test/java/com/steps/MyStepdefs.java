@@ -4,7 +4,6 @@ import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
-import main.App;
 import main.TorrentInfo;
 import main.downloader.TorrentDownloader;
 import main.file.system.ActiveTorrent;
@@ -354,7 +353,7 @@ public class MyStepdefs {
     public void applicationSaveARandomBlockInsideTorrentInAndCheckItSaved(String torrentFileName,
                                                                           String downloadLocation,
                                                                           List<BlockOfPiece> blockList) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        ActiveTorrent activeTorrent = Utils.createActiveTorrent(torrentFileName, downloadLocation);
 
         Function<Integer, byte[]> toRandomByteArray = (Integer length) -> {
             byte[] bytes = new byte[length];
@@ -364,36 +363,30 @@ public class MyStepdefs {
             return bytes;
         };
 
-        Mono<ActiveTorrent> activeTorrentMono = ActiveTorrents.getInstance()
-                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
-                .map(Optional::get)
-                .subscribeOn(App.MyScheduler);
-
-        Flux<byte[]> readFlux = Flux.fromIterable(blockList)
+        Flux<PieceMessage> pieceMessageFlux = Flux.fromIterable(blockList)
                 .map(blockOfPiece -> {
                     if (blockOfPiece.getLength() != null)
                         return new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
                                 toRandomByteArray.apply(blockOfPiece.getLength()));
                     return new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
-                            toRandomByteArray.apply(torrentInfo.getPieceLength() - blockOfPiece.getFrom()));
-                })
-                .flatMap(pieceMessage -> activeTorrentMono
-                        .flatMap(activeTorrent -> activeTorrent.writeBlock(pieceMessage).subscribeOn(App.MyScheduler))
-                        // assert that the content is written.
-                        .map(activeTorrent -> {
-                            RequestMessage requestMessage =
-                                    new RequestMessage(null, null,
-                                            pieceMessage.getIndex(),
-                                            pieceMessage.getBegin(),
-                                            pieceMessage.getBlock().length);
-                            return Utils.readFromFile(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation, requestMessage);
-                        })
-                        .doOnNext(readByteArray -> {
-                            String message = "the content I wrote is not equal to the content I read to the file";
-                            Assert.assertArrayEquals(message, readByteArray, pieceMessage.getBlock());
-                        }));
+                            toRandomByteArray.apply(activeTorrent.getPieceLength() - blockOfPiece.getFrom()));
+                });
 
-        StepVerifier.create(readFlux)
+        Flux<Object> assertWrittenPiecesFlux = Flux.zip(activeTorrent.downloadAsync(pieceMessageFlux), pieceMessageFlux,
+                (torrentPieceChanged, pieceMessage) -> {
+                    RequestMessage requestMessage =
+                            new RequestMessage(null, null,
+                                    pieceMessage.getIndex(),
+                                    pieceMessage.getBegin(),
+                                    pieceMessage.getBlock().length);
+                    byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, System.getProperty("user.dir") + "/" +
+                            downloadLocation, requestMessage);
+                    String message = "the content I wrote is not equal to the content I read to the file";
+                    Assert.assertArrayEquals(message, actualWrittenBytes, pieceMessage.getBlock());
+                    return new Object();
+                });
+
+        StepVerifier.create(assertWrittenPiecesFlux)
                 .expectNextCount(blockList.size())
                 .verifyComplete();
     }

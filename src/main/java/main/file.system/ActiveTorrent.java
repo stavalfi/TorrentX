@@ -65,7 +65,45 @@ public class ActiveTorrent extends TorrentInfo implements Downloader {
                 writeBlock(pieceMessage));
     }
 
-    public Mono<ActiveTorrent> updatePieceAsCompleted(int pieceIndex) {
+    @Override
+    public Mono<PieceMessage> readBlock(RequestMessage requestMessage) {
+        return Mono.<PieceMessage>create(sink -> {
+            if (!havePiece(requestMessage.getIndex())) {
+                sink.error(new PieceNotFoundException(requestMessage.getIndex()));
+                return;
+            }
+            byte[] result = new byte[requestMessage.getBlockLength()];
+            int freeIndexInResultArray = 0;
+
+            long from = requestMessage.getIndex() * this.getPieceLength() + requestMessage.getBegin();
+            long to = requestMessage.getIndex() * this.getPieceLength()
+                    + requestMessage.getBegin() + requestMessage.getBlockLength();
+
+            for (ActiveTorrentFile activeTorrentFile : this.activeTorrentFileList) {
+                if (activeTorrentFile.getFrom() <= from && from <= activeTorrentFile.getTo()) {
+                    int howMuchToReadFromThisFile = (int) Math.min(requestMessage.getBlockLength(), (from - to));
+                    byte[] tempResult = new byte[0];
+                    try {
+                        tempResult = activeTorrentFile.readBlock(from, howMuchToReadFromThisFile);
+                    } catch (IOException e) {
+                        sink.error(e);
+                        return;
+                    }
+                    for (int i = 0; i < tempResult.length; i++)
+                        result[freeIndexInResultArray++] = tempResult[i];
+                    from += howMuchToReadFromThisFile;
+                    if (from == to) {
+                        PieceMessage pieceMessage = new PieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
+                                requestMessage.getIndex(), requestMessage.getBegin(), result);
+                        sink.success(pieceMessage);
+                        return;
+                    }
+                }
+            }
+        }).subscribeOn(App.MyScheduler);
+    }
+
+    private Mono<ActiveTorrent> updatePieceAsCompleted(int pieceIndex) {
         return Mono.<ActiveTorrent>create(sink -> {
             this.piecesStatus.set(pieceIndex);
             Mono.just(this);
@@ -95,7 +133,7 @@ public class ActiveTorrent extends TorrentInfo implements Downloader {
         return activeTorrentFileList;
     }
 
-    public Mono<TorrentPieceChanged> writeBlock(PieceMessage pieceMessage) {
+    private Mono<TorrentPieceChanged> writeBlock(PieceMessage pieceMessage) {
         return Mono.<TorrentPieceChanged>create(sink -> {
             long from = pieceMessage.getIndex() * this.getPieceLength() + pieceMessage.getBegin();
             long to = pieceMessage.getIndex() * this.getPieceLength()
@@ -137,42 +175,5 @@ public class ActiveTorrent extends TorrentInfo implements Downloader {
                 sink.success(torrentPieceChanged);
             }
         }).subscribeOn(Schedulers.single());
-    }
-
-    public Mono<PieceMessage> readBlock(RequestMessage requestMessage) {
-        return Mono.<PieceMessage>create(sink -> {
-            if (!havePiece(requestMessage.getIndex())) {
-                sink.error(new PieceNotFoundException(requestMessage.getIndex()));
-                return;
-            }
-            byte[] result = new byte[requestMessage.getBlockLength()];
-            int freeIndexInResultArray = 0;
-
-            long from = requestMessage.getIndex() * this.getPieceLength() + requestMessage.getBegin();
-            long to = requestMessage.getIndex() * this.getPieceLength()
-                    + requestMessage.getBegin() + requestMessage.getBlockLength();
-
-            for (ActiveTorrentFile activeTorrentFile : this.activeTorrentFileList) {
-                if (activeTorrentFile.getFrom() <= from && from <= activeTorrentFile.getTo()) {
-                    int howMuchToReadFromThisFile = (int) Math.min(requestMessage.getBlockLength(), (from - to));
-                    byte[] tempResult = new byte[0];
-                    try {
-                        tempResult = activeTorrentFile.readBlock(from, howMuchToReadFromThisFile);
-                    } catch (IOException e) {
-                        sink.error(e);
-                        return;
-                    }
-                    for (int i = 0; i < tempResult.length; i++)
-                        result[freeIndexInResultArray++] = tempResult[i];
-                    from += howMuchToReadFromThisFile;
-                    if (from == to) {
-                        PieceMessage pieceMessage = new PieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
-                                requestMessage.getIndex(), requestMessage.getBegin(), result);
-                        sink.success(pieceMessage);
-                        return;
-                    }
-                }
-            }
-        }).subscribeOn(App.MyScheduler);
     }
 }
