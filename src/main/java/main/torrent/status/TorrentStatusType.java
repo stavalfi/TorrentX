@@ -1,4 +1,4 @@
-package main.downloader;
+package main.torrent.status;
 
 public enum TorrentStatusType {
     STARTED,
