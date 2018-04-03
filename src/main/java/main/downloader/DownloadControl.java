@@ -8,8 +8,6 @@ public interface DownloadControl {
 
     void start();
 
-    void stop();
-
     void resume();
 
     void pause();

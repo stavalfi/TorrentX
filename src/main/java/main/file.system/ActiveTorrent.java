@@ -5,8 +5,11 @@ import main.App;
 import main.TorrentInfo;
 import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
+import main.peer.Peer;
+import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -16,7 +19,7 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class ActiveTorrent extends TorrentInfo {
+public class ActiveTorrent extends TorrentInfo implements Downloader {
 
     private final List<ActiveTorrentFile> activeTorrentFileList;
     private final BitSet piecesStatus;
@@ -31,12 +34,65 @@ public class ActiveTorrent extends TorrentInfo {
         this.activeTorrentFileList = createActiveTorrentFileList(torrentInfo, downloadPath);
     }
 
+    @Override
     public List<? extends main.file.system.TorrentFile> getTorrentFiles() {
         return this.activeTorrentFileList;
     }
 
-    public BitSet getPiecesStatus() {
-        return this.piecesStatus;
+    @Override
+    public TorrentInfo getTorrentInfo() {
+        return this;
+    }
+
+    @Override
+    public BitFieldMessage getPiecesStatus(Peer from, Peer to) {
+        return new BitFieldMessage(from, to, this.piecesStatus);
+    }
+
+    @Override
+    public boolean havePiece(int pieceIndex) {
+        return this.piecesStatus.get(pieceIndex);
+    }
+
+    @Override
+    public String getDownloadPath() {
+        return downloadPath;
+    }
+
+    @Override
+    public Flux<TorrentPieceChanged> downloadAsync(Flux<PieceMessage> peerResponsesFlux) {
+        return peerResponsesFlux.flatMap(pieceMessage ->
+                writeBlock(pieceMessage));
+    }
+
+    public Mono<ActiveTorrent> updatePieceAsCompleted(int pieceIndex) {
+        return Mono.<ActiveTorrent>create(sink -> {
+            this.piecesStatus.set(pieceIndex);
+            Mono.just(this);
+        }).doOnSuccess(activeTorrent -> {
+            // update in mongo db
+        });
+    }
+
+    private List<ActiveTorrentFile> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) {
+        String mainFolder = !torrentInfo.isSingleFileTorrent() ?
+                downloadPath + "/" + torrentInfo.getName() + "/" :
+                downloadPath + "/";
+
+        // create activeTorrentFile list
+        long position = 0;
+        List<ActiveTorrentFile> activeTorrentFileList = new ArrayList<>();
+        for (TorrentFile torrentFile : torrentInfo.getFileList()) {
+            String filePath = torrentFile
+                    .getFileDirs()
+                    .stream()
+                    .collect(Collectors.joining("/", mainFolder, ""));
+            ActiveTorrentFile activeTorrentFile =
+                    new ActiveTorrentFile(filePath, position, position + torrentFile.getFileLength());
+            activeTorrentFileList.add(activeTorrentFile);
+            position += torrentFile.getFileLength();
+        }
+        return activeTorrentFileList;
     }
 
     public Mono<TorrentPieceChanged> writeBlock(PieceMessage pieceMessage) {
@@ -83,8 +139,8 @@ public class ActiveTorrent extends TorrentInfo {
         }).subscribeOn(Schedulers.single());
     }
 
-    public Mono<byte[]> readBlock(RequestMessage requestMessage) {
-        return Mono.<byte[]>create(sink -> {
+    public Mono<PieceMessage> readBlock(RequestMessage requestMessage) {
+        return Mono.<PieceMessage>create(sink -> {
             if (!havePiece(requestMessage.getIndex())) {
                 sink.error(new PieceNotFoundException(requestMessage.getIndex()));
                 return;
@@ -110,49 +166,13 @@ public class ActiveTorrent extends TorrentInfo {
                         result[freeIndexInResultArray++] = tempResult[i];
                     from += howMuchToReadFromThisFile;
                     if (from == to) {
-                        sink.success(result);
+                        PieceMessage pieceMessage = new PieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
+                                requestMessage.getIndex(), requestMessage.getBegin(), result);
+                        sink.success(pieceMessage);
                         return;
                     }
                 }
             }
         }).subscribeOn(App.MyScheduler);
-    }
-
-    public boolean havePiece(int pieceIndex) {
-        return this.piecesStatus.get(pieceIndex);
-    }
-
-    public Mono<ActiveTorrent> updatePieceAsCompleted(int pieceIndex) {
-        return Mono.<ActiveTorrent>create(sink -> {
-            this.piecesStatus.set(pieceIndex);
-            Mono.just(this);
-        }).doOnSuccess(activeTorrent -> {
-            // update in mongo db
-        });
-    }
-
-    private List<ActiveTorrentFile> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) {
-        String mainFolder = !torrentInfo.isSingleFileTorrent() ?
-                downloadPath + "/" + torrentInfo.getName() + "/" :
-                downloadPath + "/";
-
-        // create activeTorrentFile list
-        long position = 0;
-        List<ActiveTorrentFile> activeTorrentFileList = new ArrayList<>();
-        for (TorrentFile torrentFile : torrentInfo.getFileList()) {
-            String filePath = torrentFile
-                    .getFileDirs()
-                    .stream()
-                    .collect(Collectors.joining("/", mainFolder, ""));
-            ActiveTorrentFile activeTorrentFile =
-                    new ActiveTorrentFile(filePath, position, position + torrentFile.getFileLength());
-            activeTorrentFileList.add(activeTorrentFile);
-            position += torrentFile.getFileLength();
-        }
-        return activeTorrentFileList;
-    }
-
-    public String getDownloadPath() {
-        return downloadPath;
     }
 }

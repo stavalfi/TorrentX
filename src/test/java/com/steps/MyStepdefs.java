@@ -518,7 +518,6 @@ public class MyStepdefs {
         // for recording all the peers without blocking the main thread.
         peersFromResponsesMono.subscribe();
 
-        // start when someone subscribe.
         torrentDownloader.getDownloadControl().start();
 
         List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
