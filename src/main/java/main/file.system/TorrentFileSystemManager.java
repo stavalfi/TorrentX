@@ -6,7 +6,7 @@ import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
-import reactor.core.publisher.Flux;
+import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -24,5 +24,5 @@ public interface TorrentFileSystemManager {
 
     Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
 
-    Flux<TorrentPieceChanged> startListenForIncomingPieces();
+    ConnectableFlux<TorrentPieceChanged> startListenForIncomingPiecesFlux();
 }

@@ -3,12 +3,14 @@ package main.file.system;
 import christophedetroyer.torrent.TorrentFile;
 import main.App;
 import main.TorrentInfo;
+import main.torrent.status.TorrentStatus;
 import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
 import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
+import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -25,20 +27,30 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     private final BitSet piecesStatus;
     private final long[] piecesPartialStatus;
     private final String downloadPath;
-    private Flux<PieceMessage> peerResponsesFlux;
-    private Flux<TorrentPieceChanged> downloadTorrentFlux;
+    private TorrentStatus torrentStatus;
+    private ConnectableFlux<TorrentPieceChanged> startListenForIncomingPiecesFlux;
 
     public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath,
+                         TorrentStatus torrentStatus,
                          Flux<PieceMessage> peerResponsesFlux) {
         super(torrentInfo);
-        this.peerResponsesFlux = peerResponsesFlux;
+        this.torrentStatus = torrentStatus;
         this.downloadPath = downloadPath;
         this.piecesStatus = new BitSet(getPieces().size());
         this.piecesPartialStatus = new long[getPieces().size()];
         this.activeTorrentFileList = createActiveTorrentFileList(torrentInfo, downloadPath);
 
-        this.downloadTorrentFlux = peerResponsesFlux
-                .flatMap(pieceMessage -> writeBlock(pieceMessage));
+        this.startListenForIncomingPiecesFlux = peerResponsesFlux
+                .flatMap(pieceMessage -> writeBlock(pieceMessage))
+                .publish();
+
+        this.torrentStatus.getStatusTypeFlux()
+                .subscribe(torrentStatusType -> {
+                    switch (torrentStatusType) {
+                        case STARTED:
+                            this.startListenForIncomingPiecesFlux.connect();
+                    }
+                });
     }
 
     @Override
@@ -67,8 +79,8 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     }
 
     @Override
-    public Flux<TorrentPieceChanged> startListenForIncomingPieces() {
-        return this.downloadTorrentFlux;
+    public ConnectableFlux<TorrentPieceChanged> startListenForIncomingPiecesFlux() {
+        return this.startListenForIncomingPiecesFlux;
     }
 
     @Override

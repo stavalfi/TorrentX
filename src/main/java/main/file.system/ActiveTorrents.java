@@ -2,6 +2,7 @@ package main.file.system;
 
 import main.App;
 import main.TorrentInfo;
+import main.torrent.status.TorrentStatus;
 import main.peer.peerMessages.PieceMessage;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -19,12 +20,13 @@ public class ActiveTorrents {
     private CopyOnWriteArrayList<ActiveTorrent> activeTorrentList = new CopyOnWriteArrayList<>();
 
     public Mono<ActiveTorrent> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath,
+                                                       TorrentStatus torrentStatus,
                                                        Flux<PieceMessage> peerResponsesFlux) {
         // TODO: check if this torrent exist in db.
         Mono<ActiveTorrent> createActiveTorrentMono = createFolders(torrentInfo, downloadPath)
                 .flatMap(activeTorrents -> createFiles(torrentInfo, downloadPath))
                 .map(activeTorrents -> new ActiveTorrent(torrentInfo, downloadPath,
-                        peerResponsesFlux))
+                        torrentStatus, peerResponsesFlux))
                 .doOnNext(activeTorrent ->
                         // save this torrent information in db.
                         this.activeTorrentList.add(activeTorrent));
