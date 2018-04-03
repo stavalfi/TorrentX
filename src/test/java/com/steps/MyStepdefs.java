@@ -399,7 +399,7 @@ public class MyStepdefs {
                 .block();
 
         Flux<RequestMessage> assertWrittenPiecesFlux =
-                Flux.zip(activeTorrent.startDownloadAsync(), pieceMessageFlux,
+                Flux.zip(activeTorrent.startListenForIncomingPieces(), pieceMessageFlux,
                         (torrentPieceChanged, pieceMessage) -> {
                             RequestMessage requestMessage =
                                     new RequestMessage(null, null,
@@ -437,22 +437,22 @@ public class MyStepdefs {
             Assert.assertTrue(errorMesssage1, activeTorrent.havePiece(completedPiecesIndex));
         });
 
-        // check again in other way: (by ActiveTorrent::getAllPiecesStatus)
-        BitFieldMessage allPiecesStatus = activeTorrent.getAllPiecesStatus(null, null);
+        // check again in other way: (by ActiveTorrent::buildBitFieldMessage)
+        BitFieldMessage allPiecesStatus = activeTorrent.buildBitFieldMessage(null, null);
         completedPiecesIndexList.forEach(completedPiecesIndex -> {
             Assert.assertTrue(errorMesssage1, allPiecesStatus.getPieces().get(completedPiecesIndex));
         });
 
-        // check again in other way: (by ActiveTorrent::readBlock)
+        // check again in other way: (by ActiveTorrent::buildPieceMessage)
 
         Flux<PieceMessage> completedPiecesMessageFlux = Flux.fromIterable(completedPiecesIndexList)
                 .map(pieceIndex -> new RequestMessage(null, null,
                         pieceIndex,
                         0,
                         activeTorrent.getPieceLength()))
-                // if the above piece is not completed, ActiveTorrent::readBlock will throw exception.
+                // if the above piece is not completed, ActiveTorrent::buildPieceMessage will throw exception.
                 // but it must complete because the piece is in completedPiecesIndexList list.
-                .flatMap(requestMessage -> activeTorrent.readBlock(requestMessage))
+                .flatMap(requestMessage -> activeTorrent.buildPieceMessage(requestMessage))
                 .doOnNext(pieceMessage -> {
                     RequestMessage requestMessage =
                             new RequestMessage(null, null,
@@ -516,7 +516,7 @@ public class MyStepdefs {
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, Flux.just(lastPieceMessage))
                 .block();
 
-        Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.startDownloadAsync()
+        Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.startListenForIncomingPieces()
                 .doOnNext(torrentPieceChanged -> {
                     String message = "the last piece must be completed but it's not.";
                     Assert.assertEquals(message, TorrentPieceStatus.COMPLETED, torrentPieceChanged.getTorrentPieceStatus());
@@ -528,7 +528,7 @@ public class MyStepdefs {
                     Assert.assertArrayEquals(errorMesssage, actualWrittenBytes, lastPieceMessage.getBlock());
                 })
                 // assert that we can read the last piece successfully.
-                .flatMap(torrentPieceChanged -> activeTorrent.readBlock(requestLastPieceMessage))
+                .flatMap(torrentPieceChanged -> activeTorrent.buildPieceMessage(requestLastPieceMessage))
                 .doOnNext(pieceMessage -> {
                     byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
                     String errorMesssage = "The read operation failed to read exactly what we wrote";

@@ -19,7 +19,7 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class ActiveTorrent extends TorrentInfo implements Downloader {
+public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManager {
 
     private final List<ActiveTorrentFile> activeTorrentFileList;
     private final BitSet piecesStatus;
@@ -52,7 +52,7 @@ public class ActiveTorrent extends TorrentInfo implements Downloader {
     }
 
     @Override
-    public BitFieldMessage getAllPiecesStatus(Peer from, Peer to) {
+    public BitFieldMessage buildBitFieldMessage(Peer from, Peer to) {
         return new BitFieldMessage(from, to, this.piecesStatus);
     }
 
@@ -67,12 +67,12 @@ public class ActiveTorrent extends TorrentInfo implements Downloader {
     }
 
     @Override
-    public Flux<TorrentPieceChanged> startDownloadAsync() {
+    public Flux<TorrentPieceChanged> startListenForIncomingPieces() {
         return this.downloadTorrentFlux;
     }
 
     @Override
-    public Mono<PieceMessage> readBlock(RequestMessage requestMessage) {
+    public Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage) {
         return Mono.<PieceMessage>create(sink -> {
             if (!havePiece(requestMessage.getIndex())) {
                 sink.error(new PieceNotDownloadedYetException(requestMessage.getIndex()));

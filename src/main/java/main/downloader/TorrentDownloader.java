@@ -4,7 +4,7 @@ import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.BittorrentAlgorithmImpl;
 import main.file.system.ActiveTorrents;
-import main.file.system.Downloader;
+import main.file.system.TorrentFileSystemManager;
 import main.peer.PeersCommunicator;
 import main.peer.PeersListener;
 import main.peer.PeersProvider;
@@ -18,7 +18,7 @@ import reactor.core.publisher.Flux;
 public class TorrentDownloader {
 
     private TorrentInfo torrentInfo;
-    private Downloader downloader;
+    private TorrentFileSystemManager torrentFileSystemManager;
     private BittorrentAlgorithm bittorrentAlgorithm;
     private DownloadControl downloadControl;
     private SpeedStatistics torrentSpeedStatistics;
@@ -29,7 +29,7 @@ public class TorrentDownloader {
     private Flux<PeersCommunicator> peersCommunicatorFlux;
 
     public TorrentDownloader(TorrentInfo torrentInfo,
-                             Downloader downloader,
+                             TorrentFileSystemManager torrentFileSystemManager,
                              BittorrentAlgorithm bittorrentAlgorithm,
                              DownloadControl downloadControl,
                              SpeedStatistics torrentSpeedStatistics,
@@ -38,7 +38,7 @@ public class TorrentDownloader {
                              Flux<TrackerConnection> trackerConnectionFlux,
                              Flux<PeersCommunicator> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
-        this.downloader = downloader;
+        this.torrentFileSystemManager = torrentFileSystemManager;
         this.bittorrentAlgorithm = bittorrentAlgorithm;
         this.downloadControl = downloadControl;
         this.torrentSpeedStatistics = torrentSpeedStatistics;
@@ -56,8 +56,8 @@ public class TorrentDownloader {
         return downloadControl;
     }
 
-    public Downloader getDownloader() {
-        return downloader;
+    public TorrentFileSystemManager getTorrentFileSystemManager() {
+        return torrentFileSystemManager;
     }
 
     public SpeedStatistics getTorrentSpeedStatistics() {
@@ -103,13 +103,13 @@ public class TorrentDownloader {
         SpeedStatistics torrentSpeedStatistics =
                 new TorrentSpeedSpeedStatisticsImpl(torrentInfo, peerSpeedStatisticsFlux);
 
-        Downloader downloader = ActiveTorrents.getInstance()
+        TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath,
                         bittorrentAlgorithm.receiveTorrentMessagesMessagesFlux().getPieceMessageResponseFlux())
                 .block();
 
         return new TorrentDownloader(torrentInfo,
-                downloader,
+                torrentFileSystemManager,
                 bittorrentAlgorithm,
                 downloadControl,
                 torrentSpeedStatistics,

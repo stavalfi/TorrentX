@@ -11,18 +11,18 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 
-public interface Downloader {
+public interface TorrentFileSystemManager {
     String getDownloadPath();
 
-    Flux<TorrentPieceChanged> startDownloadAsync();
+    TorrentInfo getTorrentInfo();
 
     boolean havePiece(int pieceIndex);
 
-    Mono<PieceMessage> readBlock(RequestMessage requestMessage);
-
-    BitFieldMessage getAllPiecesStatus(Peer from, Peer to);
-
     List<? extends TorrentFile> getTorrentFiles();
 
-    TorrentInfo getTorrentInfo();
+    BitFieldMessage buildBitFieldMessage(Peer from, Peer to);
+
+    Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
+
+    Flux<TorrentPieceChanged> startListenForIncomingPieces();
 }
