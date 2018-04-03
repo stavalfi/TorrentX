@@ -1,29 +1,39 @@
 package main.algorithms;
 
 import main.TorrentInfo;
-import main.downloader.DownloadControl;
+import main.torrent.status.TorrentStatus;
 import main.downloader.TorrentPieceChanged;
 import main.peer.PeersCommunicator;
 import main.peer.ReceiveMessages;
 import main.peer.ReceiveMessagesImpl;
+import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 
 public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
     private TorrentInfo torrentInfo;
-    private DownloadControl downloadControl;
+    private TorrentStatus torrentStatus;
     private Flux<PeersCommunicator> peersCommunicatorFlux;
+    private ConnectableFlux<TorrentPieceChanged> startDownloadFlux;
 
     private ReceiveMessages receiveTorrentMessagesMessagesFlux;
 
     public BittorrentAlgorithmImpl(TorrentInfo torrentInfo,
-                                   DownloadControl downloadControl,
+                                   TorrentStatus torrentStatus,
                                    Flux<PeersCommunicator> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
-        this.downloadControl = downloadControl;
+        this.torrentStatus = torrentStatus;
         this.peersCommunicatorFlux = peersCommunicatorFlux;
-        Flux<ReceiveMessages> receiveMessagesFlux = peersCommunicatorFlux
-                .map(PeersCommunicator::receivePeerMessages);
-        this.receiveTorrentMessagesMessagesFlux = new ReceiveMessagesImpl(this.torrentInfo, receiveMessagesFlux);
+        this.receiveTorrentMessagesMessagesFlux = new ReceiveMessagesImpl(this.torrentInfo,
+                peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages));
+
+        this.startDownloadFlux = Flux.<TorrentPieceChanged>empty().publish();
+        this.torrentStatus.getStatusTypeFlux()
+                .subscribe(torrentStatusType -> {
+                    switch (torrentStatusType) {
+                        case STARTED:
+                            this.startDownloadFlux.connect();
+                    }
+                });
     }
 
 
@@ -32,8 +42,8 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
     }
 
     @Override
-    public Flux<TorrentPieceChanged> downloadAsync() {
-        return Flux.never();
+    public ConnectableFlux<TorrentPieceChanged> startDownloadFlux() {
+        return this.startDownloadFlux;
     }
 
     @Override
