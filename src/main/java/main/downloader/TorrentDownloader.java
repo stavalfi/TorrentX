@@ -114,4 +114,7 @@ public class TorrentDownloader {
                 peersCommunicatorFlux);
     }
 
+    public TorrentInfo getTorrentInfo() {
+        return torrentInfo;
+    }
 }
