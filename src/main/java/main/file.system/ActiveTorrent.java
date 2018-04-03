@@ -69,7 +69,7 @@ public class ActiveTorrent extends TorrentInfo implements Downloader {
     public Mono<PieceMessage> readBlock(RequestMessage requestMessage) {
         return Mono.<PieceMessage>create(sink -> {
             if (!havePiece(requestMessage.getIndex())) {
-                sink.error(new PieceNotFoundException(requestMessage.getIndex()));
+                sink.error(new PieceNotDownloadedYetException(requestMessage.getIndex()));
                 return;
             }
             byte[] result = new byte[requestMessage.getBlockLength()];
@@ -81,8 +81,8 @@ public class ActiveTorrent extends TorrentInfo implements Downloader {
 
             for (ActiveTorrentFile activeTorrentFile : this.activeTorrentFileList) {
                 if (activeTorrentFile.getFrom() <= from && from <= activeTorrentFile.getTo()) {
-                    int howMuchToReadFromThisFile = (int) Math.min(requestMessage.getBlockLength(), (from - to));
-                    byte[] tempResult = new byte[0];
+                    int howMuchToReadFromThisFile = (int) Math.min(requestMessage.getBlockLength(), (to - from));
+                    byte[] tempResult;
                     try {
                         tempResult = activeTorrentFile.readBlock(from, howMuchToReadFromThisFile);
                     } catch (IOException e) {
@@ -162,7 +162,17 @@ public class ActiveTorrent extends TorrentInfo implements Downloader {
 
             // update pieces status:
             // there maybe multiple writes of the same pieceRequest during one execution...
-            if (this.piecesPartialStatus[pieceMessage.getIndex()] >= this.getPieceLength()) {
+            long pieceLength = getPieceLength();
+            // check if we downloaded a block from the last piece.
+            // if yes, it's length can be less than a other pieces.
+            if (pieceMessage.getIndex() == this.getPieces().size() - 1) {
+                int lastPieceLength = (int) Math.min(getPieceLength(),
+                        getTotalSize() - (getPieces().size() - 1) * getPieceLength());
+                pieceLength = lastPieceLength;
+            }
+
+            long howMuchWeWroteUntilNowInThisPiece = this.piecesPartialStatus[pieceMessage.getIndex()];
+            if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
                 this.piecesStatus.set(pieceMessage.getIndex());
                 TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
                         this.getPieces().get(pieceMessage.getIndex()),
