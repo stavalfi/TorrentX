@@ -14,7 +14,7 @@ import java.util.List;
 public interface Downloader {
     String getDownloadPath();
 
-    Flux<TorrentPieceChanged> downloadAsync(Flux<PieceMessage> peerResponsesFlux);
+    Flux<TorrentPieceChanged> startDownloadAsync();
 
     boolean havePiece(int pieceIndex);
 

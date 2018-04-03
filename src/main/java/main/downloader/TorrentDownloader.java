@@ -3,7 +3,7 @@ package main.downloader;
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.BittorrentAlgorithmImpl;
-import main.file.system.ActiveTorrent;
+import main.file.system.ActiveTorrents;
 import main.file.system.Downloader;
 import main.peer.PeersCommunicator;
 import main.peer.PeersListener;
@@ -80,9 +80,9 @@ public class TorrentDownloader {
         return peersCommunicatorFlux;
     }
 
-    public static TorrentDownloader defaultTorrentDownloader(ActiveTorrent activeTorrent) {
-        TrackerProvider trackerProvider = new TrackerProvider(activeTorrent);
-        PeersProvider peersProvider = new PeersProvider(activeTorrent);
+    public static TorrentDownloader defaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
+        TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
+        PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
         Flux<TrackerConnection> trackerConnectionConnectableFlux =
                 trackerProvider.connectToTrackersFlux()
@@ -93,18 +93,23 @@ public class TorrentDownloader {
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux).autoConnect())
                         .publish();
 
-        DownloadControl downloadControl = new DownloadControlImpl(activeTorrent, peersCommunicatorFlux);
+        DownloadControl downloadControl = new DownloadControlImpl(torrentInfo, peersCommunicatorFlux);
 
         BittorrentAlgorithm bittorrentAlgorithm =
-                new BittorrentAlgorithmImpl(activeTorrent, downloadControl, peersCommunicatorFlux);
+                new BittorrentAlgorithmImpl(torrentInfo, downloadControl, peersCommunicatorFlux);
 
         Flux<SpeedStatistics> peerSpeedStatisticsFlux = peersCommunicatorFlux.map(PeersCommunicator::getPeerSpeedStatistics);
 
         SpeedStatistics torrentSpeedStatistics =
-                new TorrentSpeedSpeedStatisticsImpl(activeTorrent, peerSpeedStatisticsFlux);
+                new TorrentSpeedSpeedStatisticsImpl(torrentInfo, peerSpeedStatisticsFlux);
 
-        return new TorrentDownloader(activeTorrent,
-                activeTorrent,
+        Downloader downloader = ActiveTorrents.getInstance()
+                .createActiveTorrentMono(torrentInfo, downloadPath,
+                        bittorrentAlgorithm.receiveTorrentMessagesMessagesFlux().getPieceMessageResponseFlux())
+                .block();
+
+        return new TorrentDownloader(torrentInfo,
+                downloader,
                 bittorrentAlgorithm,
                 downloadControl,
                 torrentSpeedStatistics,

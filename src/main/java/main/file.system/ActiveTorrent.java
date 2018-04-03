@@ -25,13 +25,20 @@ public class ActiveTorrent extends TorrentInfo implements Downloader {
     private final BitSet piecesStatus;
     private final long[] piecesPartialStatus;
     private final String downloadPath;
+    private Flux<PieceMessage> peerResponsesFlux;
+    private Flux<TorrentPieceChanged> downloadTorrentFlux;
 
-    public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath) {
+    public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath,
+                         Flux<PieceMessage> peerResponsesFlux) {
         super(torrentInfo);
+        this.peerResponsesFlux = peerResponsesFlux;
         this.downloadPath = downloadPath;
         this.piecesStatus = new BitSet(getPieces().size());
         this.piecesPartialStatus = new long[getPieces().size()];
         this.activeTorrentFileList = createActiveTorrentFileList(torrentInfo, downloadPath);
+
+        this.downloadTorrentFlux = peerResponsesFlux
+                .flatMap(pieceMessage -> writeBlock(pieceMessage));
     }
 
     @Override
@@ -60,9 +67,8 @@ public class ActiveTorrent extends TorrentInfo implements Downloader {
     }
 
     @Override
-    public Flux<TorrentPieceChanged> downloadAsync(Flux<PieceMessage> peerResponsesFlux) {
-        return peerResponsesFlux.flatMap(pieceMessage ->
-                writeBlock(pieceMessage));
+    public Flux<TorrentPieceChanged> startDownloadAsync() {
+        return this.downloadTorrentFlux;
     }
 
     @Override
