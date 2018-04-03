@@ -2,6 +2,7 @@ package main.file.system;
 
 import main.App;
 import main.TorrentInfo;
+import main.peer.peerMessages.PieceMessage;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -17,11 +18,13 @@ public class ActiveTorrents {
 
     private CopyOnWriteArrayList<ActiveTorrent> activeTorrentList = new CopyOnWriteArrayList<>();
 
-    public Mono<ActiveTorrent> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath) {
+    public Mono<ActiveTorrent> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath,
+                                                       Flux<PieceMessage> peerResponsesFlux) {
         // TODO: check if this torrent exist in db.
         Mono<ActiveTorrent> createActiveTorrentMono = createFolders(torrentInfo, downloadPath)
                 .flatMap(activeTorrents -> createFiles(torrentInfo, downloadPath))
-                .map(activeTorrents -> new ActiveTorrent(torrentInfo, downloadPath))
+                .map(activeTorrents -> new ActiveTorrent(torrentInfo, downloadPath,
+                        peerResponsesFlux))
                 .doOnNext(activeTorrent ->
                         // save this torrent information in db.
                         this.activeTorrentList.add(activeTorrent));
@@ -95,8 +98,8 @@ public class ActiveTorrents {
     private Mono<ActiveTorrents> createFolders(TorrentInfo torrentInfo, String downloadPath) {
         // create main folder for the download of the torrent.
         String mainFolder = !torrentInfo.isSingleFileTorrent() ?
-                downloadPath + "/" + torrentInfo.getName() + "/" :
-                downloadPath + "/";
+                downloadPath + torrentInfo.getName() + "/" :
+                downloadPath;
         return Mono.create(sink -> {
             createFolder(mainFolder);
 
@@ -137,7 +140,8 @@ public class ActiveTorrents {
 
     private void createFolder(String path) {
         File file = new File(path);
-        file.getParentFile().mkdirs();
+        File parentFile = file.getParentFile();
+        parentFile.mkdirs();
         file.mkdirs();
     }
 

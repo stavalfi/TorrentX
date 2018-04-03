@@ -5,8 +5,11 @@ import main.App;
 import main.TorrentInfo;
 import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
+import main.peer.Peer;
+import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -16,77 +19,63 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class ActiveTorrent extends TorrentInfo {
+public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManager {
 
     private final List<ActiveTorrentFile> activeTorrentFileList;
     private final BitSet piecesStatus;
     private final long[] piecesPartialStatus;
     private final String downloadPath;
+    private Flux<PieceMessage> peerResponsesFlux;
+    private Flux<TorrentPieceChanged> downloadTorrentFlux;
 
-    public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath) {
+    public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath,
+                         Flux<PieceMessage> peerResponsesFlux) {
         super(torrentInfo);
+        this.peerResponsesFlux = peerResponsesFlux;
         this.downloadPath = downloadPath;
         this.piecesStatus = new BitSet(getPieces().size());
         this.piecesPartialStatus = new long[getPieces().size()];
         this.activeTorrentFileList = createActiveTorrentFileList(torrentInfo, downloadPath);
+
+        this.downloadTorrentFlux = peerResponsesFlux
+                .flatMap(pieceMessage -> writeBlock(pieceMessage));
     }
 
+    @Override
     public List<? extends main.file.system.TorrentFile> getTorrentFiles() {
         return this.activeTorrentFileList;
     }
 
-    public BitSet getPiecesStatus() {
-        return this.piecesStatus;
+    @Override
+    public TorrentInfo getTorrentInfo() {
+        return this;
     }
 
-    public Mono<TorrentPieceChanged> writeBlock(PieceMessage pieceMessage) {
-        return Mono.<TorrentPieceChanged>create(sink -> {
-            long from = pieceMessage.getIndex() * this.getPieceLength() + pieceMessage.getBegin();
-            long to = pieceMessage.getIndex() * this.getPieceLength()
-                    + pieceMessage.getBegin() + pieceMessage.getBlock().length;
-            int arrayIndexFrom = 0; // where ActiveTorrentFile object needs to write from in the array.
-
-            for (ActiveTorrentFile activeTorrentFile : this.activeTorrentFileList)
-                if (activeTorrentFile.getFrom() <= from && from <= activeTorrentFile.getTo()) {
-                    int howMuchToWriteFromArray = (int) (Math.min(to, activeTorrentFile.getTo()) - from);
-                    try {
-                        activeTorrentFile.writeBlock(from, pieceMessage.getBlock(), arrayIndexFrom, howMuchToWriteFromArray);
-                    } catch (IOException e) {
-                        sink.error(e);
-                        return;
-                    }
-                    // increase 'from' because next time we will write to different position.
-                    from += howMuchToWriteFromArray;
-                    arrayIndexFrom += howMuchToWriteFromArray;
-                    if (from == to)
-                        break;
-                }
-
-            // update pieces partial status array:
-            // WARNING: this line *only* must be synchronized among multiple threads!
-            this.piecesPartialStatus[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
-
-            // update pieces status:
-            // there maybe multiple writes of the same pieceRequest during one execution...
-            if (this.piecesPartialStatus[pieceMessage.getIndex()] >= this.getPieceLength()) {
-                this.piecesStatus.set(pieceMessage.getIndex());
-                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
-                        this.getPieces().get(pieceMessage.getIndex()),
-                        TorrentPieceStatus.COMPLETED);
-                sink.success(torrentPieceChanged);
-            } else {
-                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
-                        this.getPieces().get(pieceMessage.getIndex()),
-                        TorrentPieceStatus.DOWNLOADING);
-                sink.success(torrentPieceChanged);
-            }
-        }).subscribeOn(Schedulers.single());
+    @Override
+    public BitFieldMessage buildBitFieldMessage(Peer from, Peer to) {
+        return new BitFieldMessage(from, to, this.piecesStatus);
     }
 
-    public Mono<byte[]> readBlock(RequestMessage requestMessage) {
-        return Mono.<byte[]>create(sink -> {
+    @Override
+    public boolean havePiece(int pieceIndex) {
+        return this.piecesStatus.get(pieceIndex);
+    }
+
+    @Override
+    public String getDownloadPath() {
+        return downloadPath;
+    }
+
+    @Override
+    public Flux<TorrentPieceChanged> startListenForIncomingPieces() {
+        return this.downloadTorrentFlux;
+    }
+
+    @Override
+    public Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage) {
+        return Mono.<PieceMessage>create(sink -> {
             if (!havePiece(requestMessage.getIndex())) {
-                sink.error(new PieceNotFoundException(requestMessage.getIndex()));
+                sink.error(new PieceNotDownloadedYetException(requestMessage.getIndex()));
                 return;
             }
             byte[] result = new byte[requestMessage.getBlockLength()];
@@ -98,8 +87,8 @@ public class ActiveTorrent extends TorrentInfo {
 
             for (ActiveTorrentFile activeTorrentFile : this.activeTorrentFileList) {
                 if (activeTorrentFile.getFrom() <= from && from <= activeTorrentFile.getTo()) {
-                    int howMuchToReadFromThisFile = (int) Math.min(requestMessage.getBlockLength(), (from - to));
-                    byte[] tempResult = new byte[0];
+                    int howMuchToReadFromThisFile = (int) Math.min(requestMessage.getBlockLength(), (to - from));
+                    byte[] tempResult;
                     try {
                         tempResult = activeTorrentFile.readBlock(from, howMuchToReadFromThisFile);
                     } catch (IOException e) {
@@ -110,7 +99,9 @@ public class ActiveTorrent extends TorrentInfo {
                         result[freeIndexInResultArray++] = tempResult[i];
                     from += howMuchToReadFromThisFile;
                     if (from == to) {
-                        sink.success(result);
+                        PieceMessage pieceMessage = new PieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
+                                requestMessage.getIndex(), requestMessage.getBegin(), result);
+                        sink.success(pieceMessage);
                         return;
                     }
                 }
@@ -118,11 +109,7 @@ public class ActiveTorrent extends TorrentInfo {
         }).subscribeOn(App.MyScheduler);
     }
 
-    public boolean havePiece(int pieceIndex) {
-        return this.piecesStatus.get(pieceIndex);
-    }
-
-    public Mono<ActiveTorrent> updatePieceAsCompleted(int pieceIndex) {
+    private Mono<ActiveTorrent> updatePieceAsCompleted(int pieceIndex) {
         return Mono.<ActiveTorrent>create(sink -> {
             this.piecesStatus.set(pieceIndex);
             Mono.just(this);
@@ -152,7 +139,57 @@ public class ActiveTorrent extends TorrentInfo {
         return activeTorrentFileList;
     }
 
-    public String getDownloadPath() {
-        return downloadPath;
+    private Mono<TorrentPieceChanged> writeBlock(PieceMessage pieceMessage) {
+        return Mono.<TorrentPieceChanged>create(sink -> {
+            long from = pieceMessage.getIndex() * this.getPieceLength() + pieceMessage.getBegin();
+            long to = pieceMessage.getIndex() * this.getPieceLength()
+                    + pieceMessage.getBegin() + pieceMessage.getBlock().length;
+            int arrayIndexFrom = 0; // where ActiveTorrentFile object needs to write from in the array.
+
+            for (ActiveTorrentFile activeTorrentFile : this.activeTorrentFileList)
+                if (activeTorrentFile.getFrom() <= from && from <= activeTorrentFile.getTo()) {
+                    int howMuchToWriteFromArray = (int) (Math.min(to, activeTorrentFile.getTo()) - from);
+                    try {
+                        activeTorrentFile.writeBlock(from, pieceMessage.getBlock(), arrayIndexFrom, howMuchToWriteFromArray);
+                    } catch (IOException e) {
+                        sink.error(e);
+                        return;
+                    }
+                    // increase 'from' because next time we will write to different position.
+                    from += howMuchToWriteFromArray;
+                    arrayIndexFrom += howMuchToWriteFromArray;
+                    if (from == to)
+                        break;
+                }
+
+            // update pieces partial status array:
+            // WARNING: this line *only* must be synchronized among multiple threads!
+            this.piecesPartialStatus[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
+
+            // update pieces status:
+            // there maybe multiple writes of the same pieceRequest during one execution...
+            long pieceLength = getPieceLength();
+            // check if we downloaded a block from the last piece.
+            // if yes, it's length can be less than a other pieces.
+            if (pieceMessage.getIndex() == this.getPieces().size() - 1) {
+                int lastPieceLength = (int) Math.min(getPieceLength(),
+                        getTotalSize() - (getPieces().size() - 1) * getPieceLength());
+                pieceLength = lastPieceLength;
+            }
+
+            long howMuchWeWroteUntilNowInThisPiece = this.piecesPartialStatus[pieceMessage.getIndex()];
+            if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
+                this.piecesStatus.set(pieceMessage.getIndex());
+                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
+                        this.getPieces().get(pieceMessage.getIndex()),
+                        TorrentPieceStatus.COMPLETED);
+                sink.success(torrentPieceChanged);
+            } else {
+                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
+                        this.getPieces().get(pieceMessage.getIndex()),
+                        TorrentPieceStatus.DOWNLOADING);
+                sink.success(torrentPieceChanged);
+            }
+        }).subscribeOn(Schedulers.single());
     }
 }

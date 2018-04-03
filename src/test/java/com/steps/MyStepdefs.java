@@ -4,15 +4,16 @@ import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
-import main.App;
 import main.TorrentInfo;
 import main.downloader.TorrentDownloader;
+import main.downloader.TorrentPieceStatus;
 import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
 import main.peer.Peer;
 import main.peer.PeersCommunicator;
 import main.peer.PeersListener;
 import main.peer.PeersProvider;
+import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
@@ -50,7 +51,6 @@ public class MyStepdefs {
     }
 
     private TorrentInfo torrentInfo = mock(TorrentInfo.class);
-    private static final String DEFAULT_DOWNLOAD_LOCATION = "torrents-test/";
 
     @Given("^new torrent file: \"([^\"]*)\"$")
     public void newTorrentFile(String torrentFileName) throws Throwable {
@@ -259,7 +259,17 @@ public class MyStepdefs {
 
     @Then("^application create active-torrent for: \"([^\"]*)\",\"([^\"]*)\"$")
     public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {
-        Utils.createActiveTorrent(torrentFileName, downloadLocation);
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        // delete everything from the last test.
+        ActiveTorrents.getInstance()
+                .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                .flatMap(activeTorrent ->
+                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                .block();
+
+        // this will create an activeTorrent object.
+        TorrentDownloader.defaultTorrentDownloader(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation);
     }
 
     @Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
@@ -295,6 +305,7 @@ public class MyStepdefs {
         if (torrentFilesExist) {
             String mainFilePath = System.getProperty("user.dir") + "/" + downloadLocation + torrentInfo.getName() + "/";
             File mainFile = new File(mainFilePath);
+            Assert.assertTrue("main-folder/single-file does not exist: " + mainFile.getPath(), mainFile.exists());
             if (torrentInfo.isSingleFileTorrent())
                 Assert.assertTrue("file is directory but it doesn't need to be: " + mainFile.getPath(),
                         !mainFile.isDirectory());
@@ -356,6 +367,16 @@ public class MyStepdefs {
                                                                           List<BlockOfPiece> blockList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
+        // delete everything from the last test.
+        ActiveTorrents.getInstance()
+                .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                .flatMap(activeTorrent ->
+                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                .block();
+
+        String fullDownloadPath = System.getProperty("user.dir") + "/" + downloadLocation;
+
+
         Function<Integer, byte[]> toRandomByteArray = (Integer length) -> {
             byte[] bytes = new byte[length];
             byte content = 0;
@@ -364,57 +385,168 @@ public class MyStepdefs {
             return bytes;
         };
 
-        Mono<ActiveTorrent> activeTorrentMono = ActiveTorrents.getInstance()
-                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
-                .map(Optional::get)
-                .subscribeOn(App.MyScheduler);
-
-        Flux<byte[]> readFlux = Flux.fromIterable(blockList)
+        Flux<PieceMessage> pieceMessageFlux = Flux.fromIterable(blockList)
                 .map(blockOfPiece -> {
                     if (blockOfPiece.getLength() != null)
                         return new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
                                 toRandomByteArray.apply(blockOfPiece.getLength()));
                     return new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
                             toRandomByteArray.apply(torrentInfo.getPieceLength() - blockOfPiece.getFrom()));
-                })
-                .flatMap(pieceMessage -> activeTorrentMono
-                        .flatMap(activeTorrent -> activeTorrent.writeBlock(pieceMessage).subscribeOn(App.MyScheduler))
-                        // assert that the content is written.
-                        .map(activeTorrent -> {
+                });
+
+        ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
+                .createActiveTorrentMono(torrentInfo, fullDownloadPath, pieceMessageFlux)
+                .block();
+
+        Flux<RequestMessage> assertWrittenPiecesFlux =
+                Flux.zip(activeTorrent.startListenForIncomingPieces(), pieceMessageFlux,
+                        (torrentPieceChanged, pieceMessage) -> {
                             RequestMessage requestMessage =
                                     new RequestMessage(null, null,
                                             pieceMessage.getIndex(),
                                             pieceMessage.getBegin(),
                                             pieceMessage.getBlock().length);
-                            return Utils.readFromFile(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation, requestMessage);
-                        })
-                        .doOnNext(readByteArray -> {
+                            byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestMessage);
                             String message = "the content I wrote is not equal to the content I read to the file";
-                            Assert.assertArrayEquals(message, readByteArray, pieceMessage.getBlock());
-                        }));
+                            Assert.assertArrayEquals(message, actualWrittenBytes, pieceMessage.getBlock());
 
-        StepVerifier.create(readFlux)
+                            return requestMessage;
+                        });
+
+        StepVerifier.create(assertWrittenPiecesFlux)
                 .expectNextCount(blockList.size())
                 .verifyComplete();
     }
 
-    @Then("^completed pieces are for torrent: \"([^\"]*)\":$")
-    public void completedPiecesAreForTorrent(String torrentFileName, List<Integer> completedPiecesIndexList) throws Throwable {
+    @Then("^completed pieces are for torrent: \"([^\"]*)\" in \"([^\"]*)\":$")
+    public void completedPiecesAreForTorrent(String torrentFileName,
+                                             String downloadLocation,
+                                             List<Integer> completedPiecesIndexList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        String fullDownloadPath = System.getProperty("user.dir") + "/" + downloadLocation;
+        ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
+                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .block();
+
+        String errorMesssage1 = "the piece is not completed but it should be.";
+        String errorMesssage2 = "The read operation failed to read exactly what we wrote";
+
+        completedPiecesIndexList.forEach(completedPiecesIndex -> {
+            Assert.assertTrue(errorMesssage1, activeTorrent.havePiece(completedPiecesIndex));
+        });
+
+        // check again in other way: (by ActiveTorrent::buildBitFieldMessage)
+        BitFieldMessage allPiecesStatus = activeTorrent.buildBitFieldMessage(null, null);
+        completedPiecesIndexList.forEach(completedPiecesIndex -> {
+            Assert.assertTrue(errorMesssage1, allPiecesStatus.getPieces().get(completedPiecesIndex));
+        });
+
+        // check again in other way: (by ActiveTorrent::buildPieceMessage)
+
+        Flux<PieceMessage> completedPiecesMessageFlux = Flux.fromIterable(completedPiecesIndexList)
+                .map(pieceIndex -> new RequestMessage(null, null,
+                        pieceIndex,
+                        0,
+                        activeTorrent.getPieceLength()))
+                // if the above piece is not completed, ActiveTorrent::buildPieceMessage will throw exception.
+                // but it must complete because the piece is in completedPiecesIndexList list.
+                .flatMap(requestMessage -> activeTorrent.buildPieceMessage(requestMessage))
+                .doOnNext(pieceMessage -> {
+                    RequestMessage requestMessage =
+                            new RequestMessage(null, null,
+                                    pieceMessage.getIndex(),
+                                    pieceMessage.getBegin(),
+                                    pieceMessage.getBlock().length);
+                    byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestMessage);
+                    Assert.assertArrayEquals(errorMesssage2, actualWrittenBytes, pieceMessage.getBlock());
+                });
+
+        // check that all other peices are not in complete mode.
+        for (int i = 0; i < torrentInfo.getPieces().size(); i++) {
+            if (!completedPiecesIndexList.contains(i)) {
+                String errorMessage3 = "piece is not compeleted but it is specified as completed piece: " + i;
+                Assert.assertFalse(errorMessage3, allPiecesStatus.getPieces().get(i));
+            }
+        }
+
+        StepVerifier.create(completedPiecesMessageFlux)
+                .expectNextCount(completedPiecesIndexList.size())
+                .verifyComplete();
+
+        // delete everything this test created.
+        ActiveTorrents.getInstance()
+                .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                .flatMap(activeTorrent1 ->
+                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                .block();
+    }
+
+    @Then("^application save all the last piece of torrent: \"([^\"]*)\",\"([^\"]*)\"$")
+    public void applicationSaveAllTheLastPieceOfTorrent(String torrentFileName, String downloadLocation) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        Mono<ActiveTorrent> activeTorrentMono = ActiveTorrents.getInstance()
-                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
-                .map(Optional::get)
-                .doOnNext(activeTorrent ->
-                        completedPiecesIndexList.forEach(completedPiecesIndex -> {
-                            String message = "the piece is not completed but it should be.";
-                            Assert.assertTrue(message, activeTorrent.havePiece(completedPiecesIndex));
-                        }));
+        // delete everything from the last test.
+        ActiveTorrents.getInstance()
+                .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                .flatMap(activeTorrent ->
+                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                .block();
 
-        StepVerifier.create(activeTorrentMono)
+        String fullDownloadPath = System.getProperty("user.dir") + "/" + downloadLocation;
+
+        int lastPieceLength = (int) Math.min(torrentInfo.getPieceLength(),
+                torrentInfo.getTotalSize() - (torrentInfo.getPieces().size() - 1) * torrentInfo.getPieceLength());
+
+        // generate random complete piece.
+        byte[] lastPiece = new byte[lastPieceLength];
+        byte content = 0;
+        for (int i = 0; i < lastPieceLength; i++, content++)
+            lastPiece[i] = content;
+
+        int lastPieceIndex = torrentInfo.getPieces().size() - 1;
+        PieceMessage lastPieceMessage = new PieceMessage(null, null, lastPieceIndex, 0, lastPiece);
+        RequestMessage requestLastPieceMessage = new RequestMessage(null, null,
+                lastPieceMessage.getIndex(),
+                lastPieceMessage.getBegin(),
+                lastPieceMessage.getBlock().length);
+
+        ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
+                .createActiveTorrentMono(torrentInfo, fullDownloadPath, Flux.just(lastPieceMessage))
+                .block();
+
+        Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.startListenForIncomingPieces()
+                .doOnNext(torrentPieceChanged -> {
+                    String message = "the last piece must be completed but it's not.";
+                    Assert.assertEquals(message, TorrentPieceStatus.COMPLETED, torrentPieceChanged.getTorrentPieceStatus());
+                })
+                // assert that we wrote to the file what we should have.
+                .doOnNext(torrentPieceChanged -> {
+                    byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
+                    String errorMesssage = "The read operation failed to read exactly what we wrote";
+                    Assert.assertArrayEquals(errorMesssage, actualWrittenBytes, lastPieceMessage.getBlock());
+                })
+                // assert that we can read the last piece successfully.
+                .flatMap(torrentPieceChanged -> activeTorrent.buildPieceMessage(requestLastPieceMessage))
+                .doOnNext(pieceMessage -> {
+                    byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
+                    String errorMesssage = "The read operation failed to read exactly what we wrote";
+                    Assert.assertArrayEquals(errorMesssage, actualWrittenBytes, pieceMessage.getBlock());
+                })
+                // there must be only one signal here: the last piece. so signle() must work.
+                .single();
+
+        StepVerifier.create(readLastPieceTaskMono)
                 .expectNextCount(1)
                 .verifyComplete();
 
+        // delete everything this test created.
+        ActiveTorrents.getInstance()
+                .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                .flatMap(activeTorrent1 ->
+                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                .block();
     }
 
     private SpeedStatistics torrentDownloadSpeedStatistics;
@@ -480,9 +612,11 @@ public class MyStepdefs {
 
     @Then("^application connect to all peers and assert that we connected to them - for torrent: \"([^\"]*)\"$")
     public void applicationConnectToAllPeersAndAssertThatWeConnectedToThemForTorrent(String torrentFileName) throws Throwable {
-        ActiveTorrent activeTorrent = Utils.createActiveTorrent(torrentFileName, DEFAULT_DOWNLOAD_LOCATION);
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        TorrentDownloader torrentDownloader = TorrentDownloader.defaultTorrentDownloader(activeTorrent);
+        // we won't download anything but we still need to specify a path to download to.
+        String DEFAULT_DOWNLOAD_LOCATION = System.getProperty("user.dir") + "/" + "torrents-test/";
+        TorrentDownloader torrentDownloader = TorrentDownloader.defaultTorrentDownloader(torrentInfo, DEFAULT_DOWNLOAD_LOCATION);
 
         // consume new peers and new responses from 1.5 seconds.
         // filter distinct peers from the responses, and assert
@@ -518,7 +652,6 @@ public class MyStepdefs {
         // for recording all the peers without blocking the main thread.
         peersFromResponsesMono.subscribe();
 
-        // start when someone subscribe.
         torrentDownloader.getDownloadControl().start();
 
         List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
@@ -529,6 +662,13 @@ public class MyStepdefs {
                 .findFirst()
                 .ifPresent(peer -> Assert.fail("We received from the following peer" +
                         " messages but he doesn't exist in the conencted peers flux: " + peer));
+
+        // delete everything this test created.
+        ActiveTorrents.getInstance()
+                .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                .flatMap(activeTorrent ->
+                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                .block();
     }
 }
 
