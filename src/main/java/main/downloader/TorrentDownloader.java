@@ -1,5 +1,6 @@
 package main.downloader;
 
+import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.BittorrentAlgorithmImpl;
 import main.file.system.ActiveTorrent;
@@ -16,10 +17,10 @@ import reactor.core.publisher.Flux;
 
 public class TorrentDownloader {
 
-    private ActiveTorrent activeTorrent;
+    private TorrentInfo torrentInfo;
+    private Downloader downloader;
     private BittorrentAlgorithm bittorrentAlgorithm;
     private DownloadControl downloadControl;
-    private Downloader downloader;
     private SpeedStatistics torrentSpeedStatistics;
 
     private TrackerProvider trackerProvider;
@@ -27,7 +28,8 @@ public class TorrentDownloader {
     private Flux<TrackerConnection> trackerConnectionFlux;
     private Flux<PeersCommunicator> peersCommunicatorFlux;
 
-    public TorrentDownloader(Downloader downloader,
+    public TorrentDownloader(TorrentInfo torrentInfo,
+                             Downloader downloader,
                              BittorrentAlgorithm bittorrentAlgorithm,
                              DownloadControl downloadControl,
                              SpeedStatistics torrentSpeedStatistics,
@@ -35,6 +37,7 @@ public class TorrentDownloader {
                              PeersProvider peersProvider,
                              Flux<TrackerConnection> trackerConnectionFlux,
                              Flux<PeersCommunicator> peersCommunicatorFlux) {
+        this.torrentInfo = torrentInfo;
         this.downloader = downloader;
         this.bittorrentAlgorithm = bittorrentAlgorithm;
         this.downloadControl = downloadControl;
@@ -43,10 +46,6 @@ public class TorrentDownloader {
         this.peersProvider = peersProvider;
         this.trackerConnectionFlux = trackerConnectionFlux;
         this.peersCommunicatorFlux = peersCommunicatorFlux;
-    }
-
-    public ActiveTorrent getActiveTorrent() {
-        return activeTorrent;
     }
 
     public BittorrentAlgorithm getBittorrentAlgorithm() {
@@ -105,6 +104,7 @@ public class TorrentDownloader {
                 new TorrentSpeedSpeedStatisticsImpl(activeTorrent, peerSpeedStatisticsFlux);
 
         return new TorrentDownloader(activeTorrent,
+                activeTorrent,
                 bittorrentAlgorithm,
                 downloadControl,
                 torrentSpeedStatistics,
