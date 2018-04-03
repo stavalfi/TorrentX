@@ -5,6 +5,8 @@ import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import main.TorrentInfo;
+import main.torrent.status.TorrentStatusController;
+import main.torrent.status.TorrentStatusControllerImpl;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.ActiveTorrent;
@@ -394,12 +396,20 @@ public class MyStepdefs {
                             toRandomByteArray.apply(torrentInfo.getPieceLength() - blockOfPiece.getFrom()));
                 });
 
+        TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(torrentInfo,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false);
+
         ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, fullDownloadPath, pieceMessageFlux)
+                .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, pieceMessageFlux)
                 .block();
 
         Flux<RequestMessage> assertWrittenPiecesFlux =
-                Flux.zip(activeTorrent.startListenForIncomingPieces(), pieceMessageFlux,
+                Flux.zip(activeTorrent.startListenForIncomingPiecesFlux().autoConnect(), pieceMessageFlux,
                         (torrentPieceChanged, pieceMessage) -> {
                             RequestMessage requestMessage =
                                     new RequestMessage(null, null,
@@ -512,11 +522,20 @@ public class MyStepdefs {
                 lastPieceMessage.getBegin(),
                 lastPieceMessage.getBlock().length);
 
+        TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(torrentInfo,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false);
+
         ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, fullDownloadPath, Flux.just(lastPieceMessage))
+                .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, Flux.just(lastPieceMessage))
                 .block();
 
-        Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.startListenForIncomingPieces()
+        Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.startListenForIncomingPiecesFlux()
+                .autoConnect()
                 .doOnNext(torrentPieceChanged -> {
                     String message = "the last piece must be completed but it's not.";
                     Assert.assertEquals(message, TorrentPieceStatus.COMPLETED, torrentPieceChanged.getTorrentPieceStatus());
@@ -645,14 +664,14 @@ public class MyStepdefs {
                 .flatMap(Flux::fromIterable)
                 .sort()
                 // I'm going to get this peers again AFTER:
-                // torrentDownloader.getDownloadControl().start();
+                // torrentDownloader.getTorrentStatusController().start();
                 .replay()
                 .autoConnect();
 
         // for recording all the peers without blocking the main thread.
         peersFromResponsesMono.subscribe();
 
-        torrentDownloader.getDownloadControl().start();
+        torrentDownloader.getTorrentStatusController().start();
 
         List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
         List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
