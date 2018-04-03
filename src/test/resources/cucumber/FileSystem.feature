@@ -45,21 +45,17 @@ Feature: create get and delete active torrents
       | torrent-file-example2.torrent | torrents-test/   |
 
   Scenario Outline: we save random blocks inside files and if a piece completely downloaded, we check it has been marked as downloaded
-    Then application create active-torrent for: "<torrent>","<downloadLocation>"
+    # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
     Then application save random blocks from different threads inside torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
       | 0          | 0    | 10     |
       | 1          | 0    | 10     |
       | 0          | 10   | 11     |
-    Then application save random blocks from different threads inside torrent: "<torrent>" in "<downloadLocation>" and check it saved
-      | pieceIndex | from | length |
       | 1          | 0    | 10     |
       | 1          | 10   | 2      |
       | 1          | 12   |        |
-    Then application save random blocks from different threads inside torrent: "<torrent>" in "<downloadLocation>" and check it saved
-      | pieceIndex | from | length |
       | 2          | 0    |        |
-    Then completed pieces are for torrent: "<torrent>":
+    Then completed pieces are for torrent: "<torrent>" in "<downloadLocation>":
       | 1 |
       | 2 |
 
@@ -68,14 +64,12 @@ Feature: create get and delete active torrents
       | torrent-file-example1.torrent | torrents-test/   |
 
   Scenario Outline: we save piece of active torrent
-    Then application create active-torrent for: "<torrent>","<downloadLocation>"
+    # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
     Then application save random blocks from different threads inside torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
       | 0          | 0    |        |
-    Then application save random blocks from different threads inside torrent: "<torrent>" in "<downloadLocation>" and check it saved
-      | pieceIndex | from | length |
       | 1          | 0    | 1      |
-    Then completed pieces are for torrent: "<torrent>":
+    Then completed pieces are for torrent: "<torrent>" in "<downloadLocation>":
       | 0 |
 
     Examples:
@@ -83,7 +77,7 @@ Feature: create get and delete active torrents
       | torrent-file-example1.torrent | torrents-test/   |
 
   Scenario Outline: we save the last piece of active torrent
-    Then application create active-torrent for: "<torrent>","<downloadLocation>"
+    # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
     Then application save all the last piece of torrent: "<torrent>","<downloadLocation>"
 
     Examples:
