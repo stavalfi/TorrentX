@@ -8,7 +8,9 @@ public interface TorrentStatus {
 
     boolean isStarted();
 
-    boolean isRemoved();
+    boolean isTorrentRemoved();
+
+    boolean isFileRemoved();
 
     boolean isCompletedDownloading();
 

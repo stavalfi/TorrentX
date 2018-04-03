@@ -2,7 +2,8 @@ package main.torrent.status;
 
 public enum TorrentStatusType {
     STARTED,
-    REMOVED,
+    REMOVE_TORRENT,
+    REMOVE_FILES,
     PAUSE_DOWNLOAD,
     RESUME_DOWNLOAD,
     PAUSE_UPLOAD,

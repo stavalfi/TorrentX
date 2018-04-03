@@ -401,6 +401,7 @@ public class MyStepdefs {
                 false,
                 false,
                 false,
+                false,
                 false);
 
         ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
@@ -522,6 +523,7 @@ public class MyStepdefs {
                 lastPieceMessage.getBlock().length);
 
         TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(torrentInfo,
+                false,
                 false,
                 false,
                 false,
