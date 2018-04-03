@@ -100,7 +100,6 @@ public class TorrentDownloader {
                 false,
                 false,
                 false,
-                false,
                 false);
 
         torrentStatusController.getStatusTypeFlux()

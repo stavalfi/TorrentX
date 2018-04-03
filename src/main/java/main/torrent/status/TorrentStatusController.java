@@ -4,9 +4,13 @@ public interface TorrentStatusController extends TorrentStatus {
 
     void start();
 
-    void resume();
+    void resumeDownload();
 
-    void pause();
+    void resumeUpload();
+
+    void pauseDownload();
+
+    void pauseUpload();
 
     void remove();
 
