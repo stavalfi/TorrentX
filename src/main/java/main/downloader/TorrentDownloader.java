@@ -10,6 +10,8 @@ import main.peer.PeersListener;
 import main.peer.PeersProvider;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
+import main.torrent.status.TorrentStatusController;
+import main.torrent.status.TorrentStatusControllerImpl;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import reactor.core.publisher.ConnectableFlux;
@@ -20,7 +22,7 @@ public class TorrentDownloader {
     private TorrentInfo torrentInfo;
     private TorrentFileSystemManager torrentFileSystemManager;
     private BittorrentAlgorithm bittorrentAlgorithm;
-    private DownloadControl downloadControl;
+    private TorrentStatusController torrentStatusController;
     private SpeedStatistics torrentSpeedStatistics;
 
     private TrackerProvider trackerProvider;
@@ -31,7 +33,7 @@ public class TorrentDownloader {
     public TorrentDownloader(TorrentInfo torrentInfo,
                              TorrentFileSystemManager torrentFileSystemManager,
                              BittorrentAlgorithm bittorrentAlgorithm,
-                             DownloadControl downloadControl,
+                             TorrentStatusController torrentStatusController,
                              SpeedStatistics torrentSpeedStatistics,
                              TrackerProvider trackerProvider,
                              PeersProvider peersProvider,
@@ -40,7 +42,7 @@ public class TorrentDownloader {
         this.torrentInfo = torrentInfo;
         this.torrentFileSystemManager = torrentFileSystemManager;
         this.bittorrentAlgorithm = bittorrentAlgorithm;
-        this.downloadControl = downloadControl;
+        this.torrentStatusController = torrentStatusController;
         this.torrentSpeedStatistics = torrentSpeedStatistics;
         this.trackerProvider = trackerProvider;
         this.peersProvider = peersProvider;
@@ -52,8 +54,8 @@ public class TorrentDownloader {
         return bittorrentAlgorithm;
     }
 
-    public DownloadControl getDownloadControl() {
-        return downloadControl;
+    public TorrentStatusController getTorrentStatusController() {
+        return torrentStatusController;
     }
 
     public TorrentFileSystemManager getTorrentFileSystemManager() {
@@ -93,25 +95,39 @@ public class TorrentDownloader {
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux).autoConnect())
                         .publish();
 
-        DownloadControl downloadControl = new DownloadControlImpl(torrentInfo, peersCommunicatorFlux);
+        TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(torrentInfo,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false);
+
+        torrentStatusController.getStatusTypeFlux()
+                .subscribe(torrentStatusType -> {
+                    switch (torrentStatusType) {
+                        case STARTED:
+                            peersCommunicatorFlux.connect();
+                            break;
+                    }
+                });
 
         BittorrentAlgorithm bittorrentAlgorithm =
-                new BittorrentAlgorithmImpl(torrentInfo, downloadControl, peersCommunicatorFlux);
-
-        Flux<SpeedStatistics> peerSpeedStatisticsFlux = peersCommunicatorFlux.map(PeersCommunicator::getPeerSpeedStatistics);
-
-        SpeedStatistics torrentSpeedStatistics =
-                new TorrentSpeedSpeedStatisticsImpl(torrentInfo, peerSpeedStatisticsFlux);
+                new BittorrentAlgorithmImpl(torrentInfo, torrentStatusController, peersCommunicatorFlux);
 
         TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, downloadPath,
+                .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
                         bittorrentAlgorithm.receiveTorrentMessagesMessagesFlux().getPieceMessageResponseFlux())
                 .block();
+
+        SpeedStatistics torrentSpeedStatistics =
+                new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
+                        peersCommunicatorFlux.map(PeersCommunicator::getPeerSpeedStatistics));
 
         return new TorrentDownloader(torrentInfo,
                 torrentFileSystemManager,
                 bittorrentAlgorithm,
-                downloadControl,
+                torrentStatusController,
                 torrentSpeedStatistics,
                 trackerProvider,
                 peersProvider,
