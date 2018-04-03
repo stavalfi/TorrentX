@@ -463,6 +463,14 @@ public class MyStepdefs {
                     Assert.assertArrayEquals(errorMesssage2, actualWrittenBytes, pieceMessage.getBlock());
                 });
 
+        // check that all other peices are not in complete mode.
+        for (int i = 0; i < torrentInfo.getPieces().size(); i++) {
+            if (!completedPiecesIndexList.contains(i)) {
+                String errorMessage3 = "piece is not compeleted but it is specified as completed piece: " + i;
+                Assert.assertFalse(errorMessage3, allPiecesStatus.getPieces().get(i));
+            }
+        }
+
         StepVerifier.create(completedPiecesMessageFlux)
                 .expectNextCount(completedPiecesIndexList.size())
                 .verifyComplete();
