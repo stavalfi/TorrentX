@@ -267,11 +267,15 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         // delete everything from the last test.
-        ActiveTorrents.getInstance()
-                .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
-                .flatMap(activeTorrent ->
-                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
-                .block();
+        TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .ifPresent(torrentDownloader -> {
+                    torrentDownloader.getTorrentFileSystemManager()
+                            .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                            .flatMap(isDeleted -> torrentDownloader.getTorrentFileSystemManager()
+                                    .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                            .block();
+                });
 
         // this will create an activeTorrent object.
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
@@ -342,28 +346,22 @@ public class MyStepdefs {
                                                       boolean deleteTorrentFiles) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        Mono<Optional<ActiveTorrent>> deletionTaskMono = ActiveTorrents.getInstance()
+        Mono<Boolean> deletionTaskMono = ActiveTorrents.getInstance()
                 .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
-                .as(activeTorrentMono -> {
+                .map(Optional::get)
+                .flatMap(activeTorrent -> {
+                    if (deleteTorrentFiles && deleteActiveTorrent)
+                        return activeTorrent.deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                                .flatMap(areFilesRemoved ->
+                                        activeTorrent.deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()));
                     if (deleteTorrentFiles)
-                        return activeTorrentMono.flatMap(activeTorrent ->
-                                ActiveTorrents.getInstance()
-                                        .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash()));
-                    return activeTorrentMono;
-                })
-                .as(activeTorrentMono -> {
-                    if (deleteActiveTorrent)
-                        return activeTorrentMono.flatMap(activeTorrent ->
-                                ActiveTorrents.getInstance()
-                                        .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()));
-                    return activeTorrentMono;
+                        return activeTorrent.deleteFileOnlyMono(torrentInfo.getTorrentInfoHash());
+                    // deleteActiveTorrent == true
+                    return activeTorrent.deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash());
                 });
 
         StepVerifier.create(deletionTaskMono)
-                .consumeNextWith(activeTorrent -> {
-                    String message = "activeTorrent object wasn't exist.";
-                    Assert.assertTrue(message, activeTorrent.isPresent());
-                })
+                .expectNextCount(1)
                 .verifyComplete();
     }
 
@@ -374,11 +372,15 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         // delete everything from the last test.
-        ActiveTorrents.getInstance()
-                .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
-                .flatMap(activeTorrent ->
-                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
-                .block();
+        TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .ifPresent(torrentDownloader -> {
+                    torrentDownloader.getTorrentFileSystemManager()
+                            .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                            .flatMap(isDeleted -> torrentDownloader.getTorrentFileSystemManager()
+                                    .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                            .block();
+                });
 
         String fullDownloadPath = System.getProperty("user.dir") + "/" + downloadLocation;
 
@@ -490,12 +492,16 @@ public class MyStepdefs {
                 .expectNextCount(completedPiecesIndexList.size())
                 .verifyComplete();
 
-        // delete everything this test created.
-        ActiveTorrents.getInstance()
-                .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
-                .flatMap(activeTorrent1 ->
-                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
-                .block();
+        // delete everything from the last test.
+        TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .ifPresent(torrentDownloader -> {
+                    torrentDownloader.getTorrentFileSystemManager()
+                            .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                            .flatMap(isDeleted -> torrentDownloader.getTorrentFileSystemManager()
+                                    .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                            .block();
+                });
     }
 
     @Then("^application save all the last piece of torrent: \"([^\"]*)\",\"([^\"]*)\"$")
@@ -503,11 +509,15 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         // delete everything from the last test.
-        ActiveTorrents.getInstance()
-                .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
-                .flatMap(activeTorrent ->
-                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
-                .block();
+        TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .ifPresent(torrentDownloader -> {
+                    torrentDownloader.getTorrentFileSystemManager()
+                            .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                            .flatMap(isDeleted -> torrentDownloader.getTorrentFileSystemManager()
+                                    .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                            .block();
+                });
 
         String fullDownloadPath = System.getProperty("user.dir") + "/" + downloadLocation;
 
@@ -566,12 +576,16 @@ public class MyStepdefs {
                 .expectNextCount(1)
                 .verifyComplete();
 
-        // delete everything this test created.
-        ActiveTorrents.getInstance()
-                .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
-                .flatMap(activeTorrent1 ->
-                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
-                .block();
+        // delete everything from the last test.
+        TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .ifPresent(torrentDownloader -> {
+                    torrentDownloader.getTorrentFileSystemManager()
+                            .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                            .flatMap(isDeleted -> torrentDownloader.getTorrentFileSystemManager()
+                                    .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                            .block();
+                });
     }
 
     private SpeedStatistics torrentDownloadSpeedStatistics;
@@ -690,11 +704,11 @@ public class MyStepdefs {
                 .ifPresent(peer -> Assert.fail("We received from the following peer" +
                         " messages but he doesn't exist in the conencted peers flux: " + peer));
 
-        // delete everything this test created.
-        ActiveTorrents.getInstance()
+        // delete everything from the last test.
+        torrentDownloader.getTorrentFileSystemManager()
                 .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
-                .flatMap(activeTorrent ->
-                        ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                .flatMap(isDeleted -> torrentDownloader.getTorrentFileSystemManager()
+                        .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
                 .block();
     }
 

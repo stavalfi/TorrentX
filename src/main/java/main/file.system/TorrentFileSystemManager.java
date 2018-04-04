@@ -25,4 +25,8 @@ public interface TorrentFileSystemManager {
     Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
 
     ConnectableFlux<TorrentPieceChanged> startListenForIncomingPiecesFlux();
+
+    Mono<Boolean> deleteActiveTorrentOnlyMono(String torrentInfoHash);
+
+    Mono<Boolean> deleteFileOnlyMono(String torrentInfoHash);
 }

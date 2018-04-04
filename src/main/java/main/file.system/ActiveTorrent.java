@@ -3,19 +3,21 @@ package main.file.system;
 import christophedetroyer.torrent.TorrentFile;
 import main.App;
 import main.TorrentInfo;
-import main.torrent.status.TorrentStatus;
 import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
 import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
+import main.torrent.status.TorrentStatus;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
@@ -27,30 +29,44 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     private final BitSet piecesStatus;
     private final long[] piecesPartialStatus;
     private final String downloadPath;
-    private TorrentStatus torrentStatus;
     private ConnectableFlux<TorrentPieceChanged> startListenForIncomingPiecesFlux;
 
     public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath,
                          TorrentStatus torrentStatus,
                          Flux<PieceMessage> peerResponsesFlux) {
         super(torrentInfo);
-        this.torrentStatus = torrentStatus;
         this.downloadPath = downloadPath;
         this.piecesStatus = new BitSet(getPieces().size());
         this.piecesPartialStatus = new long[getPieces().size()];
+
+        createFolders(torrentInfo, downloadPath);
+        createFiles(torrentInfo, downloadPath).block();
+
         this.activeTorrentFileList = createActiveTorrentFileList(torrentInfo, downloadPath);
 
         this.startListenForIncomingPiecesFlux = peerResponsesFlux
                 .flatMap(pieceMessage -> writeBlock(pieceMessage))
                 .publish();
 
-        this.torrentStatus.getStatusTypeFlux()
+        torrentStatus.getStatusTypeFlux()
                 .subscribe(torrentStatusType -> {
                     switch (torrentStatusType) {
                         case START_DOWNLOAD:
                             this.startListenForIncomingPiecesFlux.connect();
                     }
                 });
+
+        torrentStatus.getStatusTypeFlux()
+                .flatMap(torrentStatusType -> {
+                    switch (torrentStatusType) {
+                        case REMOVE_FILES:
+                            return deleteFileOnlyMono(torrentInfo.getTorrentInfoHash());
+                        case REMOVE_TORRENT:
+                            return deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash());
+                        default:
+                            return Flux.empty();
+                    }
+                }).subscribe();
     }
 
     @Override
@@ -81,6 +97,30 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     @Override
     public ConnectableFlux<TorrentPieceChanged> startListenForIncomingPiecesFlux() {
         return this.startListenForIncomingPiecesFlux;
+    }
+
+    public Mono<Boolean> deleteActiveTorrentOnlyMono(String torrentInfoHash) {
+        boolean deletedActiveTorrent = ActiveTorrents.getInstance()
+                .deleteActiveTorrentOnly(torrentInfoHash);
+        return Mono.just(deletedActiveTorrent);
+    }
+
+    public Mono<Boolean> deleteFileOnlyMono(String torrentInfoHash) {
+        return ActiveTorrents.getInstance()
+                .findActiveTorrentByHashMono(torrentInfoHash)
+                .map(activeTorrentOptional -> {
+                    activeTorrentOptional.ifPresent(activeTorrent -> {
+                        activeTorrent.getTorrentFiles()
+                                .stream()
+                                .map(main.file.system.TorrentFile::getFilePath)
+                                .map(File::new)
+                                .forEach(this::completelyDeleteFolder);
+                        String filePath = activeTorrent.getDownloadPath() + "/" + activeTorrent.getName();
+                        File mainFile = new File(filePath);
+                        completelyDeleteFolder(mainFile);
+                    });
+                    return activeTorrentOptional.isPresent();
+                });
     }
 
     @Override
@@ -203,5 +243,68 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                 sink.success(torrentPieceChanged);
             }
         }).subscribeOn(Schedulers.single());
+    }
+
+    private void createFolders(TorrentInfo torrentInfo, String downloadPath) {
+        // create main folder for the download of the torrent.
+        String mainFolder = !torrentInfo.isSingleFileTorrent() ?
+                downloadPath + torrentInfo.getName() + "/" :
+                downloadPath;
+        createFolder(mainFolder);
+
+        // create sub folders for the download of the torrent
+        torrentInfo.getFileList()
+                .stream()
+                .map(christophedetroyer.torrent.TorrentFile::getFileDirs)
+                .filter(folders -> folders.size() > 1)
+                .map(folders -> folders.subList(0, folders.size() - 2))
+                .map(List::stream)
+                .map(stringStream -> stringStream.collect(Collectors.joining("/", mainFolder, "")))
+                .forEach(folderPath -> createFolder(folderPath));
+    }
+
+    private Mono<ActiveTorrent> createFiles(TorrentInfo torrentInfo, String downloadPath) {
+        String mainFolder = !torrentInfo.isSingleFileTorrent() ?
+                downloadPath + "/" + torrentInfo.getName() + "/" :
+                downloadPath + "/";
+        // create files in each folder.
+        return Mono.<ActiveTorrent>create(sink -> {
+            for (christophedetroyer.torrent.TorrentFile torrentFile : torrentInfo.getFileList()) {
+                String filePath = torrentFile
+                        .getFileDirs()
+                        .stream()
+                        .collect(Collectors.joining("/", mainFolder, ""));
+                try {
+                    createFile(filePath, torrentFile.getFileLength());
+                } catch (IOException e) {
+                    sink.error(e);
+                    return;
+                }
+            }
+            sink.success(this);
+        }).doOnError(throwable -> completelyDeleteFolder(new File(mainFolder)));
+    }
+
+    private void createFolder(String path) {
+        File file = new File(path);
+        File parentFile = file.getParentFile();
+        parentFile.mkdirs();
+        file.mkdirs();
+    }
+
+    private void createFile(String filePathToCreate, long length) throws IOException {
+        RandomAccessFile randomAccessFile = new RandomAccessFile(filePathToCreate, "rw");
+        randomAccessFile.setLength(length);
+    }
+
+
+    private boolean completelyDeleteFolder(File directoryToBeDeleted) {
+        File[] allContents = directoryToBeDeleted.listFiles();
+        if (allContents != null) {
+            for (File file : allContents) {
+                completelyDeleteFolder(file);
+            }
+        }
+        return directoryToBeDeleted.delete();
     }
 }
