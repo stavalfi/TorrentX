@@ -66,7 +66,8 @@ public class TorrentDownloaders {
                 .findFirst();
     }
 
-    public synchronized TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
+    public synchronized TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
+                                                                         TorrentStatusController torrentStatusController) {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
@@ -78,9 +79,6 @@ public class TorrentDownloaders {
                 Flux.merge(PeersListener.getInstance().getPeersConnectedToMeFlux().autoConnect(),
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux).autoConnect())
                         .publish();
-
-        TorrentStatusController torrentStatusController =
-                TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
 
         torrentStatusController.getStatusTypeFlux()
                 .subscribe(new Consumer<TorrentStatusType>() {
@@ -118,6 +116,11 @@ public class TorrentDownloaders {
                 peersProvider,
                 trackerConnectionConnectableFlux,
                 peersCommunicatorFlux);
+    }
+
+    public synchronized TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
+        return createDefaultTorrentDownloader(torrentInfo, downloadPath,
+                TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo));
     }
 
     private TorrentDownloaders() {
