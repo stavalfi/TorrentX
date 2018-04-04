@@ -79,14 +79,8 @@ public class TorrentDownloaders {
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux).autoConnect())
                         .publish();
 
-        TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(torrentInfo,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false);
+        TorrentStatusController torrentStatusController =
+                TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
 
         torrentStatusController.getStatusTypeFlux()
                 .subscribe(new Consumer<TorrentStatusType>() {

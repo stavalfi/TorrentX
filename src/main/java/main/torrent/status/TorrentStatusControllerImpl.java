@@ -210,4 +210,15 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
                 break;
         }
     }
+
+    public static TorrentStatusController createDefaultTorrentStatusController(TorrentInfo torrentInfo) {
+        return new TorrentStatusControllerImpl(torrentInfo,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false);
+    }
 }
