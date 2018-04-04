@@ -78,7 +78,7 @@ Feature: create get and delete active torrents
 
   Scenario Outline: we save the last piece of active torrent
     # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
-    Then application save all the last piece of torrent: "<torrent>","<downloadLocation>"
+    Then application save the last piece of torrent: "<torrent>","<downloadLocation>"
 
     Examples:
       | torrent                       | downloadLocation |

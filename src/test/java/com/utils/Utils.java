@@ -4,7 +4,9 @@ import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
 import main.TorrentInfo;
+import main.downloader.TorrentDownloaders;
 import main.file.system.ActiveTorrentFile;
+import main.file.system.ActiveTorrents;
 import main.peer.PeersCommunicator;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.RequestMessage;
@@ -17,12 +19,30 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class Utils {
     public static TorrentInfo createTorrentInfo(String torrentFilePath) throws IOException {
         String torrentFilesPath = "src/test/resources/torrents/" + torrentFilePath;
         return new TorrentInfo(torrentFilesPath, TorrentParser.parseTorrent(torrentFilesPath));
+    }
+
+    public static void removeEverythingRelatedToTorrent(TorrentInfo torrentInfo) {
+        TorrentDownloaders.getInstance()
+                .deleteTorrentDownloader(torrentInfo.getTorrentInfoHash());
+
+        ActiveTorrents.getInstance()
+                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .flatMap(activeTorrent -> activeTorrent
+                        .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
+                        .flatMap(isDeleted -> activeTorrent
+                                .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))).block();
+
+        // delete download folder from last test
+        Utils.deleteDownloadFolder();
     }
 
     public static Mono<PeersCommunicator> sendFakeMessage(PeersCommunicator peersCommunicator, PeerMessageType peerMessageType) {
@@ -99,7 +119,7 @@ public class Utils {
         List<TorrentFile> fileList = torrentInfo.getFileList();
 
         List<ActiveTorrentFile> activeTorrentFileList = new ArrayList<>();
-        String fullFilePath = downloadPath + "/";
+        String fullFilePath = downloadPath;
         if (!torrentInfo.isSingleFileTorrent())
             fullFilePath += torrentInfo.getName() + "/";
         long position = 0;
