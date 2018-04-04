@@ -227,39 +227,39 @@ public class MyStepdefs {
         remoteFakePeer.shutdown();
     }
 
-    @Then("^application interested in all peers$")
-    public void applicationInterestedInAllPeers() throws Throwable {
-
+    @Then("^application interested in all peers for torrent: \"([^\"]*)\"$")
+    public void applicationInterestedInAllPeersForTorrent(String torrentFileName) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
     }
 
-    @Then("^application request for a random block of a random piece from all peers$")
-    public void applicationRequestForARandomBlockOfARandomPieceFromAllPeers() throws Throwable {
-
+    @Then("^application request for a random block of a random piece from all peers in torrent: \"([^\"]*)\"$")
+    public void applicationRequestForARandomBlockOfARandomPieceFromAllPeersInTorrent(String torrentFileName) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
     }
 
-    @Then("^application receive at list one random block of a random piece$")
-    public void applicationReceiveAtListOneRandomBlockOfARandomPiece() throws Throwable {
-        TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
-        PeersProvider peersProvider = new PeersProvider(this.torrentInfo);
+    @Then("^application receive at list one random block of a random piece in torrent: \"([^\"]*)\"$")
+    public void applicationReceiveAtListOneRandomBlockOfARandomPieceInTorrent(String torrentFileName) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .get();
 
         int requestBlockSize = 16000;
 
-        Mono<PieceMessage> receiveSinglePieceMono =
-                trackerProvider.connectToTrackersFlux()
-                        .autoConnect()
-                        .as(trackerConnectionFlux -> peersProvider
-                                .getPeersCommunicatorFromTrackerFlux(trackerConnectionFlux))
-                        .autoConnect()
-                        .flatMap(peersCommunicator -> peersCommunicator.sendInterestedMessage())
-                        .flatMap(peersCommunicator -> peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux()
-                                .take(1)
-                                .flatMap(haveMessage -> peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
-                        .flatMap(peersCommunicator ->
-                                peersCommunicator.receivePeerMessages()
-                                        .getPieceMessageResponseFlux()
-                                        .doOnNext(pieceMessage -> peersCommunicator.closeConnection()))
+        Mono<PieceMessage> receiveSinglePieceMono = torrentDownloader.getPeersCommunicatorFlux()
+                .flatMap(peersCommunicator -> peersCommunicator.sendInterestedMessage())
+                .flatMap(peersCommunicator -> peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux()
                         .take(1)
-                        .single();
+                        .flatMap(haveMessage -> peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
+                .flatMap(peersCommunicator ->
+                        peersCommunicator.receivePeerMessages()
+                                .getPieceMessageResponseFlux()
+                                .doOnNext(pieceMessage -> peersCommunicator.closeConnection()))
+                .take(1)
+                .single();
+
+        torrentDownloader.getTorrentStatusController().startDownload();
 
         StepVerifier.create(receiveSinglePieceMono)
                 .expectNextCount(1)
