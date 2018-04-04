@@ -88,7 +88,7 @@ public class TorrentDownloaders {
                     public synchronized void accept(TorrentStatusType torrentStatusType) {
                         switch (torrentStatusType) {
                             case START_DOWNLOAD:
-                                if (!this.isConnected.get())
+                                if (this.isConnected.compareAndSet(false, true))
                                     peersCommunicatorFlux.connect();
                                 break;
                         }
