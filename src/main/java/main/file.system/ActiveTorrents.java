@@ -22,6 +22,19 @@ public class ActiveTorrents {
     public Mono<ActiveTorrent> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath,
                                                        TorrentStatus torrentStatus,
                                                        Flux<PieceMessage> peerResponsesFlux) {
+
+        torrentStatus.getStatusTypeFlux()
+                .flatMap(torrentStatusType -> {
+                    switch (torrentStatusType) {
+                        case REMOVE_FILES:
+                            return deleteFileOnlyMono(torrentInfo.getTorrentInfoHash());
+                        case REMOVE_TORRENT:
+                            return deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash());
+                        default:
+                            return Flux.empty();
+                    }
+                }).subscribe();
+
         // TODO: check if this torrent exist in db.
         Mono<ActiveTorrent> createActiveTorrentMono = createFolders(torrentInfo, downloadPath)
                 .flatMap(activeTorrents -> createFiles(torrentInfo, downloadPath))
@@ -69,6 +82,13 @@ public class ActiveTorrents {
                 });
     }
 
+    public Mono<Optional<ActiveTorrent>> findActiveTorrentByHashMono(String torrentInfoHash) {
+        Optional<ActiveTorrent> first = this.activeTorrentList.stream()
+                .filter(activeTorrent -> activeTorrent.getTorrentInfoHash().equals(torrentInfoHash))
+                .findFirst();
+        return Mono.just(first);
+    }
+
     private boolean completelyDeleteFolder(File directoryToBeDeleted) {
         File[] allContents = directoryToBeDeleted.listFiles();
         if (allContents != null) {
@@ -77,13 +97,6 @@ public class ActiveTorrents {
             }
         }
         return directoryToBeDeleted.delete();
-    }
-
-    public Mono<Optional<ActiveTorrent>> findActiveTorrentByHashMono(String torrentInfoHash) {
-        Optional<ActiveTorrent> first = this.activeTorrentList.stream()
-                .filter(activeTorrent -> activeTorrent.getTorrentInfoHash().equals(torrentInfoHash))
-                .findFirst();
-        return Mono.just(first);
     }
 
     public Flux<ActiveTorrent> getActiveTorrentsFlux() {
