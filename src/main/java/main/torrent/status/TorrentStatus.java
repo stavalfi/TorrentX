@@ -6,7 +6,9 @@ import reactor.core.publisher.Flux;
 public interface TorrentStatus {
     TorrentInfo getTorrentInfo();
 
-    boolean isStarted();
+    boolean isStartedDownload();
+
+    boolean isStartedUpload();
 
     boolean isTorrentRemoved();
 

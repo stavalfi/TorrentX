@@ -47,7 +47,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
         this.torrentStatus.getStatusTypeFlux()
                 .subscribe(torrentStatusType -> {
                     switch (torrentStatusType) {
-                        case STARTED:
+                        case START_DOWNLOAD:
                             this.startListenForIncomingPiecesFlux.connect();
                     }
                 });

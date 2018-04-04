@@ -4,9 +4,8 @@ import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
+import cucumber.api.java.en.When;
 import main.TorrentInfo;
-import main.torrent.status.TorrentStatusController;
-import main.torrent.status.TorrentStatusControllerImpl;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.ActiveTorrent;
@@ -21,6 +20,9 @@ import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
+import main.torrent.status.TorrentStatusController;
+import main.torrent.status.TorrentStatusControllerImpl;
+import main.torrent.status.TorrentStatusType;
 import main.tracker.Tracker;
 import main.tracker.TrackerExceptions;
 import main.tracker.TrackerProvider;
@@ -402,6 +404,7 @@ public class MyStepdefs {
                 false,
                 false,
                 false,
+                false,
                 false);
 
         ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
@@ -523,6 +526,7 @@ public class MyStepdefs {
                 lastPieceMessage.getBlock().length);
 
         TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(torrentInfo,
+                false,
                 false,
                 false,
                 false,
@@ -671,7 +675,8 @@ public class MyStepdefs {
         // for recording all the peers without blocking the main thread.
         peersFromResponsesMono.subscribe();
 
-        torrentDownloader.getTorrentStatusController().start();
+        torrentDownloader.getTorrentStatusController().startDownload();
+        torrentDownloader.getTorrentStatusController().startUpload();
 
         List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
         List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
@@ -688,6 +693,24 @@ public class MyStepdefs {
                 .flatMap(activeTorrent ->
                         ActiveTorrents.getInstance().deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
                 .block();
+    }
+
+    @Given("^active-torrent for: \"([^\"]*)\" in \"([^\"]*)\" with the following status:$")
+    public void activeTorrentForInWithTheFollowingStatus(String torrentFileName, String downloadLocation,
+                                                         Map<TorrentStatusType, Boolean> initialTorrentStatusTypeList) throws Throwable {
+        System.out.println(initialTorrentStatusTypeList);
+    }
+
+    @When("^torrent-status for \"([^\"]*)\" is trying to change to:$")
+    public void torrentStatusForIsTryingToChangeTo(String torrentFileName,
+                                                   List<TorrentStatusType> changeTorrentStatusTypeList) throws Throwable {
+
+    }
+
+    @Then("^torrent-status for \"([^\"]*)\" will be:$")
+    public void torrentStatusForWillBe(String torrentFileName,
+                                       List<TorrentStatusType> changedTorrentStatusTypeList) throws Throwable {
+
     }
 }
 

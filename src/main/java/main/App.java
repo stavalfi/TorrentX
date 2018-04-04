@@ -20,7 +20,8 @@ public class App {
                 .getPeerMessageResponseFlux()
                 .subscribe(System.out::println, Throwable::printStackTrace, System.out::println);
 
-        torrentDownloader.getDownloadControl().start();
+        torrentDownloader.getTorrentStatusController().startDownload();
+        torrentDownloader.getTorrentStatusController().startUpload();
     }
 
     public static void main(String[] args) throws Exception {

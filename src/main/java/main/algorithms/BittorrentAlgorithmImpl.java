@@ -30,7 +30,7 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
         this.torrentStatus.getStatusTypeFlux()
                 .subscribe(torrentStatusType -> {
                     switch (torrentStatusType) {
-                        case STARTED:
+                        case START_DOWNLOAD:
                             this.startDownloadFlux.connect();
                     }
                 });

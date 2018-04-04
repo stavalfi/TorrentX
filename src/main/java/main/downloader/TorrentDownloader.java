@@ -12,10 +12,14 @@ import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.TorrentStatusController;
 import main.torrent.status.TorrentStatusControllerImpl;
+import main.torrent.status.TorrentStatusType;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 public class TorrentDownloader {
 
@@ -101,14 +105,21 @@ public class TorrentDownloader {
                 false,
                 false,
                 false,
+                false,
                 false);
 
         torrentStatusController.getStatusTypeFlux()
-                .subscribe(torrentStatusType -> {
-                    switch (torrentStatusType) {
-                        case STARTED:
-                            peersCommunicatorFlux.connect();
-                            break;
+                .subscribe(new Consumer<TorrentStatusType>() {
+                    private AtomicBoolean isConnected = new AtomicBoolean(false);
+
+                    @Override
+                    public synchronized void accept(TorrentStatusType torrentStatusType) {
+                        switch (torrentStatusType) {
+                            case START_DOWNLOAD:
+                                if (!this.isConnected.get())
+                                    peersCommunicatorFlux.connect();
+                                break;
+                        }
                     }
                 });
 

@@ -9,7 +9,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class TorrentStatusControllerImpl implements TorrentStatusController {
 
     private TorrentInfo torrentInfo;
-    private AtomicBoolean isStarted;
+    private AtomicBoolean isStartedDownload;
+    private AtomicBoolean isStartedUpload;
     private AtomicBoolean isTorrentRemoved;
     private AtomicBoolean isFilesRemoved;
     private AtomicBoolean isUploading;
@@ -18,16 +19,17 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     private Flux<TorrentStatusType> statusTypeFlux;
     private FluxSink<TorrentStatusType> statusTypeFluxSink;
 
-
     public TorrentStatusControllerImpl(TorrentInfo torrentInfo,
-                                       boolean isStarted,
+                                       boolean isStartedDownload,
+                                       boolean isStartedUpload,
                                        boolean isTorrentRemoved,
                                        boolean isFilesRemoved,
                                        boolean isUploading,
                                        boolean isDownloading,
                                        boolean isCompletedDownloading) {
         this.torrentInfo = torrentInfo;
-        this.isStarted = new AtomicBoolean(isStarted);
+        this.isStartedDownload = new AtomicBoolean(isStartedDownload);
+        this.isStartedUpload = new AtomicBoolean(isStartedUpload);
         this.isTorrentRemoved = new AtomicBoolean(isTorrentRemoved);
         this.isFilesRemoved = new AtomicBoolean(isFilesRemoved);
         this.isUploading = new AtomicBoolean(isUploading);
@@ -45,12 +47,23 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     }
 
     @Override
-    public synchronized void start() {
-        if (!this.isStarted.get() &&
+    public synchronized void startDownload() {
+        if (!this.isStartedDownload.get() &&
                 !this.isCompletedDownloading.get() &&
                 !this.isTorrentRemoved.get() &&
                 !this.isFilesRemoved.get()) {
-            this.statusTypeFluxSink.next(TorrentStatusType.STARTED);
+            this.statusTypeFluxSink.next(TorrentStatusType.START_DOWNLOAD);
+            this.statusTypeFluxSink.next(TorrentStatusType.RESUME_DOWNLOAD);
+            this.statusTypeFluxSink.next(TorrentStatusType.RESUME_UPLOAD);
+        }
+    }
+
+    @Override
+    public synchronized void startUpload() {
+        if (!this.isStartedUpload.get() &&
+                !this.isTorrentRemoved.get() &&
+                !this.isFilesRemoved.get()) {
+            this.statusTypeFluxSink.next(TorrentStatusType.START_UPLOAD);
             this.statusTypeFluxSink.next(TorrentStatusType.RESUME_DOWNLOAD);
             this.statusTypeFluxSink.next(TorrentStatusType.RESUME_UPLOAD);
         }
@@ -127,18 +140,13 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     }
 
     @Override
-    public boolean isStarted() {
-        return this.isStarted.get();
+    public boolean isStartedDownload() {
+        return this.isStartedDownload.get();
     }
 
     @Override
-    public boolean isTorrentRemoved() {
-        return this.isTorrentRemoved.get();
-    }
-
-    @Override
-    public boolean isFileRemoved() {
-        return this.isFilesRemoved.get();
+    public boolean isStartedUpload() {
+        return this.isStartedUpload.get();
     }
 
     @Override
@@ -157,12 +165,28 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     }
 
     @Override
+    public boolean isTorrentRemoved() {
+        return this.isTorrentRemoved.get();
+    }
+
+    @Override
+    public boolean isFileRemoved() {
+        return this.isFilesRemoved.get();
+    }
+
+    @Override
     public TorrentInfo getTorrentInfo() {
         return this.torrentInfo;
     }
 
     private void setCurrentState(TorrentStatusType torrentStatusType) {
         switch (torrentStatusType) {
+            case START_DOWNLOAD:
+                this.isStartedDownload.set(true);
+                break;
+            case START_UPLOAD:
+                this.isStartedUpload.set(true);
+                break;
             case PAUSE_DOWNLOAD:
                 this.isDownloading.set(false);
                 break;
@@ -175,17 +199,14 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
             case RESUME_UPLOAD:
                 this.isDownloading.set(true);
                 break;
+            case COMPLETED_DOWNLOADING:
+                this.isCompletedDownloading.set(true);
+                break;
             case REMOVE_TORRENT:
                 this.isTorrentRemoved.set(true);
                 break;
             case REMOVE_FILES:
                 this.isFilesRemoved.set(true);
-                break;
-            case STARTED:
-                this.isStarted.set(true);
-                break;
-            case COMPLETED_DOWNLOADING:
-                this.isCompletedDownloading.set(true);
                 break;
         }
     }

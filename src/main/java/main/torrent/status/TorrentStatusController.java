@@ -2,7 +2,9 @@ package main.torrent.status;
 
 public interface TorrentStatusController extends TorrentStatus {
 
-    void start();
+    void startDownload();
+
+    void startUpload();
 
     void resumeDownload();
 
