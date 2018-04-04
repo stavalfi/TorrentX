@@ -3,6 +3,7 @@ package main;
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
 import main.downloader.TorrentDownloader;
+import main.downloader.TorrentDownloaders;
 import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -12,8 +13,8 @@ public class App {
     private static String downloadPath = System.getProperty("user.dir") + "/" + "torrents-test/";
 
     private static void f4() {
-        TorrentDownloader torrentDownloader =
-                TorrentDownloader.defaultTorrentDownloader(getTorrentInfo(), downloadPath);
+        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+                .createDefaultTorrentDownloader(getTorrentInfo(), downloadPath);
 
         torrentDownloader.getBittorrentAlgorithm()
                 .receiveTorrentMessagesMessagesFlux()

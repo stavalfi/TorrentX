@@ -7,6 +7,7 @@ import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
 import main.TorrentInfo;
 import main.downloader.TorrentDownloader;
+import main.downloader.TorrentDownloaders;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
@@ -273,7 +274,8 @@ public class MyStepdefs {
                 .block();
 
         // this will create an activeTorrent object.
-        TorrentDownloader.defaultTorrentDownloader(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation);
+        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+                .createDefaultTorrentDownloader(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation);
     }
 
     @Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
@@ -639,7 +641,8 @@ public class MyStepdefs {
 
         // we won't download anything but we still need to specify a path to download to.
         String DEFAULT_DOWNLOAD_LOCATION = System.getProperty("user.dir") + "/" + "torrents-test/";
-        TorrentDownloader torrentDownloader = TorrentDownloader.defaultTorrentDownloader(torrentInfo, DEFAULT_DOWNLOAD_LOCATION);
+        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+                .createDefaultTorrentDownloader(torrentInfo, DEFAULT_DOWNLOAD_LOCATION);
 
         // consume new peers and new responses from 1.5 seconds.
         // filter distinct peers from the responses, and assert
