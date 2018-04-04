@@ -62,6 +62,9 @@ public class MyStepdefs {
     public void newTorrentFile(String torrentFileName) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
+        // delete everything from the last test.
+        Utils.removeEverythingRelatedToTorrent(torrentInfo);
+
         Mockito.when(this.torrentInfo.getTorrentFilePath())
                 .thenReturn(torrentInfo.getTorrentFilePath());
         Mockito.when(this.torrentInfo.getTorrentInfoHash())
