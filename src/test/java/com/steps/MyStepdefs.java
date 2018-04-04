@@ -657,22 +657,135 @@ public class MyStepdefs {
         Utils.removeEverythingRelatedToTorrent(torrentInfo);
     }
 
-    @Given("^active-torrent for: \"([^\"]*)\" in \"([^\"]*)\" with the following status:$")
+    @Given("^initial torrent-status for torrent: \"([^\"]*)\" in \"([^\"]*)\" is:$")
     public void activeTorrentForInWithTheFollowingStatus(String torrentFileName, String downloadLocation,
-                                                         Map<TorrentStatusType, Boolean> initialTorrentStatusTypeList) throws Throwable {
-        System.out.println(initialTorrentStatusTypeList);
+                                                         Map<TorrentStatusType, Boolean> initialTorrentStatusTypeMap) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        // delete everything from the last test.
+        Utils.removeEverythingRelatedToTorrent(torrentInfo);
+
+        TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(torrentInfo,
+                initialTorrentStatusTypeMap.get(TorrentStatusType.START_DOWNLOAD),
+                initialTorrentStatusTypeMap.get(TorrentStatusType.START_UPLOAD),
+                initialTorrentStatusTypeMap.get(TorrentStatusType.REMOVE_TORRENT),
+                initialTorrentStatusTypeMap.get(TorrentStatusType.REMOVE_FILES),
+                initialTorrentStatusTypeMap.get(TorrentStatusType.RESUME_UPLOAD),
+                initialTorrentStatusTypeMap.get(TorrentStatusType.RESUME_DOWNLOAD),
+                initialTorrentStatusTypeMap.get(TorrentStatusType.COMPLETED_DOWNLOADING));
+
+        TorrentDownloaders.getInstance()
+                .createDefaultTorrentDownloader(torrentInfo,
+                        System.getProperty("user.dir") + "/" + downloadLocation,
+                        torrentStatusController);
     }
 
-    @When("^torrent-status for \"([^\"]*)\" is trying to change to:$")
+    private List<TorrentStatusType> torrentStatusTypeFlux = new ArrayList<>();
+
+    @When("^torrent-status for torrent \"([^\"]*)\" is trying to change to:$")
     public void torrentStatusForIsTryingToChangeTo(String torrentFileName,
                                                    List<TorrentStatusType> changeTorrentStatusTypeList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        TorrentStatusController torrentStatusController = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .get()
+                .getTorrentStatusController();
 
+        Flux<TorrentStatusType> torrentStatusTypeFlux = torrentStatusController.getStatusTypeFlux()
+                .replay()
+                .autoConnect();
+        this.torrentStatusTypeFlux = new ArrayList<>();
+        torrentStatusTypeFlux.subscribe(this.torrentStatusTypeFlux::add);
+
+        changeTorrentStatusTypeList.forEach(torrentStatusType -> {
+            switch (torrentStatusType) {
+                case START_DOWNLOAD:
+                    torrentStatusController.startDownload();
+                    break;
+                case START_UPLOAD:
+                    torrentStatusController.startUpload();
+                    break;
+                case PAUSE_DOWNLOAD:
+                    torrentStatusController.pauseDownload();
+                    break;
+                case RESUME_DOWNLOAD:
+                    torrentStatusController.resumeDownload();
+                    break;
+                case PAUSE_UPLOAD:
+                    torrentStatusController.pauseUpload();
+                    break;
+                case RESUME_UPLOAD:
+                    torrentStatusController.resumeUpload();
+                    break;
+                case COMPLETED_DOWNLOADING:
+                    torrentStatusController.completedDownloading();
+                    break;
+                case REMOVE_TORRENT:
+                    torrentStatusController.removeTorrent();
+                    break;
+                case REMOVE_FILES:
+                    torrentStatusController.removeFiles();
+                    break;
+            }
+        });
     }
 
-    @Then("^torrent-status for \"([^\"]*)\" will be:$")
+    @Then("^torrent-status for torrent \"([^\"]*)\" will be:$")
     public void torrentStatusForWillBe(String torrentFileName,
                                        List<TorrentStatusType> changedTorrentStatusTypeList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        TorrentStatusController torrentStatusController = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .get()
+                .getTorrentStatusController();
 
+        // assert that the state is changed by using methods: this.torrentStatusController.isXXX().
+        changedTorrentStatusTypeList.forEach(torrentStatusType -> {
+            switch (torrentStatusType) {
+                case START_DOWNLOAD:
+                    Assert.assertTrue(torrentStatusController.isStartedDownload());
+                    break;
+                case START_UPLOAD:
+                    Assert.assertTrue(torrentStatusController.isStartedUpload());
+                    break;
+                case PAUSE_DOWNLOAD:
+                    Assert.assertFalse(torrentStatusController.isDownloading());
+                    break;
+                case RESUME_DOWNLOAD:
+                    Assert.assertTrue(torrentStatusController.isDownloading());
+                    break;
+                case PAUSE_UPLOAD:
+                    Assert.assertFalse(torrentStatusController.isUploading());
+                    break;
+                case RESUME_UPLOAD:
+                    Assert.assertTrue(torrentStatusController.isUploading());
+                    break;
+                case COMPLETED_DOWNLOADING:
+                    Assert.assertTrue(torrentStatusController.isCompletedDownloading());
+                    break;
+                case REMOVE_TORRENT:
+                    Assert.assertTrue(torrentStatusController.isTorrentRemoved());
+                    break;
+                case REMOVE_FILES:
+                    Assert.assertTrue(torrentStatusController.isFileRemoved());
+                    break;
+            }
+        });
+
+        // assert that we receive the proper signals from this.torrentStatusTypeFlux.
+        Assert.assertTrue(new HashSet<>(this.torrentStatusTypeFlux).equals(new HashSet<>(changedTorrentStatusTypeList)));
+    }
+
+    @Then("^torrent-status for torrent \"([^\"]*)\" will be: Empty-table$")
+    public void torrentStatusForTorrentWillBeEmptyTable(String torrentFileName) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        TorrentStatusController torrentStatusController = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .get()
+                .getTorrentStatusController();
+
+        // assert that we receive the proper signals from this.torrentStatusTypeFlux.
+        Assert.assertTrue(new HashSet<>(this.torrentStatusTypeFlux).equals(new HashSet<>(Collections.emptyList())));
     }
 }
 
