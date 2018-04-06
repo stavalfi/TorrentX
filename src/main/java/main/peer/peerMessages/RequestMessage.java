@@ -23,7 +23,7 @@ public class RequestMessage extends PeerMessage {
         super(to, from, RequestMessage.length, messageId, ByteBuffer.allocate(12)
                 .putInt(index)
                 .putInt(begin)
-                .putInt(length).array());
+                .putInt(blockLength).array());
         this.index = index;
         this.begin = begin;
         this.blockLength = blockLength;
