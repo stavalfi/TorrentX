@@ -21,11 +21,11 @@ public class PeersCommunicator implements SendPeerMessage {
     private Peer peer;
     private Socket peerSocket;
     private TorrentInfo torrentInfo;
-    private Flux<PeerMessage> sentMessagesFlux;
+    private Flux<PeerMessage> sentPeerMessagesFlux;
     private FluxSink<PeerMessage> sentMessagesFluxSink;
     private DataOutputStream peerDataOutputStream;
 
-    public ReceiveMessages receiveMessages;
+    private ReceiveMessages receiveMessages;
     private SpeedStatistics peerSpeedStatistics;
 
     public PeersCommunicator(TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
@@ -37,12 +37,12 @@ public class PeersCommunicator implements SendPeerMessage {
         this.me = new Peer("localhost", peerSocket.getLocalPort());
         this.peerDataOutputStream = peerDataOutputStream;
 
-        this.receiveMessages = new ReceiveMessagesImpl(this.torrentInfo, this.me, this.peer, dataInputStream);
-        this.sentMessagesFlux = Flux.create((FluxSink<PeerMessage> sink) -> this.sentMessagesFluxSink = sink);
+        this.receiveMessages = new ReceivedMessagesImpl(this.me, this.peer, dataInputStream);
+        this.sentPeerMessagesFlux = Flux.create((FluxSink<PeerMessage> sink) -> this.sentMessagesFluxSink = sink);
 
         this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
                 this.receiveMessages.getPeerMessageResponseFlux(),
-                this.sentMessagesFlux);
+                this.sentPeerMessagesFlux);
     }
 
     public ReceiveMessages receivePeerMessages() {
@@ -150,8 +150,8 @@ public class PeersCommunicator implements SendPeerMessage {
     }
 
     @Override
-    public Flux<PeerMessage> getSentMessagesFlux() {
-        return this.sentMessagesFlux;
+    public Flux<PeerMessage> sentPeerMessagesFlux() {
+        return this.sentPeerMessagesFlux;
     }
 
     public SpeedStatistics getPeerSpeedStatistics() {
