@@ -35,7 +35,7 @@ public class BitFieldMessage extends PeerMessage {
         return "BitFieldMessage{} " + super.toString();
     }
 
-    public BitSet getPieces() {
+    public BitSet getPiecesStatus() {
         return pieces;
     }
 }
