@@ -27,7 +27,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
 
     private final List<ActiveTorrentFile> activeTorrentFileList;
     private final BitSet piecesStatus;
-    private final long[] piecesPartialStatus;
+    private final int[] piecesEstimatedStatus;
     private final String downloadPath;
     private ConnectableFlux<TorrentPieceChanged> startListenForIncomingPiecesFlux;
 
@@ -37,7 +37,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
         super(torrentInfo);
         this.downloadPath = downloadPath;
         this.piecesStatus = new BitSet(getPieces().size());
-        this.piecesPartialStatus = new long[getPieces().size()];
+        this.piecesEstimatedStatus = new int[getPieces().size()];
 
         createFolders(torrentInfo, downloadPath);
         createFiles(torrentInfo, downloadPath).block();
@@ -95,7 +95,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     }
 
     @Override
-    public ConnectableFlux<TorrentPieceChanged> startListenForIncomingPiecesFlux() {
+    public ConnectableFlux<TorrentPieceChanged> savedPiecesFlux() {
         return this.startListenForIncomingPiecesFlux;
     }
 
@@ -121,6 +121,27 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                     });
                     return activeTorrentOptional.isPresent();
                 });
+    }
+
+    @Override
+    public synchronized int minMissingPieceIndex() {
+        for (int i = 0; i < this.getPieces().size(); i++)
+            if (!this.piecesStatus.get(i))
+                return i;
+        return -1;
+    }
+
+    @Override
+    public int maxMissingPieceIndex() {
+        for (int i = this.getPieces().size() - 1; i >= 0; i--)
+            if (!this.piecesStatus.get(i))
+                return i;
+        return -1;
+    }
+
+    @Override
+    public int[] getPiecesEstimatedStatus() {
+        return this.piecesEstimatedStatus;
     }
 
     @Override
@@ -217,7 +238,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
 
             // update pieces partial status array:
             // WARNING: this line *only* must be synchronized among multiple threads!
-            this.piecesPartialStatus[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
+            this.piecesEstimatedStatus[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
 
             // update pieces status:
             // there maybe multiple writes of the same pieceRequest during one execution...
@@ -229,7 +250,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                         getTotalSize() - (getPieces().size() - 1) * getPieceLength());
             }
 
-            long howMuchWeWroteUntilNowInThisPiece = this.piecesPartialStatus[pieceMessage.getIndex()];
+            long howMuchWeWroteUntilNowInThisPiece = this.piecesEstimatedStatus[pieceMessage.getIndex()];
             if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
                 this.piecesStatus.set(pieceMessage.getIndex());
                 TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
