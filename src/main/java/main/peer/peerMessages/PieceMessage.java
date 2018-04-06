@@ -18,10 +18,11 @@ public class PieceMessage extends PeerMessage {
      * @param block block of data, which is a subset of the piece specified by index.
      */
     public PieceMessage(Peer from, Peer to, int index, int begin, byte[] block) {
-        super(to, from, 9 + block.length, messageId, ByteBuffer.allocate(4 + 4 + block.length)
-                .putInt(index)
-                .putInt(begin)
-                .put(block).array());
+        super(to, from, 9 + block.length, messageId,
+                ByteBuffer.allocate(4 + 4 + block.length)
+                        .putInt(index)
+                        .putInt(begin)
+                        .put(block).array());
         this.index = index;
         this.begin = begin;
         this.block = block;
