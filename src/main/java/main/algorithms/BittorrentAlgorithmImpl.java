@@ -1,53 +1,38 @@
 package main.algorithms;
 
 import main.TorrentInfo;
-import main.torrent.status.TorrentStatus;
 import main.downloader.TorrentPieceChanged;
 import main.peer.PeersCommunicator;
-import main.peer.ReceiveMessages;
-import main.peer.ReceiveMessagesImpl;
+import main.peer.ReceivedMessagesImpl;
+import main.torrent.status.TorrentStatus;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 
 public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
-    private TorrentInfo torrentInfo;
-    private TorrentStatus torrentStatus;
-    private Flux<PeersCommunicator> peersCommunicatorFlux;
-    private ConnectableFlux<TorrentPieceChanged> startDownloadFlux;
-
-    private ReceiveMessages receiveTorrentMessagesMessagesFlux;
+    private Flux<TorrentPieceChanged> startDownloadFlux;
 
     public BittorrentAlgorithmImpl(TorrentInfo torrentInfo,
                                    TorrentStatus torrentStatus,
                                    Flux<PeersCommunicator> peersCommunicatorFlux) {
-        this.torrentInfo = torrentInfo;
-        this.torrentStatus = torrentStatus;
-        this.peersCommunicatorFlux = peersCommunicatorFlux;
-        this.receiveTorrentMessagesMessagesFlux = new ReceiveMessagesImpl(this.torrentInfo,
+
+        ReceivedMessagesImpl receiveTorrentMessagesMessagesFlux = new ReceivedMessagesImpl(
                 peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages));
 
-        this.startDownloadFlux = Flux.<TorrentPieceChanged>empty().publish();
-        this.torrentStatus.getStatusTypeFlux()
-                .subscribe(torrentStatusType -> {
-                    switch (torrentStatusType) {
-                        case START_DOWNLOAD:
-                            this.startDownloadFlux.connect();
-                    }
-                });
+        this.startDownloadFlux = startBittorrentAlgorithm(torrentInfo, torrentStatus, peersCommunicatorFlux)
+                .publish();
+
+        ((ConnectableFlux<TorrentPieceChanged>) this.startDownloadFlux).connect();
+
     }
 
-
-    public TorrentInfo getTorrentInfo() {
-        return torrentInfo;
+    private Flux<TorrentPieceChanged> startBittorrentAlgorithm(TorrentInfo torrentInfo,
+                                                               TorrentStatus torrentStatus,
+                                                               Flux<PeersCommunicator> peersCommunicatorFlux) {
+        return Flux.empty();
     }
 
     @Override
-    public ConnectableFlux<TorrentPieceChanged> startDownloadFlux() {
+    public Flux<TorrentPieceChanged> startDownloadFlux() {
         return this.startDownloadFlux;
-    }
-
-    @Override
-    public ReceiveMessages receiveTorrentMessagesMessagesFlux() {
-        return this.receiveTorrentMessagesMessagesFlux;
     }
 }
