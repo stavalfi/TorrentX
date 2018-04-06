@@ -29,5 +29,5 @@ public interface SendPeerMessage {
 
     Mono<PeersCommunicator> sendUnchokeMessage();
 
-    Flux<PeerMessage> getSentMessagesFlux();
+    Flux<PeerMessage> sentPeerMessagesFlux();
 }
