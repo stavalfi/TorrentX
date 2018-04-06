@@ -87,10 +87,11 @@ public class TorrentDownloaders {
                 trackerProvider.connectToTrackersFlux()
                         .autoConnect();
 
-        ConnectableFlux<PeersCommunicator> peersCommunicatorFromTrackerFlux = peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux);
+        ConnectableFlux<PeersCommunicator> peersCommunicatorFromTrackerFlux =
+                peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux);
+
         Flux<PeersCommunicator> peersCommunicatorFlux =
-                Flux.merge(PeersListener.getInstance().getPeersConnectedToMeFlux(),
-                        peersCommunicatorFromTrackerFlux);
+                Flux.merge(PeersListener.getInstance().getPeersConnectedToMeFlux(), peersCommunicatorFromTrackerFlux);
 
         torrentStatusController.getStatusTypeFlux()
                 .subscribe(new Consumer<TorrentStatusType>() {
@@ -115,9 +116,6 @@ public class TorrentDownloaders {
                     }
                 });
 
-        BittorrentAlgorithm bittorrentAlgorithm =
-                new BittorrentAlgorithmImpl(torrentInfo, torrentStatusController, peersCommunicatorFlux);
-
         ReceivedMessagesImpl receivedMessagesFromAllPeers = new ReceivedMessagesImpl(
                 peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages));
 
@@ -125,6 +123,9 @@ public class TorrentDownloaders {
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
                         receivedMessagesFromAllPeers.getPieceMessageResponseFlux())
                 .block();
+
+        BittorrentAlgorithm bittorrentAlgorithm =
+                new BittorrentAlgorithmImpl(torrentStatusController, torrentFileSystemManager, peersCommunicatorFlux);
 
         SpeedStatistics torrentSpeedStatistics =
                 new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
