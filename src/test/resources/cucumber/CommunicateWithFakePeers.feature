@@ -45,20 +45,35 @@ Feature: connect to a fake peers and communicate with them
       | BitFieldMessage |                    |                 |
 
   Scenario Outline: fake peer request pieces from me and I give him what he want
-    Then application save random blocks from different threads inside torrent: "<torrent>" in "<downloadLocation>" and check it saved
+    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
       | 0          | 0    |        |
-      | 1          | 0    | 1      |
+      | 1          | 0    | 10     |
       | 2          | 0    |        |
-    Then [peer ip: "localhost", peer port: "8983"] connect to me and he request:
+    Then random-fake-peer connect to me for torrent: "<torrent>" in "<downloadLocation>" and he request:
       | pieceIndex | from | length |
       | 0          | 0    | 25     |
       | 1          | 0    | 10     |
       | 2          | 0    | 15     |
-    Then we assert that we gave:
+    Then we assert that for torrent: "<torrent>", we gave the following pieces to the random-fake-peer:
       | pieceIndex | from | length |
       | 0          | 0    | 25     |
       | 2          | 0    | 15     |
+
+    Examples:
+      | torrent                       | downloadLocation |
+      | torrent-file-example3.torrent | torrents-test/   |
+
+  Scenario Outline: fake peer request pieces from me but I don't have nothing to give
+    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
+      | pieceIndex | from | length |
+    Then random-fake-peer connect to me for torrent: "<torrent>" in "<downloadLocation>" and he request:
+      | pieceIndex | from | length |
+      | 0          | 0    | 25     |
+      | 1          | 0    | 10     |
+      | 2          | 0    | 15     |
+    Then we assert that for torrent: "<torrent>", we gave the following pieces to the random-fake-peer:
+      | pieceIndex | from | length |
 
     Examples:
       | torrent                       | downloadLocation |
