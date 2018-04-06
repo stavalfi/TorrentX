@@ -4,6 +4,8 @@ import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
+import main.peer.PeersCommunicator;
+import main.peer.ReceiveMessages;
 import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -16,9 +18,9 @@ public class App {
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .createDefaultTorrentDownloader(getTorrentInfo(), downloadPath);
 
-        torrentDownloader.getBittorrentAlgorithm()
-                .receiveTorrentMessagesMessagesFlux()
-                .getPeerMessageResponseFlux()
+        torrentDownloader.getPeersCommunicatorFlux()
+                .map(PeersCommunicator::receivePeerMessages)
+                .flatMap(ReceiveMessages::getPeerMessageResponseFlux)
                 .subscribe(System.out::println, Throwable::printStackTrace, System.out::println);
 
         torrentDownloader.getTorrentStatusController().startDownload();
