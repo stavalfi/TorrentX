@@ -4,19 +4,36 @@ import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
 import main.TorrentInfo;
+import main.algorithms.BittorrentAlgorithm;
+import main.algorithms.BittorrentAlgorithmImpl;
+import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.ActiveTorrentFile;
 import main.file.system.ActiveTorrents;
+import main.file.system.TorrentFileSystemManager;
 import main.peer.PeersCommunicator;
+import main.peer.PeersListener;
+import main.peer.PeersProvider;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.RequestMessage;
+import main.statistics.SpeedStatistics;
+import main.statistics.TorrentSpeedSpeedStatisticsImpl;
+import main.torrent.status.TorrentStatusController;
+import main.torrent.status.TorrentStatusControllerImpl;
+import main.torrent.status.TorrentStatusType;
+import main.tracker.TrackerConnection;
+import main.tracker.TrackerProvider;
+import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.net.SocketException;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class Utils {
@@ -26,9 +43,27 @@ public class Utils {
     }
 
     public static void removeEverythingRelatedToTorrent(TorrentInfo torrentInfo) {
+        try {
+            PeersListener.getInstance().stopListenForNewPeers();
+        } catch (IOException | NullPointerException e) {
+            //e.printStackTrace();
+        }
+
+        TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .map(TorrentDownloader::getTorrentStatusController)
+                .ifPresent(torrentStatusController -> {
+                    torrentStatusController.pauseDownload();
+                    torrentStatusController.pauseUpload();
+                    torrentStatusController.removeFiles();
+                    torrentStatusController.removeTorrent();
+                });
+
         TorrentDownloaders.getInstance()
                 .deleteTorrentDownloader(torrentInfo.getTorrentInfoHash());
 
+        // some tests directly create ActiveTorrent object without creating
+        // TorrentDownloader object so we must remove ActiveTorrent also.
         ActiveTorrents.getInstance()
                 .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
                 .filter(Optional::isPresent)
@@ -36,10 +71,64 @@ public class Utils {
                 .flatMap(activeTorrent -> activeTorrent
                         .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
                         .flatMap(isDeleted -> activeTorrent
-                                .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))).block();
+                                .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash())))
+                .block();
 
         // delete download folder from last test
         Utils.deleteDownloadFolder();
+    }
+
+    public static TorrentDownloader createCustomTorrentDownloader(TorrentInfo torrentInfo,
+                                                                  TorrentFileSystemManager torrentFileSystemManager,
+                                                                  Flux<TrackerConnection> trackerConnectionConnectableFlux) {
+        TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
+        PeersProvider peersProvider = new PeersProvider(torrentInfo);
+
+        ConnectableFlux<PeersCommunicator> peersCommunicatorFromTrackerFlux =
+                peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux);
+
+        Flux<PeersCommunicator> listenForNewIncomingPeersFlux = PeersListener.getInstance().getPeersConnectedToMeFlux()
+                // SocketException == When I shutdown the SocketServer after/before
+                // the tests inside Utils::removeEverythingRelatedToTorrent.
+                .onErrorResume(SocketException.class, throwable -> Flux.empty());
+        Flux<PeersCommunicator> peersCommunicatorFlux =
+                Flux.merge(listenForNewIncomingPeersFlux, peersCommunicatorFromTrackerFlux);
+
+        TorrentStatusController defaultTorrentStatusController = TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
+
+        defaultTorrentStatusController.getStatusTypeFlux()
+                .subscribe(new Consumer<TorrentStatusType>() {
+                    private AtomicBoolean isConnected = new AtomicBoolean(false);
+
+                    @Override
+                    public synchronized void accept(TorrentStatusType torrentStatusType) {
+                        if (torrentStatusType.equals(TorrentStatusType.START_DOWNLOAD) ||
+                                torrentStatusType.equals(TorrentStatusType.START_UPLOAD)) {
+                            if (this.isConnected.compareAndSet(false, true)) {
+                                PeersListener.getInstance().getPeersConnectedToMeFlux().connect();
+                                peersCommunicatorFromTrackerFlux.connect();
+                            }
+                        }
+                    }
+                });
+
+        BittorrentAlgorithm bittorrentAlgorithm =
+                new BittorrentAlgorithmImpl(defaultTorrentStatusController, torrentFileSystemManager, peersCommunicatorFlux);
+
+        SpeedStatistics torrentSpeedStatistics =
+                new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
+                        peersCommunicatorFlux.map(PeersCommunicator::getPeerSpeedStatistics));
+
+        return TorrentDownloaders.getInstance()
+                .createTorrentDownloader(torrentInfo,
+                        torrentFileSystemManager,
+                        bittorrentAlgorithm,
+                        defaultTorrentStatusController,
+                        torrentSpeedStatistics,
+                        trackerProvider,
+                        peersProvider,
+                        trackerConnectionConnectableFlux,
+                        peersCommunicatorFlux);
     }
 
     public static Mono<PeersCommunicator> sendFakeMessage(PeersCommunicator peersCommunicator, PeerMessageType peerMessageType) {
