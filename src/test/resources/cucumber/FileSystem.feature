@@ -46,7 +46,7 @@ Feature: create get and delete active torrents
 
   Scenario Outline: we save random blocks inside files and if a piece completely downloaded, we check it has been marked as downloaded
     # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
-    Then application save random blocks from different threads inside torrent: "<torrent>" in "<downloadLocation>" and check it saved
+    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
       | 0          | 0    | 10     |
       | 1          | 0    | 10     |
@@ -65,7 +65,7 @@ Feature: create get and delete active torrents
 
   Scenario Outline: we save piece of active torrent
     # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
-    Then application save random blocks from different threads inside torrent: "<torrent>" in "<downloadLocation>" and check it saved
+    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
       | 0          | 0    |        |
       | 1          | 0    | 1      |
