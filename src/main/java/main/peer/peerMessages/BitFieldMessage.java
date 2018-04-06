@@ -1,7 +1,6 @@
 package main.peer.peerMessages;
 
 import main.peer.Peer;
-import main.peer.PeersCommunicator;
 
 import java.util.BitSet;
 

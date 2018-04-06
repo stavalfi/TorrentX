@@ -72,7 +72,7 @@ public class MyStepdefs {
     }
 
     @Given("^additional not-responding trackers to the tracker-list$")
-    public void additionalNotRespondingTrackersToTheTrackerListFromFile() throws Throwable {
+    public void additionalNotRespondingTrackersToTheTrackerListFromFile() {
         List<Tracker> fakeTrackers = new ArrayList<>();
 
         // wrong url (but valid url) and a random port
@@ -93,13 +93,13 @@ public class MyStepdefs {
     }
 
     @Given("^only one invalid url of a tracker$")
-    public void additionalInvalidUrlOfATrackerOf() throws Throwable {
+    public void additionalInvalidUrlOfATrackerOf() {
         Mockito.when(this.torrentInfo.getTrackerList())
                 .thenReturn(Collections.singletonList(new Tracker("udp", "invalid.url.123", 123)));
     }
 
     @Then("^application send and receive Handshake from the same random peer$")
-    public void applicationSendAndReceiveHandshakeFromTheSameRandomPeer() throws Throwable {
+    public void applicationSendAndReceiveHandshakeFromTheSameRandomPeer() {
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
         PeersProvider peersProvider = new PeersProvider(this.torrentInfo);
 
@@ -119,7 +119,7 @@ public class MyStepdefs {
     }
 
     @Then("^application send and receive the following messages from a random tracker:$")
-    public void applicationSendAndReceiveTheFollowingMessagesFromARandomTracker(List<TrackerFakeRequestResponseMessage> messages) throws Throwable {
+    public void applicationSendAndReceiveTheFollowingMessagesFromARandomTracker(List<TrackerFakeRequestResponseMessage> messages) {
         boolean isMessagesFormatGood = messages.stream()
                 .noneMatch(fakeMessage -> fakeMessage.getTrackerRequestType() == TrackerRequestType.Connect);
 
@@ -172,7 +172,7 @@ public class MyStepdefs {
 
     @Then("^application send to \\[peer ip: \"([^\"]*)\", peer port: \"([^\"]*)\"] and receive the following messages:$")
     public void applicationSendToPeerIpPeerPortAndReceiveTheFollowingMessages(String peerIp, int peerPort,
-                                                                              List<PeerFakeRequestResponse> peerFakeRequestResponses) throws Throwable {
+                                                                              List<PeerFakeRequestResponse> peerFakeRequestResponses) {
         RemoteFakePeerCopyCat remoteFakePeerCopyCat = new RemoteFakePeerCopyCat(new Peer(peerIp, peerPort));
         remoteFakePeerCopyCat.listen();
 
@@ -246,7 +246,7 @@ public class MyStepdefs {
         int requestBlockSize = 16000;
 
         Mono<PieceMessage> receiveSinglePieceMono = torrentDownloader.getPeersCommunicatorFlux()
-                .flatMap(peersCommunicator -> peersCommunicator.sendInterestedMessage())
+                .flatMap(PeersCommunicator::sendInterestedMessage)
                 .flatMap(peersCommunicator -> peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux()
                         .take(1)
                         .flatMap(haveMessage -> peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
@@ -286,7 +286,8 @@ public class MyStepdefs {
 
         StepVerifier.create(activeTorrentMono)
                 .consumeNextWith(activeTorrent -> {
-                    String message = "activeTorrent object needs to be present:" + isActiveTorrentExist + ", but the opposite is heppening.";
+                    String message = "activeTorrent object needs to be present:" + isActiveTorrentExist +
+                            ", but the opposite is happening.";
                     Assert.assertEquals(message, isActiveTorrentExist, activeTorrent.isPresent());
                 })
                 .verifyComplete();
@@ -434,15 +435,13 @@ public class MyStepdefs {
         String errorMessage1 = "the piece is not completed but it should be.";
         String errorMessage2 = "The read operation failed to read exactly what we wrote";
 
-        completedPiecesIndexList.forEach(completedPiecesIndex -> {
-            Assert.assertTrue(errorMessage1, activeTorrent.havePiece(completedPiecesIndex));
-        });
+        completedPiecesIndexList.forEach(completedPiecesIndex ->
+                Assert.assertTrue(errorMessage1, activeTorrent.havePiece(completedPiecesIndex)));
 
         // check again in other way: (by ActiveTorrent::buildBitFieldMessage)
         BitFieldMessage allPiecesStatus = activeTorrent.buildBitFieldMessage(null, null);
-        completedPiecesIndexList.forEach(completedPiecesIndex -> {
-            Assert.assertTrue(errorMessage1, allPiecesStatus.getPieces().get(completedPiecesIndex));
-        });
+        completedPiecesIndexList.forEach(completedPiecesIndex ->
+                Assert.assertTrue(errorMessage1, allPiecesStatus.getPieces().get(completedPiecesIndex)));
 
         // check again in other way: (by ActiveTorrent::buildPieceMessage)
 
@@ -464,10 +463,10 @@ public class MyStepdefs {
                     Assert.assertArrayEquals(errorMessage2, actualWrittenBytes, pieceMessage.getBlock());
                 });
 
-        // check that all other peices are not in complete mode.
+        // check that all other pieces are not in complete mode.
         for (int i = 0; i < torrentInfo.getPieces().size(); i++) {
             if (!completedPiecesIndexList.contains(i)) {
-                String errorMessage3 = "piece is not compeleted but it is specified as completed piece: " + i;
+                String errorMessage3 = "piece is not completed but it is specified as completed piece: " + i;
                 Assert.assertFalse(errorMessage3, allPiecesStatus.getPieces().get(i));
             }
         }
@@ -528,10 +527,10 @@ public class MyStepdefs {
                 .flatMap(torrentPieceChanged -> activeTorrent.buildPieceMessage(requestLastPieceMessage))
                 .doOnNext(pieceMessage -> {
                     byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
-                    String errorMesssage = "The read operation failed to read exactly what we wrote";
-                    Assert.assertArrayEquals(errorMesssage, actualWrittenBytes, pieceMessage.getBlock());
+                    String errorMessage = "The read operation failed to read exactly what we wrote";
+                    Assert.assertArrayEquals(errorMessage, actualWrittenBytes, pieceMessage.getBlock());
                 })
-                // there must be only one signal here: the last piece. so signle() must work.
+                // there must be only one signal here: the last piece. so single() must work.
                 .single();
 
         StepVerifier.create(readLastPieceTaskMono)
@@ -545,7 +544,7 @@ public class MyStepdefs {
     private SpeedStatistics torrentDownloadSpeedStatistics;
 
     @Given("^size of incoming messages every \"([^\"]*)\" mill-seconds from a peer:$")
-    public void sizeOfIncomingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> incomingMessageSizeList) throws Throwable {
+    public void sizeOfIncomingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> incomingMessageSizeList) {
 
         Flux<? extends PeerMessage> receivedMessageMessages = Flux.fromIterable(incomingMessageSizeList)
                 .delayElements(Duration.ofMillis(delay))
@@ -559,7 +558,7 @@ public class MyStepdefs {
     }
 
     @Then("^download statistics every 100 mill-seconds are from a peer:$")
-    public void downloadStatisticsEveryMillSecondsAreFromAPeer(List<Double> downloadSpeedStatistics) throws Throwable {
+    public void downloadStatisticsEveryMillSecondsAreFromAPeer(List<Double> downloadSpeedStatistics) {
 
         Flux<Tuple2<Double, Double>> speedComparisionFlux =
                 Flux.zip(Flux.fromIterable(downloadSpeedStatistics),
@@ -577,7 +576,7 @@ public class MyStepdefs {
     private SpeedStatistics torrentUploadSpeedStatistics;
 
     @Given("^size of outgoing messages every \"([^\"]*)\" mill-seconds from a peer:$")
-    public void outgoingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> outgoingMessageSizeList) throws Throwable {
+    public void outgoingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> outgoingMessageSizeList) {
         Flux<? extends PeerMessage> receivedMessageMessages = Flux.fromIterable(outgoingMessageSizeList)
                 .delayElements(Duration.ofMillis(delay))
                 .map(outgoingMessageSize ->
@@ -589,7 +588,7 @@ public class MyStepdefs {
     }
 
     @Then("^upload statistics every 100 mill-seconds are from a peer:$")
-    public void uploadStatisticsEveryMillSecondsAreFromAPeer(List<Double> uploadSpeedStatistics) throws Throwable {
+    public void uploadStatisticsEveryMillSecondsAreFromAPeer(List<Double> uploadSpeedStatistics) {
         Flux<Tuple2<Double, Double>> speedComparisionFlux =
                 Flux.zip(Flux.fromIterable(uploadSpeedStatistics),
                         this.torrentUploadSpeedStatistics.getDownloadSpeedFlux())
@@ -659,7 +658,7 @@ public class MyStepdefs {
                 .filter(peer -> connectedPeers.contains(peer))
                 .findFirst()
                 .ifPresent(peer -> Assert.fail("We received from the following peer" +
-                        " messages but he doesn't exist in the conencted peers flux: " + peer));
+                        " messages but he doesn't exist in the connected peers flux: " + peer));
 
         // delete everything from the last test.
         Utils.removeEverythingRelatedToTorrent(torrentInfo);
@@ -796,8 +795,8 @@ public class MyStepdefs {
         Assert.assertTrue(new HashSet<>(this.torrentStatusTypeFlux).equals(new HashSet<>(Collections.emptyList())));
     }
 
-    Mono<List<PeersCommunicator>> requestsFromPeerToMeListMono;
-    Mono<PeersCommunicator> connectionFromFakePeerToMeMono;
+    private Mono<List<RemoteFakePeerForRequestingPieces>> requestsFromPeerToMeListMono;
+    private Mono<RemoteFakePeerForRequestingPieces> connectionFromFakePeerToMeMono;
 
     @Then("^random-fake-peer connect to me for torrent: \"([^\"]*)\" in \"([^\"]*)\" and he request:$")
     public void randomFakePeerConnectToMeForTorrentInAndHeRequest(String torrentFileName, String downloadLocation,
@@ -824,6 +823,7 @@ public class MyStepdefs {
         this.connectionFromFakePeerToMeMono = torrentDownloader.getPeersProvider()
                 // connection of fake-peer to me
                 .connectToPeerMono(me)
+                .map(RemoteFakePeerForRequestingPieces::new)
                 .flux()
                 .replay()
                 .autoConnect()
@@ -832,9 +832,9 @@ public class MyStepdefs {
         // I can't activate this flux until the app start listening for new incoming peers.
         // No one is listening for new peers now so if fake-peer try to connect to me, he will fail.
         // I can't start for new incoming peers in this step because if yes, I will lose all the
-        // pieceMessage from this app to the fake-peer and I need them for testsing that we did sent them.
+        // pieceMessage from this app to the fake-peer and I need them for testing that we did sent them.
         this.requestsFromPeerToMeListMono = this.connectionFromFakePeerToMeMono
-                .flatMap(x -> x.sendInterestedMessage())
+                .flatMap(RemoteFakePeerForRequestingPieces::sendInterestedMessage)
                 // send all requests from fake peer to me.
                 .flatMapMany(peersCommunicator ->
                         Flux.fromIterable(peerRequestBlockList)
@@ -852,8 +852,6 @@ public class MyStepdefs {
                 .collectList()
                 .doOnNext(requestList -> Assert.assertEquals("We sent less requests then expected.",
                         peerRequestBlockList.size(), requestList.size()));
-
-
     }
 
     @Then("^we assert that for torrent: \"([^\"]*)\", we gave the following pieces to the random-fake-peer:$")
@@ -871,14 +869,13 @@ public class MyStepdefs {
 
         List<PieceMessage> actualBlockFromMeList = this.requestsFromPeerToMeListMono
                 .flatMap(requests -> this.connectionFromFakePeerToMeMono)
-                .flatMapMany(PeersCommunicator::sentPeerMessagesFlux)
+                .flatMapMany(RemoteFakePeerForRequestingPieces::sentPeerMessagesFlux)
                 .cast(PieceMessage.class)
                 // if there is a problem, I don't want to wait for ever.
                 .timeout(Duration.ofSeconds(2))
                 .take(expectedBlockFromMeList.size())
                 .collectList()
                 .block();
-
 
         // assert that both the list are equal.
 
@@ -895,6 +892,9 @@ public class MyStepdefs {
                                         blockOfPiece.getFrom() == pieceMessage.getBegin() &&
                                         blockOfPiece.getLength() == pieceMessage.getBlock().length)));
 
+        this.connectionFromFakePeerToMeMono
+                .doOnNext(RemoteFakePeerForRequestingPieces::closeConnection)
+                .block();
     }
 }
 

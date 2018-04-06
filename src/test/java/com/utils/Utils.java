@@ -16,10 +16,7 @@ import reactor.core.publisher.Mono;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Utils {
@@ -105,7 +102,7 @@ public class Utils {
 
     public static long folderSize(File directory) {
         long length = 0;
-        for (File file : directory.listFiles()) {
+        for (File file : Objects.requireNonNull(directory.listFiles())) {
             if (file.isFile())
                 length += file.length();
             else

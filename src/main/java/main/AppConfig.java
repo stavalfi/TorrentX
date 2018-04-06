@@ -1,8 +1,6 @@
 package main;
 
 public class AppConfig {
-    private String peerId = "-AZ5750-TpkXttZLfpSH";
-    private int myListeningPort=9191;
 
     private static AppConfig instance = new AppConfig();
 
@@ -15,10 +13,10 @@ public class AppConfig {
 
 
     public String getPeerId() {
-        return peerId;
+        return "-AZ5750-TpkXttZLfpSH";
     }
 
     public int getMyListeningPort() {
-        return myListeningPort;
+        return 9191;
     }
 }

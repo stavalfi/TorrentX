@@ -5,6 +5,7 @@ import main.peer.peerMessages.*;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 
 public class PeerMessageFactory {
     public static PeerMessage create(Peer from, Peer to, DataInputStream dataInputStream) throws IOException {
@@ -24,7 +25,7 @@ public class PeerMessageFactory {
 
     public static PeerMessage create(Peer from, Peer to, byte[] peerMessage) {
         PeerMessageId messageId = PeerMessageId.fromValue(PeerMessage.getMessageId(peerMessage));
-        switch (messageId) {
+        switch (Objects.requireNonNull(messageId)) {
             case bitFieldMessage:
                 return new BitFieldMessage(from, to, peerMessage);
             case cancelMessage:

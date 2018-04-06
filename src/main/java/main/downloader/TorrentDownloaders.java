@@ -60,8 +60,8 @@ public class TorrentDownloaders {
      * he can do that using TorrentStatusController::removeTorrent.
      * There is no reason to remove the TorrentDownloader object also.
      *
-     * @param torrentInfoHash
-     * @return
+     * @param torrentInfoHash of torrent we need to delete it's TorrentDownload object
+     * @return boolean which indicated if the deletion was successful.
      */
     public synchronized boolean deleteTorrentDownloader(String torrentInfoHash) {
         Optional<TorrentDownloader> torrentDownloaderOptional = findTorrentDownloader(torrentInfoHash);

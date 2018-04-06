@@ -21,9 +21,9 @@ public enum PeerMessageId {
         Optional<PeerMessageId> first = Arrays.stream(PeerMessageId.values())
                 .filter((PeerMessageId peerMessageId) -> peerMessageId.getMessageId() == messageId)
                 .findFirst();
-        if (!first.isPresent()) {
-            return null;
-        }
+        if (!first.isPresent())
+            throw new IllegalArgumentException("enum not found for messageId: " + messageId);
+
         return first.get();
     }
 

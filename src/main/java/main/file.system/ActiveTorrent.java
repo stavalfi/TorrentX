@@ -147,8 +147,9 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                         sink.error(e);
                         return;
                     }
-                    for (int i = 0; i < tempResult.length; i++)
-                        result[freeIndexInResultArray++] = tempResult[i];
+                    for (byte aTempResult : tempResult)
+                        result[freeIndexInResultArray++] = aTempResult;
+
                     from += howMuchToReadFromThisFile;
                     if (from == to) {
                         PieceMessage pieceMessage = new PieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
@@ -224,9 +225,8 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
             // check if we downloaded a block from the last piece.
             // if yes, it's length can be less than a other pieces.
             if (pieceMessage.getIndex() == this.getPieces().size() - 1) {
-                int lastPieceLength = (int) Math.min(getPieceLength(),
+                pieceLength = (int) Math.min(getPieceLength(),
                         getTotalSize() - (getPieces().size() - 1) * getPieceLength());
-                pieceLength = lastPieceLength;
             }
 
             long howMuchWeWroteUntilNowInThisPiece = this.piecesPartialStatus[pieceMessage.getIndex()];

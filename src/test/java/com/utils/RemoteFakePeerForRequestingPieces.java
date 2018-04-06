@@ -1,7 +1,10 @@
 package com.utils;
 
 import main.peer.PeersCommunicator;
+import main.peer.peerMessages.PeerMessage;
 import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -31,6 +34,20 @@ public class RemoteFakePeerForRequestingPieces {
                                 requestMessage.getBegin(),
                                 toRandomByteArray(requestMessage.getBlockLength())))
                 .subscribe();
+    }
+
+    public Mono<RemoteFakePeerForRequestingPieces> sendInterestedMessage() {
+        return this.peersCommunicator.sendInterestedMessage()
+                .map(peersCommunicator -> this);
+    }
+
+    public Mono<RemoteFakePeerForRequestingPieces> sendRequestMessage(int index, int begin, int length) {
+        return this.peersCommunicator.sendRequestMessage(index, begin, length)
+                .map(peersCommunicator -> this);
+    }
+
+    public Flux<PeerMessage> sentPeerMessagesFlux() {
+        return this.peersCommunicator.sentPeerMessagesFlux();
     }
 
     private byte[] toRandomByteArray(Integer length) {
