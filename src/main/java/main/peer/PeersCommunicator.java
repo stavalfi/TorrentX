@@ -24,7 +24,7 @@ public class PeersCommunicator implements SendPeerMessage {
     private Flux<PeerMessage> sentPeerMessagesFlux;
     private FluxSink<PeerMessage> sentMessagesFluxSink;
     private DataOutputStream peerDataOutputStream;
-
+    private PeerCurrentStatus peerCurrentStatus;
     private ReceiveMessages receiveMessages;
     private SpeedStatistics peerSpeedStatistics;
 
@@ -36,10 +36,9 @@ public class PeersCommunicator implements SendPeerMessage {
         this.torrentInfo = torrentInfo;
         this.me = new Peer("localhost", peerSocket.getLocalPort());
         this.peerDataOutputStream = peerDataOutputStream;
-
-        this.receiveMessages = new ReceivedMessagesImpl(this.me, this.peer, dataInputStream);
+        this.peerCurrentStatus = new PeerCurrentStatus(torrentInfo.getPieces().size());
+        this.receiveMessages = new ReceivedMessagesImpl(this.me, this.peer, this.peerCurrentStatus, dataInputStream);
         this.sentPeerMessagesFlux = Flux.create((FluxSink<PeerMessage> sink) -> this.sentMessagesFluxSink = sink);
-
         this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
                 this.receiveMessages.getPeerMessageResponseFlux(),
                 this.sentPeerMessagesFlux);
@@ -83,25 +82,30 @@ public class PeersCommunicator implements SendPeerMessage {
                 monoSink.error(e);
             }
         }).subscribeOn(App.MyScheduler)
-                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
-    }
-
-    @Override
-    public Mono<PeersCommunicator> sendPieceMessage(int index, int begin, byte[] block) {
-        PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(), index, begin, block);
-        return send(pieceMessage)
+                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                 // for calculating the peer upload speed -
                 // I do not care if we failed to send the piece.
                 // so I don't register to doOnError or something like that.
                 .doOnNext(peersCommunicator -> {
                     if (this.sentMessagesFluxSink != null)
-                        this.sentMessagesFluxSink.next(pieceMessage);
+                        this.sentMessagesFluxSink.next(peerMessage);
                 });
+    }
+
+    @Override
+    public Mono<PeersCommunicator> sendPieceMessage(int index, int begin, byte[] block) {
+        PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(), index, begin, block);
+        return send(pieceMessage);
     }
 
     @Override
     public Mono<PeersCommunicator> sendBitFieldMessage(BitSet peaces) {
         return send(new BitFieldMessage(this.getMe(), this.getPeer(), peaces));
+    }
+
+    @Override
+    public Mono<PeersCommunicator> sendBitFieldMessage(BitFieldMessage bitFieldMessage) {
+        return send(new BitFieldMessage(this.getMe(), this.getPeer(), bitFieldMessage.getPiecesStatus()));
     }
 
     @Override
@@ -111,7 +115,8 @@ public class PeersCommunicator implements SendPeerMessage {
 
     @Override
     public Mono<PeersCommunicator> sendChokeMessage() {
-        return send(new ChokeMessage(this.getMe(), this.getPeer()));
+        return send(new ChokeMessage(this.getMe(), this.getPeer()))
+                .doOnNext(peersCommunicator -> this.peerCurrentStatus.setAmIChokingHim(true));
     }
 
     @Override
@@ -121,7 +126,8 @@ public class PeersCommunicator implements SendPeerMessage {
 
     @Override
     public Mono<PeersCommunicator> sendInterestedMessage() {
-        return send(new InterestedMessage(this.getMe(), this.getPeer()));
+        return send(new InterestedMessage(this.getMe(), this.getPeer()))
+                .doOnNext(peersCommunicator -> this.peerCurrentStatus.setAmIInterestedInHim(true));
     }
 
     @Override
@@ -131,7 +137,8 @@ public class PeersCommunicator implements SendPeerMessage {
 
     @Override
     public Mono<PeersCommunicator> sendNotInterestedMessage() {
-        return send(new NotInterestedMessage(this.getMe(), this.getPeer()));
+        return send(new NotInterestedMessage(this.getMe(), this.getPeer()))
+                .doOnNext(peersCommunicator -> this.peerCurrentStatus.setAmIInterestedInHim(false));
     }
 
     @Override
@@ -145,8 +152,15 @@ public class PeersCommunicator implements SendPeerMessage {
     }
 
     @Override
+    public Mono<PeersCommunicator> sendRequestMessage(RequestMessage requestMessage) {
+        return send(new RequestMessage(this.getMe(), this.getPeer(), requestMessage.getIndex(),
+                requestMessage.getBegin(), requestMessage.getBlockLength()));
+    }
+
+    @Override
     public Mono<PeersCommunicator> sendUnchokeMessage() {
-        return send(new UnchokeMessage(this.getMe(), this.getPeer()));
+        return send(new UnchokeMessage(this.getMe(), this.getPeer()))
+                .doOnNext(peersCommunicator -> this.peerCurrentStatus.setAmIChokingHim(false));
     }
 
     @Override
@@ -156,6 +170,10 @@ public class PeersCommunicator implements SendPeerMessage {
 
     public SpeedStatistics getPeerSpeedStatistics() {
         return peerSpeedStatistics;
+    }
+
+    public PeerCurrentStatus getPeerCurrentStatus() {
+        return peerCurrentStatus;
     }
 
     @Override

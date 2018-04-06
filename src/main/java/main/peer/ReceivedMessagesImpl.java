@@ -26,69 +26,86 @@ public class ReceivedMessagesImpl implements ReceiveMessages {
     private Flux<UnchokeMessage> unchokeMessageResponseFlux;
 
     public ReceivedMessagesImpl(Peer me, Peer peer,
+                                PeerCurrentStatus peerCurrentStatus,
                                 DataInputStream dataInputStream) {
-        this.peerMessageResponseFlux =
-                Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, me, peer, dataInputStream))
-                        .subscribeOn(App.MyScheduler)
-                        // it is important to publish from source on different thread then the
-                        // subscription to this source's thread every time because:
-                        // if not and we subscribe to this specific source multiple times then only the
-                        // first subscription will be activated and the source will never end
-                        .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
-                        // there are multiple subscribers to this source (every specific peer-message flux).
-                        // all of them must get the same message and not activate this source more then once.
-                        .publish()
-                        // **any** subscriber to **this** source may start the source to produce signals
-                        // to him and everyone else.
-                        .autoConnect(1);
+        Flux<PeerMessage> peerMessageResponseFlux = Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, me, peer, dataInputStream))
+                .subscribeOn(App.MyScheduler)
+                // it is important to publish from source on different thread then the
+                // subscription to this source's thread every time because:
+                // if not and we subscribe to this specific source multiple times then only the
+                // first subscription will be activated and the source will never end
+                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
 
-        this.bitFieldMessageResponseFlux = this.peerMessageResponseFlux
+        this.bitFieldMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof BitFieldMessage)
-                .cast(BitFieldMessage.class);
+                .cast(BitFieldMessage.class)
+                .doOnNext(bitFieldMessage -> peerCurrentStatus.updatePiecesStatus(bitFieldMessage.getPiecesStatus()));
 
-        this.cancelMessageResponseFlux = this.peerMessageResponseFlux
+        this.cancelMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof CancelMessage)
                 .cast(CancelMessage.class);
 
-        this.chokeMessageResponseFlux = this.peerMessageResponseFlux
+        this.chokeMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof ChokeMessage)
-                .cast(ChokeMessage.class);
+                .cast(ChokeMessage.class)
+                .doOnNext(chokeMessage -> peerCurrentStatus.setIsHeChokingMe(true));
 
-        this.extendedMessageResponseFlux = this.peerMessageResponseFlux
+        this.extendedMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof ExtendedMessage)
                 .cast(ExtendedMessage.class);
 
-        this.haveMessageResponseFlux = this.peerMessageResponseFlux
+        this.haveMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof HaveMessage)
-                .cast(HaveMessage.class);
+                .cast(HaveMessage.class)
+                .doOnNext(haveMessage -> peerCurrentStatus.updatePiecesStatus(haveMessage.getPieceIndex()));
 
-        this.interestedMessageResponseFlux = this.peerMessageResponseFlux
+        this.interestedMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof InterestedMessage)
-                .cast(InterestedMessage.class);
+                .cast(InterestedMessage.class)
+                .doOnNext(interestedMessage -> peerCurrentStatus.setIsInterestedInMe(true));
 
-        this.keepMessageResponseFlux = this.peerMessageResponseFlux
+        this.keepMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof KeepAliveMessage)
                 .cast(KeepAliveMessage.class);
 
-        this.notInterestedMessageResponseFlux = this.peerMessageResponseFlux
+        this.notInterestedMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof NotInterestedMessage)
-                .cast(NotInterestedMessage.class);
+                .cast(NotInterestedMessage.class)
+                .doOnNext(notInterestedMessage -> peerCurrentStatus.setIsInterestedInMe(false));
 
-        this.pieceMessageResponseFlux = this.peerMessageResponseFlux
+        this.pieceMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
                 .cast(PieceMessage.class);
 
-        this.portMessageResponseFlux = this.peerMessageResponseFlux
+        this.portMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof PortMessage)
                 .cast(PortMessage.class);
 
-        this.requestMessageResponseFlux = this.peerMessageResponseFlux
+        this.requestMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof RequestMessage)
                 .cast(RequestMessage.class);
 
         this.unchokeMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof UnchokeMessage)
-                .cast(UnchokeMessage.class);
+                .cast(UnchokeMessage.class)
+                .doOnNext(unchokeMessage -> peerCurrentStatus.setIsHeChokingMe(false));
+
+        this.peerMessageResponseFlux = Flux.merge(
+                this.bitFieldMessageResponseFlux,
+                this.cancelMessageResponseFlux,
+                this.chokeMessageResponseFlux,
+                this.extendedMessageResponseFlux,
+                this.haveMessageResponseFlux,
+                this.interestedMessageResponseFlux,
+                this.notInterestedMessageResponseFlux,
+                this.pieceMessageResponseFlux,
+                this.portMessageResponseFlux,
+                this.requestMessageResponseFlux,
+                this.unchokeMessageResponseFlux)
+                // there are multiple subscribers to this source (every specific peer-message flux).
+                // all of them must get the same message and not activate this source more then once.
+                .publish()
+                .autoConnect();
     }
 
     public ReceivedMessagesImpl(Flux<ReceiveMessages> peersMessageResponseFlux) {
