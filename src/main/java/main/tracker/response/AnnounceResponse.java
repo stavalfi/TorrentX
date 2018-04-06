@@ -50,7 +50,11 @@ public class AnnounceResponse extends TrackerResponse {
         this.seedersAmount = receiveData.getInt();
 
         this.peers = IntStream.range(0, Integer.min(maxPeersWeWantToGet, this.leechersAmount + this.seedersAmount))
-                .mapToObj((int index) -> new Peer(castIntegerToInetAddress(receiveData.getInt()).getHostAddress(), ushort(receiveData.getShort()).intValue()))
+                .mapToObj((int index) -> {
+                    String hostAddress = castIntegerToInetAddress(receiveData.getInt()).getHostAddress();
+                    int peerPort = ushort(receiveData.getShort()).intValue();
+                    return new Peer(hostAddress, peerPort);
+                })
                 .collect(Collectors.toList());
     }
 

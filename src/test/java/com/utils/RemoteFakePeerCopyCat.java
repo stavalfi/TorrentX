@@ -18,13 +18,13 @@ import java.util.List;
  * 2. the second response will be delayed in 2 seconds.
  * 3. the third response will cause the peer to shutdown the connection.
  */
-public class RemoteFakePeer extends Peer {
+public class RemoteFakePeerCopyCat extends Peer {
 
     private boolean closeEverything = false;
     private ServerSocket listenToPeerConnection;
     private final List<Socket> peerConnections = new ArrayList<>();
 
-    public RemoteFakePeer(Peer Me) {
+    public RemoteFakePeerCopyCat(Peer Me) {
         super(Me.getPeerIp(), Me.getPeerPort());
         try {
             this.listenToPeerConnection = new ServerSocket(this.getPeerPort());
@@ -107,13 +107,3 @@ public class RemoteFakePeer extends Peer {
         });
     }
 }
-//                    if (receivedMessagesAmount == 2)
-//                        Thread.sleep(2 * 1000);
-//                    if (receivedMessagesAmount == 3) {
-//                        try {
-//                            peerConnection.close();
-//                        } catch (IOException e1) {
-//                            e1.printStackTrace();
-//                        }
-//                        return;
-//                    }

@@ -1,24 +1,27 @@
 package main;
 
 import christophedetroyer.torrent.TorrentParser;
-import lombok.SneakyThrows;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
+import main.peer.PeersCommunicator;
+import main.peer.ReceiveMessages;
 import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
+
+import java.io.IOException;
 
 public class App {
     public static Scheduler MyScheduler = Schedulers.elastic();
     private static String downloadPath = System.getProperty("user.dir") + "/" + "torrents-test/";
 
-    private static void f4() {
+    private static void f4() throws IOException {
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .createDefaultTorrentDownloader(getTorrentInfo(), downloadPath);
 
-        torrentDownloader.getBittorrentAlgorithm()
-                .receiveTorrentMessagesMessagesFlux()
-                .getPeerMessageResponseFlux()
+        torrentDownloader.getPeersCommunicatorFlux()
+                .map(PeersCommunicator::receivePeerMessages)
+                .flatMap(ReceiveMessages::getPeerMessageResponseFlux)
                 .subscribe(System.out::println, Throwable::printStackTrace, System.out::println);
 
         torrentDownloader.getTorrentStatusController().startDownload();
@@ -31,8 +34,7 @@ public class App {
         Thread.sleep(1000 * 1000);
     }
 
-    @SneakyThrows
-    public static TorrentInfo getTorrentInfo() {
+    private static TorrentInfo getTorrentInfo() throws IOException {
         String torrentFilePath = "src/main/resources/torrents/torrent-file-example3.torrent";
         return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
     }

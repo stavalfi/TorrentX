@@ -1,7 +1,6 @@
 package main.peer;
 
 import main.App;
-import main.TorrentInfo;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
@@ -10,9 +9,7 @@ import reactor.core.publisher.Mono;
 import java.io.DataInputStream;
 import java.io.IOException;
 
-public class ReceiveMessagesImpl implements ReceiveMessages {
-    private TorrentInfo torrentInfo;
-
+public class ReceivedMessagesImpl implements ReceiveMessages {
     private Flux<? extends PeerMessage> peerMessageResponseFlux;
 
     private Flux<BitFieldMessage> bitFieldMessageResponseFlux;
@@ -28,9 +25,8 @@ public class ReceiveMessagesImpl implements ReceiveMessages {
     private Flux<RequestMessage> requestMessageResponseFlux;
     private Flux<UnchokeMessage> unchokeMessageResponseFlux;
 
-    public ReceiveMessagesImpl(TorrentInfo torrentInfo, Peer me, Peer peer,
-                               DataInputStream dataInputStream) {
-        this.torrentInfo = torrentInfo;
+    public ReceivedMessagesImpl(Peer me, Peer peer,
+                                DataInputStream dataInputStream) {
         this.peerMessageResponseFlux =
                 Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, me, peer, dataInputStream))
                         .subscribeOn(App.MyScheduler)
@@ -95,9 +91,7 @@ public class ReceiveMessagesImpl implements ReceiveMessages {
                 .cast(UnchokeMessage.class);
     }
 
-    public ReceiveMessagesImpl(TorrentInfo torrentInfo,
-                               Flux<ReceiveMessages> peersMessageResponseFlux) {
-        this.torrentInfo = torrentInfo;
+    public ReceivedMessagesImpl(Flux<ReceiveMessages> peersMessageResponseFlux) {
         this.peerMessageResponseFlux = peersMessageResponseFlux
                 .flatMap(ReceiveMessages::getPeerMessageResponseFlux);
 

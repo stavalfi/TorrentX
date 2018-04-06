@@ -44,14 +44,9 @@ public class Peer implements Comparable<Peer> {
     }
 
     @Override
-    public int compareTo(Peer o) {
-        if (this.peerIp.compareTo(o.getPeerIp()) != 0)
-            return this.peerIp.compareTo(o.getPeerIp());
-        else if (this.peerPort < o.peerPort)
-            return -1;
-        else if (this.peerPort > o.peerPort)
-            return 1;
-        else
-            return 0;
+    public int compareTo(Peer peer) {
+        if (this.peerIp.compareTo(peer.getPeerIp()) != 0)
+            return this.peerIp.compareTo(peer.getPeerIp());
+        return Integer.compare(this.peerPort, peer.peerPort);
     }
 }

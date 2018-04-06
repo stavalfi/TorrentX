@@ -15,6 +15,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import java.util.function.Function;
 
 class TrackerCommunication {
@@ -101,7 +102,7 @@ class TrackerCommunication {
                 sink.success(clientSocket);
 
             } catch (IOException exception) {
-                clientSocket.close();
+                Objects.requireNonNull(clientSocket).close();
                 sink.error(exception);
             }
         });

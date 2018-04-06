@@ -12,7 +12,7 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
     private final byte messageId; // 1 byte
     private final byte[] payload;
 
-    public PeerMessage(Peer to, Peer from, int length, byte messageId, byte[] payload) {
+    PeerMessage(Peer to, Peer from, int length, byte messageId, byte[] payload) {
         this.length = length;
         this.messageId = messageId;
         this.payload = payload;
@@ -20,7 +20,7 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
         this.to = to;
     }
 
-    public PeerMessage(Peer to, byte[] peerMessage, Peer from) {
+    PeerMessage(Peer to, byte[] peerMessage, Peer from) {
         this.from = from;
         this.to = to;
         ByteBuffer buffer = ByteBuffer.wrap(peerMessage);

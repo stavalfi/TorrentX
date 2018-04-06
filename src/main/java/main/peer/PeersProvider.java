@@ -84,9 +84,7 @@ public class PeersProvider {
 
     public Flux<Peer> getPeersFromTrackerFlux(TrackerConnection trackerConnection) {
         return trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), PeersListener.getInstance().getTcpPort())
-                .flux()
-                // getPeersFlux return flux of N peers on different N threads. ;)
-                .flatMap(AnnounceResponse::getPeersFlux);
+                .flatMapMany(AnnounceResponse::getPeersFlux);
     }
 
     public ConnectableFlux<PeersCommunicator> getPeersCommunicatorFromTrackerFlux(Flux<TrackerConnection> trackerConnectionFlux) {

@@ -4,6 +4,8 @@ import main.App;
 import main.AppConfig;
 import main.HexByteConverter;
 import main.TorrentInfo;
+import main.downloader.TorrentDownloader;
+import main.downloader.TorrentDownloaders;
 import main.peer.peerMessages.HandShake;
 import main.tracker.BadResponseException;
 import reactor.core.publisher.ConnectableFlux;
@@ -18,7 +20,7 @@ import java.net.Socket;
 import java.util.Optional;
 
 public class PeersListener {
-    private Integer tcpPort = 9191;
+    private Integer tcpPort = AppConfig.getInstance().getMyListeningPort();
     private ServerSocket listenToPeerConnection;
     private ConnectableFlux<PeersCommunicator> peersConnectedToMeFlux;
 
@@ -50,29 +52,20 @@ public class PeersListener {
     }
 
     private void acceptPeerConnection(Socket peerSocket, FluxSink<PeersCommunicator> sink) {
-        DataOutputStream peerDataOutputStream = null;
+        DataOutputStream peerDataOutputStream;
+        DataInputStream peerDataInputStream;
+        HandShake handShakeReceived;
         try {
             peerDataOutputStream = new DataOutputStream(peerSocket.getOutputStream());
-        } catch (IOException e) {
-            sink.error(e);
-            return;
-        }
-        DataInputStream peerDataInputStream = null;
-        try {
             peerDataInputStream = new DataInputStream(peerSocket.getInputStream());
-        } catch (IOException e) {
-            sink.error(e);
-            return;
-        }
 
-        // firstly, we need to receive Handshake message from the peer and send him Handshake back.
-        HandShake handShakeReceived = null;
-        try {
+            // firstly, we need to receive Handshake message from the peer and send him Handshake back.
             handShakeReceived = new HandShake(peerDataInputStream);
         } catch (IOException e) {
             sink.error(e);
             return;
         }
+
         String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
 
         Optional<TorrentInfo> torrentInfo = haveThisTorrent(receivedTorrentInfoHash);
@@ -104,7 +97,10 @@ public class PeersListener {
     }
 
     private Optional<TorrentInfo> haveThisTorrent(String receivedTorrentInfoHash) {
-        return Optional.empty();
+        return TorrentDownloaders.getInstance()
+                .findTorrentDownloader(receivedTorrentInfoHash)
+                // Optional pipeline:
+                .map(TorrentDownloader::getTorrentInfo);
     }
 
     public void stopListenForNewPeers() throws IOException, NullPointerException {
