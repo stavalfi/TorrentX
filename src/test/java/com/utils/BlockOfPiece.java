@@ -22,4 +22,13 @@ public class BlockOfPiece {
     public Integer getLength() {
         return length;
     }
+
+    @Override
+    public String toString() {
+        return "BlockOfPiece{" +
+                "pieceIndex=" + pieceIndex +
+                ", from=" + from +
+                ", length=" + length +
+                '}';
+    }
 }
