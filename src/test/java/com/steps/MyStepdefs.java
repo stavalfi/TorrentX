@@ -403,7 +403,7 @@ public class MyStepdefs {
                 .block();
 
         Flux<RequestMessage> assertWrittenPiecesFlux =
-                Flux.zip(activeTorrent.startListenForIncomingPiecesFlux().autoConnect(), pieceMessageFlux,
+                Flux.zip(activeTorrent.savedPiecesFlux().autoConnect(), pieceMessageFlux,
                         (torrentPieceChanged, pieceMessage) -> {
                             RequestMessage requestMessage =
                                     new RequestMessage(null, null,
@@ -443,7 +443,7 @@ public class MyStepdefs {
         // check again in other way: (by ActiveTorrent::buildBitFieldMessage)
         BitFieldMessage allPiecesStatus = activeTorrent.buildBitFieldMessage(null, null);
         completedPiecesIndexList.forEach(completedPiecesIndex ->
-                Assert.assertTrue(errorMessage1, allPiecesStatus.getPieces().get(completedPiecesIndex)));
+                Assert.assertTrue(errorMessage1, allPiecesStatus.getPiecesStatus().get(completedPiecesIndex)));
 
         // check again in other way: (by ActiveTorrent::buildPieceMessage)
 
@@ -469,7 +469,7 @@ public class MyStepdefs {
         for (int i = 0; i < torrentInfo.getPieces().size(); i++) {
             if (!completedPiecesIndexList.contains(i)) {
                 String errorMessage3 = "piece is not completed but it is specified as completed piece: " + i;
-                Assert.assertFalse(errorMessage3, allPiecesStatus.getPieces().get(i));
+                Assert.assertFalse(errorMessage3, allPiecesStatus.getPiecesStatus().get(i));
             }
         }
 
@@ -513,7 +513,7 @@ public class MyStepdefs {
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, Flux.just(lastPieceMessage))
                 .block();
 
-        Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.startListenForIncomingPiecesFlux()
+        Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.savedPiecesFlux()
                 .autoConnect()
                 .doOnNext(torrentPieceChanged -> {
                     String message = "the last piece must be completed but it's not.";
@@ -841,10 +841,7 @@ public class MyStepdefs {
                                     if (blockOfPiece.getLength() != null)
                                         return fakePeersCommunicator.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
                                                 blockOfPiece.getLength());
-                                    long blockLength = torrentInfo.getPieceLength();
-                                    if (blockOfPiece.getPieceIndex() == torrentInfo.getPieces().size() - 1)
-                                        blockLength = torrentInfo.getTotalSize() -
-                                                ((torrentInfo.getPieces().size() - 1) * torrentInfo.getPieceLength());
+                                    long blockLength = torrentInfo.getPieceLength(blockOfPiece.getPieceIndex());
                                     return fakePeersCommunicator.sendRequestMessage(blockOfPiece.getPieceIndex(),
                                             blockOfPiece.getFrom(), (int) (blockLength - blockOfPiece.getFrom()));
                                 }))
@@ -877,6 +874,8 @@ public class MyStepdefs {
         ConnectableFlux<PieceMessage> sentMessagesFromFakePeerToApplicationFlux =
                 singleFakePeerCommunicatorFlux.flatMap(PeersCommunicator::sentPeerMessagesFlux)
                         // the application send to the fake-peer only PieceMessages in this test.
+                        // + my algorithm may send at the start a bitfield-message.
+                        .filter(peerMessage -> peerMessage instanceof PieceMessage)
                         .cast(PieceMessage.class)
                         // if there is a problem, I don't want to wait for ever.
 //                .timeout(Duration.ofSeconds(5))
