@@ -22,9 +22,15 @@ public interface TorrentFileSystemManager {
 
     BitFieldMessage buildBitFieldMessage(Peer from, Peer to);
 
+    int minMissingPieceIndex();
+
+    int maxMissingPieceIndex();
+
+    int[] getPiecesEstimatedStatus();
+
     Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
 
-    ConnectableFlux<TorrentPieceChanged> startListenForIncomingPiecesFlux();
+    ConnectableFlux<TorrentPieceChanged> savedBlockFlux();
 
     Mono<Boolean> deleteActiveTorrentOnlyMono(String torrentInfoHash);
 

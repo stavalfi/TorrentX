@@ -232,8 +232,10 @@ public class MyStepdefs {
 
         Mono<PieceMessage> receiveSinglePieceMono = torrentDownloader.getPeersCommunicatorFlux()
                 .flatMap(PeersCommunicator::sendInterestedMessage)
+                .doOnNext(peersCommunicator -> System.out.println(peersCommunicator))
                 .flatMap(peersCommunicator -> peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux()
                         .take(1)
+                        .doOnNext(haveMessage -> System.out.println(haveMessage))
                         .flatMap(haveMessage -> peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
                 .flatMap(peersCommunicator ->
                         peersCommunicator.receivePeerMessages()
@@ -242,7 +244,7 @@ public class MyStepdefs {
                 .take(1)
                 .single();
 
-        torrentDownloader.getTorrentStatusController().startDownload();
+//        torrentDownloader.getTorrentStatusController().startUpload();
 
         StepVerifier.create(receiveSinglePieceMono)
                 .expectNextCount(1)
@@ -385,7 +387,7 @@ public class MyStepdefs {
                 .block();
 
         Flux<RequestMessage> assertWrittenPiecesFlux =
-                Flux.zip(activeTorrent.startListenForIncomingPiecesFlux().autoConnect(), pieceMessageFlux,
+                Flux.zip(activeTorrent.savedBlockFlux().autoConnect(), pieceMessageFlux,
                         (torrentPieceChanged, pieceMessage) -> {
                             RequestMessage requestMessage =
                                     new RequestMessage(null, null,
@@ -495,7 +497,7 @@ public class MyStepdefs {
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, Flux.just(lastPieceMessage))
                 .block();
 
-        Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.startListenForIncomingPiecesFlux()
+        Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.savedBlockFlux()
                 .autoConnect()
                 .doOnNext(torrentPieceChanged -> {
                     String message = "the last piece must be completed but it's not.";

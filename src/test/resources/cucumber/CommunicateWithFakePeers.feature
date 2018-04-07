@@ -1,7 +1,7 @@
 Feature: connect to a fake peers and communicate with them
 
   Background: read torrent file
-    Given new torrent file: "torrent-file-example3.torrent"
+    Given new torrent file: "tor.torrent"
 
   Scenario: we send peer-messages and must receive the same peer-messages back
   1. the fake peers response with the same peer-message they received
@@ -62,7 +62,7 @@ Feature: connect to a fake peers and communicate with them
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example3.torrent | torrents-test/   |
+      | tor.torrent | torrents-test/   |
 
   Scenario Outline: fake peer request pieces from me but I don't have nothing to give
     Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
@@ -77,4 +77,4 @@ Feature: connect to a fake peers and communicate with them
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example3.torrent | torrents-test/   |
+      | tor.torrent | torrents-test/   |

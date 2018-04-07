@@ -20,9 +20,12 @@ public class App {
                 .createDefaultTorrentDownloader(getTorrentInfo(), downloadPath);
 
         torrentDownloader.getPeersCommunicatorFlux()
+                .subscribe(System.out::println, Throwable::printStackTrace);
+
+        torrentDownloader.getPeersCommunicatorFlux()
                 .map(PeersCommunicator::receivePeerMessages)
                 .flatMap(ReceiveMessages::getPeerMessageResponseFlux)
-                .subscribe(System.out::println, Throwable::printStackTrace, System.out::println);
+                .subscribe(System.out::println, Throwable::printStackTrace);
 
         torrentDownloader.getTorrentStatusController().startDownload();
         torrentDownloader.getTorrentStatusController().startUpload();
@@ -35,7 +38,7 @@ public class App {
     }
 
     private static TorrentInfo getTorrentInfo() throws IOException {
-        String torrentFilePath = "src/main/resources/torrents/torrent-file-example3.torrent";
+        String torrentFilePath = "src/main/resources/torrents/tor.torrent";
         return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
     }
 }

@@ -16,8 +16,8 @@ Feature: connect to real peers and communicate with them
     Then application receive at list one random block of a random piece in torrent: "<torrent>"
 
     Examples:
-      | torrent                       | downloadLocation |
-      | torrent-file-example3.torrent | torrents-test/   |
+      | torrent                           | downloadLocation |
+      | tor.torrent | torrents-test/   |
 
   Scenario: we connect to all peers and get their bitfield status
   and then check that the list of peers we connected to is given

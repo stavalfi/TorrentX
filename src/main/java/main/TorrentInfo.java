@@ -82,6 +82,8 @@ public class TorrentInfo {
                 .map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
                 .filter(Matcher::matches)
                 .map((Matcher matcher) -> new Tracker(matcher.group(1), matcher.group(3), Integer.parseInt(matcher.group(4))))
+                .filter(tracker -> !tracker.getConnectionType().equals("http"))
+                .filter(tracker -> !tracker.getConnectionType().equals("https"))
                 .collect(Collectors.toList());
     }
 
@@ -99,16 +101,15 @@ public class TorrentInfo {
     @Override
     public String toString() {
 
-        String trackers = this.torrent.getAnnounceList() != null ?
-                this.torrent.getAnnounceList()
-                        .stream()
-                        .collect(Collectors.joining("\n")) : "";
+        String trackers = getTrackerList()
+                .stream()
+                .map(tracker -> tracker.toString())
+                .collect(Collectors.joining("\n"));
 
-        String fileList = this.torrent.getFileList() != null ?
-                this.torrent.getFileList()
+        String fileList = getFileList()
                         .stream()
                         .map(TorrentFile::toString)
-                        .collect(Collectors.joining("\n")) : "";
+                        .collect(Collectors.joining("\n"));
 
         return "TorrentInfo{" +
                 "Created By: " + this.torrent.getCreatedBy() + "\n" +

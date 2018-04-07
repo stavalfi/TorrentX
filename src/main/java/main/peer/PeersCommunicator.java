@@ -105,6 +105,11 @@ public class PeersCommunicator implements SendPeerMessage {
     }
 
     @Override
+    public Mono<PeersCommunicator> sendBitFieldMessage(BitFieldMessage bitFieldMessage) {
+        return sendBitFieldMessage(bitFieldMessage.getPieces());
+    }
+
+    @Override
     public Mono<PeersCommunicator> sendCancelMessage(int index, int begin, int length) {
         return send(new CancelMessage(this.getMe(), this.getPeer(), index, begin, length));
     }
