@@ -37,6 +37,13 @@ public class TorrentInfo {
         return Math.toIntExact(this.torrent.getPieceLength());
     }
 
+    public int getPieceLength(int pieceIndex) {
+        if (pieceIndex == this.torrent.getPieces().size() - 1)
+            return Math.toIntExact(this.torrent.getTotalSize() -
+                    ((this.torrent.getPieces().size() - 1) * this.torrent.getPieceLength()));
+        return Math.toIntExact(this.torrent.getPieceLength());
+    }
+
     public byte[] getPiecesBlob() {
         return this.torrent.getPiecesBlob();
     }

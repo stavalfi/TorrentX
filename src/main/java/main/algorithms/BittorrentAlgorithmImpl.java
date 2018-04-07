@@ -2,37 +2,42 @@ package main.algorithms;
 
 import main.TorrentInfo;
 import main.downloader.TorrentPieceChanged;
+import main.file.system.PieceNotDownloadedYetException;
+import main.file.system.TorrentFileSystemManager;
 import main.peer.PeersCommunicator;
-import main.peer.ReceivedMessagesImpl;
 import main.torrent.status.TorrentStatus;
-import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
-    private Flux<TorrentPieceChanged> startDownloadFlux;
+    private Flux<TorrentPieceChanged> startDownloadFlux = Flux.empty();
 
     public BittorrentAlgorithmImpl(TorrentInfo torrentInfo,
+                                   TorrentFileSystemManager torrentFileSystemManager,
                                    TorrentStatus torrentStatus,
                                    Flux<PeersCommunicator> peersCommunicatorFlux) {
 
-        ReceivedMessagesImpl receiveTorrentMessagesMessagesFlux = new ReceivedMessagesImpl(
-                peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages));
+        uploadFlux(torrentStatus, torrentFileSystemManager, peersCommunicatorFlux)
+                .publish()
+                .connect();
 
-        this.startDownloadFlux = startBittorrentAlgorithm(torrentInfo, torrentStatus, peersCommunicatorFlux)
-                .publish();
 
-        ((ConnectableFlux<TorrentPieceChanged>) this.startDownloadFlux).connect();
-
-    }
-
-    private Flux<TorrentPieceChanged> startBittorrentAlgorithm(TorrentInfo torrentInfo,
-                                                               TorrentStatus torrentStatus,
-                                                               Flux<PeersCommunicator> peersCommunicatorFlux) {
-        return Flux.empty();
     }
 
     @Override
     public Flux<TorrentPieceChanged> startDownloadFlux() {
         return this.startDownloadFlux;
+    }
+
+    private Flux<PeersCommunicator> uploadFlux(TorrentStatus torrentStatus,
+                                               TorrentFileSystemManager torrentFileSystemManager,
+                                               Flux<PeersCommunicator> peersCommunicatorFlux) {
+        return peersCommunicatorFlux.flatMap(peersCommunicator ->
+                peersCommunicator.receivePeerMessages()
+                        .getRequestMessageResponseFlux()
+                        .flatMap(requestMessage -> torrentFileSystemManager.buildPieceMessage(requestMessage)
+                                .onErrorResume(PieceNotDownloadedYetException.class, throwable -> Mono.empty()))
+                        .flatMap(pieceMessage -> peersCommunicator.sendPieceMessage(pieceMessage.getIndex(),
+                                pieceMessage.getBegin(), pieceMessage.getBlock())));
     }
 }

@@ -115,8 +115,6 @@ public class TorrentDownloaders {
                     }
                 });
 
-        BittorrentAlgorithm bittorrentAlgorithm =
-                new BittorrentAlgorithmImpl(torrentInfo, torrentStatusController, peersCommunicatorFlux);
 
         ReceivedMessagesImpl receivedMessagesFromAllPeers = new ReceivedMessagesImpl(
                 peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages));
@@ -125,6 +123,12 @@ public class TorrentDownloaders {
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
                         receivedMessagesFromAllPeers.getPieceMessageResponseFlux())
                 .block();
+
+        BittorrentAlgorithm bittorrentAlgorithm =
+                new BittorrentAlgorithmImpl(torrentInfo,
+                        torrentFileSystemManager,
+                        torrentStatusController,
+                        peersCommunicatorFlux);
 
         SpeedStatistics torrentSpeedStatistics =
                 new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
