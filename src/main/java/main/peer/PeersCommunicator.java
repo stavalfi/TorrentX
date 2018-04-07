@@ -24,6 +24,7 @@ public class PeersCommunicator implements SendPeerMessage {
     private Flux<PeerMessage> sentPeerMessagesFlux;
     private FluxSink<PeerMessage> sentMessagesFluxSink;
     private DataOutputStream peerDataOutputStream;
+    private Flux<? extends PeerMessage> peerMessageResponseFlux;
 
     private ReceiveMessages receiveMessages;
     private SpeedStatistics peerSpeedStatistics;

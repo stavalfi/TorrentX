@@ -11,10 +11,7 @@ import main.downloader.TorrentDownloaders;
 import main.file.system.ActiveTorrentFile;
 import main.file.system.ActiveTorrents;
 import main.file.system.TorrentFileSystemManager;
-import main.peer.PeersCommunicator;
-import main.peer.PeersListener;
-import main.peer.PeersProvider;
-import main.peer.ReceivedMessagesImpl;
+import main.peer.*;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.statistics.SpeedStatistics;
@@ -98,12 +95,10 @@ public class Utils {
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                                 .autoConnect());
 
-        ReceivedMessagesImpl receivedMessagesFromAllPeers = new ReceivedMessagesImpl(
-                peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages));
-
         TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
-                        receivedMessagesFromAllPeers.getPieceMessageResponseFlux())
+                        peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages)
+                                .flatMap(ReceiveMessages::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =

@@ -91,47 +91,6 @@ public class ReceivedMessagesImpl implements ReceiveMessages {
                 .cast(UnchokeMessage.class);
     }
 
-    public ReceivedMessagesImpl(Flux<ReceiveMessages> peersMessageResponseFlux) {
-        this.peerMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getPeerMessageResponseFlux);
-
-        this.bitFieldMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getBitFieldMessageResponseFlux);
-
-        this.cancelMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getCancelMessageResponseFlux);
-
-        this.chokeMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getChokeMessageResponseFlux);
-
-        this.extendedMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getExtendedMessageResponseFlux);
-
-        this.haveMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getHaveMessageResponseFlux);
-
-        this.interestedMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getInterestedMessageResponseFlux);
-
-        this.keepMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getKeepMessageResponseFlux);
-
-        this.notInterestedMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getNotInterestedMessageResponseFlux);
-
-        this.pieceMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getPieceMessageResponseFlux);
-
-        this.portMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getPortMessageResponseFlux);
-
-        this.requestMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getRequestMessageResponseFlux);
-
-        this.unchokeMessageResponseFlux = peersMessageResponseFlux
-                .flatMap(ReceiveMessages::getUnchokeMessageResponseFlux);
-    }
-
     private void listenForPeerMessages(FluxSink<PeerMessage> sink, Peer me, Peer peer, DataInputStream dataInputStream) {
         while (!sink.isCancelled()) {
             try {
@@ -150,7 +109,6 @@ public class ReceivedMessagesImpl implements ReceiveMessages {
             }
         }
     }
-
 
     @Override
     public Flux<? extends PeerMessage> getPeerMessageResponseFlux() {

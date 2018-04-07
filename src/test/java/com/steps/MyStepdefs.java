@@ -16,7 +16,7 @@ import main.file.system.TorrentFileSystemManager;
 import main.peer.Peer;
 import main.peer.PeersCommunicator;
 import main.peer.PeersProvider;
-import main.peer.ReceivedMessagesImpl;
+import main.peer.ReceiveMessages;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -612,12 +612,9 @@ public class MyStepdefs {
                 .flatMap(Flux::fromIterable)
                 .sort();
 
-        ReceivedMessagesImpl receivedMessagesFromAllPeers = new ReceivedMessagesImpl(
-                torrentDownloader.getPeersCommunicatorFlux()
-                        .map(PeersCommunicator::receivePeerMessages));
-
-        Flux<Peer> peersFromResponsesMono = receivedMessagesFromAllPeers
-                .getPeerMessageResponseFlux()
+        Flux<Peer> peersFromResponsesMono = torrentDownloader.getPeersCommunicatorFlux()
+                .map(PeersCommunicator::receivePeerMessages)
+                .flatMap(ReceiveMessages::getPeerMessageResponseFlux)
                 .map(PeerMessage::getFrom)
                 .distinct()
                 .timeout(Duration.ofMillis(1500))

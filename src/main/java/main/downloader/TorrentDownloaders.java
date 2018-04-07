@@ -5,10 +5,7 @@ import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.BittorrentAlgorithmImpl;
 import main.file.system.ActiveTorrents;
 import main.file.system.TorrentFileSystemManager;
-import main.peer.PeersCommunicator;
-import main.peer.PeersListener;
-import main.peer.PeersProvider;
-import main.peer.ReceivedMessagesImpl;
+import main.peer.*;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.TorrentStatusController;
@@ -99,12 +96,10 @@ public class TorrentDownloaders {
                 false,
                 false);
 
-        ReceivedMessagesImpl receivedMessagesFromAllPeers = new ReceivedMessagesImpl(
-                peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages));
-
         TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
-                        receivedMessagesFromAllPeers.getPieceMessageResponseFlux())
+                        peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages)
+                                .flatMap(ReceiveMessages::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
