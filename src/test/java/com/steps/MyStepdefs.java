@@ -13,10 +13,7 @@ import main.downloader.TorrentPieceStatus;
 import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
 import main.file.system.TorrentFileSystemManager;
-import main.peer.Peer;
-import main.peer.PeersCommunicator;
-import main.peer.PeersProvider;
-import main.peer.ReceiveMessages;
+import main.peer.*;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -181,7 +178,7 @@ public class MyStepdefs {
 
         Mono<Object[]> peerResponsesMono = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
                 .flatMap(peersCommunicator -> {
-                    List<Mono<PeersCommunicator>> sendPeerMessageMonoStream = peerMessageTypeList.stream()
+                    List<Mono<SendPeerMessages>> sendPeerMessageMonoStream = peerMessageTypeList.stream()
                             .map(peerRequestMessage -> Utils.sendFakeMessage(peersCommunicator, peerRequestMessage))
                             .collect(Collectors.toList());
                     return Mono.zip(sendPeerMessageMonoStream, peersCommunicators -> peersCommunicator);
@@ -231,12 +228,14 @@ public class MyStepdefs {
         int requestBlockSize = 16000;
 
         Mono<PieceMessage> receiveSinglePieceMono = torrentDownloader.getPeersCommunicatorFlux()
-                .flatMap(PeersCommunicator::sendInterestedMessage)
-                .doOnNext(peersCommunicator -> System.out.println(peersCommunicator))
+                .flatMap(peersCommunicator -> peersCommunicator.sendMessages()
+                        .sendInterestedMessage()
+                        .map(sendPeerMessages -> peersCommunicator))
                 .flatMap(peersCommunicator -> peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux()
                         .take(1)
-                        .doOnNext(haveMessage -> System.out.println(haveMessage))
-                        .flatMap(haveMessage -> peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
+                        .flatMap(haveMessage -> peersCommunicator.sendMessages()
+                                .sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)
+                                .map(sendPeerMessages -> peersCommunicator)))
                 .flatMap(peersCommunicator ->
                         peersCommunicator.receivePeerMessages()
                                 .getPieceMessageResponseFlux()
@@ -607,7 +606,6 @@ public class MyStepdefs {
                 .timeout(Duration.ofMillis(1500))
                 .buffer(Duration.ofMillis(1500))
                 .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
-                .doOnNext(x -> System.out.println("connected until now: " + x))
                 .take(3)
                 .flatMap(Flux::fromIterable)
                 .sort();
@@ -620,7 +618,6 @@ public class MyStepdefs {
                 .timeout(Duration.ofMillis(1500))
                 .buffer(Duration.ofMillis(1500))
                 .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
-                .doOnNext(x -> System.out.println("responses from until now: " + x))
                 .take(2)
                 .flatMap(Flux::fromIterable)
                 .sort()
@@ -854,7 +851,9 @@ public class MyStepdefs {
         singleFakePeerCommunicatorFlux.connect();
 
         ConnectableFlux<PieceMessage> sentMessagesFromFakePeerToApplicationFlux =
-                singleFakePeerCommunicatorFlux.flatMap(PeersCommunicator::sentPeerMessagesFlux)
+                singleFakePeerCommunicatorFlux
+                        .map(PeersCommunicator::sendMessages)
+                        .flatMap(SendPeerMessages::sentPeerMessagesFlux)
                         // the application sendMessage to the fake-peer only PieceMessages in this test.
                         // + my algorithm may sendMessage at the start a bitfield-message.
                         .filter(peerMessage -> peerMessage instanceof PieceMessage)

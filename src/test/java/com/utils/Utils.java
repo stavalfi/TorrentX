@@ -171,30 +171,30 @@ public class Utils {
                         peersCommunicatorFlux);
     }
 
-    public static Mono<PeersCommunicator> sendFakeMessage(PeersCommunicator peersCommunicator, PeerMessageType peerMessageType) {
+    public static Mono<SendPeerMessages> sendFakeMessage(PeersCommunicator peersCommunicator, PeerMessageType peerMessageType) {
         switch (peerMessageType) {
             case HaveMessage:
-                return peersCommunicator.sendHaveMessage(0);
+                return peersCommunicator.sendMessages().sendHaveMessage(0);
             case PortMessage:
-                return peersCommunicator.sendPortMessage((short) peersCommunicator.getMe().getPeerPort());
+                return peersCommunicator.sendMessages().sendPortMessage((short) peersCommunicator.getMe().getPeerPort());
             case ChokeMessage:
-                return peersCommunicator.sendChokeMessage();
+                return peersCommunicator.sendMessages().sendChokeMessage();
             case PieceMessage:
-                return peersCommunicator.sendPieceMessage(0, 0, new byte[10]);
+                return peersCommunicator.sendMessages().sendPieceMessage(0, 0, new byte[10]);
             case CancelMessage:
-                return peersCommunicator.sendCancelMessage(0, 0, 10);
+                return peersCommunicator.sendMessages().sendCancelMessage(0, 0, 10);
             case KeepAliveMessage:
-                return peersCommunicator.sendKeepAliveMessage();
+                return peersCommunicator.sendMessages().sendKeepAliveMessage();
             case RequestMessage:
-                return peersCommunicator.sendRequestMessage(0, 0, 10);
+                return peersCommunicator.sendMessages().sendRequestMessage(0, 0, 10);
             case UnchokeMessage:
-                return peersCommunicator.sendUnchokeMessage();
+                return peersCommunicator.sendMessages().sendUnchokeMessage();
             case BitFieldMessage:
-                return peersCommunicator.sendBitFieldMessage(BitSet.valueOf(new byte[10]));
+                return peersCommunicator.sendMessages().sendBitFieldMessage(BitSet.valueOf(new byte[10]));
             case InterestedMessage:
-                return peersCommunicator.sendInterestedMessage();
+                return peersCommunicator.sendMessages().sendInterestedMessage();
             case NotInterestedMessage:
-                return peersCommunicator.sendNotInterestedMessage();
+                return peersCommunicator.sendMessages().sendNotInterestedMessage();
             default:
                 throw new IllegalArgumentException(peerMessageType.toString());
         }
