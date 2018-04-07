@@ -78,8 +78,7 @@ public class TorrentDownloaders {
                 .findFirst();
     }
 
-    public synchronized TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
-                                                                         TorrentStatusController torrentStatusController) {
+    public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
@@ -87,10 +86,21 @@ public class TorrentDownloaders {
                 trackerProvider.connectToTrackersFlux()
                         .autoConnect();
 
+        PeersListener peersListener = new PeersListener();
+
         ConnectableFlux<PeersCommunicator> peersCommunicatorFromTrackerFlux = peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux);
         Flux<PeersCommunicator> peersCommunicatorFlux =
-                Flux.merge(PeersListener.getInstance().getPeersConnectedToMeFlux(),
+                Flux.merge(peersListener.getPeersConnectedToMeFlux(),
                         peersCommunicatorFromTrackerFlux);
+
+        TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(torrentInfo,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false);
 
         torrentStatusController.getStatusTypeFlux()
                 .subscribe(new Consumer<TorrentStatusType>() {
@@ -101,13 +111,13 @@ public class TorrentDownloaders {
                         switch (torrentStatusType) {
                             case START_DOWNLOAD:
                                 if (this.isConnected.compareAndSet(false, true)) {
-                                    PeersListener.getInstance().getPeersConnectedToMeFlux().connect();
+                                    peersListener.getPeersConnectedToMeFlux().connect();
                                     peersCommunicatorFromTrackerFlux.connect();
                                 }
                                 break;
                             case START_UPLOAD:
                                 if (this.isConnected.compareAndSet(false, true)) {
-                                    PeersListener.getInstance().getPeersConnectedToMeFlux().connect();
+                                    peersListener.getPeersConnectedToMeFlux().connect();
                                     peersCommunicatorFromTrackerFlux.connect();
                                 }
                                 break;
@@ -126,28 +136,24 @@ public class TorrentDownloaders {
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 new BittorrentAlgorithmImpl(torrentInfo,
-                        torrentFileSystemManager,
                         torrentStatusController,
+                        torrentFileSystemManager,
                         peersCommunicatorFlux);
 
         SpeedStatistics torrentSpeedStatistics =
                 new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
                         peersCommunicatorFlux.map(PeersCommunicator::getPeerSpeedStatistics));
 
-        return createTorrentDownloader(torrentInfo,
-                torrentFileSystemManager,
-                bittorrentAlgorithm,
-                torrentStatusController,
-                torrentSpeedStatistics,
-                trackerProvider,
-                peersProvider,
-                trackerConnectionConnectableFlux,
-                peersCommunicatorFlux);
-    }
-
-    public synchronized TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
-        return createDefaultTorrentDownloader(torrentInfo, downloadPath,
-                TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo));
+        return TorrentDownloaders.getInstance()
+                .createTorrentDownloader(torrentInfo,
+                        torrentFileSystemManager,
+                        bittorrentAlgorithm,
+                        torrentStatusController,
+                        torrentSpeedStatistics,
+                        trackerProvider,
+                        peersProvider,
+                        trackerConnectionConnectableFlux,
+                        peersCommunicatorFlux);
     }
 
     private TorrentDownloaders() {

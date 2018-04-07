@@ -13,7 +13,10 @@ import main.downloader.TorrentPieceStatus;
 import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
 import main.file.system.TorrentFileSystemManager;
-import main.peer.*;
+import main.peer.Peer;
+import main.peer.PeersCommunicator;
+import main.peer.PeersProvider;
+import main.peer.ReceivedMessagesImpl;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -122,7 +125,7 @@ public class MyStepdefs {
                                     switch (messageWeNeedToSend.getTrackerRequestType()) {
                                         case Announce:
                                             return trackerConnection.announceMono(this.torrentInfo.getTorrentInfoHash(),
-                                                    PeersListener.getInstance().getTcpPort());
+                                                    AppConfig.getInstance().getMyListeningPort());
                                         case Scrape:
                                             return trackerConnection.scrapeMono(Collections.singletonList(this.torrentInfo.getTorrentInfoHash()));
                                         default:
@@ -254,8 +257,7 @@ public class MyStepdefs {
         Utils.removeEverythingRelatedToTorrent(torrentInfo);
 
         // this will create an activeTorrent object.
-        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
-                .createDefaultTorrentDownloader(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation);
+        TorrentDownloader torrentDownloader = Utils.createDefaultTorrentDownloader(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation);
     }
 
     @Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
@@ -588,10 +590,11 @@ public class MyStepdefs {
     public void applicationConnectToAllPeersAndAssertThatWeConnectedToThemForTorrent(String torrentFileName) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
+        Utils.removeEverythingRelatedToTorrent(torrentInfo);
+
         // we won't download anything but we still need to specify a path to download to.
         String DEFAULT_DOWNLOAD_LOCATION = System.getProperty("user.dir") + "/" + "torrents-test/";
-        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
-                .createDefaultTorrentDownloader(torrentInfo, DEFAULT_DOWNLOAD_LOCATION);
+        TorrentDownloader torrentDownloader = Utils.createDefaultTorrentDownloader(torrentInfo, DEFAULT_DOWNLOAD_LOCATION);
 
         // consume new peers and new responses from 1.5 seconds.
         // filter distinct peers from the responses, and assert
@@ -663,10 +666,9 @@ public class MyStepdefs {
                 initialTorrentStatusTypeMap.get(TorrentStatusType.RESUME_DOWNLOAD),
                 initialTorrentStatusTypeMap.get(TorrentStatusType.COMPLETED_DOWNLOADING));
 
-        TorrentDownloaders.getInstance()
-                .createDefaultTorrentDownloader(torrentInfo,
-                        System.getProperty("user.dir") + "/" + downloadLocation,
-                        torrentStatusController);
+        Utils.createDefaultTorrentDownloader(torrentInfo,
+                System.getProperty("user.dir") + "/" + downloadLocation,
+                torrentStatusController);
     }
 
     private List<TorrentStatusType> torrentStatusTypeFlux = new ArrayList<>();

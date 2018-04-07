@@ -14,6 +14,7 @@ import main.file.system.TorrentFileSystemManager;
 import main.peer.PeersCommunicator;
 import main.peer.PeersListener;
 import main.peer.PeersProvider;
+import main.peer.ReceivedMessagesImpl;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.statistics.SpeedStatistics;
@@ -37,18 +38,14 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class Utils {
+    public static PeersListener peersListener;
+
     public static TorrentInfo createTorrentInfo(String torrentFilePath) throws IOException {
         String torrentFilesPath = "src/test/resources/torrents/" + torrentFilePath;
         return new TorrentInfo(torrentFilesPath, TorrentParser.parseTorrent(torrentFilesPath));
     }
 
     public static void removeEverythingRelatedToTorrent(TorrentInfo torrentInfo) {
-        try {
-            PeersListener.getInstance().stopListenForNewPeers();
-        } catch (IOException | NullPointerException e) {
-            //e.printStackTrace();
-        }
-
         TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .map(TorrentDownloader::getTorrentStatusController)
@@ -58,6 +55,15 @@ public class Utils {
                     torrentStatusController.removeFiles();
                     torrentStatusController.removeTorrent();
                 });
+
+        if (peersListener != null) {
+            try {
+                peersListener.stopListenForNewPeers();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            peersListener = null;
+        }
 
         TorrentDownloaders.getInstance()
                 .deleteTorrentDownloader(torrentInfo.getTorrentInfoHash());
@@ -78,6 +84,81 @@ public class Utils {
         Utils.deleteDownloadFolder();
     }
 
+    public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
+                                                                   TorrentStatusController torrentStatusController) {
+        TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
+        PeersProvider peersProvider = new PeersProvider(torrentInfo);
+
+        Flux<TrackerConnection> trackerConnectionConnectableFlux =
+                trackerProvider.connectToTrackersFlux()
+                        .autoConnect();
+
+        peersListener = new PeersListener();
+
+        ConnectableFlux<PeersCommunicator> peersCommunicatorFromTrackerFlux = peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux);
+        Flux<PeersCommunicator> peersCommunicatorFlux =
+                Flux.merge(peersListener.getPeersConnectedToMeFlux(),
+                        peersCommunicatorFromTrackerFlux);
+
+        torrentStatusController.getStatusTypeFlux()
+                .subscribe(new Consumer<TorrentStatusType>() {
+                    private AtomicBoolean isConnected = new AtomicBoolean(false);
+
+                    @Override
+                    public synchronized void accept(TorrentStatusType torrentStatusType) {
+                        switch (torrentStatusType) {
+                            case START_DOWNLOAD:
+                                if (this.isConnected.compareAndSet(false, true)) {
+                                    peersListener.getPeersConnectedToMeFlux().connect();
+                                    peersCommunicatorFromTrackerFlux.connect();
+                                }
+                                break;
+                            case START_UPLOAD:
+                                if (this.isConnected.compareAndSet(false, true)) {
+                                    peersListener.getPeersConnectedToMeFlux().connect();
+                                    peersCommunicatorFromTrackerFlux.connect();
+                                }
+                                break;
+                        }
+                    }
+                });
+
+
+        ReceivedMessagesImpl receivedMessagesFromAllPeers = new ReceivedMessagesImpl(
+                peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages));
+
+        TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
+                .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
+                        receivedMessagesFromAllPeers.getPieceMessageResponseFlux())
+                .block();
+
+        BittorrentAlgorithm bittorrentAlgorithm =
+                new BittorrentAlgorithmImpl(torrentInfo,
+                        torrentStatusController,
+                        torrentFileSystemManager,
+                        peersCommunicatorFlux);
+
+        SpeedStatistics torrentSpeedStatistics =
+                new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
+                        peersCommunicatorFlux.map(PeersCommunicator::getPeerSpeedStatistics));
+
+        return TorrentDownloaders.getInstance()
+                .createTorrentDownloader(torrentInfo,
+                        torrentFileSystemManager,
+                        bittorrentAlgorithm,
+                        torrentStatusController,
+                        torrentSpeedStatistics,
+                        trackerProvider,
+                        peersProvider,
+                        trackerConnectionConnectableFlux,
+                        peersCommunicatorFlux);
+    }
+
+    public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
+        return createDefaultTorrentDownloader(torrentInfo, downloadPath,
+                TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo));
+    }
+
     public static TorrentDownloader createCustomTorrentDownloader(TorrentInfo torrentInfo,
                                                                   TorrentFileSystemManager torrentFileSystemManager,
                                                                   Flux<TrackerConnection> trackerConnectionConnectableFlux) {
@@ -87,7 +168,8 @@ public class Utils {
         ConnectableFlux<PeersCommunicator> peersCommunicatorFromTrackerFlux =
                 peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux);
 
-        Flux<PeersCommunicator> listenForNewIncomingPeersFlux = PeersListener.getInstance().getPeersConnectedToMeFlux()
+        peersListener = new PeersListener();
+        Flux<PeersCommunicator> listenForNewIncomingPeersFlux = peersListener.getPeersConnectedToMeFlux()
                 // SocketException == When I shutdown the SocketServer after/before
                 // the tests inside Utils::removeEverythingRelatedToTorrent.
                 .onErrorResume(SocketException.class, throwable -> Flux.empty());
@@ -105,7 +187,7 @@ public class Utils {
                         if (torrentStatusType.equals(TorrentStatusType.START_DOWNLOAD) ||
                                 torrentStatusType.equals(TorrentStatusType.START_UPLOAD)) {
                             if (this.isConnected.compareAndSet(false, true)) {
-                                PeersListener.getInstance().getPeersConnectedToMeFlux().connect();
+                                peersListener.getPeersConnectedToMeFlux().connect();
                                 peersCommunicatorFromTrackerFlux.connect();
                             }
                         }
@@ -114,8 +196,8 @@ public class Utils {
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 new BittorrentAlgorithmImpl(torrentInfo,
-                        torrentFileSystemManager,
                         defaultTorrentStatusController,
+                        torrentFileSystemManager,
                         peersCommunicatorFlux);
 
         SpeedStatistics torrentSpeedStatistics =

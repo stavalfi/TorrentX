@@ -20,18 +20,24 @@ import java.net.Socket;
 import java.util.Optional;
 
 public class PeersListener {
-    private Integer tcpPort = AppConfig.getInstance().getMyListeningPort();
+    private Integer tcpPort;
     private ServerSocket listenToPeerConnection;
     private ConnectableFlux<PeersCommunicator> peersConnectedToMeFlux;
 
-    private PeersListener() {
+    public PeersListener() {
+        this(AppConfig.getInstance().getMyListeningPort());
+    }
 
+    public PeersListener(Integer tcpPort) {
+        this.tcpPort = tcpPort;
         this.peersConnectedToMeFlux = Flux.create((FluxSink<PeersCommunicator> sink) -> {
             try {
                 this.listenToPeerConnection = new ServerSocket(this.tcpPort);
             } catch (IOException e) {
                 // TODO: do something with this shit
                 e.printStackTrace();
+                sink.error(e);
+                return;
             }
             while (!this.listenToPeerConnection.isClosed() && !sink.isCancelled())
                 try {
@@ -103,19 +109,13 @@ public class PeersListener {
                 .map(TorrentDownloader::getTorrentInfo);
     }
 
-    public void stopListenForNewPeers() throws IOException, NullPointerException {
-        this.listenToPeerConnection.close();
+    public void stopListenForNewPeers() throws IOException {
+        if (this.listenToPeerConnection != null)
+            this.listenToPeerConnection.close();
     }
 
     public int getTcpPort() {
         return this.tcpPort;
-    }
-
-
-    private static PeersListener instance = new PeersListener();
-
-    public static PeersListener getInstance() {
-        return instance;
     }
 
     public ConnectableFlux<PeersCommunicator> getPeersConnectedToMeFlux() {
