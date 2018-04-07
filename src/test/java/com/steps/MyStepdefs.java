@@ -612,7 +612,7 @@ public class MyStepdefs {
 
         Flux<Peer> peersFromResponsesMono = torrentDownloader.getPeersCommunicatorFlux()
                 .map(PeersCommunicator::receivePeerMessages)
-                .flatMap(ReceiveMessages::getPeerMessageResponseFlux)
+                .flatMap(ReceivePeerMessages::getPeerMessageResponseFlux)
                 .map(PeerMessage::getFrom)
                 .distinct()
                 .timeout(Duration.ofMillis(1500))

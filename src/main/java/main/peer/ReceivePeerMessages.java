@@ -3,7 +3,7 @@ package main.peer;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 
-public interface ReceiveMessages {
+public interface ReceivePeerMessages {
     Flux<? extends PeerMessage> getPeerMessageResponseFlux();
 
     Flux<BitFieldMessage> getBitFieldMessageResponseFlux();

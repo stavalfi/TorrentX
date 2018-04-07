@@ -99,7 +99,7 @@ public class TorrentDownloaders {
         TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
                         peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages)
-                                .flatMap(ReceiveMessages::getPieceMessageResponseFlux))
+                                .flatMap(ReceivePeerMessages::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =

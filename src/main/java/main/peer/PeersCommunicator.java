@@ -16,7 +16,7 @@ public class PeersCommunicator {
     private TorrentInfo torrentInfo;
     private PeerCurrentStatus peerCurrentStatus;
     private SendPeerMessages sendMessages;
-    private ReceiveMessages receiveMessages;
+    private ReceivePeerMessages receivePeerMessages;
     private SpeedStatistics peerSpeedStatistics;
 
     public PeersCommunicator(TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
@@ -33,17 +33,17 @@ public class PeersCommunicator {
                 this.peerCurrentStatus,
                 this::closeConnection,
                 peerDataOutputStream);
-        this.receiveMessages = new ReceivedMessagesImpl(this.me, this.peer,
+        this.receivePeerMessages = new ReceivePeerMessagesImpl(this.me, this.peer,
                 this.peerCurrentStatus,
                 dataInputStream);
 
         this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-                this.receiveMessages.getPeerMessageResponseFlux(),
+                this.receivePeerMessages.getPeerMessageResponseFlux(),
                 this.sendMessages.sentPeerMessagesFlux());
     }
 
-    public ReceiveMessages receivePeerMessages() {
-        return receiveMessages;
+    public ReceivePeerMessages receivePeerMessages() {
+        return receivePeerMessages;
     }
 
     public Peer getPeer() {
