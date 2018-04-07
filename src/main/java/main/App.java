@@ -16,7 +16,7 @@ public class App {
     private static String downloadPath = System.getProperty("user.dir") + "/" + "torrents-test/";
 
     private static void f4() throws IOException {
-        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+        TorrentDownloader torrentDownloader = TorrentDownloaders
                 .createDefaultTorrentDownloader(getTorrentInfo(), downloadPath);
 
         torrentDownloader.getPeersCommunicatorFlux()

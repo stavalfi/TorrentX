@@ -21,7 +21,6 @@ import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.TorrentStatusController;
 import main.torrent.status.TorrentStatusControllerImpl;
-import main.torrent.status.TorrentStatusType;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import reactor.core.publisher.ConnectableFlux;
@@ -33,8 +32,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.SocketException;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class Utils {
@@ -95,34 +92,11 @@ public class Utils {
 
         peersListener = new PeersListener();
 
-        ConnectableFlux<PeersCommunicator> peersCommunicatorFromTrackerFlux = peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux);
         Flux<PeersCommunicator> peersCommunicatorFlux =
-                Flux.merge(peersListener.getPeersConnectedToMeFlux(),
-                        peersCommunicatorFromTrackerFlux);
-
-        torrentStatusController.getStatusTypeFlux()
-                .subscribe(new Consumer<TorrentStatusType>() {
-                    private AtomicBoolean isConnected = new AtomicBoolean(false);
-
-                    @Override
-                    public synchronized void accept(TorrentStatusType torrentStatusType) {
-                        switch (torrentStatusType) {
-                            case START_DOWNLOAD:
-                                if (this.isConnected.compareAndSet(false, true)) {
-                                    peersListener.getPeersConnectedToMeFlux().connect();
-                                    peersCommunicatorFromTrackerFlux.connect();
-                                }
-                                break;
-                            case START_UPLOAD:
-                                if (this.isConnected.compareAndSet(false, true)) {
-                                    peersListener.getPeersConnectedToMeFlux().connect();
-                                    peersCommunicatorFromTrackerFlux.connect();
-                                }
-                                break;
-                        }
-                    }
-                });
-
+                Flux.merge(peersListener.getPeersConnectedToMeFlux()
+                                .autoConnect(),
+                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                                .autoConnect());
 
         ReceivedMessagesImpl receivedMessagesFromAllPeers = new ReceivedMessagesImpl(
                 peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages));
@@ -169,30 +143,16 @@ public class Utils {
                 peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux);
 
         peersListener = new PeersListener();
-        Flux<PeersCommunicator> listenForNewIncomingPeersFlux = peersListener.getPeersConnectedToMeFlux()
-                // SocketException == When I shutdown the SocketServer after/before
-                // the tests inside Utils::removeEverythingRelatedToTorrent.
-                .onErrorResume(SocketException.class, throwable -> Flux.empty());
         Flux<PeersCommunicator> peersCommunicatorFlux =
-                Flux.merge(listenForNewIncomingPeersFlux, peersCommunicatorFromTrackerFlux);
+                Flux.merge(peersListener.getPeersConnectedToMeFlux()
+                                .autoConnect()
+                                // SocketException == When I shutdown the SocketServer after/before
+                                // the tests inside Utils::removeEverythingRelatedToTorrent.
+                                .onErrorResume(SocketException.class, throwable -> Flux.empty()),
+                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                                .autoConnect());
 
         TorrentStatusController defaultTorrentStatusController = TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
-
-        defaultTorrentStatusController.getStatusTypeFlux()
-                .subscribe(new Consumer<TorrentStatusType>() {
-                    private AtomicBoolean isConnected = new AtomicBoolean(false);
-
-                    @Override
-                    public synchronized void accept(TorrentStatusType torrentStatusType) {
-                        if (torrentStatusType.equals(TorrentStatusType.START_DOWNLOAD) ||
-                                torrentStatusType.equals(TorrentStatusType.START_UPLOAD)) {
-                            if (this.isConnected.compareAndSet(false, true)) {
-                                peersListener.getPeersConnectedToMeFlux().connect();
-                                peersCommunicatorFromTrackerFlux.connect();
-                            }
-                        }
-                    }
-                });
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 new BittorrentAlgorithmImpl(torrentInfo,
