@@ -25,8 +25,11 @@ public class ReceivedMessagesImpl implements ReceiveMessages {
     private Flux<RequestMessage> requestMessageResponseFlux;
     private Flux<UnchokeMessage> unchokeMessageResponseFlux;
 
+    private PeerCurrentStatus peerCurrentStatus;
+
     public ReceivedMessagesImpl(Peer me, Peer peer,
-                                DataInputStream dataInputStream) {
+                                PeerCurrentStatus peerCurrentStatus, DataInputStream dataInputStream) {
+        this.peerCurrentStatus = peerCurrentStatus;
         this.peerMessageResponseFlux =
                 Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, me, peer, dataInputStream))
                         .subscribeOn(App.MyScheduler)
@@ -44,7 +47,8 @@ public class ReceivedMessagesImpl implements ReceiveMessages {
 
         this.bitFieldMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof BitFieldMessage)
-                .cast(BitFieldMessage.class);
+                .cast(BitFieldMessage.class)
+                .doOnNext(bitFieldMessage -> this.peerCurrentStatus.updatePiecesStatus(bitFieldMessage.getPiecesStatus()));
 
         this.cancelMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof CancelMessage)
@@ -52,7 +56,8 @@ public class ReceivedMessagesImpl implements ReceiveMessages {
 
         this.chokeMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof ChokeMessage)
-                .cast(ChokeMessage.class);
+                .cast(ChokeMessage.class)
+                .doOnNext(__ -> this.peerCurrentStatus.setIsHeChokingMe(true));
 
         this.extendedMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof ExtendedMessage)
@@ -64,7 +69,8 @@ public class ReceivedMessagesImpl implements ReceiveMessages {
 
         this.interestedMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof InterestedMessage)
-                .cast(InterestedMessage.class);
+                .cast(InterestedMessage.class)
+                .doOnNext(__ -> this.peerCurrentStatus.setIsHeInterestedInMe(true));
 
         this.keepMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof KeepAliveMessage)
@@ -72,7 +78,8 @@ public class ReceivedMessagesImpl implements ReceiveMessages {
 
         this.notInterestedMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof NotInterestedMessage)
-                .cast(NotInterestedMessage.class);
+                .cast(NotInterestedMessage.class)
+                .doOnNext(__ -> this.peerCurrentStatus.setIsHeInterestedInMe(false));
 
         this.pieceMessageResponseFlux = this.peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
@@ -88,7 +95,8 @@ public class ReceivedMessagesImpl implements ReceiveMessages {
 
         this.unchokeMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof UnchokeMessage)
-                .cast(UnchokeMessage.class);
+                .cast(UnchokeMessage.class)
+                .doOnNext(__ -> this.peerCurrentStatus.setIsHeChokingMe(false));
     }
 
     private void listenForPeerMessages(FluxSink<PeerMessage> sink, Peer me, Peer peer, DataInputStream dataInputStream) {

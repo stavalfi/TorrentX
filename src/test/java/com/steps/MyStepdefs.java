@@ -426,7 +426,7 @@ public class MyStepdefs {
         // check again in other way: (by ActiveTorrent::buildBitFieldMessage)
         BitFieldMessage allPiecesStatus = activeTorrent.buildBitFieldMessage(null, null);
         completedPiecesIndexList.forEach(completedPiecesIndex ->
-                Assert.assertTrue(errorMessage1, allPiecesStatus.getPieces().get(completedPiecesIndex)));
+                Assert.assertTrue(errorMessage1, allPiecesStatus.getPiecesStatus().get(completedPiecesIndex)));
 
         // check again in other way: (by ActiveTorrent::buildPieceMessage)
 
@@ -452,7 +452,7 @@ public class MyStepdefs {
         for (int i = 0; i < torrentInfo.getPieces().size(); i++) {
             if (!completedPiecesIndexList.contains(i)) {
                 String errorMessage3 = "piece is not completed but it is specified as completed piece: " + i;
-                Assert.assertFalse(errorMessage3, allPiecesStatus.getPieces().get(i));
+                Assert.assertFalse(errorMessage3, allPiecesStatus.getPiecesStatus().get(i));
             }
         }
 

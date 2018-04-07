@@ -17,13 +17,16 @@ class SendPeerMessagesImpl implements SendPeerMessages {
     private DataOutputStream peerDataOutputStream;
     private Flux<PeerMessage> sentPeerMessagesFlux;
     private FluxSink<PeerMessage> sentMessagesFluxSink;
+    private PeerCurrentStatus peerCurrentStatus;
     private Runnable closeConnectionMethod;
 
     SendPeerMessagesImpl(Peer me, Peer peer,
+                         PeerCurrentStatus peerCurrentStatus,
                          Runnable closeConnectionMethod,
                          DataOutputStream peerDataOutputStream) {
         this.me = me;
         this.peer = peer;
+        this.peerCurrentStatus = peerCurrentStatus;
         this.closeConnectionMethod = closeConnectionMethod;
         this.peerDataOutputStream = peerDataOutputStream;
         this.sentPeerMessagesFlux = Flux.create((FluxSink<PeerMessage> sink) -> this.sentMessagesFluxSink = sink);
@@ -39,20 +42,17 @@ class SendPeerMessagesImpl implements SendPeerMessages {
                 monoSink.error(e);
             }
         }).subscribeOn(App.MyScheduler)
-                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty());
+                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
+                .doOnNext(peersCommunicator -> {
+                    if (this.sentMessagesFluxSink != null)
+                        this.sentMessagesFluxSink.next(peerMessage);
+                });
     }
 
     @Override
     public Mono<SendPeerMessages> sendPieceMessage(int index, int begin, byte[] block) {
         PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(), index, begin, block);
-        return send(pieceMessage)
-                // for calculating the peer upload speed -
-                // I do not care if we failed to send the piece.
-                // so I don't register to doOnError or something like that.
-                .doOnNext(peersCommunicator -> {
-                    if (this.sentMessagesFluxSink != null)
-                        this.sentMessagesFluxSink.next(pieceMessage);
-                });
+        return send(pieceMessage);
     }
 
     @Override
@@ -62,7 +62,7 @@ class SendPeerMessagesImpl implements SendPeerMessages {
 
     @Override
     public Mono<SendPeerMessages> sendBitFieldMessage(BitFieldMessage bitFieldMessage) {
-        return sendBitFieldMessage(bitFieldMessage.getPieces());
+        return sendBitFieldMessage(bitFieldMessage.getPiecesStatus());
     }
 
     @Override
@@ -72,7 +72,8 @@ class SendPeerMessagesImpl implements SendPeerMessages {
 
     @Override
     public Mono<SendPeerMessages> sendChokeMessage() {
-        return send(new ChokeMessage(this.getMe(), this.getPeer()));
+        return send(new ChokeMessage(this.getMe(), this.getPeer()))
+                .doOnNext(__ -> this.peerCurrentStatus.setAmIChokingHim(true));
     }
 
     @Override
@@ -82,7 +83,8 @@ class SendPeerMessagesImpl implements SendPeerMessages {
 
     @Override
     public Mono<SendPeerMessages> sendInterestedMessage() {
-        return send(new InterestedMessage(this.getMe(), this.getPeer()));
+        return send(new InterestedMessage(this.getMe(), this.getPeer()))
+                .doOnNext(__ -> this.peerCurrentStatus.setAmIInterestedInHim(true));
     }
 
     @Override
@@ -92,7 +94,8 @@ class SendPeerMessagesImpl implements SendPeerMessages {
 
     @Override
     public Mono<SendPeerMessages> sendNotInterestedMessage() {
-        return send(new NotInterestedMessage(this.getMe(), this.getPeer()));
+        return send(new NotInterestedMessage(this.getMe(), this.getPeer()))
+                .doOnNext(__ -> this.peerCurrentStatus.setAmIInterestedInHim(false));
     }
 
     @Override
@@ -107,7 +110,8 @@ class SendPeerMessagesImpl implements SendPeerMessages {
 
     @Override
     public Mono<SendPeerMessages> sendUnchokeMessage() {
-        return send(new UnchokeMessage(this.getMe(), this.getPeer()));
+        return send(new UnchokeMessage(this.getMe(), this.getPeer()))
+                .doOnNext(__ -> this.peerCurrentStatus.setAmIChokingHim(false));
     }
 
     @Override
