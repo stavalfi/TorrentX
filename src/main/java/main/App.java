@@ -4,7 +4,7 @@ import christophedetroyer.torrent.TorrentParser;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.peer.PeersCommunicator;
-import main.peer.ReceiveMessages;
+import main.peer.ReceivePeerMessages;
 import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -24,7 +24,7 @@ public class App {
 
         torrentDownloader.getPeersCommunicatorFlux()
                 .map(PeersCommunicator::receivePeerMessages)
-                .flatMap(ReceiveMessages::getPeerMessageResponseFlux)
+                .flatMap(ReceivePeerMessages::getPeerMessageResponseFlux)
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
         torrentDownloader.getTorrentStatusController().startDownload();

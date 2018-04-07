@@ -109,7 +109,6 @@ class ReceivePeerMessagesImpl implements ReceivePeerMessages {
                 this.chokeMessageResponseFlux,
                 this.cancelMessageResponseFlux,
                 this.bitFieldMessageResponseFlux)
-                .doOnNext(x -> System.out.println(x))
                 .publish()
                 .autoConnect();
     }

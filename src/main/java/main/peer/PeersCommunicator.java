@@ -42,10 +42,6 @@ public class PeersCommunicator {
                 this.sendMessages.sentPeerMessagesFlux());
     }
 
-    public ReceivePeerMessages receivePeerMessages() {
-        return receivePeerMessages;
-    }
-
     public Peer getPeer() {
         return peer;
     }
@@ -79,7 +75,15 @@ public class PeersCommunicator {
                 '}';
     }
 
+    public ReceivePeerMessages receivePeerMessages() {
+        return receivePeerMessages;
+    }
+
     public SendPeerMessages sendMessages() {
         return sendMessages;
+    }
+
+    public PeerCurrentStatus getPeerCurrentStatus() {
+        return peerCurrentStatus;
     }
 }

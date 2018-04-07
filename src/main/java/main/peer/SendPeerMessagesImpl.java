@@ -109,6 +109,11 @@ class SendPeerMessagesImpl implements SendPeerMessages {
     }
 
     @Override
+    public Mono<SendPeerMessages> sendRequestMessage(RequestMessage requestMessage) {
+        return send(requestMessage);
+    }
+
+    @Override
     public Mono<SendPeerMessages> sendUnchokeMessage() {
         return send(new UnchokeMessage(this.getMe(), this.getPeer()))
                 .doOnNext(__ -> this.peerCurrentStatus.setAmIChokingHim(false));

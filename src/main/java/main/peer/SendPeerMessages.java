@@ -2,6 +2,7 @@ package main.peer;
 
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
+import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -29,6 +30,8 @@ public interface SendPeerMessages {
     Mono<SendPeerMessages> sendPortMessage(short listenPort);
 
     Mono<SendPeerMessages> sendRequestMessage(int index, int begin, int length);
+
+    Mono<SendPeerMessages> sendRequestMessage(RequestMessage requestMessage);
 
     Mono<SendPeerMessages> sendUnchokeMessage();
 
