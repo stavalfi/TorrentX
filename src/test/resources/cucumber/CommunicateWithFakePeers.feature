@@ -11,7 +11,7 @@ Feature: connect to a fake peers and communicate with them
       | sendMessageType | receiveMessageType | errorSignalType |
       | BitFieldMessage | BitFieldMessage    |                 |
       | CancelMessage   | CancelMessage      |                 |
-
+#
     Then application send to [peer ip: "localhost", peer port: "8981"] and receive the following messages:
       | sendMessageType   | receiveMessageType | errorSignalType |
       | HaveMessage       | HaveMessage        |                 |
@@ -61,7 +61,7 @@ Feature: connect to a fake peers and communicate with them
       | 2          | 0    | 15     |
 
     Examples:
-      | torrent                       | downloadLocation |
+      | torrent     | downloadLocation |
       | tor.torrent | torrents-test/   |
 
   Scenario Outline: fake peer request pieces from me but I don't have nothing to give
@@ -76,5 +76,5 @@ Feature: connect to a fake peers and communicate with them
       | pieceIndex | from | length |
 
     Examples:
-      | torrent                       | downloadLocation |
+      | torrent     | downloadLocation |
       | tor.torrent | torrents-test/   |
