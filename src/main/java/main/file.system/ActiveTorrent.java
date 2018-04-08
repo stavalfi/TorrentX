@@ -29,7 +29,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     private final BitSet piecesStatus;
     private final int[] piecesPartialStatus;
     private final String downloadPath;
-    private ConnectableFlux<TorrentPieceChanged> startListenForIncomingPiecesFlux;
+    private Flux<TorrentPieceChanged> startListenForIncomingPiecesFlux;
 
     public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath,
                          TorrentStatus torrentStatus,
@@ -48,7 +48,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                 .flatMap(pieceMessage -> writeBlock(pieceMessage))
                 .publish();
 
-        this.startListenForIncomingPiecesFlux.connect();
+        ((ConnectableFlux<TorrentPieceChanged>) this.startListenForIncomingPiecesFlux).connect();
 
         torrentStatus.getStatusTypeFlux()
                 .flatMap(torrentStatusType -> {
@@ -89,7 +89,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     }
 
     @Override
-    public ConnectableFlux<TorrentPieceChanged> savedBlockFlux() {
+    public Flux<TorrentPieceChanged> savedBlockFlux() {
         return this.startListenForIncomingPiecesFlux;
     }
 

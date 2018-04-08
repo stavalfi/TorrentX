@@ -386,7 +386,7 @@ public class MyStepdefs {
                 .block();
 
         Flux<RequestMessage> assertWrittenPiecesFlux =
-                Flux.zip(activeTorrent.savedBlockFlux().autoConnect(), pieceMessageFlux,
+                Flux.zip(activeTorrent.savedBlockFlux(), pieceMessageFlux,
                         (torrentPieceChanged, pieceMessage) -> {
                             RequestMessage requestMessage =
                                     new RequestMessage(null, null,
@@ -497,7 +497,6 @@ public class MyStepdefs {
                 .block();
 
         Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.savedBlockFlux()
-                .autoConnect()
                 .doOnNext(torrentPieceChanged -> {
                     String message = "the last piece must be completed but it's not.";
                     Assert.assertEquals(message, TorrentPieceStatus.COMPLETED, torrentPieceChanged.getTorrentPieceStatus());

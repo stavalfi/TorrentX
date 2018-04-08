@@ -3,8 +3,6 @@ package main;
 import christophedetroyer.torrent.TorrentParser;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.peer.PeersCommunicator;
-import main.peer.ReceivePeerMessages;
 import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -19,13 +17,21 @@ public class App {
         TorrentDownloader torrentDownloader = TorrentDownloaders
                 .createDefaultTorrentDownloader(getTorrentInfo(), downloadPath);
 
-        torrentDownloader.getPeersCommunicatorFlux()
+        torrentDownloader.getTorrentFileSystemManager()
+                .savedBlockFlux()
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
-        torrentDownloader.getPeersCommunicatorFlux()
-                .map(PeersCommunicator::receivePeerMessages)
-                .flatMap(ReceivePeerMessages::getPeerMessageResponseFlux)
-                .subscribe(System.out::println, Throwable::printStackTrace);
+//        torrentDownloader.getPeersCommunicatorFlux()
+//                .map(PeersCommunicator::sendMessages)
+//                .flatMap(SendPeerMessages::sentPeerMessagesFlux)
+//                .filter(peerMessage -> peerMessage instanceof RequestMessage)
+//                .cast(RequestMessage.class)
+//                .subscribe(peerMessage -> System.out.println("sent: " + peerMessage), Throwable::printStackTrace);
+//
+//        torrentDownloader.getPeersCommunicatorFlux()
+//                .map(PeersCommunicator::receivePeerMessages)
+//                .flatMap(ReceivePeerMessages::getPeerMessageResponseFlux)
+//                .subscribe(peerMessage -> System.out.println("received: " + peerMessage), Throwable::printStackTrace);
 
         torrentDownloader.getTorrentStatusController().startDownload();
         torrentDownloader.getTorrentStatusController().startUpload();

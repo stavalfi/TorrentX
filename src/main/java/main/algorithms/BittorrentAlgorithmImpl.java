@@ -7,6 +7,8 @@ import main.file.system.PieceNotDownloadedYetException;
 import main.file.system.TorrentFileSystemManager;
 import main.peer.Peer;
 import main.peer.PeersCommunicator;
+import main.peer.ReceivePeerMessages;
+import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatus;
 import main.torrent.status.TorrentStatusType;
@@ -17,12 +19,13 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
+import java.util.function.Predicate;
 
 public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
     private static Logger logger = LoggerFactory.getLogger(BittorrentAlgorithmImpl.class);
 
     private ConnectableFlux<TorrentPieceChanged> startUploadFlux;
-    private ConnectableFlux<TorrentPieceChanged> startDownloadFlux;
+    private ConnectableFlux<RequestMessage> startDownloadFlux;
 
     public BittorrentAlgorithmImpl(TorrentInfo torrentInfo,
                                    TorrentStatus torrentStatus,
@@ -32,7 +35,8 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
                 .publish();
         this.startUploadFlux.connect();
 
-        this.startDownloadFlux = downloadFlux(torrentInfo, torrentStatus, torrentFileSystemManager, peersCommunicatorFlux)
+        this.startDownloadFlux = downloadFlux(torrentInfo, torrentStatus,
+                torrentFileSystemManager, peersCommunicatorFlux.publish().autoConnect())
                 .publish();
         this.startDownloadFlux.connect();
     }
@@ -55,26 +59,14 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
                                                 TorrentPieceStatus.UPLOADING))));
     }
 
-    private Flux<TorrentPieceChanged> downloadFlux(TorrentInfo torrentInfo,
-                                                   TorrentStatus torrentStatus,
-                                                   TorrentFileSystemManager torrentFileSystemManager,
-                                                   Flux<PeersCommunicator> peersCommunicatorFlux) {
-        ConnectableFlux<PeersCommunicator> recordedPeersFlux = peersCommunicatorFlux
-                .flatMap(peersCommunicator ->
-                        peersCommunicator.sendMessages().sendBitFieldMessage(torrentFileSystemManager
-                                .buildBitFieldMessage(peersCommunicator.getMe(), peersCommunicator.getPeer()))
-                                .flatMap(sendPeerMessages -> sendPeerMessages.sendInterestedMessage())
-                                .map(sendPeerMessages -> peersCommunicator))
-                .replay();
-
-        // start recording connected peers
-        recordedPeersFlux.connect();
-
+    private Flux<RequestMessage> downloadFlux(TorrentInfo torrentInfo,
+                                              TorrentStatus torrentStatus,
+                                              TorrentFileSystemManager torrentFileSystemManager,
+                                              Flux<PeersCommunicator> peersCommunicatorFlux) {
         Flux<PeersCommunicator> informAllPeersAboutCompletedPiecesFlux = torrentFileSystemManager.savedBlockFlux()
-                .doOnNext(torrentPieceChanged -> logger.info(torrentPieceChanged.toString()))
                 .filter(torrentPieceChanged -> torrentPieceChanged.equals(TorrentPieceStatus.COMPLETED))
                 .flatMap(torrentPieceChanged ->
-                        recordedPeersFlux.flatMap(peersCommunicator ->
+                        peersCommunicatorFlux.flatMap(peersCommunicator ->
                                 peersCommunicator.sendMessages()
                                         .sendHaveMessage(torrentPieceChanged.getPieceIndex())
                                         .map(sendPeerMessages -> peersCommunicator)));
@@ -88,19 +80,42 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
         if (minMissingPieceIndex == -1 || maxMissingPieceIndex == -1)
             return Flux.empty();
 
-        Flux.range(minMissingPieceIndex, piecesAmountToDownloadAtMost)
-                .filter(pieceIndex -> torrentFileSystemManager.havePiece(pieceIndex))
+//        final int AMOUNT_OF_CONCURRENT_CONNECTIONS = 3;
+        final int AMOUNT_OF_CONCURRENT_PIECES_DOWNLOADS = 1;
+
+        Flux<PeersCommunicator> recordedPeersFlux = peersCommunicatorFlux
+                .flatMap(peersCommunicator ->
+                        peersCommunicator.sendMessages().sendInterestedMessage()
+                                .map(sendPeerMessages -> peersCommunicator))
+                .replay()
+                .autoConnect()
+                .filter(peersCommunicator -> !peersCommunicator.getPeerCurrentStatus().getIsHeChokingMe())
+                .filter(peersCommunicator -> peersCommunicator.getPeerCurrentStatus().getAmIInterestedInHim());
+
+//        getIndexOfMissingPieceFlux(torrentFileSystemManager)
+
+
+        return Flux.range(minMissingPieceIndex, piecesAmountToDownloadAtMost)
+                .filter(pieceIndex -> !torrentFileSystemManager.havePiece(pieceIndex))
                 .flatMap(pieceIndex ->
                         getPieceFlux(torrentInfo, torrentStatus, pieceIndex,
-                                torrentFileSystemManager, recordedPeersFlux), 2);
-        return Flux.empty();
+                                torrentFileSystemManager, recordedPeersFlux), AMOUNT_OF_CONCURRENT_PIECES_DOWNLOADS);
     }
 
-    private Flux<PeersCommunicator> getPieceFlux(TorrentInfo torrentInfo,
-                                                 TorrentStatus torrentStatus,
-                                                 int pieceIndex,
-                                                 TorrentFileSystemManager torrentFileSystemManager,
-                                                 Flux<PeersCommunicator> recordedPeersFlux) {
+    private Flux<Integer> getIndexOfMissingPieceFlux(TorrentFileSystemManager torrentFileSystemManager) {
+        int minMissingPieceIndex = torrentFileSystemManager.minMissingPieceIndex();
+        int maxMissingPieceIndex = torrentFileSystemManager.maxMissingPieceIndex();
+        int piecesAmountToDownloadAtMost = maxMissingPieceIndex - minMissingPieceIndex + 1;
+
+        return Flux.range(minMissingPieceIndex, piecesAmountToDownloadAtMost)
+                .filter(pieceIndex -> !torrentFileSystemManager.havePiece(pieceIndex));
+    }
+
+    private Flux<RequestMessage> getPieceFlux(TorrentInfo torrentInfo,
+                                              TorrentStatus torrentStatus,
+                                              int pieceIndex,
+                                              TorrentFileSystemManager torrentFileSystemManager,
+                                              Flux<PeersCommunicator> recordedPeersFlux) {
         int pieceLength = torrentFileSystemManager.getTorrentInfo().getPieceLength(pieceIndex);
         int estimatedPieceStatus = torrentFileSystemManager.getPiecesEstimatedStatus()[pieceIndex];
 
@@ -111,27 +126,25 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
                 .replay(1);
         isInDownloadingStateFlux.connect();
 
-        return recordedPeersFlux.filter(peersCommunicator -> !peersCommunicator.getPeerCurrentStatus().getIsHeChokingMe())
-                .filter(peersCommunicator -> peersCommunicator.getPeerCurrentStatus().getAmIInterestedInHim())
-                .filter(peersCommunicator -> peersCommunicator.getPeerCurrentStatus()
-                                .getPiecesStatus()
-                                .get(pieceIndex))
-                .flatMap(peersCommunicator ->
-                        isInDownloadingStateFlux.filter(isInDownloadingState -> isInDownloadingState)
-                                .map(__ -> peersCommunicator))
-                // I will be here when I'm in downloading state only.
-                .flatMap(peersCommunicator ->
-                        buildRequestMessagesToPiece(peersCommunicator.getMe(), peersCommunicator.getPeer(), pieceIndex, pieceLength, estimatedPieceStatus)
-                                .flatMap(requestMessage -> peersCommunicator.sendMessages()
-                                        .sendRequestMessage(requestMessage), 1)
-                                // I don't want to emit the same peersCommunicator object multiple times.
-                                .collectList()
-                                .map(sentRequests -> peersCommunicator));
+        Flux<Boolean> waitUntilWeInDownloadState =
+                isInDownloadingStateFlux.filter(isInDownloadingState -> isInDownloadingState);
+
+        Predicate<PeersCommunicator> isPeerHavePiece = peersCommunicator ->
+                peersCommunicator.getPeerCurrentStatus().getPiecesStatus().get(pieceIndex);
+
+        final int AMOUNT_OF_CONCURRENT_REQUESTS = 3;
+
+        return recordedPeersFlux.filter(isPeerHavePiece)
+                .flatMap(peersCommunicator -> waitUntilWeInDownloadState
+                        .flatMap(__ -> buildRequestMessagesToPiece(peersCommunicator.getMe(),
+                                peersCommunicator.getPeer(), pieceIndex, pieceLength, estimatedPieceStatus)
+                                        .flatMap(requestMessage -> getPieceFromPeer(peersCommunicator, requestMessage))
+                                , AMOUNT_OF_CONCURRENT_REQUESTS));
     }
 
     private Flux<RequestMessage> buildRequestMessagesToPiece(Peer from, Peer to, int pieceIndex,
                                                              int pieceLength, int pieceEstimatedStatus) {
-        final int REQUEST_BLOCK_SIZE = 16_000;
+        final int REQUEST_BLOCK_SIZE = 16_384;
         ArrayList<RequestMessage> requests = new ArrayList();
         for (int i = pieceEstimatedStatus; i < pieceLength; i += REQUEST_BLOCK_SIZE) {
             requests.add(new RequestMessage(from, to, pieceIndex, i, REQUEST_BLOCK_SIZE));
@@ -139,8 +152,23 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
         return Flux.fromIterable(requests);
     }
 
+    private Mono<RequestMessage> getPieceFromPeer(PeersCommunicator peersCommunicator,
+                                                  RequestMessage requestMessage) {
+        Predicate<PieceMessage> isPieceRelatedToRequest = pieceMessage ->
+                pieceMessage.getIndex() == requestMessage.getIndex() &&
+                        pieceMessage.getBegin() == requestMessage.getBegin();
+
+        return peersCommunicator.sendMessages()
+                .sendRequestMessage(requestMessage)
+                .map(sendPeerMessages -> peersCommunicator.receivePeerMessages())
+                .flatMapMany(ReceivePeerMessages::getPieceMessageResponseFlux)
+                .filter(isPieceRelatedToRequest)
+                .single()
+                .map(pieceMessage -> requestMessage);
+    }
+
     @Override
-    public Flux<TorrentPieceChanged> startDownloadFlux() {
+    public Flux<RequestMessage> startDownloadFlux() {
         return this.startDownloadFlux;
     }
 
