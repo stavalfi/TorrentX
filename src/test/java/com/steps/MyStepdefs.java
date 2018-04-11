@@ -20,6 +20,7 @@ import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
+import main.torrent.status.TorrentStatus;
 import main.torrent.status.TorrentStatusController;
 import main.torrent.status.TorrentStatusControllerImpl;
 import main.torrent.status.TorrentStatusType;
@@ -720,58 +721,47 @@ public class MyStepdefs {
     public void torrentStatusForWillBe(String torrentFileName,
                                        List<TorrentStatusType> changedTorrentStatusTypeList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-        TorrentStatusController torrentStatusController = TorrentDownloaders.getInstance()
+        TorrentStatus torrentStatus = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .get()
                 .getTorrentStatusController();
 
-        // assert that the state is changed by using methods: this.torrentStatusController.isXXX().
-        changedTorrentStatusTypeList.forEach(torrentStatusType -> {
-            switch (torrentStatusType) {
-                case START_DOWNLOAD:
-                    Assert.assertTrue(torrentStatusController.isStartedDownload());
-                    break;
-                case START_UPLOAD:
-                    Assert.assertTrue(torrentStatusController.isStartedUpload());
-                    break;
-                case PAUSE_DOWNLOAD:
-                    Assert.assertFalse(torrentStatusController.isDownloading());
-                    break;
-                case RESUME_DOWNLOAD:
-                    Assert.assertTrue(torrentStatusController.isDownloading());
-                    break;
-                case PAUSE_UPLOAD:
-                    Assert.assertFalse(torrentStatusController.isUploading());
-                    break;
-                case RESUME_UPLOAD:
-                    Assert.assertTrue(torrentStatusController.isUploading());
-                    break;
-                case COMPLETED_DOWNLOADING:
-                    Assert.assertTrue(torrentStatusController.isCompletedDownloading());
-                    break;
-                case REMOVE_TORRENT:
-                    Assert.assertTrue(torrentStatusController.isTorrentRemoved());
-                    break;
-                case REMOVE_FILES:
-                    Assert.assertTrue(torrentStatusController.isFileRemoved());
-                    break;
-            }
-        });
+        // assert that the state is changed.
 
-        // assert that we receive the proper signals from this.torrentStatusTypeFlux.
-        Assert.assertTrue(new HashSet<>(this.torrentStatusTypeFlux).equals(new HashSet<>(changedTorrentStatusTypeList)));
-    }
+        boolean expectedStartDownload = changedTorrentStatusTypeList.contains(TorrentStatusType.START_DOWNLOAD);
+        Assert.assertEquals(expectedStartDownload, torrentStatus.isStartedDownloadingFlux()
+                .filter(isTrue -> isTrue == expectedStartDownload)
+                .blockFirst());
 
-    @Then("^torrent-status for torrent \"([^\"]*)\" will be: Empty-table$")
-    public void torrentStatusForTorrentWillBeEmptyTable(String torrentFileName) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-        TorrentStatusController torrentStatusController = TorrentDownloaders.getInstance()
-                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get()
-                .getTorrentStatusController();
+        boolean expectedStartUpload = changedTorrentStatusTypeList.contains(TorrentStatusType.START_UPLOAD);
+        Assert.assertEquals(expectedStartUpload, torrentStatus.isStartedUploadingFlux()
+                .filter(isTrue -> isTrue == expectedStartUpload)
+                .blockFirst());
 
-        // assert that we receive the proper signals from this.torrentStatusTypeFlux.
-        Assert.assertTrue(new HashSet<>(this.torrentStatusTypeFlux).equals(new HashSet<>(Collections.emptyList())));
+        boolean expectedDownloading = changedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_DOWNLOAD);
+        Assert.assertEquals(expectedDownloading, torrentStatus.isDownloadingFlux()
+                .filter(isTrue -> isTrue == expectedDownloading)
+                .blockFirst());
+
+        boolean expectedUploading = changedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_UPLOAD);
+        Assert.assertEquals(expectedUploading, torrentStatus.isUploadingFlux()
+                .filter(isTrue -> isTrue == expectedUploading)
+                .blockFirst());
+
+        boolean expectedCompletedDownload = changedTorrentStatusTypeList.contains(TorrentStatusType.COMPLETED_DOWNLOADING);
+        Assert.assertEquals(expectedCompletedDownload, torrentStatus.isCompletedDownloadingFlux()
+                .filter(isTrue -> isTrue == expectedCompletedDownload)
+                .blockFirst());
+
+        boolean expectedRemovedFiles = changedTorrentStatusTypeList.contains(TorrentStatusType.REMOVE_FILES);
+        Assert.assertEquals(expectedRemovedFiles, torrentStatus.isFilesRemovedFlux()
+                .filter(isTrue -> isTrue == expectedRemovedFiles)
+                .blockFirst());
+
+        boolean expectedRemoveTorrent = changedTorrentStatusTypeList.contains(TorrentStatusType.REMOVE_TORRENT);
+        Assert.assertEquals(expectedRemoveTorrent, torrentStatus.isTorrentRemovedFlux()
+                .filter(isTrue -> isTrue == expectedRemoveTorrent)
+                .blockFirst());
     }
 
     private Mono<List<RemoteFakePeerForRequestingPieces>> requestsFromPeerToMeListMono;

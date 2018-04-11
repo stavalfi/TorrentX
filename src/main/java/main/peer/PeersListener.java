@@ -18,11 +18,13 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PeersListener {
     private Integer tcpPort;
     private ServerSocket listenToPeerConnection;
     private ConnectableFlux<PeersCommunicator> peersConnectedToMeFlux;
+    private AtomicBoolean didIStop = new AtomicBoolean(false);
 
     public PeersListener() {
         this(AppConfig.getInstance().getMyListeningPort());
@@ -49,9 +51,11 @@ public class PeersListener {
                         this.listenToPeerConnection.close();
                     } catch (IOException e1) {
                         // TODO: do something with this shit
-                        e1.printStackTrace();
+                        //e1.printStackTrace();
                     }
-                    sink.error(e);
+                    if (!this.didIStop.get())
+                        sink.error(e);
+                    return;
                 }
         }).subscribeOn(App.MyScheduler)
                 .publish();
@@ -110,8 +114,10 @@ public class PeersListener {
     }
 
     public void stopListenForNewPeers() throws IOException {
-        if (this.listenToPeerConnection != null)
+        if (this.didIStop.compareAndSet(false, true) &&
+                this.listenToPeerConnection != null) {
             this.listenToPeerConnection.close();
+        }
     }
 
     public int getTcpPort() {

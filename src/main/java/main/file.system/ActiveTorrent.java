@@ -10,7 +10,6 @@ import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatus;
-import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -44,23 +43,26 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
 
         this.activeTorrentFileList = createActiveTorrentFileList(torrentInfo, downloadPath);
 
-        this.startListenForIncomingPiecesFlux = peerResponsesFlux
-                .flatMap(pieceMessage -> writeBlock(pieceMessage))
-                .publish();
+        torrentStatus.isFilesRemovedFlux()
+                .filter(isFilesRemoved -> isFilesRemoved)
+                // I can be here only once.
+                .flatMap(__ -> deleteFileOnlyMono(torrentInfo.getTorrentInfoHash()))
+                .publish()
+                .autoConnect(0);
 
-        ((ConnectableFlux<TorrentPieceChanged>) this.startListenForIncomingPiecesFlux).connect();
+        torrentStatus.isTorrentRemovedFlux()
+                .filter(isTorrentRemoved -> isTorrentRemoved)
+                // I can be here only once.
+                .flatMap(__ -> deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                .publish()
+                .autoConnect(0);
 
-        torrentStatus.getStatusTypeFlux()
-                .flatMap(torrentStatusType -> {
-                    switch (torrentStatusType) {
-                        case REMOVE_FILES:
-                            return deleteFileOnlyMono(torrentInfo.getTorrentInfoHash());
-                        case REMOVE_TORRENT:
-                            return deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash());
-                        default:
-                            return Flux.empty();
-                    }
-                }).subscribe();
+        this.startListenForIncomingPiecesFlux = torrentStatus.isStartedDownloadingFlux()
+                .filter(isStartedDownloading -> isStartedDownloading)
+                // I can be here only once.
+                .flatMap(__ -> peerResponsesFlux.flatMap(pieceMessage -> writeBlock(pieceMessage)))
+                .publish()
+                .autoConnect(0);
     }
 
     @Override
@@ -92,6 +94,12 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     public Flux<TorrentPieceChanged> savedBlockFlux() {
         return this.startListenForIncomingPiecesFlux;
     }
+
+//    @Override
+//    public void startListenForSavedBlockFlux() {
+//        if (this.isStartListenForIncomingPieces.compareAndSet(false, true))
+//            this.startListenForIncomingPiecesFlux.connect();
+//    }
 
     public Mono<Boolean> deleteActiveTorrentOnlyMono(String torrentInfoHash) {
         boolean deletedActiveTorrent = ActiveTorrents.getInstance()

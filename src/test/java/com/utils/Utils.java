@@ -54,7 +54,7 @@ public class Utils {
             try {
                 peersListener.stopListenForNewPeers();
             } catch (IOException e) {
-                e.printStackTrace();
+
             }
             peersListener = null;
         }
