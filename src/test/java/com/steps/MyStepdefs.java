@@ -193,18 +193,21 @@ public class MyStepdefs {
                     int listSize = peerMessageFluxList.size();
                     if (completeSignal.isPresent())
                         // we won't get any response for the last flux so we won't listen to it.
-                        return Flux.zip(peerMessageFluxList.subList(0, listSize - 2), Function.identity())
-                                .doOnNext(peerResponses -> peersCommunicator.closeConnection());
+                        return Flux.zip(peerMessageFluxList.subList(0, listSize - 2), Function.identity());
                     // there will be an error signal or only next signals. either way, we will listen to all fluxes.
-                    return Flux.zip(peerMessageFluxList, Function.identity())
-                            .doOnNext(peerResponses -> peersCommunicator.closeConnection());
+                    return Flux.zip(peerMessageFluxList, Function.identity());
                 })
                 .take(1)
                 .single();
 
-        StepVerifier.create(peerResponsesMono)
-                .expectNextCount(1)
-                .verifyComplete();
+        if (errorSignalType.isPresent())
+            StepVerifier.create(peerResponsesMono)
+                    .expectError(errorSignalType.get().getErrorSignal())
+                    .verify();
+        else
+            StepVerifier.create(peerResponsesMono)
+                    .expectNextCount(1)
+                    .verifyComplete();
 
         remoteFakePeerCopyCat.shutdown();
     }
