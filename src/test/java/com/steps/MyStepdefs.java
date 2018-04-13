@@ -506,26 +506,31 @@ public class MyStepdefs {
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, Flux.just(lastPieceMessage))
                 .block();
 
-        Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.savedBlockFlux()
-                .doOnNext(torrentPieceChanged -> {
-                    String message = "the last piece must be completed but it's not.";
-                    Assert.assertEquals(message, TorrentPieceStatus.COMPLETED, torrentPieceChanged.getTorrentPieceStatus());
-                })
-                // assert that we wrote to the file what we should have.
-                .doOnNext(torrentPieceChanged -> {
-                    byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
-                    String errorMessage = "The read operation failed to read exactly what we wrote";
-                    Assert.assertArrayEquals(errorMessage, actualWrittenBytes, lastPieceMessage.getBlock());
-                })
-                // assert that we can read the last piece successfully.
-                .flatMap(torrentPieceChanged -> activeTorrent.buildPieceMessage(requestLastPieceMessage))
-                .doOnNext(pieceMessage -> {
-                    byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
-                    String errorMessage = "The read operation failed to read exactly what we wrote";
-                    Assert.assertArrayEquals(errorMessage, actualWrittenBytes, pieceMessage.getBlock());
-                })
-                // there must be only one signal here: the last piece. so single() must work.
-                .single();
+        Mono<PieceMessage> readLastPieceTaskMono =
+                activeTorrent.savedBlockFlux()
+                        .replay()
+                        .autoConnect(0)
+                        .doOnNext(torrentPieceChanged -> {
+                            String message = "the last piece must be completed but it's not.";
+                            Assert.assertEquals(message, TorrentPieceStatus.COMPLETED, torrentPieceChanged.getTorrentPieceStatus());
+                        })
+                        // assert that we wrote to the file what we should have.
+                        .doOnNext(torrentPieceChanged -> {
+                            byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
+                            String errorMessage = "The read operation failed to read exactly what we wrote";
+                            Assert.assertArrayEquals(errorMessage, actualWrittenBytes, lastPieceMessage.getBlock());
+                        })
+                        // assert that we can read the last piece successfully.
+                        .flatMap(torrentPieceChanged -> activeTorrent.buildPieceMessage(requestLastPieceMessage))
+                        .doOnNext(pieceMessage -> {
+                            byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
+                            String errorMessage = "The read operation failed to read exactly what we wrote";
+                            Assert.assertArrayEquals(errorMessage, actualWrittenBytes, pieceMessage.getBlock());
+                        })
+                        .take(1)
+                        .single();
+
+        torrentStatusController.startDownload();
 
         StepVerifier.create(readLastPieceTaskMono)
                 .expectNextCount(1)
