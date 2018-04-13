@@ -27,9 +27,10 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
                 .publish()
                 .autoConnect(0);
 
-        this.startDownloadFlux = downloadFlux(torrentInfo, torrentStatus,
-                torrentFileSystemManager, peersCommunicatorFlux.publish().autoConnect())
-                .publish();
+//        this.startDownloadFlux = downloadFlux(torrentInfo, torrentStatus,
+//                torrentFileSystemManager, peersCommunicatorFlux.publish().autoConnect())
+//                .publish();
+        this.startDownloadFlux = Flux.never();
         // this.startDownloadFlux.connect();
     }
 
