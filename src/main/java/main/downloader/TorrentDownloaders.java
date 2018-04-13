@@ -34,21 +34,22 @@ public class TorrentDownloaders {
                                                                   PeersProvider peersProvider,
                                                                   Flux<TrackerConnection> trackerConnectionFlux,
                                                                   Flux<PeersCommunicator> peersCommunicatorFlux) {
-        Optional<TorrentDownloader> torrentDownloader1 = findTorrentDownloader(torrentInfo.getTorrentInfoHash());
-        if (torrentDownloader1.isPresent())
-            return torrentDownloader1.get();
+        return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseGet(() -> {
+                    TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
+                            torrentFileSystemManager,
+                            bittorrentAlgorithm,
+                            torrentStatusController,
+                            torrentSpeedStatistics,
+                            trackerProvider,
+                            peersProvider,
+                            trackerConnectionFlux,
+                            peersCommunicatorFlux);
 
-        TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
-                torrentFileSystemManager,
-                bittorrentAlgorithm,
-                torrentStatusController,
-                torrentSpeedStatistics,
-                trackerProvider,
-                peersProvider,
-                trackerConnectionFlux,
-                peersCommunicatorFlux);
-        this.torrentDownloaderList.add(torrentDownloader);
-        return torrentDownloader;
+                    this.torrentDownloaderList.add(torrentDownloader);
+
+                    return torrentDownloader;
+                });
     }
 
     /**
@@ -93,10 +94,14 @@ public class TorrentDownloaders {
                         .filter(isStarted -> isStarted)
                         .take(1)
                         .flatMap(__ ->
-                                Flux.merge(peersListener.getPeersConnectedToMeFlux()
-                                                .autoConnect(),
+                                Flux.merge(peersListener.getPeersConnectedToMeFlux(),
                                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                                                .autoConnect()));
+                                                .autoConnect()))
+                        // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
+                        // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
+                        // every time and then I will connect to all the peers again and again...
+                        .publish()
+                        .autoConnect();
 
         TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,

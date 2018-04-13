@@ -103,7 +103,12 @@ public class Utils {
                                 Flux.merge(peersListener.getPeersConnectedToMeFlux()
                                                 .autoConnect(),
                                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                                                .autoConnect()));
+                                                .autoConnect()))
+                        // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
+                        // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
+                        // every time and then I will connect to all the peers again and again...
+                        .publish()
+                        .autoConnect();
 
         TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
@@ -159,7 +164,12 @@ public class Utils {
                                                 // the tests inside Utils::removeEverythingRelatedToTorrent.
                                                 .onErrorResume(SocketException.class, throwable -> Flux.empty()),
                                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                                                .autoConnect()));
+                                                .autoConnect()))
+                        // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
+                        // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
+                        // every time and then I will connect to all the peers again and again...
+                        .publish()
+                        .autoConnect();
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 new BittorrentAlgorithmImpl(torrentInfo,
@@ -236,6 +246,8 @@ public class Utils {
                 return peersCommunicator.receivePeerMessages().getInterestedMessageResponseFlux();
             case NotInterestedMessage:
                 return peersCommunicator.receivePeerMessages().getNotInterestedMessageResponseFlux();
+            case ExtendedMessage:
+                return peersCommunicator.receivePeerMessages().getExtendedMessageResponseFlux();
             default:
                 throw new IllegalArgumentException(peerMessageType.toString());
         }
