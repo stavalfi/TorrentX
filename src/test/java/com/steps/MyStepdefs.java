@@ -219,38 +219,53 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
     }
 
-    @Then("^application receive at list one random block of a random piece in torrent: \"([^\"]*)\"$")
-    public void applicationReceiveAtListOneRandomBlockOfARandomPieceInTorrent(String torrentFileName) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
-                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get();
-
-        int requestBlockSize = 16000;
-
-        Mono<PieceMessage> receiveSinglePieceMono = torrentDownloader.getPeersCommunicatorFlux()
-                .flatMap(peersCommunicator -> peersCommunicator.sendMessages()
-                        .sendInterestedMessage()
-                        .map(sendPeerMessages -> peersCommunicator))
-                .flatMap(peersCommunicator -> peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux()
-                        .take(1)
-                        .flatMap(haveMessage -> peersCommunicator.sendMessages()
-                                .sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)
-                                .map(sendPeerMessages -> peersCommunicator)))
-                .flatMap(peersCommunicator ->
-                        peersCommunicator.receivePeerMessages()
-                                .getPieceMessageResponseFlux()
-                                .doOnNext(pieceMessage -> peersCommunicator.closeConnection()))
-                .take(1)
-                .single();
-
+//    @Then("^application receive at list one random block of a random piece in torrent: \"([^\"]*)\"$")
+//    public void applicationReceiveAtListOneRandomBlockOfARandomPieceInTorrent(String torrentFileName) throws Throwable {
+//        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+//
+//        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+//                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+//                .get();
+//
+//        int requestBlockSize = 16_384;
+//
+//        Function<BitFieldMessage, List<Integer>> getCompletedPieces = bitFieldMessage -> {
+//            List<Integer> completedPieces = new ArrayList<>();
+//            for (int i = 0; i < bitFieldMessage.getPiecesStatus().size(); i++)
+//                if (bitFieldMessage.getPiecesStatus().get(i))
+//                    completedPieces.add(i);
+//            return completedPieces;
+//        };
+//
+//        Mono<PieceMessage> receiveSinglePieceMono =
+//                torrentDownloader.getPeersCommunicatorFlux()
+//                        .replay()
+//                        .autoConnect(0)
+//                        .flatMap(peersCommunicator -> peersCommunicator.sendMessages()
+//                                .sendInterestedMessage()
+//                                .map(sendPeerMessages -> peersCommunicator))
+//                        .flatMap(peersCommunicator ->
+//                                peersCommunicator.receivePeerMessages()
+//                                        .getBitFieldMessageResponseFlux()
+//                                        .map(bitFieldMessage -> getCompletedPieces.apply(bitFieldMessage))
+//                                        .flatMap(Flux::fromIterable)
+//                                        .take(5)
+//                                        .flatMap(completedPieceIndex -> peersCommunicator.sendMessages()
+//                                                .sendRequestMessage(completedPieceIndex, 0, requestBlockSize)
+//                                                .map(sendPeerMessages -> peersCommunicator)))
+//                        .flatMap(peersCommunicator ->
+//                                peersCommunicator.receivePeerMessages()
+//                                        .getPieceMessageResponseFlux()
+//                                        .doOnNext(pieceMessage -> peersCommunicator.closeConnection()))
+//                        .take(1)
+//                        .single();
+//
 //        torrentDownloader.getTorrentStatusController().startUpload();
-
-        StepVerifier.create(receiveSinglePieceMono)
-                .expectNextCount(1)
-                .verifyComplete();
-    }
+//
+//        StepVerifier.create(receiveSinglePieceMono)
+//                .expectNextCount(1)
+//                .verifyComplete();
+//    }
 
     @Then("^application create active-torrent for: \"([^\"]*)\",\"([^\"]*)\"$")
     public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {

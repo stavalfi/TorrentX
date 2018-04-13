@@ -5,7 +5,10 @@ import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.BittorrentAlgorithmImpl;
 import main.file.system.ActiveTorrents;
 import main.file.system.TorrentFileSystemManager;
-import main.peer.*;
+import main.peer.PeersCommunicator;
+import main.peer.PeersListener;
+import main.peer.PeersProvider;
+import main.peer.ReceivePeerMessages;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.TorrentStatusController;
@@ -81,20 +84,19 @@ public class TorrentDownloaders {
 
         PeersListener peersListener = new PeersListener();
 
-        Flux<PeersCommunicator> peersCommunicatorFlux =
-                Flux.merge(peersListener.getPeersConnectedToMeFlux()
-                                .autoConnect(),
-                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                                .autoConnect());
+        TorrentStatusController torrentStatusController =
+                TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
 
-        TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(torrentInfo,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false);
+        Flux<PeersCommunicator> peersCommunicatorFlux =
+                Flux.merge(torrentStatusController.isStartedDownloadingFlux(),
+                        torrentStatusController.isStartedUploadingFlux())
+                        .filter(isStarted -> isStarted)
+                        .take(1)
+                        .flatMap(__ ->
+                                Flux.merge(peersListener.getPeersConnectedToMeFlux()
+                                                .autoConnect(),
+                                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                                                .autoConnect()));
 
         TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
