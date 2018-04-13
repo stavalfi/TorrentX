@@ -18,20 +18,28 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PeersListener {
-    private Integer tcpPort = AppConfig.getInstance().getMyListeningPort();
+    private Integer tcpPort;
     private ServerSocket listenToPeerConnection;
     private ConnectableFlux<PeersCommunicator> peersConnectedToMeFlux;
+    private AtomicBoolean didIStop = new AtomicBoolean(false);
 
-    private PeersListener() {
+    public PeersListener() {
+        this(AppConfig.getInstance().getMyListeningPort());
+    }
 
+    public PeersListener(Integer tcpPort) {
+        this.tcpPort = tcpPort;
         this.peersConnectedToMeFlux = Flux.create((FluxSink<PeersCommunicator> sink) -> {
             try {
                 this.listenToPeerConnection = new ServerSocket(this.tcpPort);
             } catch (IOException e) {
                 // TODO: do something with this shit
                 e.printStackTrace();
+                sink.error(e);
+                return;
             }
             while (!this.listenToPeerConnection.isClosed() && !sink.isCancelled())
                 try {
@@ -43,9 +51,11 @@ public class PeersListener {
                         this.listenToPeerConnection.close();
                     } catch (IOException e1) {
                         // TODO: do something with this shit
-                        e1.printStackTrace();
+                        //e1.printStackTrace();
                     }
-                    sink.error(e);
+                    if (!this.didIStop.get())
+                        sink.error(e);
+                    return;
                 }
         }).subscribeOn(App.MyScheduler)
                 .publish();
@@ -103,19 +113,15 @@ public class PeersListener {
                 .map(TorrentDownloader::getTorrentInfo);
     }
 
-    public void stopListenForNewPeers() throws IOException, NullPointerException {
-        this.listenToPeerConnection.close();
+    public void stopListenForNewPeers() throws IOException {
+        if (this.didIStop.compareAndSet(false, true) &&
+                this.listenToPeerConnection != null) {
+            this.listenToPeerConnection.close();
+        }
     }
 
     public int getTcpPort() {
         return this.tcpPort;
-    }
-
-
-    private static PeersListener instance = new PeersListener();
-
-    public static PeersListener getInstance() {
-        return instance;
     }
 
     public ConnectableFlux<PeersCommunicator> getPeersConnectedToMeFlux() {

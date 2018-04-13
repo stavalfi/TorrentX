@@ -9,6 +9,7 @@ import main.AppConfig;
 import main.TorrentInfo;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
+import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
@@ -20,15 +21,18 @@ import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
+import main.torrent.status.TorrentStatus;
 import main.torrent.status.TorrentStatusController;
 import main.torrent.status.TorrentStatusControllerImpl;
 import main.torrent.status.TorrentStatusType;
 import main.tracker.Tracker;
+import main.tracker.TrackerConnection;
 import main.tracker.TrackerExceptions;
 import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
 import org.junit.Assert;
 import org.mockito.Mockito;
+import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
@@ -98,26 +102,6 @@ public class MyStepdefs {
                 .thenReturn(Collections.singletonList(new Tracker("udp", "invalid.url.123", 123)));
     }
 
-    @Then("^application send and receive Handshake from the same random peer$")
-    public void applicationSendAndReceiveHandshakeFromTheSameRandomPeer() {
-        TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
-        PeersProvider peersProvider = new PeersProvider(this.torrentInfo);
-
-        Mono<PeersCommunicator> peersCommunicatorFlux =
-                trackerProvider.connectToTrackersFlux()
-                        .autoConnect()
-                        .as(trackerConnectionFlux ->
-                                peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionFlux)
-                                        .autoConnect())
-                        .take(1)
-                        .single();
-
-        StepVerifier.create(peersCommunicatorFlux)
-                .expectNextCount(1)
-                .expectComplete()
-                .verify();
-    }
-
     @Then("^application send and receive the following messages from a random tracker:$")
     public void applicationSendAndReceiveTheFollowingMessagesFromARandomTracker(List<TrackerFakeRequestResponseMessage> messages) {
         boolean isMessagesFormatGood = messages.stream()
@@ -140,7 +124,7 @@ public class MyStepdefs {
                                     switch (messageWeNeedToSend.getTrackerRequestType()) {
                                         case Announce:
                                             return trackerConnection.announceMono(this.torrentInfo.getTorrentInfoHash(),
-                                                    PeersListener.getInstance().getTcpPort());
+                                                    AppConfig.getInstance().getMyListeningPort());
                                         case Scrape:
                                             return trackerConnection.scrapeMono(Collections.singletonList(this.torrentInfo.getTorrentInfoHash()));
                                         default:
@@ -178,49 +162,69 @@ public class MyStepdefs {
 
         PeersProvider peersProvider = new PeersProvider(this.torrentInfo);
 
-        List<PeerMessageType> peerMessageTypeList = peerFakeRequestResponses.stream()
+        List<PeerMessageType> messageToSendList = peerFakeRequestResponses.stream()
                 .map(PeerFakeRequestResponse::getSendMessageType)
                 .collect(Collectors.toList());
 
         // check if we expect an error signal.
-        Optional<ErrorSignalType> errorSignalType = peerFakeRequestResponses.stream()
+        Optional<ErrorSignalType> errorSignalTypeOptional = peerFakeRequestResponses.stream()
                 .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() != null)
                 .map(PeerFakeRequestResponse::getErrorSignalType)
                 .findAny();
 
         // check if we expect a complete signal
-        Optional<PeerFakeRequestResponse> completeSignal = peerFakeRequestResponses.stream()
+        Optional<PeerFakeRequestResponse> completeSignalOptional = peerFakeRequestResponses.stream()
                 .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
                         peerFakeRequestResponse.getReceiveMessageType() == null)
                 .findAny();
 
-        Mono<Object[]> peerResponsesMono = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
-                .flatMap(peersCommunicator -> {
-                    List<Mono<PeersCommunicator>> sendPeerMessageMonoStream = peerMessageTypeList.stream()
-                            .map(peerRequestMessage -> Utils.sendFakeMessage(peersCommunicator, peerRequestMessage))
-                            .collect(Collectors.toList());
-                    return Mono.zip(sendPeerMessageMonoStream, peersCommunicators -> peersCommunicator);
-                })
-                .flux()
-                .flatMap(peersCommunicator -> {
-                    List<Flux<? extends PeerMessage>> peerMessageFluxList = peerMessageTypeList.stream()
-                            .map(peerMessageType -> Utils.getSpecificMessageResponseFluxByMessageType(peersCommunicator, peerMessageType))
-                            .collect(Collectors.toList());
-                    int listSize = peerMessageFluxList.size();
-                    if (completeSignal.isPresent())
-                        // we won't get any response for the last flux so we won't listen to it.
-                        return Flux.zip(peerMessageFluxList.subList(0, listSize - 2), Function.identity())
-                                .doOnNext(peerResponses -> peersCommunicator.closeConnection());
-                    // there will be an error signal or only next signals. either way, we will listen to all fluxes.
-                    return Flux.zip(peerMessageFluxList, Function.identity())
-                            .doOnNext(peerResponses -> peersCommunicator.closeConnection());
-                })
-                .take(1)
-                .single();
+        boolean expectResponseToEveryRequest = peerFakeRequestResponses.stream()
+                .allMatch(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
+                        peerFakeRequestResponse.getReceiveMessageType() != null);
 
-        StepVerifier.create(peerResponsesMono)
-                .expectNextCount(1)
-                .verifyComplete();
+        PeersCommunicator fakePeer = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
+                .block();
+
+        Flux<? extends PeerMessage> recordedResponseFlux =
+                Flux.fromIterable(messageToSendList)
+                        .flatMap(peerMessageType ->
+                                Utils.getSpecificMessageResponseFluxByMessageType(fakePeer, peerMessageType))
+                        .replay()
+                        // start record incoming messages from fake peer
+                        .autoConnect(0);
+
+
+        Mono<List<SendPeerMessages>> sentMessagesMono = Flux.fromIterable(messageToSendList)
+                .flatMap(peerMessageType ->
+                        Utils.sendFakeMessage(fakePeer, peerMessageType))
+                .collectList();
+
+        if (expectResponseToEveryRequest)
+            StepVerifier
+                    .create(sentMessagesMono
+                            .flatMapMany(peersCommunicator -> recordedResponseFlux)
+                            .take(messageToSendList.size()))
+                    .expectNextCount(messageToSendList.size())
+                    .verifyComplete();
+
+        errorSignalTypeOptional.map(ErrorSignalType::getErrorSignal)
+                .ifPresent(errorSignalType ->
+                        StepVerifier
+                                .create(sentMessagesMono
+                                        .flatMapMany(peersCommunicator -> recordedResponseFlux)
+                                        .take(messageToSendList.size() - 1))
+                                .expectNextCount(messageToSendList.size() - 1)
+                                .expectError(errorSignalType)
+                                .verify());
+
+        completeSignalOptional.map(PeerFakeRequestResponse::getSendMessageType)
+                .ifPresent(errorSignalType1 ->
+                        StepVerifier
+                                .create(sentMessagesMono
+                                        .flatMapMany(peersCommunicator -> recordedResponseFlux)
+                                        .take(messageToSendList.size() - 1))
+                                .expectNextCount(messageToSendList.size() - 1)
+                                .verifyComplete());
 
         remoteFakePeerCopyCat.shutdown();
     }
@@ -243,21 +247,40 @@ public class MyStepdefs {
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .get();
 
-        int requestBlockSize = 16000;
+        int requestBlockSize = 16_384;
 
-        Mono<PieceMessage> receiveSinglePieceMono = torrentDownloader.getPeersCommunicatorFlux()
-                .flatMap(PeersCommunicator::sendInterestedMessage)
-                .flatMap(peersCommunicator -> peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux()
+        Function<BitFieldMessage, List<Integer>> getCompletedPieces = bitFieldMessage -> {
+            List<Integer> completedPieces = new ArrayList<>();
+            for (int i = 0; i < bitFieldMessage.getPiecesStatus().size(); i++)
+                if (bitFieldMessage.getPiecesStatus().get(i))
+                    completedPieces.add(i);
+            return completedPieces;
+        };
+
+        Mono<PieceMessage> receiveSinglePieceMono =
+                torrentDownloader.getPeersCommunicatorFlux()
+                        .replay()
+                        .autoConnect(0)
+                        .flatMap(peersCommunicator -> peersCommunicator.sendMessages()
+                                .sendInterestedMessage()
+                                .map(sendPeerMessages -> peersCommunicator))
+                        .flatMap(peersCommunicator ->
+                                peersCommunicator.receivePeerMessages()
+                                        .getBitFieldMessageResponseFlux()
+                                        .map(bitFieldMessage -> getCompletedPieces.apply(bitFieldMessage))
+                                        .flatMap(Flux::fromIterable)
+                                        .take(5)
+                                        .flatMap(completedPieceIndex -> peersCommunicator.sendMessages()
+                                                .sendRequestMessage(completedPieceIndex, 0, requestBlockSize)
+                                                .map(sendPeerMessages -> peersCommunicator)))
+                        .flatMap(peersCommunicator ->
+                                peersCommunicator.receivePeerMessages()
+                                        .getPieceMessageResponseFlux()
+                                        .doOnNext(pieceMessage -> peersCommunicator.closeConnection()))
                         .take(1)
-                        .flatMap(haveMessage -> peersCommunicator.sendRequestMessage(haveMessage.getPieceIndex(), 0, requestBlockSize)))
-                .flatMap(peersCommunicator ->
-                        peersCommunicator.receivePeerMessages()
-                                .getPieceMessageResponseFlux()
-                                .doOnNext(pieceMessage -> peersCommunicator.closeConnection()))
-                .take(1)
-                .single();
+                        .single();
 
-        torrentDownloader.getTorrentStatusController().startDownload();
+        torrentDownloader.getTorrentStatusController().startUpload();
 
         StepVerifier.create(receiveSinglePieceMono)
                 .expectNextCount(1)
@@ -272,8 +295,7 @@ public class MyStepdefs {
         Utils.removeEverythingRelatedToTorrent(torrentInfo);
 
         // this will create an activeTorrent object.
-        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
-                .createDefaultTorrentDownloader(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation);
+        TorrentDownloader torrentDownloader = Utils.createDefaultTorrentDownloader(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation);
     }
 
     @Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
@@ -400,8 +422,16 @@ public class MyStepdefs {
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, pieceMessageFlux)
                 .block();
 
+        Flux<TorrentPieceChanged> recordedTorrentPieceChangedFlux =
+                activeTorrent.savedBlockFlux()
+                        .replay()
+                        .autoConnect(0);
+
+        // will cause recordedTorrentPieceChangedFlux to start recording signals.
+        torrentStatusController.startDownload();
+
         Flux<RequestMessage> assertWrittenPiecesFlux =
-                Flux.zip(activeTorrent.startListenForIncomingPiecesFlux().autoConnect(), pieceMessageFlux,
+                Flux.zip(recordedTorrentPieceChangedFlux, pieceMessageFlux,
                         (torrentPieceChanged, pieceMessage) -> {
                             RequestMessage requestMessage =
                                     new RequestMessage(null, null,
@@ -441,7 +471,7 @@ public class MyStepdefs {
         // check again in other way: (by ActiveTorrent::buildBitFieldMessage)
         BitFieldMessage allPiecesStatus = activeTorrent.buildBitFieldMessage(null, null);
         completedPiecesIndexList.forEach(completedPiecesIndex ->
-                Assert.assertTrue(errorMessage1, allPiecesStatus.getPieces().get(completedPiecesIndex)));
+                Assert.assertTrue(errorMessage1, allPiecesStatus.getPiecesStatus().get(completedPiecesIndex)));
 
         // check again in other way: (by ActiveTorrent::buildPieceMessage)
 
@@ -467,7 +497,7 @@ public class MyStepdefs {
         for (int i = 0; i < torrentInfo.getPieces().size(); i++) {
             if (!completedPiecesIndexList.contains(i)) {
                 String errorMessage3 = "piece is not completed but it is specified as completed piece: " + i;
-                Assert.assertFalse(errorMessage3, allPiecesStatus.getPieces().get(i));
+                Assert.assertFalse(errorMessage3, allPiecesStatus.getPiecesStatus().get(i));
             }
         }
 
@@ -511,27 +541,31 @@ public class MyStepdefs {
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, Flux.just(lastPieceMessage))
                 .block();
 
-        Mono<PieceMessage> readLastPieceTaskMono = activeTorrent.startListenForIncomingPiecesFlux()
-                .autoConnect()
-                .doOnNext(torrentPieceChanged -> {
-                    String message = "the last piece must be completed but it's not.";
-                    Assert.assertEquals(message, TorrentPieceStatus.COMPLETED, torrentPieceChanged.getTorrentPieceStatus());
-                })
-                // assert that we wrote to the file what we should have.
-                .doOnNext(torrentPieceChanged -> {
-                    byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
-                    String errorMessage = "The read operation failed to read exactly what we wrote";
-                    Assert.assertArrayEquals(errorMessage, actualWrittenBytes, lastPieceMessage.getBlock());
-                })
-                // assert that we can read the last piece successfully.
-                .flatMap(torrentPieceChanged -> activeTorrent.buildPieceMessage(requestLastPieceMessage))
-                .doOnNext(pieceMessage -> {
-                    byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
-                    String errorMessage = "The read operation failed to read exactly what we wrote";
-                    Assert.assertArrayEquals(errorMessage, actualWrittenBytes, pieceMessage.getBlock());
-                })
-                // there must be only one signal here: the last piece. so single() must work.
-                .single();
+        Mono<PieceMessage> readLastPieceTaskMono =
+                activeTorrent.savedBlockFlux()
+                        .replay()
+                        .autoConnect(0)
+                        .doOnNext(torrentPieceChanged -> {
+                            String message = "the last piece must be completed but it's not.";
+                            Assert.assertEquals(message, TorrentPieceStatus.COMPLETED, torrentPieceChanged.getTorrentPieceStatus());
+                        })
+                        // assert that we wrote to the file what we should have.
+                        .doOnNext(torrentPieceChanged -> {
+                            byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
+                            String errorMessage = "The read operation failed to read exactly what we wrote";
+                            Assert.assertArrayEquals(errorMessage, actualWrittenBytes, lastPieceMessage.getBlock());
+                        })
+                        // assert that we can read the last piece successfully.
+                        .flatMap(torrentPieceChanged -> activeTorrent.buildPieceMessage(requestLastPieceMessage))
+                        .doOnNext(pieceMessage -> {
+                            byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
+                            String errorMessage = "The read operation failed to read exactly what we wrote";
+                            Assert.assertArrayEquals(errorMessage, actualWrittenBytes, pieceMessage.getBlock());
+                        })
+                        .take(1)
+                        .single();
+
+        torrentStatusController.startDownload();
 
         StepVerifier.create(readLastPieceTaskMono)
                 .expectNextCount(1)
@@ -606,10 +640,11 @@ public class MyStepdefs {
     public void applicationConnectToAllPeersAndAssertThatWeConnectedToThemForTorrent(String torrentFileName) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
+        Utils.removeEverythingRelatedToTorrent(torrentInfo);
+
         // we won't download anything but we still need to specify a path to download to.
         String DEFAULT_DOWNLOAD_LOCATION = System.getProperty("user.dir") + "/" + "torrents-test/";
-        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
-                .createDefaultTorrentDownloader(torrentInfo, DEFAULT_DOWNLOAD_LOCATION);
+        TorrentDownloader torrentDownloader = Utils.createDefaultTorrentDownloader(torrentInfo, DEFAULT_DOWNLOAD_LOCATION);
 
         // consume new peers and new responses from 1.5 seconds.
         // filter distinct peers from the responses, and assert
@@ -620,23 +655,18 @@ public class MyStepdefs {
                 .timeout(Duration.ofMillis(1500))
                 .buffer(Duration.ofMillis(1500))
                 .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
-                .doOnNext(x -> System.out.println("connected until now: " + x))
                 .take(3)
                 .flatMap(Flux::fromIterable)
                 .sort();
 
-        ReceivedMessagesImpl receivedMessagesFromAllPeers = new ReceivedMessagesImpl(
-                torrentDownloader.getPeersCommunicatorFlux()
-                        .map(PeersCommunicator::receivePeerMessages));
-
-        Flux<Peer> peersFromResponsesMono = receivedMessagesFromAllPeers
-                .getPeerMessageResponseFlux()
+        Flux<Peer> peersFromResponsesMono = torrentDownloader.getPeersCommunicatorFlux()
+                .map(PeersCommunicator::receivePeerMessages)
+                .flatMap(ReceivePeerMessages::getPeerMessageResponseFlux)
                 .map(PeerMessage::getFrom)
                 .distinct()
                 .timeout(Duration.ofMillis(1500))
                 .buffer(Duration.ofMillis(1500))
                 .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
-                .doOnNext(x -> System.out.println("responses from until now: " + x))
                 .take(2)
                 .flatMap(Flux::fromIterable)
                 .sort()
@@ -681,10 +711,9 @@ public class MyStepdefs {
                 initialTorrentStatusTypeMap.get(TorrentStatusType.RESUME_DOWNLOAD),
                 initialTorrentStatusTypeMap.get(TorrentStatusType.COMPLETED_DOWNLOADING));
 
-        TorrentDownloaders.getInstance()
-                .createDefaultTorrentDownloader(torrentInfo,
-                        System.getProperty("user.dir") + "/" + downloadLocation,
-                        torrentStatusController);
+        Utils.createDefaultTorrentDownloader(torrentInfo,
+                System.getProperty("user.dir") + "/" + downloadLocation,
+                torrentStatusController);
     }
 
     private List<TorrentStatusType> torrentStatusTypeFlux = new ArrayList<>();
@@ -741,58 +770,47 @@ public class MyStepdefs {
     public void torrentStatusForWillBe(String torrentFileName,
                                        List<TorrentStatusType> changedTorrentStatusTypeList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-        TorrentStatusController torrentStatusController = TorrentDownloaders.getInstance()
+        TorrentStatus torrentStatus = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .get()
                 .getTorrentStatusController();
 
-        // assert that the state is changed by using methods: this.torrentStatusController.isXXX().
-        changedTorrentStatusTypeList.forEach(torrentStatusType -> {
-            switch (torrentStatusType) {
-                case START_DOWNLOAD:
-                    Assert.assertTrue(torrentStatusController.isStartedDownload());
-                    break;
-                case START_UPLOAD:
-                    Assert.assertTrue(torrentStatusController.isStartedUpload());
-                    break;
-                case PAUSE_DOWNLOAD:
-                    Assert.assertFalse(torrentStatusController.isDownloading());
-                    break;
-                case RESUME_DOWNLOAD:
-                    Assert.assertTrue(torrentStatusController.isDownloading());
-                    break;
-                case PAUSE_UPLOAD:
-                    Assert.assertFalse(torrentStatusController.isUploading());
-                    break;
-                case RESUME_UPLOAD:
-                    Assert.assertTrue(torrentStatusController.isUploading());
-                    break;
-                case COMPLETED_DOWNLOADING:
-                    Assert.assertTrue(torrentStatusController.isCompletedDownloading());
-                    break;
-                case REMOVE_TORRENT:
-                    Assert.assertTrue(torrentStatusController.isTorrentRemoved());
-                    break;
-                case REMOVE_FILES:
-                    Assert.assertTrue(torrentStatusController.isFileRemoved());
-                    break;
-            }
-        });
+        // assert that the state is changed.
 
-        // assert that we receive the proper signals from this.torrentStatusTypeFlux.
-        Assert.assertTrue(new HashSet<>(this.torrentStatusTypeFlux).equals(new HashSet<>(changedTorrentStatusTypeList)));
-    }
+        boolean expectedStartDownload = changedTorrentStatusTypeList.contains(TorrentStatusType.START_DOWNLOAD);
+        Assert.assertEquals(expectedStartDownload, torrentStatus.isStartedDownloadingFlux()
+                .filter(isTrue -> isTrue == expectedStartDownload)
+                .blockFirst());
 
-    @Then("^torrent-status for torrent \"([^\"]*)\" will be: Empty-table$")
-    public void torrentStatusForTorrentWillBeEmptyTable(String torrentFileName) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-        TorrentStatusController torrentStatusController = TorrentDownloaders.getInstance()
-                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get()
-                .getTorrentStatusController();
+        boolean expectedStartUpload = changedTorrentStatusTypeList.contains(TorrentStatusType.START_UPLOAD);
+        Assert.assertEquals(expectedStartUpload, torrentStatus.isStartedUploadingFlux()
+                .filter(isTrue -> isTrue == expectedStartUpload)
+                .blockFirst());
 
-        // assert that we receive the proper signals from this.torrentStatusTypeFlux.
-        Assert.assertTrue(new HashSet<>(this.torrentStatusTypeFlux).equals(new HashSet<>(Collections.emptyList())));
+        boolean expectedDownloading = changedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_DOWNLOAD);
+        Assert.assertEquals(expectedDownloading, torrentStatus.isDownloadingFlux()
+                .filter(isTrue -> isTrue == expectedDownloading)
+                .blockFirst());
+
+        boolean expectedUploading = changedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_UPLOAD);
+        Assert.assertEquals(expectedUploading, torrentStatus.isUploadingFlux()
+                .filter(isTrue -> isTrue == expectedUploading)
+                .blockFirst());
+
+        boolean expectedCompletedDownload = changedTorrentStatusTypeList.contains(TorrentStatusType.COMPLETED_DOWNLOADING);
+        Assert.assertEquals(expectedCompletedDownload, torrentStatus.isCompletedDownloadingFlux()
+                .filter(isTrue -> isTrue == expectedCompletedDownload)
+                .blockFirst());
+
+        boolean expectedRemovedFiles = changedTorrentStatusTypeList.contains(TorrentStatusType.REMOVE_FILES);
+        Assert.assertEquals(expectedRemovedFiles, torrentStatus.isFilesRemovedFlux()
+                .filter(isTrue -> isTrue == expectedRemovedFiles)
+                .blockFirst());
+
+        boolean expectedRemoveTorrent = changedTorrentStatusTypeList.contains(TorrentStatusType.REMOVE_TORRENT);
+        Assert.assertEquals(expectedRemoveTorrent, torrentStatus.isTorrentRemovedFlux()
+                .filter(isTrue -> isTrue == expectedRemoveTorrent)
+                .blockFirst());
     }
 
     private Mono<List<RemoteFakePeerForRequestingPieces>> requestsFromPeerToMeListMono;
@@ -803,50 +821,45 @@ public class MyStepdefs {
                                                                   List<BlockOfPiece> peerRequestBlockList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        // The last step created ActiveTorrent object which I need to remove because I create
-        // TorrentDownloader object which will create it's own ActiveTorrent object.
-        // **The last step couldn't create TorrentDownloader because it supplied him
-        // a custom pieceMessageFlux.
-        ActiveTorrents.getInstance()
+        // The last step created ActiveTorrent object which listen to custom
+        // peerResponsesFlux. So I can't expect it to react to the original peerResponsesFlux.
+        ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
                 .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
                 .filter(Optional::isPresent)
                 .map(Optional::get)
-                .flatMap(activeTorrent -> activeTorrent.deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
-                .filter(isActiveTorrentDeleted -> isActiveTorrentDeleted)
                 .block();
 
-        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
-                .createDefaultTorrentDownloader(torrentInfo, System.getProperty("user.dir") + "/" + downloadLocation);
+        // this flux is empty because if not, the application will get the peers from
+        // them and then it will connect to all those peers and then those peers will
+        // sendMessage me incoming messages and I don't want any incoming messages but the
+        // messages from my fake-peer.
+        Flux<TrackerConnection> trackerConnectionFlux = Flux.empty();
+        TorrentDownloader torrentDownloader =
+                Utils.createCustomTorrentDownloader(torrentInfo, activeTorrent, trackerConnectionFlux);
 
+        // the fake-peer will connect to me.
         Peer me = new Peer("localhost", AppConfig.getInstance().getMyListeningPort());
-
-        this.connectionFromFakePeerToMeMono = torrentDownloader.getPeersProvider()
-                // connection of fake-peer to me
-                .connectToPeerMono(me)
-                .map(RemoteFakePeerForRequestingPieces::new)
-                .flux()
-                .replay()
-                .autoConnect()
-                .single();
 
         // I can't activate this flux until the app start listening for new incoming peers.
         // No one is listening for new peers now so if fake-peer try to connect to me, he will fail.
         // I can't start for new incoming peers in this step because if yes, I will lose all the
         // pieceMessage from this app to the fake-peer and I need them for testing that we did sent them.
-        this.requestsFromPeerToMeListMono = this.connectionFromFakePeerToMeMono
+        this.requestsFromPeerToMeListMono = torrentDownloader.getPeersProvider()
+                // connection of fake-peer to me.
+                // later we can get this fake-peer from the flux of connected
+                // peers because this flux will contain the incoming peers also.
+                .connectToPeerMono(me)
+                .map(RemoteFakePeerForRequestingPieces::new)
                 .flatMap(RemoteFakePeerForRequestingPieces::sendInterestedMessage)
-                // send all requests from fake peer to me.
-                .flatMapMany(peersCommunicator ->
+                // sendMessage all requests from fake peer to me.
+                .flatMapMany(fakePeersCommunicator ->
                         Flux.fromIterable(peerRequestBlockList)
                                 .flatMap(blockOfPiece -> {
                                     if (blockOfPiece.getLength() != null)
-                                        return peersCommunicator.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
+                                        return fakePeersCommunicator.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
                                                 blockOfPiece.getLength());
-                                    long blockLength = torrentInfo.getPieceLength();
-                                    if (blockOfPiece.getPieceIndex() == torrentInfo.getPieces().size() - 1)
-                                        blockLength = torrentInfo.getTotalSize() -
-                                                ((torrentInfo.getPieces().size() - 1) * torrentInfo.getPieceLength());
-                                    return peersCommunicator.sendRequestMessage(blockOfPiece.getPieceIndex(),
+                                    long blockLength = torrentInfo.getPieceLength(blockOfPiece.getPieceIndex());
+                                    return fakePeersCommunicator.sendRequestMessage(blockOfPiece.getPieceIndex(),
                                             blockOfPiece.getFrom(), (int) (blockLength - blockOfPiece.getFrom()));
                                 }))
                 .collectList()
@@ -867,34 +880,58 @@ public class MyStepdefs {
         // wait until the app will start listen for new incoming peers
         Thread.sleep(500);
 
+        // the fake-peer is the only peer.
+        ConnectableFlux<PeersCommunicator> singleFakePeerCommunicatorFlux =
+                torrentDownloader.getPeersCommunicatorFlux()
+                        .replay();
+
+        // start record the fake-peer-communicator object
+        singleFakePeerCommunicatorFlux.connect();
+
+        ConnectableFlux<PieceMessage> sentMessagesFromFakePeerToApplicationFlux =
+                singleFakePeerCommunicatorFlux
+                        .map(PeersCommunicator::sendMessages)
+                        .flatMap(SendPeerMessages::sentPeerMessagesFlux)
+                        // the application sendMessage to the fake-peer only PieceMessages in this test.
+                        // + my algorithm may sendMessage at the start a bitfield-message.
+                        .filter(peerMessage -> peerMessage instanceof PieceMessage)
+                        .cast(PieceMessage.class)
+                        // if there is a problem, I don't want to wait for ever.
+//                .timeout(Duration.ofSeconds(5))
+                        .take(expectedBlockFromMeList.size())
+                        .replay();
+
+        // start record the messages the app sendMessage to the fake-peer
+        // **before** we sending the messages.
+        // if I will record only after the messages are sent,
+        // I won't get them because no one subscribed to get them.
+        sentMessagesFromFakePeerToApplicationFlux.connect();
+
         List<PieceMessage> actualBlockFromMeList = this.requestsFromPeerToMeListMono
-                .flatMap(requests -> this.connectionFromFakePeerToMeMono)
-                .flatMapMany(RemoteFakePeerForRequestingPieces::sentPeerMessagesFlux)
-                .cast(PieceMessage.class)
-                // if there is a problem, I don't want to wait for ever.
-                .timeout(Duration.ofSeconds(2))
-                .take(expectedBlockFromMeList.size())
+                .flatMapMany(remoteFakePeerForRequestingPieces -> sentMessagesFromFakePeerToApplicationFlux)
                 .collectList()
                 .block();
 
         // assert that both the list are equal.
 
         expectedBlockFromMeList.forEach(blockOfPiece ->
-                Assert.assertTrue("the app didn't send the block: " + blockOfPiece, actualBlockFromMeList.stream()
+                Assert.assertTrue("the app didn't sendMessage the block: " + blockOfPiece, actualBlockFromMeList.stream()
                         .anyMatch(pieceMessage -> blockOfPiece.getPieceIndex() == pieceMessage.getIndex() &&
                                 blockOfPiece.getFrom() == pieceMessage.getBegin() &&
                                 blockOfPiece.getLength() == pieceMessage.getBlock().length)));
 
         actualBlockFromMeList.stream()
                 .forEach(pieceMessage ->
-                        Assert.assertTrue("the app send a block which it didn't suppose to send: " + pieceMessage, expectedBlockFromMeList.stream()
+                        Assert.assertTrue("the app sendMessage a block which it didn't suppose to sendMessage: " + pieceMessage, expectedBlockFromMeList.stream()
                                 .anyMatch(blockOfPiece -> blockOfPiece.getPieceIndex() == pieceMessage.getIndex() &&
                                         blockOfPiece.getFrom() == pieceMessage.getBegin() &&
                                         blockOfPiece.getLength() == pieceMessage.getBlock().length)));
 
-        this.connectionFromFakePeerToMeMono
-                .doOnNext(RemoteFakePeerForRequestingPieces::closeConnection)
-                .block();
+        // the fake-peer is the only peer.
+        singleFakePeerCommunicatorFlux
+                .subscribe(x -> x.closeConnection());
+
+        Utils.removeEverythingRelatedToTorrent(torrentInfo);
     }
 }
 

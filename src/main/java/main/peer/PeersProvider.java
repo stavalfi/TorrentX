@@ -83,7 +83,7 @@ public class PeersProvider {
     }
 
     public Flux<Peer> getPeersFromTrackerFlux(TrackerConnection trackerConnection) {
-        return trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), PeersListener.getInstance().getTcpPort())
+        return trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), AppConfig.getInstance().getMyListeningPort())
                 .flatMapMany(AnnounceResponse::getPeersFlux);
     }
 

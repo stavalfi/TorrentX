@@ -1,12 +1,10 @@
 Feature: connect to a fake peers and communicate with them
 
-  Background: read torrent file
-    Given new torrent file: "torrent-file-example3.torrent"
-
   Scenario: we send peer-messages and must receive the same peer-messages back
-  1. the fake peers response with the same peer-message they received
-  2. the second response will be delayed in 2 seconds
-  3. the third response will cause the peer to shutdown the connection and not responding anything
+#  1. the fake peers response with the same peer-message they received
+#  2. the second response will be delayed in 2 seconds
+#  3. the third response will cause the peer to shutdown the connection and not responding anything
+    Given new torrent file: "tor.torrent"
     Then application send to [peer ip: "localhost", peer port: "8980"] and receive the following messages:
       | sendMessageType | receiveMessageType | errorSignalType |
       | BitFieldMessage | BitFieldMessage    |                 |
@@ -33,9 +31,10 @@ Feature: connect to a fake peers and communicate with them
       | PortMessage     | PortMessage        |                 |
 
   Scenario: we send 3 peer-messages and the connection must be closed by the rules of the fake peers
-  1. the fake peers response with the same peer-message they received
-  2. the second response will be delayed in 2 seconds
-  3. the third response will cause the peer to shutdown the connection and not responding anything
+#  1. the fake peers response with the same peer-message they received
+#  2. the second response will be delayed in 2 seconds
+#  3. the third response will cause the peer to shutdown the connection and not responding anything
+    Given new torrent file: "tor.torrent"
     Then application send to [peer ip: "localhost", peer port: "8985"] and receive the following messages:
       | sendMessageType | receiveMessageType | errorSignalType |
       | BitFieldMessage | BitFieldMessage    |                 |
@@ -44,39 +43,37 @@ Feature: connect to a fake peers and communicate with them
       # inside the receive() flux. so we will get a complete signal from receive().
       | BitFieldMessage |                    |                 |
 
-#  Scenario Outline: fake peer request pieces from me and I give him what he want
-#    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
-#      | pieceIndex | from | length |
-#      | 0          | 0    |        |
-#      | 1          | 0    | 10     |
-#      | 2          | 0    |        |
-#    Then random-fake-peer connect to me for torrent: "<torrent>" in "<downloadLocation>" and he request:
-#      | pieceIndex | from | length |
-#      | 0          | 0    | 25     |
-#      | 1          | 0    | 10     |
-#      | 2          | 0    | 15     |
-#    Then we assert that for torrent: "<torrent>", we gave the following pieces to the random-fake-peer:
-#      | pieceIndex | from | length |
-#      | 0          | 0    | 25     |
-#      | 2          | 0    | 15     |
-#
-#    Examples:
-#      | torrent                       | downloadLocation |
-#      | torrent-file-example3.torrent | torrents-test/   |
-#
-#  TODO: This test won't pass until the bug inside reactor core won't be fixed:
-#        https://github.com/reactor/reactor-core/issues/1158
-#  Scenario Outline: fake peer request pieces from me but I don't have nothing to give
-#    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
-#      | pieceIndex | from | length |
-#    Then random-fake-peer connect to me for torrent: "<torrent>" in "<downloadLocation>" and he request:
-#      | pieceIndex | from | length |
-#      | 0          | 0    | 25     |
-#      | 1          | 0    | 10     |
-#      | 2          | 0    | 15     |
-#    Then we assert that for torrent: "<torrent>", we gave the following pieces to the random-fake-peer:
-#      | pieceIndex | from | length |
-#
-#    Examples:
-#      | torrent                       | downloadLocation |
-#      | torrent-file-example3.torrent | torrents-test/   |
+  Scenario Outline: fake peer request pieces from me and I give him what he want
+    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
+      | pieceIndex | from | length |
+      | 0          | 0    |        |
+      | 1          | 0    | 10     |
+      | 2          | 0    |        |
+    Then random-fake-peer connect to me for torrent: "<torrent>" in "<downloadLocation>" and he request:
+      | pieceIndex | from | length |
+      | 0          | 0    | 25     |
+      | 1          | 0    | 10     |
+      | 2          | 0    | 15     |
+    Then we assert that for torrent: "<torrent>", we gave the following pieces to the random-fake-peer:
+      | pieceIndex | from | length |
+      | 0          | 0    | 25     |
+      | 2          | 0    | 15     |
+
+    Examples:
+      | torrent     | downloadLocation |
+      | tor.torrent | torrents-test/   |
+
+  Scenario Outline: fake peer request pieces from me but I don't have nothing to give
+    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
+      | pieceIndex | from | length |
+    Then random-fake-peer connect to me for torrent: "<torrent>" in "<downloadLocation>" and he request:
+      | pieceIndex | from | length |
+      | 0          | 0    | 25     |
+      | 1          | 0    | 10     |
+      | 2          | 0    | 15     |
+    Then we assert that for torrent: "<torrent>", we gave the following pieces to the random-fake-peer:
+      | pieceIndex | from | length |
+
+    Examples:
+      | torrent     | downloadLocation |
+      | tor.torrent | torrents-test/   |

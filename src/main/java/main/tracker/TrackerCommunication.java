@@ -53,7 +53,7 @@ class TrackerCommunication {
                                 "error type: " + throwable.getClass().getName()))
                 // the retry operation will run the first, ever created, publisher again
                 // which is defined in sendRequestMono method.
-                .retry(1, TrackerExceptions.communicationErrors)
+                .retry(2, TrackerExceptions.communicationErrors)
                 .doOnError(TrackerExceptions.communicationErrors, error ->
                         logger.debug("error signal: (the application retried to send" +
                                 " a request to the same tracker again and failed)." +
@@ -111,9 +111,9 @@ class TrackerCommunication {
     private static Mono<ByteBuffer> receiveResponseMono(DatagramSocket trackerSocket) {
         return Mono.create(sink -> {
             try {
-                byte[] receiveData = new byte[1000];
+                byte[] receiveData = new byte[100000];
                 DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-                trackerSocket.setSoTimeout(1000);
+                trackerSocket.setSoTimeout(4000);
                 trackerSocket.receive(receivePacket);
                 ByteBuffer response = ByteBuffer.wrap(receiveData);
                 sink.success(response);

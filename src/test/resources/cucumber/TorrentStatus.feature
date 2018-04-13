@@ -46,7 +46,10 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | PAUSE_UPLOAD |
     Then torrent-status for torrent "<torrent>" will be:
-      | PAUSE_UPLOAD |
+      | START_DOWNLOAD  |
+      | START_UPLOAD    |
+      | RESUME_DOWNLOAD |
+      | PAUSE_UPLOAD    |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -66,7 +69,10 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | PAUSE_UPLOAD |
     Then torrent-status for torrent "<torrent>" will be:
-      | PAUSE_UPLOAD |
+      | START_DOWNLOAD  |
+      | START_UPLOAD    |
+      | RESUME_DOWNLOAD |
+      | PAUSE_UPLOAD    |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -87,6 +93,8 @@ Feature: start/stop downloading/uploading
       | PAUSE_DOWNLOAD |
       | PAUSE_UPLOAD   |
     Then torrent-status for torrent "<torrent>" will be:
+      | START_DOWNLOAD |
+      | START_UPLOAD   |
       | PAUSE_DOWNLOAD |
       | PAUSE_UPLOAD   |
 
@@ -108,6 +116,8 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | REMOVE_TORRENT |
     Then torrent-status for torrent "<torrent>" will be:
+      | START_DOWNLOAD |
+      | START_UPLOAD   |
       | PAUSE_DOWNLOAD |
       | PAUSE_UPLOAD   |
       | REMOVE_TORRENT |
@@ -129,7 +139,10 @@ Feature: start/stop downloading/uploading
       | REMOVE_FILES          | false |
     When torrent-status for torrent "<torrent>" is trying to change to:
       | START_DOWNLOAD |
-    Then torrent-status for torrent "<torrent>" will be: Empty-table
+    Then torrent-status for torrent "<torrent>" will be:
+      | REMOVE_TORRENT |
+      | PAUSE_DOWNLOAD |
+      | PAUSE_UPLOAD   |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -148,7 +161,10 @@ Feature: start/stop downloading/uploading
       | REMOVE_FILES          | true  |
     When torrent-status for torrent "<torrent>" is trying to change to:
       | START_DOWNLOAD |
-    Then torrent-status for torrent "<torrent>" will be: Empty-table
+    Then torrent-status for torrent "<torrent>" will be:
+      | REMOVE_FILES   |
+      | PAUSE_DOWNLOAD |
+      | PAUSE_UPLOAD   |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -167,7 +183,11 @@ Feature: start/stop downloading/uploading
       | REMOVE_FILES          | true  |
     When torrent-status for torrent "<torrent>" is trying to change to:
       | START_DOWNLOAD |
-    Then torrent-status for torrent "<torrent>" will be: Empty-table
+    Then torrent-status for torrent "<torrent>" will be:
+      | REMOVE_TORRENT |
+      | REMOVE_FILES   |
+      | PAUSE_DOWNLOAD |
+      | PAUSE_UPLOAD   |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -186,7 +206,11 @@ Feature: start/stop downloading/uploading
       | REMOVE_FILES          | true  |
     When torrent-status for torrent "<torrent>" is trying to change to:
       | COMPLETED_DOWNLOADING |
-    Then torrent-status for torrent "<torrent>" will be: Empty-table
+    Then torrent-status for torrent "<torrent>" will be:
+      | REMOVE_TORRENT |
+      | REMOVE_FILES   |
+      | PAUSE_DOWNLOAD |
+      | PAUSE_UPLOAD   |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -206,7 +230,11 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | START_DOWNLOAD |
       | START_UPLOAD   |
-    Then torrent-status for torrent "<torrent>" will be: Empty-table
+    Then torrent-status for torrent "<torrent>" will be:
+      | START_DOWNLOAD  |
+      | START_UPLOAD    |
+      | RESUME_DOWNLOAD |
+      | RESUME_UPLOAD   |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -234,7 +262,11 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | START_DOWNLOAD |
       | START_UPLOAD   |
-    Then torrent-status for torrent "<torrent>" will be: Empty-table
+    Then torrent-status for torrent "<torrent>" will be:
+      | START_DOWNLOAD  |
+      | START_UPLOAD    |
+      | RESUME_DOWNLOAD |
+      | RESUME_UPLOAD   |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -253,8 +285,10 @@ Feature: start/stop downloading/uploading
       | REMOVE_FILES          | false |
     When torrent-status for torrent "<torrent>" is trying to change to:
       | REMOVE_TORRENT |
-    Then torrent-status for torrent "<torrent>" will be: Empty-table
-
+    Then torrent-status for torrent "<torrent>" will be:
+      | PAUSE_DOWNLOAD |
+      | PAUSE_UPLOAD   |
+      | REMOVE_TORRENT |
     Examples:
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test/   |
@@ -272,8 +306,10 @@ Feature: start/stop downloading/uploading
       | REMOVE_FILES          | true  |
     When torrent-status for torrent "<torrent>" is trying to change to:
       | REMOVE_FILES |
-    Then torrent-status for torrent "<torrent>" will be: Empty-table
-
+    Then torrent-status for torrent "<torrent>" will be:
+      | PAUSE_DOWNLOAD |
+      | PAUSE_UPLOAD   |
+      | REMOVE_FILES   |
     Examples:
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test/   |
@@ -291,8 +327,10 @@ Feature: start/stop downloading/uploading
       | REMOVE_FILES          | false |
     When torrent-status for torrent "<torrent>" is trying to change to:
       | COMPLETED_DOWNLOADING |
-    Then torrent-status for torrent "<torrent>" will be: Empty-table
-
+    Then torrent-status for torrent "<torrent>" will be:
+      | PAUSE_DOWNLOAD        |
+      | PAUSE_UPLOAD          |
+      | COMPLETED_DOWNLOADING |
     Examples:
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test/   |

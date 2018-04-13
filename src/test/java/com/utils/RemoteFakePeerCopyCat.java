@@ -53,38 +53,26 @@ public class RemoteFakePeerCopyCat extends Peer {
         thread.start();
     }
 
-    private void waitForMessagesFromPeer(Socket peerConnection) {
+    private void waitForMessagesFromPeer(Socket peerConnection) throws IOException, InterruptedException {
         int receivedMessagesAmount = 0;
+        DataInputStream dataInputStream = new DataInputStream(peerConnection.getInputStream());
+        OutputStream outputStream = peerConnection.getOutputStream();
+        if (!this.closeEverything) {
+            HandShake handShakeReceived = new HandShake(dataInputStream);
+            outputStream.write(handShakeReceived.createPacketFromObject());
+        } else
+            return;
+        Peer fromPeer = new Peer("localhost", peerConnection.getPort());
         while (!this.closeEverything) {
-            try {
-                DataInputStream dataInputStream = new DataInputStream(peerConnection.getInputStream());
-                OutputStream outputStream = peerConnection.getOutputStream();
-                if (receivedMessagesAmount == 0) {
-                    HandShake handShakeReceived = new HandShake(dataInputStream);
-                    outputStream.write(handShakeReceived.createPacketFromObject());
-                } else {
-                    if (receivedMessagesAmount == 2)
-                        Thread.sleep(2000);
-                    else if (receivedMessagesAmount == 3) {
-                        peerConnection.close();
-                        return;
-                    }
-                    Peer fromPeer = new Peer("localhost", peerConnection.getPort());
-                    PeerMessage peerMessage = PeerMessageFactory.create(fromPeer, this, dataInputStream);
-                    outputStream.write(peerMessage.createPacketFromObject());
-                }
-                receivedMessagesAmount++;
-            } catch (IOException | InterruptedException e) {
-                // I don't want to print errors from this class.
-                // a possible error can be if a peer is closing
-                // the connection with This Fake peer.
-                // e.printStackTrace();
-                try {
-                    peerConnection.close();
-                } catch (IOException e1) {
-                    e1.printStackTrace();
-                }
+            PeerMessage peerMessage = PeerMessageFactory.create(fromPeer, this, dataInputStream);
+            if (receivedMessagesAmount == 2)
+                Thread.sleep(2000);
+            else if (receivedMessagesAmount == 3) {
+                peerConnection.close();
+                return;
             }
+            outputStream.write(peerMessage.createPacketFromObject());
+            receivedMessagesAmount++;
         }
     }
 

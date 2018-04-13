@@ -9,6 +9,7 @@ import reactor.core.publisher.Mono;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -51,7 +52,14 @@ public class AnnounceResponse extends TrackerResponse {
 
         this.peers = IntStream.range(0, Integer.min(maxPeersWeWantToGet, this.leechersAmount + this.seedersAmount))
                 .mapToObj((int index) -> {
-                    String hostAddress = castIntegerToInetAddress(receiveData.getInt()).getHostAddress();
+                    int peerIp = -1;
+                    try {
+                        peerIp = receiveData.getInt();
+                    } catch (BufferUnderflowException e) {
+                        e.printStackTrace();
+                    }
+                    InetAddress inetAddress = castIntegerToInetAddress(peerIp);
+                    String hostAddress = inetAddress.getHostAddress();
                     int peerPort = ushort(receiveData.getShort()).intValue();
                     return new Peer(hostAddress, peerPort);
                 })
