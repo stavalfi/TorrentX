@@ -9,21 +9,23 @@ import main.peer.PeersCommunicator;
 import main.peer.SendPeerMessages;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatus;
-import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
-    private ConnectableFlux<TorrentPieceChanged> startUploadFlux;
-    private ConnectableFlux<RequestMessage> startDownloadFlux;
+    private Flux<TorrentPieceChanged> startUploadFlux;
+    private Flux<RequestMessage> startDownloadFlux;
 
     public BittorrentAlgorithmImpl(TorrentInfo torrentInfo,
                                    TorrentStatus torrentStatus,
                                    TorrentFileSystemManager torrentFileSystemManager,
                                    Flux<PeersCommunicator> peersCommunicatorFlux) {
-        this.startUploadFlux = uploadFlux(torrentInfo, torrentStatus, torrentFileSystemManager, peersCommunicatorFlux)
-                .publish();
-        this.startUploadFlux.connect();
+        this.startUploadFlux = torrentStatus.isStartedUploadingFlux()
+                .filter(isUploadingStarted -> isUploadingStarted)
+                .flatMap(__ ->
+                        uploadFlux(torrentInfo, torrentStatus, torrentFileSystemManager, peersCommunicatorFlux))
+                .publish()
+                .autoConnect(0);
 
         this.startDownloadFlux = downloadFlux(torrentInfo, torrentStatus,
                 torrentFileSystemManager, peersCommunicatorFlux.publish().autoConnect())
@@ -38,9 +40,10 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
         return peersCommunicatorFlux.flatMap(peersCommunicator ->
                 peersCommunicator.receivePeerMessages()
                         .getRequestMessageResponseFlux()
-                        .filter(requestMessage -> torrentStatus.isUploading())
-                        .flatMap(requestMessage -> torrentFileSystemManager.buildPieceMessage(requestMessage)
-                                .onErrorResume(PieceNotDownloadedYetException.class, throwable -> Mono.empty()))
+                        .flatMap(requestMessage -> torrentStatus.isUploadingFlux()
+                                .filter(isUploading -> isUploading)
+                                .flatMap(__ -> torrentFileSystemManager.buildPieceMessage(requestMessage)
+                                        .onErrorResume(PieceNotDownloadedYetException.class, throwable -> Mono.empty())))
                         .flatMap(pieceMessage ->
                                 peersCommunicator.sendMessages().sendPieceMessage(pieceMessage.getIndex(),
                                         pieceMessage.getBegin(), pieceMessage.getBlock())
