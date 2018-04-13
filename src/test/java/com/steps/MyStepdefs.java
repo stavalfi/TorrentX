@@ -9,6 +9,7 @@ import main.AppConfig;
 import main.TorrentInfo;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
+import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
@@ -386,8 +387,16 @@ public class MyStepdefs {
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, pieceMessageFlux)
                 .block();
 
+        Flux<TorrentPieceChanged> recordedTorrentPieceChangedFlux =
+                activeTorrent.savedBlockFlux()
+                        .replay()
+                        .autoConnect(0);
+
+        // will cause recordedTorrentPieceChangedFlux to start recording signals.
+        torrentStatusController.startDownload();
+
         Flux<RequestMessage> assertWrittenPiecesFlux =
-                Flux.zip(activeTorrent.savedBlockFlux(), pieceMessageFlux,
+                Flux.zip(recordedTorrentPieceChangedFlux, pieceMessageFlux,
                         (torrentPieceChanged, pieceMessage) -> {
                             RequestMessage requestMessage =
                                     new RequestMessage(null, null,
