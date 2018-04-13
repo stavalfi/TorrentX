@@ -162,52 +162,69 @@ public class MyStepdefs {
 
         PeersProvider peersProvider = new PeersProvider(this.torrentInfo);
 
-        List<PeerMessageType> peerMessageTypeList = peerFakeRequestResponses.stream()
+        List<PeerMessageType> messageToSendList = peerFakeRequestResponses.stream()
                 .map(PeerFakeRequestResponse::getSendMessageType)
                 .collect(Collectors.toList());
 
         // check if we expect an error signal.
-        Optional<ErrorSignalType> errorSignalType = peerFakeRequestResponses.stream()
+        Optional<ErrorSignalType> errorSignalTypeOptional = peerFakeRequestResponses.stream()
                 .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() != null)
                 .map(PeerFakeRequestResponse::getErrorSignalType)
                 .findAny();
 
         // check if we expect a complete signal
-        Optional<PeerFakeRequestResponse> completeSignal = peerFakeRequestResponses.stream()
+        Optional<PeerFakeRequestResponse> completeSignalOptional = peerFakeRequestResponses.stream()
                 .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
                         peerFakeRequestResponse.getReceiveMessageType() == null)
                 .findAny();
 
-        Mono<Object[]> peerResponsesMono = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
-                .flatMap(peersCommunicator -> {
-                    List<Mono<SendPeerMessages>> sendPeerMessageMonoStream = peerMessageTypeList.stream()
-                            .map(peerRequestMessage -> Utils.sendFakeMessage(peersCommunicator, peerRequestMessage))
-                            .collect(Collectors.toList());
-                    return Mono.zip(sendPeerMessageMonoStream, peersCommunicators -> peersCommunicator);
-                })
-                .flux()
-                .flatMap(peersCommunicator -> {
-                    List<Flux<? extends PeerMessage>> peerMessageFluxList = peerMessageTypeList.stream()
-                            .map(peerMessageType -> Utils.getSpecificMessageResponseFluxByMessageType(peersCommunicator, peerMessageType))
-                            .collect(Collectors.toList());
-                    int listSize = peerMessageFluxList.size();
-                    if (completeSignal.isPresent())
-                        // we won't get any response for the last flux so we won't listen to it.
-                        return Flux.zip(peerMessageFluxList.subList(0, listSize - 2), Function.identity());
-                    // there will be an error signal or only next signals. either way, we will listen to all fluxes.
-                    return Flux.zip(peerMessageFluxList, Function.identity());
-                })
-                .take(1)
-                .single();
+        boolean expectResponseToEveryRequest = peerFakeRequestResponses.stream()
+                .allMatch(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
+                        peerFakeRequestResponse.getReceiveMessageType() != null);
 
-        if (errorSignalType.isPresent())
-            StepVerifier.create(peerResponsesMono)
-                    .expectError(errorSignalType.get().getErrorSignal())
-                    .verify();
-        else
-            StepVerifier.create(peerResponsesMono)
-                    .expectNextCount(1)
+        PeersCommunicator fakePeer = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
+                .block();
+
+        Flux<? extends PeerMessage> recordedResponseFlux =
+                Flux.fromIterable(messageToSendList)
+                        .flatMap(peerMessageType ->
+                                Utils.getSpecificMessageResponseFluxByMessageType(fakePeer, peerMessageType))
+                        .replay()
+                        // start record incoming messages from fake peer
+                        .autoConnect(0);
+
+
+        Mono<List<SendPeerMessages>> sentMessagesMono = Flux.fromIterable(messageToSendList)
+                .flatMap(peerMessageType ->
+                        Utils.sendFakeMessage(fakePeer, peerMessageType))
+                .collectList();
+
+        if (expectResponseToEveryRequest)
+            StepVerifier
+                    .create(sentMessagesMono
+                            .flatMapMany(peersCommunicator -> recordedResponseFlux)
+                            .take(messageToSendList.size()))
+                    .expectNextCount(messageToSendList.size())
                     .verifyComplete();
+
+        errorSignalTypeOptional.map(ErrorSignalType::getErrorSignal)
+                .ifPresent(errorSignalType ->
+                        StepVerifier
+                                .create(sentMessagesMono
+                                        .flatMapMany(peersCommunicator -> recordedResponseFlux)
+                                        .take(messageToSendList.size() - 1))
+                                .expectNextCount(messageToSendList.size() - 1)
+                                .expectError(errorSignalType)
+                                .verify());
+
+        completeSignalOptional.map(PeerFakeRequestResponse::getSendMessageType)
+                .ifPresent(errorSignalType1 ->
+                        StepVerifier
+                                .create(sentMessagesMono
+                                        .flatMapMany(peersCommunicator -> recordedResponseFlux)
+                                        .take(messageToSendList.size() - 1))
+                                .expectNextCount(messageToSendList.size() - 1)
+                                .verifyComplete());
 
         remoteFakePeerCopyCat.shutdown();
     }
