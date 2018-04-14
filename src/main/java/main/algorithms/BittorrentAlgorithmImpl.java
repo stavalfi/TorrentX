@@ -1,6 +1,9 @@
 package main.algorithms;
 
 import main.TorrentInfo;
+import main.algorithms.v2.DownloadAlgorithmImplV3;
+import main.algorithms.v2.PeersPiecesStatusOrganizer;
+import main.algorithms.v2.PieceRequestsSupplier;
 import main.downloader.TorrentPieceChanged;
 import main.file.system.TorrentFileSystemManager;
 import main.peer.Link;
@@ -10,7 +13,7 @@ import reactor.core.publisher.Flux;
 public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
     private NotifyAboutCompletedPieceImpl notifyAboutCompletedPiece;
     private UploadBittorrentAlgorithmImpl uploadBittorrentAlgorithm;
-    private DownloadBittorrentAlgorithmImpl downloadBittorrentAlgorithm;
+    private DownloadAlgorithmImplV3 downloadBittorrentAlgorithm;
 
     public BittorrentAlgorithmImpl(TorrentInfo torrentInfo,
                                    TorrentStatus torrentStatus,
@@ -34,10 +37,19 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
                 torrentFileSystemManager,
                 peersCommunicatorFlux);
 
-        this.downloadBittorrentAlgorithm = new DownloadBittorrentAlgorithmImpl(torrentInfo,
+        PeersPiecesStatusOrganizer organizer =
+                new PeersPiecesStatusOrganizer(recordedFreePeerFlux,
+                        torrentFileSystemManager.getUpdatedPiecesStatus());
+
+        PieceRequestsSupplier pieceRequestsSupplier =
+                new PieceRequestsSupplier(torrentInfo, torrentFileSystemManager);
+
+        this.downloadBittorrentAlgorithm = new DownloadAlgorithmImplV3(
+                torrentInfo,
                 torrentStatus,
                 torrentFileSystemManager,
-                recordedFreePeerFlux);
+                organizer,
+                pieceRequestsSupplier);
     }
 
     @Override
