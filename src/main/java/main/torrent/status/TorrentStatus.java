@@ -27,9 +27,9 @@ public interface TorrentStatus {
 
     Mono<TorrentStatusType> notifyWhenStartedUploading();
 
-    Flux<TorrentStatusType> notifyWhenDownloading();
+    Flux<TorrentStatusType> notifyWhenResumeDownload();
 
-    Flux<TorrentStatusType> notifyWhenUploading();
+    Flux<TorrentStatusType> notifyWhenResumeUpload();
 
     Mono<TorrentStatusType> notifyWhenCompletedDownloading();
 

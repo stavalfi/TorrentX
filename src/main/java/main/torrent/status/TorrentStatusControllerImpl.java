@@ -343,12 +343,12 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     }
 
     @Override
-    public Flux<TorrentStatusType> notifyWhenDownloading() {
+    public Flux<TorrentStatusType> notifyWhenResumeDownload() {
         return this.notifyWhenDownloading;
     }
 
     @Override
-    public Flux<TorrentStatusType> notifyWhenUploading() {
+    public Flux<TorrentStatusType> notifyWhenResumeUpload() {
         return this.notifyWhenUploading;
     }
 
