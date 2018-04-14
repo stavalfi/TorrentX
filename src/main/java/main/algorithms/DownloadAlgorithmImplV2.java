@@ -3,7 +3,7 @@ package main.algorithms;
 import main.TorrentInfo;
 import main.downloader.TorrentPieceChanged;
 import main.file.system.TorrentFileSystemManager;
-import main.peer.PeersCommunicator;
+import main.peer.Link;
 import main.torrent.status.TorrentStatus;
 import reactor.core.publisher.Flux;
 
@@ -11,7 +11,7 @@ public class DownloadAlgorithmImplV2 {
     private TorrentInfo torrentInfo;
     private TorrentStatus torrentStatus;
     private TorrentFileSystemManager torrentFileSystemManager;
-    private Flux<PeersCommunicator> recordedFreePeerFlux;
+    private Flux<Link> recordedFreePeerFlux;
     private Flux<TorrentPieceChanged> recordedReceivedBlockFlux;
 
     private Flux<Integer> startDownloadFlux;
@@ -19,7 +19,7 @@ public class DownloadAlgorithmImplV2 {
     DownloadAlgorithmImplV2(TorrentInfo torrentInfo,
                             TorrentStatus torrentStatus,
                             TorrentFileSystemManager torrentFileSystemManager,
-                            Flux<PeersCommunicator> recordedFreePeerFlux) {
+                            Flux<Link> recordedFreePeerFlux) {
         this.torrentInfo = torrentInfo;
         this.torrentStatus = torrentStatus;
         this.torrentFileSystemManager = torrentFileSystemManager;

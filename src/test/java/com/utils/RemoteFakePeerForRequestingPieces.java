@@ -1,6 +1,6 @@
 package com.utils;
 
-import main.peer.PeersCommunicator;
+import main.peer.Link;
 import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 
@@ -11,36 +11,36 @@ public class RemoteFakePeerForRequestingPieces {
     private Disposable subscribe1;
     private Disposable subscribe2;
     private Disposable subscribe3;
-    private PeersCommunicator peersCommunicator;
+    private Link link;
     private AtomicBoolean isInterestedInMe = new AtomicBoolean(false);
 
-    public RemoteFakePeerForRequestingPieces(PeersCommunicator peersCommunicator) {
-        this.peersCommunicator = peersCommunicator;
-        this.subscribe1 = this.peersCommunicator.receivePeerMessages()
+    public RemoteFakePeerForRequestingPieces(Link link) {
+        this.link = link;
+        this.subscribe1 = this.link.receivePeerMessages()
                 .getInterestedMessageResponseFlux()
                 .subscribe(interestedMessage -> this.isInterestedInMe.set(true));
 
-        this.subscribe2 = this.peersCommunicator.receivePeerMessages()
+        this.subscribe2 = this.link.receivePeerMessages()
                 .getNotInterestedMessageResponseFlux()
                 .subscribe(interestedMessage -> this.isInterestedInMe.set(false));
 
-        this.subscribe3 = this.peersCommunicator.receivePeerMessages()
+        this.subscribe3 = this.link.receivePeerMessages()
                 .getRequestMessageResponseFlux()
                 .filter(requestMessage -> this.isInterestedInMe.get())
                 .flatMap(requestMessage ->
-                        this.peersCommunicator.sendMessages().sendPieceMessage(requestMessage.getIndex(),
+                        this.link.sendMessages().sendPieceMessage(requestMessage.getIndex(),
                                 requestMessage.getBegin(),
                                 toRandomByteArray(requestMessage.getBlockLength())))
                 .subscribe();
     }
 
     public Mono<RemoteFakePeerForRequestingPieces> sendInterestedMessage() {
-        return this.peersCommunicator.sendMessages().sendInterestedMessage()
+        return this.link.sendMessages().sendInterestedMessage()
                 .map(peersCommunicator -> this);
     }
 
     public Mono<RemoteFakePeerForRequestingPieces> sendRequestMessage(int index, int begin, int length) {
-        return this.peersCommunicator.sendMessages().sendRequestMessage(index, begin, length)
+        return this.link.sendMessages().sendRequestMessage(index, begin, length)
                 .map(peersCommunicator -> this);
     }
 
@@ -53,7 +53,7 @@ public class RemoteFakePeerForRequestingPieces {
     }
 
     public synchronized void closeConnection() {
-        this.peersCommunicator.closeConnection();
+        this.link.closeConnection();
         this.subscribe1.dispose();
         this.subscribe2.dispose();
         this.subscribe3.dispose();

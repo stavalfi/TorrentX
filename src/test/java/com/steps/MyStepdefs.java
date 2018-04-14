@@ -182,7 +182,7 @@ public class MyStepdefs {
                 .allMatch(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
                         peerFakeRequestResponse.getReceiveMessageType() != null);
 
-        PeersCommunicator fakePeer = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
+        Link fakePeer = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
                 .block();
 
         Flux<? extends PeerMessage> recordedResponseFlux =
@@ -651,7 +651,7 @@ public class MyStepdefs {
         // that both the list of peers are equal.
 
         Flux<Peer> connectedPeersFlux = torrentDownloader.getPeersCommunicatorFlux()
-                .map(PeersCommunicator::getPeer)
+                .map(Link::getPeer)
                 .timeout(Duration.ofMillis(1500))
                 .buffer(Duration.ofMillis(1500))
                 .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
@@ -660,7 +660,7 @@ public class MyStepdefs {
                 .sort();
 
         Flux<Peer> peersFromResponsesMono = torrentDownloader.getPeersCommunicatorFlux()
-                .map(PeersCommunicator::receivePeerMessages)
+                .map(Link::receivePeerMessages)
                 .flatMap(ReceivePeerMessages::getPeerMessageResponseFlux)
                 .map(PeerMessage::getFrom)
                 .distinct()
@@ -887,7 +887,7 @@ public class MyStepdefs {
         Thread.sleep(500);
 
         // the fake-peer is the only peer.
-        ConnectableFlux<PeersCommunicator> singleFakePeerCommunicatorFlux =
+        ConnectableFlux<Link> singleFakePeerCommunicatorFlux =
                 torrentDownloader.getPeersCommunicatorFlux()
                         .replay();
 
@@ -896,7 +896,7 @@ public class MyStepdefs {
 
         ConnectableFlux<PieceMessage> sentMessagesFromFakePeerToApplicationFlux =
                 singleFakePeerCommunicatorFlux
-                        .map(PeersCommunicator::sendMessages)
+                        .map(Link::sendMessages)
                         .flatMap(SendPeerMessages::sentPeerMessagesFlux)
                         // the application sendMessage to the fake-peer only PieceMessages in this test.
                         // + my algorithm may sendMessage at the start a bitfield-message.

@@ -4,7 +4,7 @@ import main.TorrentInfo;
 import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.TorrentFileSystemManager;
-import main.peer.PeersCommunicator;
+import main.peer.Link;
 import main.torrent.status.TorrentStatus;
 import reactor.core.publisher.Flux;
 
@@ -12,14 +12,14 @@ public class UploadBittorrentAlgorithmImpl {
     private TorrentInfo torrentInfo;
     private TorrentStatus torrentStatus;
     private TorrentFileSystemManager torrentFileSystemManager;
-    private Flux<PeersCommunicator> peersCommunicatorFlux;
+    private Flux<Link> peersCommunicatorFlux;
 
     private Flux<TorrentPieceChanged> startUploadFlux;
 
     UploadBittorrentAlgorithmImpl(TorrentInfo torrentInfo,
                                   TorrentStatus torrentStatus,
                                   TorrentFileSystemManager torrentFileSystemManager,
-                                  Flux<PeersCommunicator> peersCommunicatorFlux) {
+                                  Flux<Link> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
         this.torrentStatus = torrentStatus;
         this.torrentFileSystemManager = torrentFileSystemManager;

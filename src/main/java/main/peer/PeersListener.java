@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class PeersListener {
     private Integer tcpPort;
     private ServerSocket listenToPeerConnection;
-    private ConnectableFlux<PeersCommunicator> peersConnectedToMeFlux;
+    private ConnectableFlux<Link> peersConnectedToMeFlux;
     private AtomicBoolean didIStop = new AtomicBoolean(false);
 
     public PeersListener() {
@@ -32,7 +32,7 @@ public class PeersListener {
 
     public PeersListener(Integer tcpPort) {
         this.tcpPort = tcpPort;
-        this.peersConnectedToMeFlux = Flux.create((FluxSink<PeersCommunicator> sink) -> {
+        this.peersConnectedToMeFlux = Flux.create((FluxSink<Link> sink) -> {
             try {
                 this.listenToPeerConnection = new ServerSocket(this.tcpPort);
             } catch (IOException e) {
@@ -61,7 +61,7 @@ public class PeersListener {
                 .publish();
     }
 
-    private void acceptPeerConnection(Socket peerSocket, FluxSink<PeersCommunicator> sink) {
+    private void acceptPeerConnection(Socket peerSocket, FluxSink<Link> sink) {
         DataOutputStream peerDataOutputStream;
         DataInputStream peerDataInputStream;
         HandShake handShakeReceived;
@@ -103,7 +103,7 @@ public class PeersListener {
         }
         // all went well, I accept this connection.
         Peer peer = new Peer(peerSocket.getInetAddress().getHostAddress(), peerSocket.getPort());
-        sink.next(new PeersCommunicator(torrentInfo.get(), peer, peerSocket, peerDataInputStream, peerDataOutputStream));
+        sink.next(new Link(torrentInfo.get(), peer, peerSocket, peerDataInputStream, peerDataOutputStream));
     }
 
     private Optional<TorrentInfo> haveThisTorrent(String receivedTorrentInfoHash) {
@@ -124,7 +124,7 @@ public class PeersListener {
         return this.tcpPort;
     }
 
-    public ConnectableFlux<PeersCommunicator> getPeersConnectedToMeFlux() {
+    public ConnectableFlux<Link> getPeersConnectedToMeFlux() {
         return peersConnectedToMeFlux;
     }
 }

@@ -5,7 +5,7 @@ import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.BittorrentAlgorithmImpl;
 import main.file.system.ActiveTorrents;
 import main.file.system.TorrentFileSystemManager;
-import main.peer.PeersCommunicator;
+import main.peer.Link;
 import main.peer.PeersListener;
 import main.peer.PeersProvider;
 import main.peer.ReceivePeerMessages;
@@ -33,7 +33,7 @@ public class TorrentDownloaders {
                                                                   TrackerProvider trackerProvider,
                                                                   PeersProvider peersProvider,
                                                                   Flux<TrackerConnection> trackerConnectionFlux,
-                                                                  Flux<PeersCommunicator> peersCommunicatorFlux) {
+                                                                  Flux<Link> peersCommunicatorFlux) {
         return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .orElseGet(() -> {
                     TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
@@ -88,7 +88,7 @@ public class TorrentDownloaders {
         TorrentStatusController torrentStatusController =
                 TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
 
-        Flux<PeersCommunicator> peersCommunicatorFlux =
+        Flux<Link> peersCommunicatorFlux =
                 Flux.merge(torrentStatusController.isStartedDownloadingFlux(),
                         torrentStatusController.isStartedUploadingFlux())
                         .filter(isStarted -> isStarted)
@@ -105,7 +105,7 @@ public class TorrentDownloaders {
 
         TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
-                        peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages)
+                        peersCommunicatorFlux.map(Link::receivePeerMessages)
                                 .flatMap(ReceivePeerMessages::getPieceMessageResponseFlux))
                 .block();
 
@@ -117,7 +117,7 @@ public class TorrentDownloaders {
 
         SpeedStatistics torrentSpeedStatistics =
                 new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-                        peersCommunicatorFlux.map(PeersCommunicator::getPeerSpeedStatistics));
+                        peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 
         return TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,

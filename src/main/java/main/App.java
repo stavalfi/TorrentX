@@ -3,7 +3,7 @@ package main;
 import christophedetroyer.torrent.TorrentParser;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.peer.PeersCommunicator;
+import main.peer.Link;
 import main.peer.ReceivePeerMessages;
 import main.peer.SendPeerMessages;
 import main.peer.peerMessages.RequestMessage;
@@ -22,13 +22,13 @@ public class App {
                 .createDefaultTorrentDownloader(getTorrentInfo(), downloadPath);
 
         torrentDownloader.getPeersCommunicatorFlux()
-                .map(PeersCommunicator::sendMessages)
+                .map(Link::sendMessages)
                 .flatMap(SendPeerMessages::sentPeerMessagesFlux)
                 .filter(peerMessage -> peerMessage instanceof RequestMessage)
                 .subscribe(peerMessage -> System.out.println("sent: " + peerMessage), Throwable::printStackTrace);
 
         torrentDownloader.getPeersCommunicatorFlux()
-                .map(PeersCommunicator::receivePeerMessages)
+                .map(Link::receivePeerMessages)
                 .flatMap(ReceivePeerMessages::getPieceMessageResponseFlux)
                 .subscribe(System.out::println, Throwable::printStackTrace);
 

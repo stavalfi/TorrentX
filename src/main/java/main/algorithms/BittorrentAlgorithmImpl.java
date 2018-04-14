@@ -3,7 +3,7 @@ package main.algorithms;
 import main.TorrentInfo;
 import main.downloader.TorrentPieceChanged;
 import main.file.system.TorrentFileSystemManager;
-import main.peer.PeersCommunicator;
+import main.peer.Link;
 import main.torrent.status.TorrentStatus;
 import reactor.core.publisher.Flux;
 
@@ -15,9 +15,9 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
     public BittorrentAlgorithmImpl(TorrentInfo torrentInfo,
                                    TorrentStatus torrentStatus,
                                    TorrentFileSystemManager torrentFileSystemManager,
-                                   Flux<PeersCommunicator> peersCommunicatorFlux) {
+                                   Flux<Link> peersCommunicatorFlux) {
 
-        Flux<PeersCommunicator> recordedFreePeerFlux = peersCommunicatorFlux
+        Flux<Link> recordedFreePeerFlux = peersCommunicatorFlux
                 .flatMap(peersCommunicator ->
                         peersCommunicator.sendMessages().sendInterestedMessage()
                                 .map(sendPeerMessages -> peersCommunicator))

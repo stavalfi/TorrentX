@@ -4,7 +4,7 @@ import main.TorrentInfo;
 import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.TorrentFileSystemManager;
-import main.peer.PeersCommunicator;
+import main.peer.Link;
 import main.torrent.status.TorrentStatus;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -16,14 +16,14 @@ public class NotifyAboutCompletedPieceImpl {
     private TorrentInfo torrentInfo;
     private TorrentStatus torrentStatus;
     private TorrentFileSystemManager torrentFileSystemManager;
-    private Flux<PeersCommunicator> recordedFreePeerFlux;
+    private Flux<Link> recordedFreePeerFlux;
 
     private Flux<Integer> notifyAboutCompletedPieceFlux;
 
     public NotifyAboutCompletedPieceImpl(TorrentInfo torrentInfo,
                                          TorrentStatus torrentStatus,
                                          TorrentFileSystemManager torrentFileSystemManager,
-                                         Flux<PeersCommunicator> recordedFreePeerFlux) {
+                                         Flux<Link> recordedFreePeerFlux) {
         this.torrentInfo = torrentInfo;
         this.torrentStatus = torrentStatus;
         this.torrentFileSystemManager = torrentFileSystemManager;
@@ -41,7 +41,7 @@ public class NotifyAboutCompletedPieceImpl {
                 .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
                 .map(TorrentPieceChanged::getPieceIndex)
                 .flatMap(completedPiece ->
-                        this.recordedFreePeerFlux.map(PeersCommunicator::sendMessages)
+                        this.recordedFreePeerFlux.map(Link::sendMessages)
                                 .flatMap(sendPeerMessages -> sendPeerMessages.sendHaveMessage(completedPiece))
                                 .timeout(Duration.ofSeconds(1))
                                 // I will never complete the following line because recordedFreePeerFlux

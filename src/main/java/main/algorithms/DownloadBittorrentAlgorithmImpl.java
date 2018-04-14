@@ -5,8 +5,8 @@ import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.PieceDownloadedAlreadyException;
 import main.file.system.TorrentFileSystemManager;
+import main.peer.Link;
 import main.peer.Peer;
-import main.peer.PeersCommunicator;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatus;
@@ -22,7 +22,7 @@ public class DownloadBittorrentAlgorithmImpl {
     private TorrentInfo torrentInfo;
     private TorrentStatus torrentStatus;
     private TorrentFileSystemManager torrentFileSystemManager;
-    private Flux<PeersCommunicator> recordedFreePeerFlux;
+    private Flux<Link> recordedFreePeerFlux;
     private Flux<TorrentPieceChanged> recordedReceivedBlockFlux;
 
     private Flux<Integer> startDownloadFlux;
@@ -30,7 +30,7 @@ public class DownloadBittorrentAlgorithmImpl {
     DownloadBittorrentAlgorithmImpl(TorrentInfo torrentInfo,
                                     TorrentStatus torrentStatus,
                                     TorrentFileSystemManager torrentFileSystemManager,
-                                    Flux<PeersCommunicator> recordedFreePeerFlux) {
+                                    Flux<Link> recordedFreePeerFlux) {
         this.torrentInfo = torrentInfo;
         this.torrentStatus = torrentStatus;
         this.torrentFileSystemManager = torrentFileSystemManager;
@@ -99,7 +99,7 @@ public class DownloadBittorrentAlgorithmImpl {
         // much bytes I downloaded in this piece.
         final int CONCURRENT_BLOCK_REQUESTS_FROM_PEERS = 1;
 
-        BiPredicate<PeersCommunicator, Integer> doesPeerHavePiece = (peer, pieceIndex) ->
+        BiPredicate<Link, Integer> doesPeerHavePiece = (peer, pieceIndex) ->
                 peer.getPeerCurrentStatus().getPiecesStatus().get(pieceIndex);
 
         // Keep creating and sending requests to this piece until
@@ -119,20 +119,20 @@ public class DownloadBittorrentAlgorithmImpl {
                 .onErrorResume(PieceDownloadedAlreadyException.class, throwable -> Mono.just(missingPieceIndex));
     }
 
-    private Flux<TorrentPieceChanged> requestAndWait(PeersCommunicator peersCommunicator,
+    private Flux<TorrentPieceChanged> requestAndWait(Link link,
                                                      int missingPieceIndex) {
         final Duration minWaitForBlock = Duration.ofMillis(500);
 
         return Flux.<RequestMessage>generate(sink -> {
             try {
                 RequestMessage requestToPiece =
-                        createRequestToPiece(peersCommunicator.getMe(), peersCommunicator.getPeer(), missingPieceIndex);
+                        createRequestToPiece(link.getMe(), link.getPeer(), missingPieceIndex);
                 sink.next(requestToPiece);
             } catch (PieceDownloadedAlreadyException e) {
                 sink.complete();
             }
         }).flatMap(requestMessage ->
-                peersCommunicator.sendMessages()
+                link.sendMessages()
                         .sendRequestMessage(requestMessage)
                         .map(sendPeerMessages -> requestMessage), 1)
                 .doOnNext(requestMessage -> blockThread(minWaitForBlock))
