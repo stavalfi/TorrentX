@@ -51,6 +51,10 @@ public class PieceMessage extends PeerMessage {
 
     @Override
     public String toString() {
-        return "PieceMessage{} " + super.toString();
+        return "PieceMessage{" +
+                "index=" + index +
+                ", begin=" + begin +
+                ", blockLength=" + block.length +
+                "} " + super.toString();
     }
 }

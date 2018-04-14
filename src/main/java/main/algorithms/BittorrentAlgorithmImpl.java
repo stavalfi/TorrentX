@@ -22,10 +22,7 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
                         peersCommunicator.sendMessages().sendInterestedMessage()
                                 .map(sendPeerMessages -> peersCommunicator))
                 .replay()
-                .autoConnect()
-                .filter(peersCommunicator -> !peersCommunicator.getPeerCurrentStatus().getIsHeChokingMe())
-                .filter(peersCommunicator -> peersCommunicator.getPeerCurrentStatus().getAmIInterestedInHim())
-                .filter(peersCommunicator -> !peersCommunicator.getPeerCurrentStatus().getAmIDownloadingFromHim());
+                .autoConnect();
 
         this.notifyAboutCompletedPiece = new NotifyAboutCompletedPieceImpl(torrentInfo,
                 torrentStatus,
