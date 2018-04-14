@@ -59,12 +59,13 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                 .publish()
                 .autoConnect(0);
 
-        this.startListenForIncomingPiecesFlux = this.torrentStatusController.isStartedDownloadingFlux()
-                .filter(isStartedDownloading -> isStartedDownloading)
-                // I can be here only once.
-                .flatMap(__ -> peerResponsesFlux.flatMap(pieceMessage -> writeBlock(pieceMessage)))
-                .publish()
-                .autoConnect(0);
+        this.startListenForIncomingPiecesFlux =
+                this.torrentStatusController.notifyWhenStartedDownloading()
+                        .flatMapMany(__ -> peerResponsesFlux)
+                        .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
+                        .flatMap(pieceMessage -> writeBlock(pieceMessage))
+                        .publish()
+                        .autoConnect(0);
     }
 
     @Override
@@ -209,6 +210,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     }
 
     private Mono<TorrentPieceChanged> writeBlock(PieceMessage pieceMessage) {
+
         return Mono.<TorrentPieceChanged>create(sink -> {
             long from = pieceMessage.getIndex() * this.getPieceLength() + pieceMessage.getBegin();
             long to = pieceMessage.getIndex() * this.getPieceLength()
