@@ -711,6 +711,11 @@ public class MyStepdefs {
                 initialTorrentStatusTypeMap.get(TorrentStatusType.RESUME_DOWNLOAD),
                 initialTorrentStatusTypeMap.get(TorrentStatusType.COMPLETED_DOWNLOADING));
 
+        TorrentDownloaders.getInstance()
+                .createTorrentDownloader(torrentInfo, null, null,
+                        torrentStatusController, null, null, null,
+                        null, null);
+
         Utils.createDefaultTorrentDownloader(torrentInfo,
                 System.getProperty("user.dir") + "/" + downloadLocation,
                 torrentStatusController);
@@ -727,9 +732,10 @@ public class MyStepdefs {
                 .get()
                 .getTorrentStatusController();
 
-        Flux<TorrentStatusType> torrentStatusTypeFlux = torrentStatusController.getStatusTypeFlux()
+        Flux<TorrentStatusType> torrentStatusTypeFlux =
+                torrentStatusController.getStatusTypeFlux()
                 .replay()
-                .autoConnect();
+                .autoConnect(0);
         this.torrentStatusTypeFlux = new ArrayList<>();
         torrentStatusTypeFlux.subscribe(this.torrentStatusTypeFlux::add);
 

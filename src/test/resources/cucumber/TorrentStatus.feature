@@ -286,8 +286,6 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | REMOVE_TORRENT |
     Then torrent-status for torrent "<torrent>" will be:
-      | PAUSE_DOWNLOAD |
-      | PAUSE_UPLOAD   |
       | REMOVE_TORRENT |
     Examples:
       | torrent                       | downloadLocation |
@@ -307,8 +305,6 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | REMOVE_FILES |
     Then torrent-status for torrent "<torrent>" will be:
-      | PAUSE_DOWNLOAD |
-      | PAUSE_UPLOAD   |
       | REMOVE_FILES   |
     Examples:
       | torrent                       | downloadLocation |
@@ -316,7 +312,7 @@ Feature: start/stop downloading/uploading
 
   Scenario Outline: complete torrent twice
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
-      | START_DOWNLOAD        | false |
+      | START_DOWNLOAD        | true  |
       | START_UPLOAD          | false |
       | PAUSE_DOWNLOAD        | false |
       | RESUME_DOWNLOAD       | false |
@@ -328,8 +324,7 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | COMPLETED_DOWNLOADING |
     Then torrent-status for torrent "<torrent>" will be:
-      | PAUSE_DOWNLOAD        |
-      | PAUSE_UPLOAD          |
+      | START_DOWNLOAD        |
       | COMPLETED_DOWNLOADING |
     Examples:
       | torrent                       | downloadLocation |

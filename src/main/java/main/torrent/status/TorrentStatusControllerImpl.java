@@ -37,18 +37,18 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
                                        boolean isCompletedDownloading) {
         this.torrentInfo = torrentInfo;
 
-        // initialize all properties in false and at the end of the constructor, I will change it.
-        this.isStartedDownload = new AtomicBoolean(false);
-        this.isStartedUpload = new AtomicBoolean(false);
-        this.isTorrentRemoved = new AtomicBoolean(false);
-        this.isFilesRemoved = new AtomicBoolean(false);
-        this.isUploading = new AtomicBoolean(false);
-        this.isDownloading = new AtomicBoolean(false);
-        this.isCompletedDownloading = new AtomicBoolean(false);
+        this.isStartedDownload = new AtomicBoolean(isStartedDownload);
+        this.isStartedUpload = new AtomicBoolean(isStartedUpload);
+        this.isTorrentRemoved = new AtomicBoolean(isTorrentRemoved);
+        this.isFilesRemoved = new AtomicBoolean(isFilesRemoved);
+        this.isUploading = new AtomicBoolean(isUploading);
+        this.isDownloading = new AtomicBoolean(isDownloading);
+        this.isCompletedDownloading = new AtomicBoolean(isCompletedDownloading);
 
         this.statusTypeFlux = Flux.<TorrentStatusType>create(sink -> this.statusTypeFluxSink = sink)
+                .doOnNext(x-> System.out.println(x))
                 // we have to make it publishOn and not subscribeOn because if we use subscribeOn,
-                // than when we do autoConnect(0), we may not come to create immediately and we
+                // than when we do autoConnect(0), we may not come to create-method immediately and we
                 // must initialize statusTypeFluxSink asap.
                 .publishOn(App.MyScheduler)
                 .publish()
@@ -106,34 +106,33 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
         // signal initial state:
 
         if (isStartedDownload)
-            startDownload();
+            statusTypeFluxSink.next(TorrentStatusType.START_DOWNLOAD);
         else
             statusTypeFluxSink.next(TorrentStatusType.NOT_START_DOWNLOAD);
         if (isStartedUpload)
-            startUpload();
+            statusTypeFluxSink.next(TorrentStatusType.START_UPLOAD);
         else
             statusTypeFluxSink.next(TorrentStatusType.NOT_START_UPLOAD);
         if (isTorrentRemoved)
-            removeTorrent();
+            statusTypeFluxSink.next(TorrentStatusType.REMOVE_TORRENT);
         else
             statusTypeFluxSink.next(TorrentStatusType.NOT_REMOVE_TORRENT);
         if (isFilesRemoved)
-            removeFiles();
+            statusTypeFluxSink.next(TorrentStatusType.REMOVE_FILES);
         else
             statusTypeFluxSink.next(TorrentStatusType.NOT_REMOVE_FILES);
         if (isUploading)
-            resumeUpload();
+            statusTypeFluxSink.next(TorrentStatusType.RESUME_UPLOAD);
         else
             statusTypeFluxSink.next(TorrentStatusType.PAUSE_UPLOAD);
         if (isDownloading)
-            startDownload();
+            statusTypeFluxSink.next(TorrentStatusType.RESUME_DOWNLOAD);
         else
             statusTypeFluxSink.next(TorrentStatusType.PAUSE_DOWNLOAD);
         if (isCompletedDownloading)
-            completedDownloading();
+            statusTypeFluxSink.next(TorrentStatusType.COMPLETED_DOWNLOADING);
         else
             statusTypeFluxSink.next(TorrentStatusType.NOT_COMPLETED_DOWNLOADING);
-
     }
 
     @Override
@@ -178,67 +177,61 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
 
     @Override
     public synchronized void startDownload() {
-        if (!this.isStartedDownload.get() &&
+        if (this.isStartedDownload.compareAndSet(false, true) &&
                 !this.isCompletedDownloading.get() &&
                 !this.isTorrentRemoved.get() &&
                 !this.isFilesRemoved.get()) {
-            this.isStartedDownload.set(true);
-            this.statusTypeFluxSink.next(TorrentStatusType.START_DOWNLOAD);
             this.isDownloading.set(true);
+            this.statusTypeFluxSink.next(TorrentStatusType.START_DOWNLOAD);
             this.statusTypeFluxSink.next(TorrentStatusType.RESUME_DOWNLOAD);
         }
     }
 
     @Override
     public synchronized void startUpload() {
-        if (!this.isStartedUpload.get() &&
+        if (this.isStartedUpload.compareAndSet(false, true) &&
                 !this.isTorrentRemoved.get() &&
                 !this.isFilesRemoved.get()) {
-            this.isStartedUpload.set(true);
-            this.statusTypeFluxSink.next(TorrentStatusType.START_UPLOAD);
             this.isUploading.set(true);
+            this.statusTypeFluxSink.next(TorrentStatusType.START_UPLOAD);
             this.statusTypeFluxSink.next(TorrentStatusType.RESUME_UPLOAD);
         }
     }
 
     @Override
     public synchronized void resumeDownload() {
-        if (!this.isDownloading.get() &&
+        if (this.isDownloading.compareAndSet(false, true) &&
                 !this.isTorrentRemoved.get() &&
                 !this.isFilesRemoved.get() &&
                 !this.isCompletedDownloading.get()) {
-            this.isDownloading.set(true);
             this.statusTypeFluxSink.next(TorrentStatusType.RESUME_DOWNLOAD);
         }
     }
 
     @Override
     public synchronized void resumeUpload() {
-        if (!this.isUploading.get() &&
+        if (this.isUploading.compareAndSet(false, true) &&
                 !this.isTorrentRemoved.get() &&
                 !this.isFilesRemoved.get()) {
-            this.isUploading.set(true);
             this.statusTypeFluxSink.next(TorrentStatusType.RESUME_UPLOAD);
         }
     }
 
     @Override
     public synchronized void pauseDownload() {
-        if (this.isDownloading.get() &&
+        if (this.isDownloading.compareAndSet(true, false) &&
                 !this.isTorrentRemoved.get() &&
                 !this.isFilesRemoved.get() &&
                 !this.isCompletedDownloading.get()) {
-            this.isDownloading.set(false);
             this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_DOWNLOAD);
         }
     }
 
     @Override
     public synchronized void pauseUpload() {
-        if (this.isUploading.get() &&
+        if (this.isUploading.compareAndSet(true, false) &&
                 !this.isTorrentRemoved.get() &&
                 !this.isFilesRemoved.get()) {
-            this.isUploading.set(false);
             this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_UPLOAD);
         }
     }
@@ -246,43 +239,42 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     @Override
     public synchronized void completedDownloading() {
         if (this.isCompletedDownloading.compareAndSet(false, true) &&
+                this.isStartedDownload.get() &&
                 !this.isTorrentRemoved.get() &&
                 !this.isFilesRemoved.get()) {
-            this.isDownloading.set(false);
-            this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_DOWNLOAD);
-            this.isCompletedDownloading.set(true);
+            if (this.isDownloading.compareAndSet(true, false)) {
+                this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_DOWNLOAD);
+            }
             this.statusTypeFluxSink.next(TorrentStatusType.COMPLETED_DOWNLOADING);
         }
     }
 
     @Override
     public synchronized void removeTorrent() {
-        if (!this.isTorrentRemoved.get()) {
-            if (this.isDownloading.get()) {
-                this.isDownloading.set(false);
+        if (this.isTorrentRemoved.compareAndSet(false, true)) {
+            boolean wasDownloading = this.isDownloading.compareAndSet(true, false);
+            boolean wasUploading = this.isUploading.compareAndSet(true, false);
+            if (wasDownloading) {
                 this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_DOWNLOAD);
             }
-            if (this.isUploading.get()) {
-                this.isUploading.set(false);
+            if (wasUploading) {
                 this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_UPLOAD);
             }
-            this.isTorrentRemoved.set(true);
             this.statusTypeFluxSink.next(TorrentStatusType.REMOVE_TORRENT);
         }
     }
 
     @Override
     public synchronized void removeFiles() {
-        if (!this.isFilesRemoved.get()) {
-            if (this.isDownloading.get()) {
-                this.isDownloading.set(false);
+        if (this.isFilesRemoved.compareAndSet(false, true)) {
+            boolean wasDownloading = this.isDownloading.compareAndSet(true, false);
+            boolean wasUploading = this.isUploading.compareAndSet(true, false);
+            if (wasDownloading) {
                 this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_DOWNLOAD);
             }
-            if (this.isUploading.get()) {
-                this.isUploading.set(false);
+            if (wasUploading) {
                 this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_UPLOAD);
             }
-            this.isFilesRemoved.set(true);
             this.statusTypeFluxSink.next(TorrentStatusType.REMOVE_FILES);
         }
     }

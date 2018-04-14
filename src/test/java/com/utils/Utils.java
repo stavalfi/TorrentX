@@ -72,7 +72,7 @@ public class Utils {
                         .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
                         .flatMap(isDeleted -> activeTorrent
                                 .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash())))
-                .block();
+                .subscribe();
 
         // delete download folder from last test
         Utils.deleteDownloadFolder();
