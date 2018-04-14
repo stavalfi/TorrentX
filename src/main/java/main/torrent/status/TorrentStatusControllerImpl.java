@@ -4,6 +4,7 @@ import main.App;
 import main.TorrentInfo;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.Mono;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -27,6 +28,14 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     private Flux<Boolean> isUploadingFlux;
     private Flux<Boolean> isCompletedDownloadingFlux;
 
+    private Mono<TorrentStatusType> notifyWhenStartedDownloading;
+    private Mono<TorrentStatusType> notifyWhenStartedUploading;
+    private Flux<TorrentStatusType> notifyWhenDownloading;
+    private Flux<TorrentStatusType> notifyWhenUploading;
+    private Mono<TorrentStatusType> notifyWhenCompletedDownloading;
+    private Mono<TorrentStatusType> notifyWhenTorrentRemoved;
+    private Mono<TorrentStatusType> notifyWhenFilesRemoved;
+
     public TorrentStatusControllerImpl(TorrentInfo torrentInfo,
                                        boolean isStartedDownload,
                                        boolean isStartedUpload,
@@ -46,7 +55,6 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
         this.isCompletedDownloading = new AtomicBoolean(isCompletedDownloading);
 
         this.statusTypeFlux = Flux.<TorrentStatusType>create(sink -> this.statusTypeFluxSink = sink)
-                .doOnNext(x-> System.out.println(x))
                 // we have to make it publishOn and not subscribeOn because if we use subscribeOn,
                 // than when we do autoConnect(0), we may not come to create-method immediately and we
                 // must initialize statusTypeFluxSink asap.
@@ -102,6 +110,51 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
                 .map(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.REMOVE_FILES))
                 .replay(1)
                 .autoConnect(0);
+
+        this.notifyWhenStartedDownloading = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.START_DOWNLOAD))
+                .replay(1)
+                .autoConnect(0)
+                .take(1)
+                .single();
+
+        this.notifyWhenStartedUploading = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.START_UPLOAD))
+                .replay(1)
+                .autoConnect(0)
+                .take(1)
+                .single();
+
+        this.notifyWhenDownloading = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.RESUME_DOWNLOAD))
+                .replay(1)
+                .autoConnect(0);
+
+        this.notifyWhenUploading = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.RESUME_UPLOAD))
+                .replay(1)
+                .autoConnect(0);
+
+        this.notifyWhenCompletedDownloading = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.COMPLETED_DOWNLOADING))
+                .replay(1)
+                .autoConnect(0)
+                .take(1)
+                .single();
+
+        this.notifyWhenTorrentRemoved = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.REMOVE_TORRENT))
+                .replay(1)
+                .autoConnect(0)
+                .take(1)
+                .single();
+
+        this.notifyWhenFilesRemoved = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.REMOVE_FILES))
+                .replay(1)
+                .autoConnect(0)
+                .take(1)
+                .single();
 
         // signal initial state:
 
@@ -277,6 +330,41 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
             }
             this.statusTypeFluxSink.next(TorrentStatusType.REMOVE_FILES);
         }
+    }
+
+    @Override
+    public Mono<TorrentStatusType> notifyWhenStartedDownloading() {
+        return this.notifyWhenStartedDownloading;
+    }
+
+    @Override
+    public Mono<TorrentStatusType> notifyWhenStartedUploading() {
+        return this.notifyWhenStartedUploading;
+    }
+
+    @Override
+    public Flux<TorrentStatusType> notifyWhenDownloading() {
+        return this.notifyWhenDownloading;
+    }
+
+    @Override
+    public Flux<TorrentStatusType> notifyWhenUploading() {
+        return this.notifyWhenUploading;
+    }
+
+    @Override
+    public Mono<TorrentStatusType> notifyWhenCompletedDownloading() {
+        return this.notifyWhenCompletedDownloading;
+    }
+
+    @Override
+    public Mono<TorrentStatusType> notifyWhenTorrentRemoved() {
+        return this.notifyWhenTorrentRemoved;
+    }
+
+    @Override
+    public Mono<TorrentStatusType> notifyWhenFilesRemoved() {
+        return this.notifyWhenFilesRemoved;
     }
 
     @Override
