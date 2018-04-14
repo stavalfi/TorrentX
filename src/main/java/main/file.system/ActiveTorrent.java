@@ -250,17 +250,13 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
             long howMuchWeWroteUntilNowInThisPiece = this.piecesPartialStatus[pieceMessage.getIndex()];
             if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
                 this.piecesStatus.set(pieceMessage.getIndex());
-                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
-                        this.getPieces().get(pieceMessage.getIndex()),
-                        TorrentPieceStatus.COMPLETED, pieceMessage);
+                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(TorrentPieceStatus.COMPLETED, pieceMessage);
                 sink.success(torrentPieceChanged);
 
                 if (minMissingPieceIndex() == -1)
                     this.torrentStatusController.completedDownloading();
             } else {
-                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
-                        this.getPieces().get(pieceMessage.getIndex()),
-                        TorrentPieceStatus.DOWNLOADING, pieceMessage);
+                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(TorrentPieceStatus.DOWNLOADING, pieceMessage);
                 sink.success(torrentPieceChanged);
             }
         }).subscribeOn(Schedulers.single());

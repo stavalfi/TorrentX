@@ -5,6 +5,7 @@ import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.TorrentFileSystemManager;
 import main.peer.Link;
+import main.peer.peerMessages.PieceMessage;
 import main.torrent.status.TorrentStatus;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -39,7 +40,8 @@ public class NotifyAboutCompletedPieceImpl {
                 .filter(isDownloadStarted -> isDownloadStarted)
                 .flatMap(__ -> this.torrentFileSystemManager.savedBlockFlux())
                 .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
-                .map(TorrentPieceChanged::getPieceIndex)
+                .map(TorrentPieceChanged::getReceivedPiece)
+                .map(PieceMessage::getIndex)
                 .flatMap(completedPiece ->
                         this.recordedFreePeerFlux.map(Link::sendMessages)
                                 .flatMap(sendPeerMessages -> sendPeerMessages.sendHaveMessage(completedPiece))

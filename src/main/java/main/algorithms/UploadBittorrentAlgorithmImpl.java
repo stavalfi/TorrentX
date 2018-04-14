@@ -43,9 +43,7 @@ public class UploadBittorrentAlgorithmImpl {
                                 .flatMap(pieceMessage ->
                                         peersCommunicator.sendMessages().sendPieceMessage(pieceMessage.getIndex(),
                                                 pieceMessage.getBegin(), pieceMessage.getBlock())
-                                                .map(___ -> new TorrentPieceChanged(pieceMessage.getIndex(),
-                                                        this.torrentInfo.getPieces().get(pieceMessage.getIndex()),
-                                                        TorrentPieceStatus.UPLOADING, pieceMessage)))));
+                                                .map(___ -> new TorrentPieceChanged(TorrentPieceStatus.UPLOADING, pieceMessage)))));
     }
 
     public Flux<TorrentPieceChanged> startUploadingFlux() {

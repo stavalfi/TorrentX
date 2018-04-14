@@ -60,7 +60,8 @@ public class DownloadBittorrentAlgorithmImpl {
                         .filter(isDownloadStarted -> isDownloadStarted)
                         .flatMap(__ -> this.torrentFileSystemManager.savedBlockFlux())
                         .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
-                        .map(TorrentPieceChanged::getPieceIndex)
+                        .map(TorrentPieceChanged::getReceivedPiece)
+                        .map(PieceMessage::getIndex)
                         .replay()
                         .autoConnect(0);
 
