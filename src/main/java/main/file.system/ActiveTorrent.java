@@ -9,7 +9,7 @@ import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
-import main.torrent.status.TorrentStatus;
+import main.torrent.status.TorrentStatusController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -28,13 +28,15 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     private final BitSet piecesStatus;
     private final int[] piecesPartialStatus;
     private final String downloadPath;
+    private TorrentStatusController torrentStatusController;
     private Flux<TorrentPieceChanged> startListenForIncomingPiecesFlux;
 
     public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath,
-                         TorrentStatus torrentStatus,
+                         TorrentStatusController torrentStatusController,
                          Flux<PieceMessage> peerResponsesFlux) {
         super(torrentInfo);
         this.downloadPath = downloadPath;
+        this.torrentStatusController = torrentStatusController;
         this.piecesStatus = new BitSet(getPieces().size());
         this.piecesPartialStatus = new int[getPieces().size()];
 
@@ -43,21 +45,21 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
 
         this.activeTorrentFileList = createActiveTorrentFileList(torrentInfo, downloadPath);
 
-        torrentStatus.isFilesRemovedFlux()
+        this.torrentStatusController.isFilesRemovedFlux()
                 .filter(isFilesRemoved -> isFilesRemoved)
                 // I can be here only once.
                 .flatMap(__ -> deleteFileOnlyMono(torrentInfo.getTorrentInfoHash()))
                 .publish()
                 .autoConnect(0);
 
-        torrentStatus.isTorrentRemovedFlux()
+        this.torrentStatusController.isTorrentRemovedFlux()
                 .filter(isTorrentRemoved -> isTorrentRemoved)
                 // I can be here only once.
                 .flatMap(__ -> deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
                 .publish()
                 .autoConnect(0);
 
-        this.startListenForIncomingPiecesFlux = torrentStatus.isStartedDownloadingFlux()
+        this.startListenForIncomingPiecesFlux = this.torrentStatusController.isStartedDownloadingFlux()
                 .filter(isStartedDownloading -> isStartedDownloading)
                 // I can be here only once.
                 .flatMap(__ -> peerResponsesFlux.flatMap(pieceMessage -> writeBlock(pieceMessage)))
@@ -185,15 +187,6 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
         }).subscribeOn(App.MyScheduler);
     }
 
-    private Mono<ActiveTorrent> updatePieceAsCompleted(int pieceIndex) {
-        return Mono.<ActiveTorrent>create(sink -> {
-            this.piecesStatus.set(pieceIndex);
-            Mono.just(this);
-        }).doOnSuccess(activeTorrent -> {
-            // update in mongo db
-        });
-    }
-
     private List<ActiveTorrentFile> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) {
         String mainFolder = !torrentInfo.isSingleFileTorrent() ?
                 downloadPath + "/" + torrentInfo.getName() + "/" :
@@ -259,6 +252,9 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                         this.getPieces().get(pieceMessage.getIndex()),
                         TorrentPieceStatus.COMPLETED);
                 sink.success(torrentPieceChanged);
+
+                if (minMissingPieceIndex() == -1)
+                    this.torrentStatusController.completedDownloading();
             } else {
                 TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
                         this.getPieces().get(pieceMessage.getIndex()),
