@@ -19,7 +19,7 @@ public class UploadBittorrentAlgorithmImpl {
     UploadBittorrentAlgorithmImpl(TorrentInfo torrentInfo,
                                   TorrentStatus torrentStatus,
                                   TorrentFileSystemManager torrentFileSystemManager,
-                                  Flux<PeersCommunicator> peersCommunicatorFlux){
+                                  Flux<PeersCommunicator> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
         this.torrentStatus = torrentStatus;
         this.torrentFileSystemManager = torrentFileSystemManager;
@@ -45,7 +45,7 @@ public class UploadBittorrentAlgorithmImpl {
                                                 pieceMessage.getBegin(), pieceMessage.getBlock())
                                                 .map(___ -> new TorrentPieceChanged(pieceMessage.getIndex(),
                                                         this.torrentInfo.getPieces().get(pieceMessage.getIndex()),
-                                                        TorrentPieceStatus.UPLOADING)))));
+                                                        TorrentPieceStatus.UPLOADING, pieceMessage)))));
     }
 
     public Flux<TorrentPieceChanged> startUploadingFlux() {

@@ -250,7 +250,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                 this.piecesStatus.set(pieceMessage.getIndex());
                 TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
                         this.getPieces().get(pieceMessage.getIndex()),
-                        TorrentPieceStatus.COMPLETED);
+                        TorrentPieceStatus.COMPLETED, pieceMessage);
                 sink.success(torrentPieceChanged);
 
                 if (minMissingPieceIndex() == -1)
@@ -258,7 +258,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
             } else {
                 TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
                         this.getPieces().get(pieceMessage.getIndex()),
-                        TorrentPieceStatus.DOWNLOADING);
+                        TorrentPieceStatus.DOWNLOADING, pieceMessage);
                 sink.success(torrentPieceChanged);
             }
         }).subscribeOn(Schedulers.single());
