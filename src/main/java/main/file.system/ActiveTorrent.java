@@ -252,22 +252,17 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                         break;
                 }
 
-            // update pieces partial status array:
-            // WARNING: this line *only* must be synchronized among multiple threads!
-            this.piecesPartialStatus[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
-
             // update pieces status:
             // there maybe multiple writes of the same pieceRequest during one execution...
-            long pieceLength = getPieceLength();
-            // check if we downloaded a block from the last piece.
-            // if yes, it's length can be less than a other pieces.
-            if (pieceMessage.getIndex() == this.getPieces().size() - 1) {
-                pieceLength = (int) Math.min(getPieceLength(),
-                        getTotalSize() - (getPieces().size() - 1) * getPieceLength());
-            }
+            long pieceLength = getPieceLength(pieceMessage.getIndex());
+            this.piecesPartialStatus[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
+            if (pieceLength < this.piecesPartialStatus[pieceMessage.getIndex()])
+                this.piecesPartialStatus[pieceMessage.getIndex()] = getPieceLength(pieceMessage.getIndex());
 
             long howMuchWeWroteUntilNowInThisPiece = this.piecesPartialStatus[pieceMessage.getIndex()];
             if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
+                // update pieces partial status array:
+                // TODO: WARNING: this line *only* must be synchronized among multiple threads!
                 this.piecesStatus.set(pieceMessage.getIndex());
                 TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(TorrentPieceStatus.COMPLETED, pieceMessage);
                 sink.success(torrentPieceChanged);
@@ -275,6 +270,8 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                 if (minMissingPieceIndex() == -1)
                     this.torrentStatusController.completedDownloading();
             } else {
+                // update pieces partial status array:
+                // TODO: WARNING: this line *only* must be synchronized among multiple threads!
                 TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(TorrentPieceStatus.DOWNLOADING, pieceMessage);
                 sink.success(torrentPieceChanged);
             }
