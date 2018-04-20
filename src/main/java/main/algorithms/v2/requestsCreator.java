@@ -6,12 +6,12 @@ import main.peer.Peer;
 import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Flux;
 
-public class PieceRequestsSupplier {
+public class requestsCreator {
     private TorrentInfo torrentInfo;
     private TorrentFileSystemManager torrentFileSystemManager;
 
-    public PieceRequestsSupplier(TorrentInfo torrentInfo,
-                                 TorrentFileSystemManager torrentFileSystemManager) {
+    public requestsCreator(TorrentInfo torrentInfo,
+                           TorrentFileSystemManager torrentFileSystemManager) {
         this.torrentInfo = torrentInfo;
         this.torrentFileSystemManager = torrentFileSystemManager;
     }

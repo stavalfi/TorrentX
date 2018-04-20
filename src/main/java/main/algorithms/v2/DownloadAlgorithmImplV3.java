@@ -18,8 +18,8 @@ public class DownloadAlgorithmImplV3 {
     private TorrentInfo torrentInfo;
     private TorrentStatus torrentStatus;
     private TorrentFileSystemManager torrentFileSystemManager;
-    private PeersPiecesStatusOrganizer peersPiecesStatusOrganizer;
-    private PieceRequestsSupplier pieceRequestsSupplier;
+    private LinkForPiecesProvider linkForPiecesProvider;
+    private requestsCreator requestsCreator;
 
     private Flux<TorrentPieceChanged> recordedSavedBlockFlux;
 
@@ -27,71 +27,96 @@ public class DownloadAlgorithmImplV3 {
 
     public DownloadAlgorithmImplV3(TorrentInfo torrentInfo, TorrentStatus torrentStatus,
                                    TorrentFileSystemManager torrentFileSystemManager,
-                                   PeersPiecesStatusOrganizer peersPiecesStatusOrganizer,
-                                   PieceRequestsSupplier pieceRequestsSupplier) {
+                                   LinkForPiecesProvider linkForPiecesProvider,
+                                   requestsCreator requestsCreator) {
         this.torrentInfo = torrentInfo;
         this.torrentStatus = torrentStatus;
         this.torrentFileSystemManager = torrentFileSystemManager;
-        this.peersPiecesStatusOrganizer = peersPiecesStatusOrganizer;
-        this.pieceRequestsSupplier = pieceRequestsSupplier;
+        this.linkForPiecesProvider = linkForPiecesProvider;
+        this.requestsCreator = requestsCreator;
 
         this.recordedSavedBlockFlux = this.torrentFileSystemManager
                 .savedBlockFlux()
-                .doOnNext(x -> System.out.println("4: " + Thread.currentThread().getName()))
                 .replay()
-                .autoConnect(0)
-                .doOnNext(x -> System.out.println("5: " + Thread.currentThread().getName()));
+                .autoConnect(0);
 
         this.startDownloadFlux = downloadFlux()
                 .publish()
                 .autoConnect(0);
     }
 
+    private Flux<Integer> downloadFlux2() {
+        return this.torrentStatus.notifyWhenStartedDownloading()
+                .map(__ -> this.linkForPiecesProvider)
+                .flatMapMany(linkForPiecesProvider -> linkForPiecesProvider.pieceToRequestFlux())
+                .flatMap(pieceIndex -> {
+                            // I'm trying to download the following
+                            // piece - block by block (one at a time).
+                            // If I'm failing to download from a peer,
+                            // then I will download the failed block
+                            // from the next peer.
+                            System.out.println("start downloading piece: " + pieceIndex);
+                            return Flux.empty();
+                        }
+                        , 1, 1);
+    }
+
     private Flux<Integer> downloadFlux() {
         return this.torrentStatus.notifyWhenStartedDownloading()
-                .map(__ -> this.peersPiecesStatusOrganizer)
-                .flatMapMany(peersPiecesStatusOrganizer -> peersPiecesStatusOrganizer.pieceToRequestFlux())
-                .flatMap(pieceIndex -> this.peersPiecesStatusOrganizer.pieceSupplier(pieceIndex)
-                                // request -> block 2 sec -> wait for piece response
-                                .flatMap(link -> request(link, pieceIndex)
-                                                .doOnNext(x -> System.out.println("1: " + Thread.currentThread().getName()))
-                                                .doOnNext(requestMessage -> blockThread())
-                                                .doOnNext(x -> System.out.println("2: " + Thread.currentThread().getName()))
-                                                .flatMap(requestMessage -> wait(requestMessage), 1, 1)
-                                                .doOnNext(x -> System.out.println("3: " + Thread.currentThread().getName()))
-                                                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
-                                        , 1,1)
-                                .doOnNext(x -> System.out.println("6: " + Thread.currentThread().getName()))
-                        , 1,1)
-                .doOnNext(x -> System.out.println("7: " + Thread.currentThread().getName()));
+                .map(__ -> this.linkForPiecesProvider)
+                .flatMapMany(linkForPiecesProvider -> linkForPiecesProvider.pieceToRequestFlux())
+                .flatMap(pieceIndex -> {
+                            // I'm trying to download the following
+                            // piece - block by block (one at a time).
+                            // If I'm failing to download from a peer,
+                            // then I will download the failed block
+                            // from the next peer.
+                            System.out.println("start downloading piece: " + pieceIndex);
+                            // TODO: bug -
+                            // when I finish to download all the blocks from a given piece, then "request(link, pieceIndex)"
+                            // will send complete signal. then I will ask the upstream for more signals.
+                            // upstream == "this.linkForPiecesProvider.peerSupplierFlux(pieceIndex)"
+                            // and the upstream will give me more peers for the same piece I already downloaded.
+                            // and I won't try to download that piece so "request(link, pieceIndex)" will send complete signal
+                            // and all over again forever.
+                            return this.linkForPiecesProvider.peerSupplierFlux(pieceIndex)
+                                    .doOnNext(link -> System.out.println("trying to download piece: " + pieceIndex + " from: " + link.getPeer()))
+                                    //.log("", Level.INFO, true)
+                                    // request -> block 2 sec -> waitUntilCorrectResponse for piece response
+                                    .flatMap(link -> request(link, pieceIndex)
+                                                    .doOnNext(requestMessage -> blockThread())
+                                                    .flatMap(requestMessage -> waitUntilCorrectResponse(requestMessage), 1, 1)
+                                                    .doOnError(throwable -> System.out.println(throwable))
+                                                    // max wait to the correct block back from peer.
+                                                    .timeout(Duration.ofSeconds(2))
+                                                    // If I don't get the correct block from the peer in
+                                                    // the specified time, then I will download
+                                                    // the same block again because the next operation
+                                                    // after "onErrorResume" will request more signals
+                                                    // from upstream.
+                                                    .onErrorResume(TimeoutException.class, throwable -> Mono.empty())
+                                                    // If there is an error then I will communicate with the next peer.
+                                                    .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
+                                            , 1, 1);
+                        }
+                        , 1, 1);
     }
 
     private Flux<RequestMessage> request(Link link, int pieceIndex) {
-        return this.pieceRequestsSupplier.createRequestFlux(link.getMe(), link.getPeer(), pieceIndex)
+        return this.requestsCreator.createRequestFlux(link.getMe(), link.getPeer(), pieceIndex)
                 .flatMap(requestMessage ->
-                        link.sendMessages()
-                                .sendRequestMessage(requestMessage)
-                                .map(sendPeerMessages -> requestMessage), 1,1);
+                        link.sendMessages().sendRequestMessage(requestMessage)
+                                .map(sendPeerMessages -> requestMessage), 1, 1);
     }
 
-    private Mono<Integer> wait(RequestMessage requestMessage) {
-        final Duration maxWaitForBlock = Duration.ofSeconds(700000);
+    private Mono<Integer> waitUntilCorrectResponse(RequestMessage requestMessage) {
         return this.recordedSavedBlockFlux
                 .filter(torrentPieceChanged -> requestMessage.getIndex() == torrentPieceChanged.getReceivedPiece().getIndex())
                 .filter(torrentPieceChanged -> requestMessage.getBegin() == torrentPieceChanged.getReceivedPiece().getBegin())
                 .map(TorrentPieceChanged::getReceivedPiece)
                 .map(PieceMessage::getIndex)
                 .take(1)
-                .single()
-                .timeout(maxWaitForBlock)
-                // If I don't get the block from the peer in
-                // the specified time, then I will download
-                // the same block again because the next operation
-                // after "onErrorResume" will request more signals
-                // from upstream.
-                .doOnError(TimeoutException.class,
-                        throwable -> System.out.println("timeout - requesting again: " + requestMessage))
-                .onErrorResume(TimeoutException.class, throwable -> Mono.empty());
+                .single();
     }
 
     private void blockThread() {

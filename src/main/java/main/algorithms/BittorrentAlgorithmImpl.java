@@ -2,8 +2,8 @@ package main.algorithms;
 
 import main.TorrentInfo;
 import main.algorithms.v2.DownloadAlgorithmImplV3;
-import main.algorithms.v2.PeersPiecesStatusOrganizer;
-import main.algorithms.v2.PieceRequestsSupplier;
+import main.algorithms.v2.LinkForPiecesProvider;
+import main.algorithms.v2.requestsCreator;
 import main.downloader.TorrentPieceChanged;
 import main.file.system.TorrentFileSystemManager;
 import main.peer.Link;
@@ -37,19 +37,19 @@ public class BittorrentAlgorithmImpl implements BittorrentAlgorithm {
                 torrentFileSystemManager,
                 peersCommunicatorFlux);
 
-        PeersPiecesStatusOrganizer organizer =
-                new PeersPiecesStatusOrganizer(recordedFreePeerFlux,
+        LinkForPiecesProvider organizer =
+                new LinkForPiecesProvider(recordedFreePeerFlux,
                         torrentFileSystemManager.getUpdatedPiecesStatus());
 
-        PieceRequestsSupplier pieceRequestsSupplier =
-                new PieceRequestsSupplier(torrentInfo, torrentFileSystemManager);
+        requestsCreator requestsCreator =
+                new requestsCreator(torrentInfo, torrentFileSystemManager);
 
         this.downloadBittorrentAlgorithm = new DownloadAlgorithmImplV3(
                 torrentInfo,
                 torrentStatus,
                 torrentFileSystemManager,
                 organizer,
-                pieceRequestsSupplier);
+                requestsCreator);
     }
 
     @Override
