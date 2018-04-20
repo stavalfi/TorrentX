@@ -419,7 +419,7 @@ public class MyStepdefs {
                 // when ActiveTorrent class and me in the test will subscribe, then start signaling.
                 // if I remove this, then in the tests I will lose all the signals this class will send in
                 // activeTorrent.savedBlockFlux().
-                .autoConnect(3);
+                .autoConnect(2);
 
         TorrentStatusController torrentStatusController =
                 TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
@@ -433,10 +433,8 @@ public class MyStepdefs {
                         .replay()
                         .autoConnect(0);
 
-        // will cause ActiveTorrent to start recording signals in activeTorrent.savedBlockFlux().
-        pieceMessageFlux.subscribe();
-
         Flux<RequestMessage> assertWrittenPiecesFlux =
+                // will cause ActiveTorrent to start recording signals in activeTorrent.savedBlockFlux().
                 Flux.zip(recordedTorrentPieceChangedFlux, pieceMessageFlux,
                         (torrentPieceChanged, pieceMessage) -> {
                             RequestMessage requestMessage =
@@ -543,14 +541,24 @@ public class MyStepdefs {
         TorrentStatusController torrentStatusController =
                 TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
 
+        Flux<PieceMessage> lastPieceFlux = Flux.just(lastPieceMessage)
+                .replay()
+                .autoConnect(2);
+
         ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, Flux.just(lastPieceMessage))
+                .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, lastPieceFlux)
                 .block();
 
-        Mono<PieceMessage> readLastPieceTaskMono =
+        Flux<TorrentPieceChanged> recordedTorrentPieceChangedFlux =
                 activeTorrent.savedBlockFlux()
                         .replay()
-                        .autoConnect(0)
+                        .autoConnect(0);
+
+        // start recording only after I listen to activeTorrent.savedBlockFlux(). Now I won't lose signals.
+        lastPieceFlux.subscribe();
+
+        Mono<PieceMessage> readLastPieceTaskMono =
+                recordedTorrentPieceChangedFlux
                         .doOnNext(torrentPieceChanged -> {
                             String message = "the last piece must be completed but it's not.";
                             Assert.assertEquals(message, TorrentPieceStatus.COMPLETED, torrentPieceChanged.getTorrentPieceStatus());
@@ -570,8 +578,6 @@ public class MyStepdefs {
                         })
                         .take(1)
                         .single();
-
-        torrentStatusController.startDownload();
 
         StepVerifier.create(readLastPieceTaskMono)
                 .expectNextCount(1)
