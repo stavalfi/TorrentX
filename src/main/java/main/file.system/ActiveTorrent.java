@@ -61,9 +61,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                 .autoConnect(0);
 
         this.startListenForIncomingPiecesFlux =
-                this.torrentStatusController.notifyWhenStartedDownloading()
-                        .flatMapMany(__ -> peerResponsesFlux)
-                        .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
+                peerResponsesFlux.filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
                         .flatMap(pieceMessage -> writeBlock(pieceMessage))
                         .publish()
                         .autoConnect(0);

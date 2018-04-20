@@ -414,7 +414,12 @@ public class MyStepdefs {
                                 ((torrentInfo.getPieces().size() - 1) * torrentInfo.getPieceLength());
                     return new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
                             toRandomByteArray.apply((int) (blockLength - blockOfPiece.getFrom())));
-                });
+                })
+                .publish()
+                // when ActiveTorrent class and me in the test will subscribe, then start signaling.
+                // if I remove this, then in the tests I will lose all the signals this class will send in
+                // activeTorrent.savedBlockFlux().
+                .autoConnect(3);
 
         TorrentStatusController torrentStatusController =
                 TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
@@ -428,8 +433,8 @@ public class MyStepdefs {
                         .replay()
                         .autoConnect(0);
 
-        // will cause recordedTorrentPieceChangedFlux to start recording signals.
-        torrentStatusController.startDownload();
+        // will cause ActiveTorrent to start recording signals in activeTorrent.savedBlockFlux().
+        pieceMessageFlux.subscribe();
 
         Flux<RequestMessage> assertWrittenPiecesFlux =
                 Flux.zip(recordedTorrentPieceChangedFlux, pieceMessageFlux,
