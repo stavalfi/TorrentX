@@ -5,6 +5,7 @@ import java.net.ConnectException;
 import java.net.NoRouteToHostException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 
 public class PeerExceptions {
@@ -20,5 +21,10 @@ public class PeerExceptions {
                 // waiting for more incoming data in the stream.
                 throwable instanceof EOFException;
     };
+
+    // I requested a piece and he didn't response with the piece back or communication problems.
+    public static Predicate<Throwable> peerNotResponding =
+            communicationErrors.or(throwable -> throwable instanceof TimeoutException);
+
 
 }

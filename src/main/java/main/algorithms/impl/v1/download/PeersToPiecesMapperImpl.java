@@ -1,5 +1,6 @@
-package main.algorithms.v2;
+package main.algorithms.impl.v1.download;
 
+import main.algorithms.PeersToPiecesMapper;
 import main.peer.Link;
 import reactor.core.publisher.Flux;
 
@@ -7,7 +8,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
-public class LinkForPiecesProvider {
+public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
     // from outside
     private Flux<Link> linkFlux;
     private BitSet updatedPieceState;
@@ -18,7 +19,7 @@ public class LinkForPiecesProvider {
     // to outside
     private Flux<Integer> pieceToRequestFlux;
 
-    public LinkForPiecesProvider(Flux<Link> linkFlux, BitSet updatedPieceState) {
+    public PeersToPiecesMapperImpl(Flux<Link> linkFlux, BitSet updatedPieceState) {
         this.linkFlux = linkFlux;
         this.updatedPieceState = updatedPieceState;
 
@@ -45,12 +46,15 @@ public class LinkForPiecesProvider {
                         .filter(pieceIndex -> !this.updatedPieceState.get(pieceIndex));
     }
 
+    @Override
     public Flux<Integer> pieceToRequestFlux() {
         return this.pieceToRequestFlux;
     }
 
+    @Override
     public Flux<Link> peerSupplierFlux(int pieceIndex) {
         return this.linkFlux
-                .filter((Link link) -> link.getPeerCurrentStatus().getPiecesStatus().get(pieceIndex));
+                .filter(link -> link.getPeerCurrentStatus().getPiecesStatus().get(pieceIndex))
+                .filter(link -> !link.getPeerCurrentStatus().getIsHeChokingMe());
     }
 }

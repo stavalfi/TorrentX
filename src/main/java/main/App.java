@@ -3,8 +3,8 @@ package main;
 import christophedetroyer.torrent.TorrentParser;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
+import main.downloader.TorrentPieceChanged;
 import main.peer.Link;
-import main.peer.ReceivePeerMessages;
 import main.peer.SendPeerMessages;
 import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Hooks;
@@ -25,11 +25,16 @@ public class App {
                 .map(Link::sendMessages)
                 .flatMap(SendPeerMessages::sentPeerMessagesFlux)
                 .filter(peerMessage -> peerMessage instanceof RequestMessage)
-                .subscribe(peerMessage -> System.out.println("sent: " + peerMessage), Throwable::printStackTrace);
+                .cast(RequestMessage.class)
+                .map(requestMessage -> "request: index: " + requestMessage.getIndex() +
+                        ", begin: " + requestMessage.getBegin() + ", from: " + requestMessage.getTo())
+                .subscribe(System.out::println, Throwable::printStackTrace);
 
-        torrentDownloader.getPeersCommunicatorFlux()
-                .map(Link::receivePeerMessages)
-                .flatMap(ReceivePeerMessages::getPieceMessageResponseFlux)
+        torrentDownloader.getTorrentFileSystemManager()
+                .savedBlockFlux()
+                .map(TorrentPieceChanged::getReceivedPiece)
+                .map(pieceMessage -> "received: index: " + pieceMessage.getIndex() +
+                        ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
         torrentDownloader.getTorrentStatusController().startDownload();
