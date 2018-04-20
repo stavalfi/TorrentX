@@ -940,5 +940,95 @@ public class MyStepdefs {
 
         Utils.removeEverythingRelatedToTorrent(torrentInfo);
     }
+
+    @Given("^torrent: \"([^\"]*)\",\"([^\"]*)\"$")
+    public void torrent(String torrentFileName, String downloadLocation) throws Throwable {
+
+    }
+
+    @Given("^link to \"([^\"]*)\" - fake-peer on port \"([^\"]*)\" with the following pieces - for torrent: \"([^\"]*)\"$")
+    public void linkToFakePeerWithTheFollowingPiecesForTorrent(FakePeerType fakePeerType, Integer fakePeerPort, String torrentFileName, List<Integer> fakePeerCompletedPieces) throws Throwable {
+
+    }
+
+    @When("^application request the following blocks from him - for torrent: \"([^\"]*)\":$")
+    public void applicationRequestTheFollowingBlocksFromHimForTorrent(String torrentFileName, List<BlockOfPiece> peerRequestBlockList) throws Throwable {
+
+    }
+
+    @Then("^application receive the following blocks from him - for torrent: \"([^\"]*)\":$")
+    public void applicationReceiveTheFollowingBlocksFromHimForTorrent(String torrentFileName,
+                                                                      List<BlockOfPiece> expectedBlockFromFakePeerList) throws Throwable {
+
+    }
+
+    @Then("^application doesn't receive the following blocks from him - for torrent: \"([^\"]*)\":$")
+    public void applicationDoesnTReceiveTheFollowingBlocksFromHimForTorrent(String torrentFileName,
+                                                                            List<BlockOfPiece> notExpectedBlockFromFakePeerList) throws Throwable {
+
+    }
+
+    @Then("^fake-peer on port \"([^\"]*)\" choke me: \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
+    public void fakePeerOnPortChokeMeForTorrent(Integer fakePeerPort, boolean isChoking, String torrentFileName) throws Throwable {
+
+    }
+
+    @When("^application request available pieces - for torrent: \"([^\"]*)\"$")
+    public void applicationRequestAvailablePiecesForTorrent(String torrentFileName) throws Throwable {
+
+    }
+
+    @Then("^application receive the following available pieces - for torrent: \"([^\"]*)\":$")
+    public void applicationReceiveTheFollowingAvailablePiecesForTorrent(String torrentFileName,
+                                                                        List<Integer> expectedAvailablePiecesList) throws Throwable {
+
+    }
+
+    @Then("^application receive the following extra available pieces - for torrent: \"([^\"]*)\":$")
+    public void applicationReceiveTheFollowingExtraAvailablePiecesForTorrent(String torrentFileName,
+                                                                             List<Integer> expectedAvailablePiecesList) throws Throwable {
+
+    }
+
+    @When("^application request available peers for piece: \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
+    public void applicationRequestAvailablePeersForPieceForTorrent(int pieceIndex, String torrentFileName) throws Throwable {
+
+    }
+
+    @When("^fake-peer on port \"([^\"]*)\" notify on more completed pieces using \"([^\"]*)\" - for torrent: \"([^\"]*)\":$")
+    public void fakePeerOnPortNotifyOnMoreCompletedPiecesUsingForTorrent(int fakePeerPort,
+                                                                         String peerMessageType,
+                                                                         String torrentFileName,
+                                                                         List<Integer> fakePeerNotifyOnCompletedPieceList) throws Throwable {
+
+    }
+
+    @Then("^application receive the following available fake-peers for piece: \"([^\"]*)\" - for torrent: \"([^\"]*)\":$")
+    public void applicationReceiveTheFollowingAvailableFakePeersForPieceForTorrent(int pieceIndex,
+                                                                                   String torrentFileName,
+                                                                                   List<Integer> expectedAvailableFakePeerPortList) throws Throwable {
+    }
+
+    @Then("^application receive the following extra available fake-peers for piece: \"([^\"]*)\" - for torrent: \"([^\"]*)\":$")
+    public void applicationReceiveTheFollowingExtraAvailablePeersForPieceForTorrent(int pieceIndex,
+                                                                                    String torrentFileName,
+                                                                                    List<Integer> expectedAvailableFakePeerPortList) throws Throwable {
+
+    }
+
+    @Then("^application receive none extra available pieces - for torrent: \"([^\"]*)\"$")
+    public void applicationReceiveNoneExtraAvailablePiecesForTorrent(String torrentFileName) throws Throwable {
+
+    }
+
+    @Then("^application receive none available fake-peers for piece: \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
+    public void applicationReceiveNoneAvailableFakePeersForPieceForTorrent(int pieceIndex, String torrentFileName) throws Throwable {
+
+    }
+
+    @Then("^application receive the none available pieces - for torrent: \"([^\"]*)\"$")
+    public void applicationReceiveTheNoneAvailablePiecesForTorrent(String torrentFileName) throws Throwable {
+
+    }
 }
 
