@@ -38,7 +38,6 @@ class SendPeerMessagesImpl implements SendPeerMessages {
                 this.peerDataOutputStream.write(peerMessage.createPacketFromObject());
                 monoSink.success(this);
             } catch (IOException e) {
-                System.out.println("failed to send: " + peerMessage + ", reason: " + e);
                 this.closeConnectionMethod.run();
                 monoSink.error(e);
             }

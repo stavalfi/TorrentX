@@ -5,7 +5,7 @@ import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
-import main.algorithms.BittorrentAlgorithmImpl;
+import main.algorithms.impl.BittorrentAlgorithmInitializer;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.ActiveTorrentFile;
@@ -117,7 +117,7 @@ public class Utils {
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
-                new BittorrentAlgorithmImpl(torrentInfo,
+                BittorrentAlgorithmInitializer.v1(torrentInfo,
                         torrentStatusController,
                         torrentFileSystemManager,
                         peersCommunicatorFlux);
@@ -172,7 +172,7 @@ public class Utils {
                         .autoConnect();
 
         BittorrentAlgorithm bittorrentAlgorithm =
-                new BittorrentAlgorithmImpl(torrentInfo,
+                BittorrentAlgorithmInitializer.v1(torrentInfo,
                         torrentStatusController,
                         torrentFileSystemManager,
                         peersCommunicatorFlux);

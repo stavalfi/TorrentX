@@ -1,12 +1,27 @@
 package main.algorithms;
 
-import main.downloader.TorrentPieceChanged;
-import reactor.core.publisher.Flux;
+public class BittorrentAlgorithm {
+    private UploadAlgorithm uploadAlgorithm;
+    private DownloadAlgorithm downloadAlgorithm;
+    private NotifyAboutCompletedPieceAlgorithm notifyAboutCompletedPieceAlgorithm;
 
-public interface BittorrentAlgorithm {
-    Flux<Integer> startDownloadFlux();
+    public BittorrentAlgorithm(UploadAlgorithm uploadAlgorithm,
+                               DownloadAlgorithm downloadAlgorithm,
+                               NotifyAboutCompletedPieceAlgorithm notifyAboutCompletedPieceAlgorithm) {
+        this.uploadAlgorithm = uploadAlgorithm;
+        this.downloadAlgorithm = downloadAlgorithm;
+        this.notifyAboutCompletedPieceAlgorithm = notifyAboutCompletedPieceAlgorithm;
+    }
 
-    Flux<TorrentPieceChanged> startUploadingFlux();
+    public UploadAlgorithm getUploadAlgorithm() {
+        return uploadAlgorithm;
+    }
 
-    Flux<Integer> getNotifyAboutCompletedPieceFlux();
+    public DownloadAlgorithm getDownloadAlgorithm() {
+        return downloadAlgorithm;
+    }
+
+    public NotifyAboutCompletedPieceAlgorithm getNotifyAboutCompletedPieceAlgorithm() {
+        return notifyAboutCompletedPieceAlgorithm;
+    }
 }

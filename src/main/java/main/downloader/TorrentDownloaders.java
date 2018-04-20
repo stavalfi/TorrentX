@@ -2,7 +2,7 @@ package main.downloader;
 
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
-import main.algorithms.BittorrentAlgorithmImpl;
+import main.algorithms.impl.BittorrentAlgorithmInitializer;
 import main.file.system.ActiveTorrents;
 import main.file.system.TorrentFileSystemManager;
 import main.peer.Link;
@@ -110,7 +110,7 @@ public class TorrentDownloaders {
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
-                new BittorrentAlgorithmImpl(torrentInfo,
+                BittorrentAlgorithmInitializer.v1(torrentInfo,
                         torrentStatusController,
                         torrentFileSystemManager,
                         peersCommunicatorFlux);
