@@ -3,10 +3,9 @@ package main;
 import christophedetroyer.torrent.TorrentParser;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.peer.PeersCommunicator;
-import main.peer.ReceivePeerMessages;
+import main.downloader.TorrentPieceChanged;
+import main.peer.Link;
 import main.peer.SendPeerMessages;
-import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Scheduler;
@@ -22,35 +21,21 @@ public class App {
         TorrentDownloader torrentDownloader = TorrentDownloaders
                 .createDefaultTorrentDownloader(getTorrentInfo(), downloadPath);
 
-        torrentDownloader.getTorrentFileSystemManager()
-                .savedBlockFlux()
-                .subscribe(System.out::println, Throwable::printStackTrace);
-
         torrentDownloader.getPeersCommunicatorFlux()
-                .map(PeersCommunicator::sendMessages)
+                .map(Link::sendMessages)
                 .flatMap(SendPeerMessages::sentPeerMessagesFlux)
                 .filter(peerMessage -> peerMessage instanceof RequestMessage)
                 .cast(RequestMessage.class)
-                .subscribe(peerMessage -> System.out.println("sent: " + peerMessage), Throwable::printStackTrace);
+                .map(requestMessage -> "request: index: " + requestMessage.getIndex() +
+                        ", begin: " + requestMessage.getBegin() + ", from: " + requestMessage.getTo())
+                .subscribe(System.out::println, Throwable::printStackTrace);
 
-        torrentDownloader.getPeersCommunicatorFlux()
-                .map(PeersCommunicator::getPeer)
-                .index()
-                .subscribe(peer -> System.out.println("connected to: " + peer), Throwable::printStackTrace);
-
-        torrentDownloader.getPeersCommunicatorFlux()
-                .map(PeersCommunicator::receivePeerMessages)
-                .flatMap(ReceivePeerMessages::getPeerMessageResponseFlux)
-                .map(PeerMessage::getFrom)
-                .distinct()
-                .index()
-                .subscribe(peer -> System.out.println("the peer start sending me messages: " + peer), Throwable::printStackTrace);
-
-        torrentDownloader.getPeersCommunicatorFlux()
-                .map(PeersCommunicator::receivePeerMessages)
-                .flatMap(ReceivePeerMessages::getPeerMessageResponseFlux)
-                .index()
-                .subscribe(peer -> System.out.println("received from: " + peer), Throwable::printStackTrace);
+        torrentDownloader.getTorrentFileSystemManager()
+                .savedBlockFlux()
+                .map(TorrentPieceChanged::getReceivedPiece)
+                .map(pieceMessage -> "received: index: " + pieceMessage.getIndex() +
+                        ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
+                .subscribe(System.out::println, Throwable::printStackTrace);
 
         torrentDownloader.getTorrentStatusController().startDownload();
         torrentDownloader.getTorrentStatusController().startUpload();

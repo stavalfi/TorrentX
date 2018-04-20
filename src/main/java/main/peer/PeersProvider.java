@@ -30,8 +30,8 @@ public class PeersProvider {
         this.torrentInfo = torrentInfo;
     }
 
-    public Mono<PeersCommunicator> connectToPeerMono(Peer peer) {
-        return Mono.create((MonoSink<PeersCommunicator> sink) -> {
+    public Mono<Link> connectToPeerMono(Peer peer) {
+        return Mono.create((MonoSink<Link> sink) -> {
             Socket peerSocket = new Socket();
             sink.onCancel(() -> {
                 try {
@@ -60,9 +60,9 @@ public class PeersProvider {
                             " with the wrong torrent-info-hash: " + receivedTorrentInfoHash));
                 } else {
                     // all went well, I accept this connection.
-                    PeersCommunicator peersCommunicator = new PeersCommunicator(this.torrentInfo, peer,
+                    Link link = new Link(this.torrentInfo, peer,
                             peerSocket, receiveMessages, sendMessages);
-                    sink.success(peersCommunicator);
+                    sink.success(link);
                 }
             } catch (IOException e) {
                 try {
@@ -87,7 +87,7 @@ public class PeersProvider {
                 .flatMapMany(AnnounceResponse::getPeersFlux);
     }
 
-    public ConnectableFlux<PeersCommunicator> getPeersCommunicatorFromTrackerFlux(Flux<TrackerConnection> trackerConnectionFlux) {
+    public ConnectableFlux<Link> getPeersCommunicatorFromTrackerFlux(Flux<TrackerConnection> trackerConnectionFlux) {
         return trackerConnectionFlux
                 .flatMap(trackerConnection -> getPeersFromTrackerFlux(trackerConnection))
                 .distinct()

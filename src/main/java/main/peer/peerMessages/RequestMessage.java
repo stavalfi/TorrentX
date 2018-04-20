@@ -37,11 +37,6 @@ public class RequestMessage extends PeerMessage {
         this.blockLength = byteBuffer.getInt();
     }
 
-    @Override
-    public String toString() {
-        return "RequestMessage{} " + super.toString();
-    }
-
     public int getIndex() {
         return index;
     }
@@ -52,5 +47,14 @@ public class RequestMessage extends PeerMessage {
 
     public int getBlockLength() {
         return blockLength;
+    }
+
+    @Override
+    public String toString() {
+        return "RequestMessage{" +
+                "index=" + index +
+                ", begin=" + begin +
+                ", blockLength=" + blockLength +
+                "} " + super.toString();
     }
 }

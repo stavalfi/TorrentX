@@ -32,7 +32,6 @@ import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
 import org.junit.Assert;
 import org.mockito.Mockito;
-import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
@@ -182,7 +181,7 @@ public class MyStepdefs {
                 .allMatch(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
                         peerFakeRequestResponse.getReceiveMessageType() != null);
 
-        PeersCommunicator fakePeer = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
+        Link fakePeer = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
                 .block();
 
         Flux<? extends PeerMessage> recordedResponseFlux =
@@ -367,7 +366,9 @@ public class MyStepdefs {
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .get()
                 .getTorrentFileSystemManager();
+
         Mono<Boolean> deletionTaskMono;
+
         if (deleteTorrentFiles && deleteActiveTorrent)
             deletionTaskMono = torrentFileSystemManager.deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
                     .flatMap(areFilesRemoved ->
@@ -413,7 +414,12 @@ public class MyStepdefs {
                                 ((torrentInfo.getPieces().size() - 1) * torrentInfo.getPieceLength());
                     return new PieceMessage(null, null, blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
                             toRandomByteArray.apply((int) (blockLength - blockOfPiece.getFrom())));
-                });
+                })
+                .publish()
+                // when ActiveTorrent class and me in the test will subscribe, then start signaling.
+                // if I remove this, then in the tests I will lose all the signals this class will send in
+                // activeTorrent.savedBlockFlux().
+                .autoConnect(2);
 
         TorrentStatusController torrentStatusController =
                 TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
@@ -427,10 +433,8 @@ public class MyStepdefs {
                         .replay()
                         .autoConnect(0);
 
-        // will cause recordedTorrentPieceChangedFlux to start recording signals.
-        torrentStatusController.startDownload();
-
         Flux<RequestMessage> assertWrittenPiecesFlux =
+                // will cause ActiveTorrent to start recording signals in activeTorrent.savedBlockFlux().
                 Flux.zip(recordedTorrentPieceChangedFlux, pieceMessageFlux,
                         (torrentPieceChanged, pieceMessage) -> {
                             RequestMessage requestMessage =
@@ -537,14 +541,24 @@ public class MyStepdefs {
         TorrentStatusController torrentStatusController =
                 TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
 
+        Flux<PieceMessage> lastPieceFlux = Flux.just(lastPieceMessage)
+                .replay()
+                .autoConnect(2);
+
         ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, Flux.just(lastPieceMessage))
+                .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, lastPieceFlux)
                 .block();
 
-        Mono<PieceMessage> readLastPieceTaskMono =
+        Flux<TorrentPieceChanged> recordedTorrentPieceChangedFlux =
                 activeTorrent.savedBlockFlux()
                         .replay()
-                        .autoConnect(0)
+                        .autoConnect(0);
+
+        // start recording only after I listen to activeTorrent.savedBlockFlux(). Now I won't lose signals.
+        lastPieceFlux.subscribe();
+
+        Mono<PieceMessage> readLastPieceTaskMono =
+                recordedTorrentPieceChangedFlux
                         .doOnNext(torrentPieceChanged -> {
                             String message = "the last piece must be completed but it's not.";
                             Assert.assertEquals(message, TorrentPieceStatus.COMPLETED, torrentPieceChanged.getTorrentPieceStatus());
@@ -564,8 +578,6 @@ public class MyStepdefs {
                         })
                         .take(1)
                         .single();
-
-        torrentStatusController.startDownload();
 
         StepVerifier.create(readLastPieceTaskMono)
                 .expectNextCount(1)
@@ -651,7 +663,7 @@ public class MyStepdefs {
         // that both the list of peers are equal.
 
         Flux<Peer> connectedPeersFlux = torrentDownloader.getPeersCommunicatorFlux()
-                .map(PeersCommunicator::getPeer)
+                .map(Link::getPeer)
                 .timeout(Duration.ofMillis(1500))
                 .buffer(Duration.ofMillis(1500))
                 .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
@@ -660,7 +672,7 @@ public class MyStepdefs {
                 .sort();
 
         Flux<Peer> peersFromResponsesMono = torrentDownloader.getPeersCommunicatorFlux()
-                .map(PeersCommunicator::receivePeerMessages)
+                .map(Link::receivePeerMessages)
                 .flatMap(ReceivePeerMessages::getPeerMessageResponseFlux)
                 .map(PeerMessage::getFrom)
                 .distinct()
@@ -711,6 +723,11 @@ public class MyStepdefs {
                 initialTorrentStatusTypeMap.get(TorrentStatusType.RESUME_DOWNLOAD),
                 initialTorrentStatusTypeMap.get(TorrentStatusType.COMPLETED_DOWNLOADING));
 
+        TorrentDownloaders.getInstance()
+                .createTorrentDownloader(torrentInfo, null, null,
+                        torrentStatusController, null, null, null,
+                        null, null);
+
         Utils.createDefaultTorrentDownloader(torrentInfo,
                 System.getProperty("user.dir") + "/" + downloadLocation,
                 torrentStatusController);
@@ -727,9 +744,10 @@ public class MyStepdefs {
                 .get()
                 .getTorrentStatusController();
 
-        Flux<TorrentStatusType> torrentStatusTypeFlux = torrentStatusController.getStatusTypeFlux()
-                .replay()
-                .autoConnect();
+        Flux<TorrentStatusType> torrentStatusTypeFlux =
+                torrentStatusController.getStatusTypeFlux()
+                        .replay()
+                        .autoConnect(0);
         this.torrentStatusTypeFlux = new ArrayList<>();
         torrentStatusTypeFlux.subscribe(this.torrentStatusTypeFlux::add);
 
@@ -813,8 +831,8 @@ public class MyStepdefs {
                 .blockFirst());
     }
 
-    private Mono<List<RemoteFakePeerForRequestingPieces>> requestsFromPeerToMeListMono;
-    private Mono<RemoteFakePeerForRequestingPieces> connectionFromFakePeerToMeMono;
+    private Mono<Link> meToFakePeerLink;
+    private Mono<List<SendPeerMessages>> requestsFromPeerToMeListMono;
 
     @Then("^random-fake-peer connect to me for torrent: \"([^\"]*)\" in \"([^\"]*)\" and he request:$")
     public void randomFakePeerConnectToMeForTorrentInAndHeRequest(String torrentFileName, String downloadLocation,
@@ -834,34 +852,43 @@ public class MyStepdefs {
         // sendMessage me incoming messages and I don't want any incoming messages but the
         // messages from my fake-peer.
         Flux<TrackerConnection> trackerConnectionFlux = Flux.empty();
+        // represent this application TorrentDownloader. (not the fake-peer TorrentDownloader).
         TorrentDownloader torrentDownloader =
                 Utils.createCustomTorrentDownloader(torrentInfo, activeTorrent, trackerConnectionFlux);
 
         // the fake-peer will connect to me.
         Peer me = new Peer("localhost", AppConfig.getInstance().getMyListeningPort());
 
-        // I can't activate this flux until the app start listening for new incoming peers.
-        // No one is listening for new peers now so if fake-peer try to connect to me, he will fail.
-        // I can't start for new incoming peers in this step because if yes, I will lose all the
-        // pieceMessage from this app to the fake-peer and I need them for testing that we did sent them.
-        this.requestsFromPeerToMeListMono = torrentDownloader.getPeersProvider()
-                // connection of fake-peer to me.
-                // later we can get this fake-peer from the flux of connected
-                // peers because this flux will contain the incoming peers also.
+        this.meToFakePeerLink = torrentDownloader.getPeersCommunicatorFlux()
+                .replay()
+                .autoConnect(0)
+                .take(1)
+                .single();
+
+        // my application start listening for new peers.
+        // (it will happen only when I'm starting download or upload).
+        // and also listen for incoming request messages and response to them.
+        torrentDownloader.getTorrentStatusController().startUpload();
+
+        // wait until the app will start listen for new incoming peers
+        Thread.sleep(500);
+
+        Link fakePeerToMeLink = new PeersProvider(torrentInfo)
+                // fake-peer connect to me.
                 .connectToPeerMono(me)
-                .map(RemoteFakePeerForRequestingPieces::new)
-                .flatMap(RemoteFakePeerForRequestingPieces::sendInterestedMessage)
+                .block();
+
+        this.requestsFromPeerToMeListMono = fakePeerToMeLink.sendMessages().sendInterestedMessage()
                 // sendMessage all requests from fake peer to me.
-                .flatMapMany(fakePeersCommunicator ->
-                        Flux.fromIterable(peerRequestBlockList)
-                                .flatMap(blockOfPiece -> {
-                                    if (blockOfPiece.getLength() != null)
-                                        return fakePeersCommunicator.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
-                                                blockOfPiece.getLength());
-                                    long blockLength = torrentInfo.getPieceLength(blockOfPiece.getPieceIndex());
-                                    return fakePeersCommunicator.sendRequestMessage(blockOfPiece.getPieceIndex(),
-                                            blockOfPiece.getFrom(), (int) (blockLength - blockOfPiece.getFrom()));
-                                }))
+                .flatMapMany(__ -> Flux.fromIterable(peerRequestBlockList))
+                .flatMap(blockOfPiece -> {
+                    if (blockOfPiece.getLength() != null)
+                        return fakePeerToMeLink.sendMessages().sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
+                                blockOfPiece.getLength());
+                    long blockLength = torrentInfo.getPieceLength(blockOfPiece.getPieceIndex());
+                    return fakePeerToMeLink.sendMessages().sendRequestMessage(blockOfPiece.getPieceIndex(),
+                            blockOfPiece.getFrom(), (int) (blockLength - blockOfPiece.getFrom()));
+                })
                 .collectList()
                 .doOnNext(requestList -> Assert.assertEquals("We sent less requests then expected.",
                         peerRequestBlockList.size(), requestList.size()));
@@ -875,40 +902,22 @@ public class MyStepdefs {
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .get();
 
-        torrentDownloader.getTorrentStatusController().startUpload();
+        // I must record this because when I subscribe to this.requestsFromPeerToMeListMono,
+        // fake-peer will send me request messages and I response to him **piece messages**
+        // which I don't want to lose.
+        Flux<PieceMessage> recordedPieceMessageFlux = this.meToFakePeerLink
+                .map(Link::sendMessages)
+                .flatMapMany(SendPeerMessages::sentPeerMessagesFlux)
+                .filter(peerMessage -> peerMessage instanceof PieceMessage)
+                .cast(PieceMessage.class)
+                .replay()
+                .autoConnect(0);
 
-        // wait until the app will start listen for new incoming peers
-        Thread.sleep(500);
-
-        // the fake-peer is the only peer.
-        ConnectableFlux<PeersCommunicator> singleFakePeerCommunicatorFlux =
-                torrentDownloader.getPeersCommunicatorFlux()
-                        .replay();
-
-        // start record the fake-peer-communicator object
-        singleFakePeerCommunicatorFlux.connect();
-
-        ConnectableFlux<PieceMessage> sentMessagesFromFakePeerToApplicationFlux =
-                singleFakePeerCommunicatorFlux
-                        .map(PeersCommunicator::sendMessages)
-                        .flatMap(SendPeerMessages::sentPeerMessagesFlux)
-                        // the application sendMessage to the fake-peer only PieceMessages in this test.
-                        // + my algorithm may sendMessage at the start a bitfield-message.
-                        .filter(peerMessage -> peerMessage instanceof PieceMessage)
-                        .cast(PieceMessage.class)
-                        // if there is a problem, I don't want to wait for ever.
-//                .timeout(Duration.ofSeconds(5))
-                        .take(expectedBlockFromMeList.size())
-                        .replay();
-
-        // start record the messages the app sendMessage to the fake-peer
-        // **before** we sending the messages.
-        // if I will record only after the messages are sent,
-        // I won't get them because no one subscribed to get them.
-        sentMessagesFromFakePeerToApplicationFlux.connect();
-
+        // send request massages from fake peer to me and get all the
+        // piece messages from me to fake peer and collect them to list.
         List<PieceMessage> actualBlockFromMeList = this.requestsFromPeerToMeListMono
-                .flatMapMany(remoteFakePeerForRequestingPieces -> sentMessagesFromFakePeerToApplicationFlux)
+                .flatMapMany(remoteFakePeerForRequestingPieces -> recordedPieceMessageFlux)
+                .take(expectedBlockFromMeList.size())
                 .collectList()
                 .block();
 
@@ -927,9 +936,7 @@ public class MyStepdefs {
                                         blockOfPiece.getFrom() == pieceMessage.getBegin() &&
                                         blockOfPiece.getLength() == pieceMessage.getBlock().length)));
 
-        // the fake-peer is the only peer.
-        singleFakePeerCommunicatorFlux
-                .subscribe(x -> x.closeConnection());
+        meToFakePeerLink.subscribe(Link::closeConnection);
 
         Utils.removeEverythingRelatedToTorrent(torrentInfo);
     }

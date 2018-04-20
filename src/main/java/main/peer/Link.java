@@ -9,7 +9,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 
-public class PeersCommunicator {
+public class Link {
     private Peer me;
     private Peer peer;
     private Socket peerSocket;
@@ -19,9 +19,9 @@ public class PeersCommunicator {
     private ReceivePeerMessages receivePeerMessages;
     private SpeedStatistics peerSpeedStatistics;
 
-    public PeersCommunicator(TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
-                             DataInputStream dataInputStream,
-                             DataOutputStream peerDataOutputStream) {
+    public Link(TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
+                DataInputStream dataInputStream,
+                DataOutputStream peerDataOutputStream) {
         assert peerSocket != null;
         this.peer = peer;
         this.peerSocket = peerSocket;
@@ -69,7 +69,7 @@ public class PeersCommunicator {
 
     @Override
     public String toString() {
-        return "PeersCommunicator{" +
+        return "Link{" +
                 "me=" + me +
                 ", peer=" + peer +
                 '}';

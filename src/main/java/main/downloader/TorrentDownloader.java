@@ -3,7 +3,7 @@ package main.downloader;
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.file.system.TorrentFileSystemManager;
-import main.peer.PeersCommunicator;
+import main.peer.Link;
 import main.peer.PeersProvider;
 import main.statistics.SpeedStatistics;
 import main.torrent.status.TorrentStatusController;
@@ -22,7 +22,7 @@ public class TorrentDownloader {
     private TrackerProvider trackerProvider;
     private PeersProvider peersProvider;
     private Flux<TrackerConnection> trackerConnectionFlux;
-    private Flux<PeersCommunicator> peersCommunicatorFlux;
+    private Flux<Link> peersCommunicatorFlux;
 
     public TorrentDownloader(TorrentInfo torrentInfo,
                              TorrentFileSystemManager torrentFileSystemManager,
@@ -32,7 +32,7 @@ public class TorrentDownloader {
                              TrackerProvider trackerProvider,
                              PeersProvider peersProvider,
                              Flux<TrackerConnection> trackerConnectionFlux,
-                             Flux<PeersCommunicator> peersCommunicatorFlux) {
+                             Flux<Link> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
         this.torrentFileSystemManager = torrentFileSystemManager;
         this.bittorrentAlgorithm = bittorrentAlgorithm;
@@ -72,7 +72,7 @@ public class TorrentDownloader {
         return trackerConnectionFlux;
     }
 
-    public Flux<PeersCommunicator> getPeersCommunicatorFlux() {
+    public Flux<Link> getPeersCommunicatorFlux() {
         return peersCommunicatorFlux;
     }
 

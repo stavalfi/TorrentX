@@ -9,6 +9,7 @@ import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.BitSet;
 import java.util.List;
 
 public interface TorrentFileSystemManager {
@@ -19,6 +20,8 @@ public interface TorrentFileSystemManager {
     boolean havePiece(int pieceIndex);
 
     List<? extends TorrentFile> getTorrentFiles();
+
+    BitSet getUpdatedPiecesStatus();
 
     BitFieldMessage buildBitFieldMessage(Peer from, Peer to);
 
@@ -31,6 +34,8 @@ public interface TorrentFileSystemManager {
     Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
 
     Flux<TorrentPieceChanged> savedBlockFlux();
+
+    Flux<Integer> savedPieceFlux();
 
     Mono<Boolean> deleteActiveTorrentOnlyMono(String torrentInfoHash);
 

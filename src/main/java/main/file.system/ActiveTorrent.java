@@ -9,7 +9,7 @@ import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
-import main.torrent.status.TorrentStatus;
+import main.torrent.status.TorrentStatusController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -28,13 +28,16 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     private final BitSet piecesStatus;
     private final int[] piecesPartialStatus;
     private final String downloadPath;
+    private TorrentStatusController torrentStatusController;
+    private Flux<Integer> savedPieceFlux;
     private Flux<TorrentPieceChanged> startListenForIncomingPiecesFlux;
 
     public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath,
-                         TorrentStatus torrentStatus,
+                         TorrentStatusController torrentStatusController,
                          Flux<PieceMessage> peerResponsesFlux) {
         super(torrentInfo);
         this.downloadPath = downloadPath;
+        this.torrentStatusController = torrentStatusController;
         this.piecesStatus = new BitSet(getPieces().size());
         this.piecesPartialStatus = new int[getPieces().size()];
 
@@ -43,24 +46,31 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
 
         this.activeTorrentFileList = createActiveTorrentFileList(torrentInfo, downloadPath);
 
-        torrentStatus.isFilesRemovedFlux()
+        this.torrentStatusController.isFilesRemovedFlux()
                 .filter(isFilesRemoved -> isFilesRemoved)
                 // I can be here only once.
                 .flatMap(__ -> deleteFileOnlyMono(torrentInfo.getTorrentInfoHash()))
                 .publish()
                 .autoConnect(0);
 
-        torrentStatus.isTorrentRemovedFlux()
+        this.torrentStatusController.isTorrentRemovedFlux()
                 .filter(isTorrentRemoved -> isTorrentRemoved)
                 // I can be here only once.
                 .flatMap(__ -> deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
                 .publish()
                 .autoConnect(0);
 
-        this.startListenForIncomingPiecesFlux = torrentStatus.isStartedDownloadingFlux()
-                .filter(isStartedDownloading -> isStartedDownloading)
-                // I can be here only once.
-                .flatMap(__ -> peerResponsesFlux.flatMap(pieceMessage -> writeBlock(pieceMessage)))
+        this.startListenForIncomingPiecesFlux =
+                peerResponsesFlux.filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
+                        .flatMap(pieceMessage -> writeBlock(pieceMessage))
+                        .publish()
+                        .autoConnect(0);
+
+        this.savedPieceFlux = this.startListenForIncomingPiecesFlux
+                .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
+                .map(TorrentPieceChanged::getReceivedPiece)
+                .map(PieceMessage::getIndex)
+                .distinct()
                 .publish()
                 .autoConnect(0);
     }
@@ -68,6 +78,11 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     @Override
     public List<? extends main.file.system.TorrentFile> getTorrentFiles() {
         return this.activeTorrentFileList;
+    }
+
+    @Override
+    public BitSet getUpdatedPiecesStatus() {
+        return this.piecesStatus;
     }
 
     @Override
@@ -93,6 +108,11 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     @Override
     public Flux<TorrentPieceChanged> savedBlockFlux() {
         return this.startListenForIncomingPiecesFlux;
+    }
+
+    @Override
+    public Flux<Integer> savedPieceFlux() {
+        return this.savedPieceFlux;
     }
 
 //    @Override
@@ -185,15 +205,6 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
         }).subscribeOn(App.MyScheduler);
     }
 
-    private Mono<ActiveTorrent> updatePieceAsCompleted(int pieceIndex) {
-        return Mono.<ActiveTorrent>create(sink -> {
-            this.piecesStatus.set(pieceIndex);
-            Mono.just(this);
-        }).doOnSuccess(activeTorrent -> {
-            // update in mongo db
-        });
-    }
-
     private List<ActiveTorrentFile> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) {
         String mainFolder = !torrentInfo.isSingleFileTorrent() ?
                 downloadPath + "/" + torrentInfo.getName() + "/" :
@@ -216,6 +227,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     }
 
     private Mono<TorrentPieceChanged> writeBlock(PieceMessage pieceMessage) {
+
         return Mono.<TorrentPieceChanged>create(sink -> {
             long from = pieceMessage.getIndex() * this.getPieceLength() + pieceMessage.getBegin();
             long to = pieceMessage.getIndex() * this.getPieceLength()
@@ -238,31 +250,27 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                         break;
                 }
 
-            // update pieces partial status array:
-            // WARNING: this line *only* must be synchronized among multiple threads!
-            this.piecesPartialStatus[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
-
             // update pieces status:
             // there maybe multiple writes of the same pieceRequest during one execution...
-            long pieceLength = getPieceLength();
-            // check if we downloaded a block from the last piece.
-            // if yes, it's length can be less than a other pieces.
-            if (pieceMessage.getIndex() == this.getPieces().size() - 1) {
-                pieceLength = (int) Math.min(getPieceLength(),
-                        getTotalSize() - (getPieces().size() - 1) * getPieceLength());
-            }
+            long pieceLength = getPieceLength(pieceMessage.getIndex());
+            this.piecesPartialStatus[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
+            if (pieceLength < this.piecesPartialStatus[pieceMessage.getIndex()])
+                this.piecesPartialStatus[pieceMessage.getIndex()] = getPieceLength(pieceMessage.getIndex());
 
             long howMuchWeWroteUntilNowInThisPiece = this.piecesPartialStatus[pieceMessage.getIndex()];
             if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
+                // update pieces partial status array:
+                // TODO: WARNING: this line *only* must be synchronized among multiple threads!
                 this.piecesStatus.set(pieceMessage.getIndex());
-                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
-                        this.getPieces().get(pieceMessage.getIndex()),
-                        TorrentPieceStatus.COMPLETED);
+                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(TorrentPieceStatus.COMPLETED, pieceMessage);
                 sink.success(torrentPieceChanged);
+
+                if (minMissingPieceIndex() == -1)
+                    this.torrentStatusController.completedDownloading();
             } else {
-                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(pieceMessage.getIndex(),
-                        this.getPieces().get(pieceMessage.getIndex()),
-                        TorrentPieceStatus.DOWNLOADING);
+                // update pieces partial status array:
+                // TODO: WARNING: this line *only* must be synchronized among multiple threads!
+                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(TorrentPieceStatus.DOWNLOADING, pieceMessage);
                 sink.success(torrentPieceChanged);
             }
         }).subscribeOn(Schedulers.single());

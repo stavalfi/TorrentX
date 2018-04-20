@@ -5,7 +5,7 @@ import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
-import main.algorithms.BittorrentAlgorithmImpl;
+import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.ActiveTorrentFile;
@@ -72,7 +72,7 @@ public class Utils {
                         .deleteFileOnlyMono(torrentInfo.getTorrentInfoHash())
                         .flatMap(isDeleted -> activeTorrent
                                 .deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash())))
-                .block();
+                .subscribe();
 
         // delete download folder from last test
         Utils.deleteDownloadFolder();
@@ -94,7 +94,7 @@ public class Utils {
 
         peersListener = new PeersListener();
 
-        Flux<PeersCommunicator> peersCommunicatorFlux =
+        Flux<Link> peersCommunicatorFlux =
                 Flux.merge(torrentStatusController.isStartedDownloadingFlux(),
                         torrentStatusController.isStartedUploadingFlux())
                         .filter(isStarted -> isStarted)
@@ -112,19 +112,19 @@ public class Utils {
 
         TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
-                        peersCommunicatorFlux.map(PeersCommunicator::receivePeerMessages)
+                        peersCommunicatorFlux.map(Link::receivePeerMessages)
                                 .flatMap(ReceivePeerMessages::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
-                new BittorrentAlgorithmImpl(torrentInfo,
+                BittorrentAlgorithmInitializer.v1(torrentInfo,
                         torrentStatusController,
                         torrentFileSystemManager,
                         peersCommunicatorFlux);
 
         SpeedStatistics torrentSpeedStatistics =
                 new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-                        peersCommunicatorFlux.map(PeersCommunicator::getPeerSpeedStatistics));
+                        peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 
         return TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
@@ -144,7 +144,7 @@ public class Utils {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
-        ConnectableFlux<PeersCommunicator> peersCommunicatorFromTrackerFlux =
+        ConnectableFlux<Link> peersCommunicatorFromTrackerFlux =
                 peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux);
 
         peersListener = new PeersListener();
@@ -152,7 +152,7 @@ public class Utils {
         TorrentStatusController torrentStatusController =
                 TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
 
-        Flux<PeersCommunicator> peersCommunicatorFlux =
+        Flux<Link> peersCommunicatorFlux =
                 Flux.merge(torrentStatusController.isStartedDownloadingFlux(),
                         torrentStatusController.isStartedUploadingFlux())
                         .filter(isStarted -> isStarted)
@@ -172,14 +172,14 @@ public class Utils {
                         .autoConnect();
 
         BittorrentAlgorithm bittorrentAlgorithm =
-                new BittorrentAlgorithmImpl(torrentInfo,
+                BittorrentAlgorithmInitializer.v1(torrentInfo,
                         torrentStatusController,
                         torrentFileSystemManager,
                         peersCommunicatorFlux);
 
         SpeedStatistics torrentSpeedStatistics =
                 new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-                        peersCommunicatorFlux.map(PeersCommunicator::getPeerSpeedStatistics));
+                        peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 
         return TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
@@ -193,61 +193,61 @@ public class Utils {
                         peersCommunicatorFlux);
     }
 
-    public static Mono<SendPeerMessages> sendFakeMessage(PeersCommunicator peersCommunicator, PeerMessageType peerMessageType) {
+    public static Mono<SendPeerMessages> sendFakeMessage(Link link, PeerMessageType peerMessageType) {
         switch (peerMessageType) {
             case HaveMessage:
-                return peersCommunicator.sendMessages().sendHaveMessage(0);
+                return link.sendMessages().sendHaveMessage(0);
             case PortMessage:
-                return peersCommunicator.sendMessages().sendPortMessage((short) peersCommunicator.getMe().getPeerPort());
+                return link.sendMessages().sendPortMessage((short) link.getMe().getPeerPort());
             case ChokeMessage:
-                return peersCommunicator.sendMessages().sendChokeMessage();
+                return link.sendMessages().sendChokeMessage();
             case PieceMessage:
-                return peersCommunicator.sendMessages().sendPieceMessage(0, 0, new byte[10]);
+                return link.sendMessages().sendPieceMessage(0, 0, new byte[10]);
             case CancelMessage:
-                return peersCommunicator.sendMessages().sendCancelMessage(0, 0, 10);
+                return link.sendMessages().sendCancelMessage(0, 0, 10);
             case KeepAliveMessage:
-                return peersCommunicator.sendMessages().sendKeepAliveMessage();
+                return link.sendMessages().sendKeepAliveMessage();
             case RequestMessage:
-                return peersCommunicator.sendMessages().sendRequestMessage(0, 0, 10);
+                return link.sendMessages().sendRequestMessage(0, 0, 10);
             case UnchokeMessage:
-                return peersCommunicator.sendMessages().sendUnchokeMessage();
+                return link.sendMessages().sendUnchokeMessage();
             case BitFieldMessage:
-                return peersCommunicator.sendMessages().sendBitFieldMessage(BitSet.valueOf(new byte[10]));
+                return link.sendMessages().sendBitFieldMessage(BitSet.valueOf(new byte[10]));
             case InterestedMessage:
-                return peersCommunicator.sendMessages().sendInterestedMessage();
+                return link.sendMessages().sendInterestedMessage();
             case NotInterestedMessage:
-                return peersCommunicator.sendMessages().sendNotInterestedMessage();
+                return link.sendMessages().sendNotInterestedMessage();
             default:
                 throw new IllegalArgumentException(peerMessageType.toString());
         }
     }
 
-    public static Flux<? extends PeerMessage> getSpecificMessageResponseFluxByMessageType(PeersCommunicator peersCommunicator, PeerMessageType peerMessageType) {
+    public static Flux<? extends PeerMessage> getSpecificMessageResponseFluxByMessageType(Link link, PeerMessageType peerMessageType) {
         switch (peerMessageType) {
             case HaveMessage:
-                return peersCommunicator.receivePeerMessages().getHaveMessageResponseFlux();
+                return link.receivePeerMessages().getHaveMessageResponseFlux();
             case PortMessage:
-                return peersCommunicator.receivePeerMessages().getPortMessageResponseFlux();
+                return link.receivePeerMessages().getPortMessageResponseFlux();
             case ChokeMessage:
-                return peersCommunicator.receivePeerMessages().getChokeMessageResponseFlux();
+                return link.receivePeerMessages().getChokeMessageResponseFlux();
             case PieceMessage:
-                return peersCommunicator.receivePeerMessages().getPieceMessageResponseFlux();
+                return link.receivePeerMessages().getPieceMessageResponseFlux();
             case CancelMessage:
-                return peersCommunicator.receivePeerMessages().getCancelMessageResponseFlux();
+                return link.receivePeerMessages().getCancelMessageResponseFlux();
             case KeepAliveMessage:
-                return peersCommunicator.receivePeerMessages().getKeepMessageResponseFlux();
+                return link.receivePeerMessages().getKeepMessageResponseFlux();
             case RequestMessage:
-                return peersCommunicator.receivePeerMessages().getRequestMessageResponseFlux();
+                return link.receivePeerMessages().getRequestMessageResponseFlux();
             case UnchokeMessage:
-                return peersCommunicator.receivePeerMessages().getUnchokeMessageResponseFlux();
+                return link.receivePeerMessages().getUnchokeMessageResponseFlux();
             case BitFieldMessage:
-                return peersCommunicator.receivePeerMessages().getBitFieldMessageResponseFlux();
+                return link.receivePeerMessages().getBitFieldMessageResponseFlux();
             case InterestedMessage:
-                return peersCommunicator.receivePeerMessages().getInterestedMessageResponseFlux();
+                return link.receivePeerMessages().getInterestedMessageResponseFlux();
             case NotInterestedMessage:
-                return peersCommunicator.receivePeerMessages().getNotInterestedMessageResponseFlux();
+                return link.receivePeerMessages().getNotInterestedMessageResponseFlux();
             case ExtendedMessage:
-                return peersCommunicator.receivePeerMessages().getExtendedMessageResponseFlux();
+                return link.receivePeerMessages().getExtendedMessageResponseFlux();
             default:
                 throw new IllegalArgumentException(peerMessageType.toString());
         }
