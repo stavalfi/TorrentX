@@ -11,13 +11,9 @@ import reactor.core.publisher.Mono;
  * There may multiple algorithms for asserting that.
  */
 public interface BlockDownloader {
+
     /**
      * send the request and check that we received the correct block.
-     *
-     * @param link
-     * @param requestMessage
-     * @return
      */
-    Mono<TorrentPieceChanged> downloadBlock(Link link,
-                                            RequestMessage requestMessage);
+    Mono<TorrentPieceChanged> downloadBlock(Link link, RequestMessage requestMessage);
 }

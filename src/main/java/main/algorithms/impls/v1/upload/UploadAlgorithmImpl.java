@@ -1,4 +1,4 @@
-package main.algorithms.impl.v1.upload;
+package main.algorithms.impls.v1.upload;
 
 import main.TorrentInfo;
 import main.algorithms.UploadAlgorithm;

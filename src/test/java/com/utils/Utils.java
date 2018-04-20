@@ -5,7 +5,7 @@ import christophedetroyer.torrent.TorrentParser;
 import lombok.SneakyThrows;
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
-import main.algorithms.impl.BittorrentAlgorithmInitializer;
+import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.ActiveTorrentFile;

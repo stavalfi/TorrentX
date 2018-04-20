@@ -2,7 +2,7 @@ package main.downloader;
 
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
-import main.algorithms.impl.BittorrentAlgorithmInitializer;
+import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.file.system.ActiveTorrents;
 import main.file.system.TorrentFileSystemManager;
 import main.peer.Link;

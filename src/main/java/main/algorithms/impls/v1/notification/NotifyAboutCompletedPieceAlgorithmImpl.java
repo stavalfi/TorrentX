@@ -1,4 +1,4 @@
-package main.algorithms.impl.v1.notification;
+package main.algorithms.impls.v1.notification;
 
 import main.TorrentInfo;
 import main.algorithms.NotifyAboutCompletedPieceAlgorithm;

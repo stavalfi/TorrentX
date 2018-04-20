@@ -1,10 +1,10 @@
-package main.algorithms.impl;
+package main.algorithms.impls;
 
 import main.TorrentInfo;
 import main.algorithms.*;
-import main.algorithms.impl.v1.download.*;
-import main.algorithms.impl.v1.notification.NotifyAboutCompletedPieceAlgorithmImpl;
-import main.algorithms.impl.v1.upload.UploadAlgorithmImpl;
+import main.algorithms.impls.v1.download.*;
+import main.algorithms.impls.v1.notification.NotifyAboutCompletedPieceAlgorithmImpl;
+import main.algorithms.impls.v1.upload.UploadAlgorithmImpl;
 import main.file.system.TorrentFileSystemManager;
 import main.peer.Link;
 import main.torrent.status.TorrentStatus;

@@ -1,4 +1,4 @@
-package main.algorithms.impl.v1.download;
+package main.algorithms.impls.v1.download;
 
 import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
