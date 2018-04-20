@@ -31,19 +31,19 @@ public class UploadBittorrentAlgorithmImpl {
     }
 
     private Flux<TorrentPieceChanged> uploadFlux() {
-        return this.torrentStatus.isStartedUploadingFlux()
-                .filter(isUploadingStarted -> isUploadingStarted)
-                .flatMap(__ -> this.peersCommunicatorFlux.flatMap(peersCommunicator ->
+        return this.torrentStatus
+                .notifyWhenStartedUploading()
+                .flatMapMany(__ -> this.peersCommunicatorFlux)
+                .flatMap(peersCommunicator ->
                         peersCommunicator.receivePeerMessages()
                                 .getRequestMessageResponseFlux()
                                 .filter(requestMessage -> this.torrentFileSystemManager.havePiece(requestMessage.getIndex()))
-                                .flatMap(requestMessage -> this.torrentStatus.isUploadingFlux()
-                                        .filter(isUploading -> isUploading)
+                                .flatMap(requestMessage -> this.torrentStatus.notifyWhenResumeUpload()
                                         .flatMap(___ -> this.torrentFileSystemManager.buildPieceMessage(requestMessage)))
                                 .flatMap(pieceMessage ->
                                         peersCommunicator.sendMessages().sendPieceMessage(pieceMessage.getIndex(),
                                                 pieceMessage.getBegin(), pieceMessage.getBlock())
-                                                .map(___ -> new TorrentPieceChanged(TorrentPieceStatus.UPLOADING, pieceMessage)))));
+                                                .map(___ -> new TorrentPieceChanged(TorrentPieceStatus.UPLOADING, pieceMessage))));
     }
 
     public Flux<TorrentPieceChanged> startUploadingFlux() {
