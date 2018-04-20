@@ -36,8 +36,8 @@ So many measurement and analytical studies have published suggestions for differ
 * [PaperTrail](https://papertrailapp.com/) - Cloud logger
 
 ## Continues Integration
-* [Circle CI](https://circleci.com/) [![CircleCI](https://circleci.com/gh/UniversityFinalProjects/TorrentX/tree/master.svg?style=svg)](https://circleci.com/gh/UniversityFinalProjects/TorrentX/tree/master)
-* [Travis CI](https://travis-ci.org/) [![Build Status](https://travis-ci.org/UniversityFinalProjects/TorrentX.svg?branch=master)](https://travis-ci.org/UniversityFinalProjects/TorrentX) 
+* [Circle CI](https://circleci.com/)
+* [Travis CI](https://travis-ci.org/)
 
 ## Continues Deployment
 
