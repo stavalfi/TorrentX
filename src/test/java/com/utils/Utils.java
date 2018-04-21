@@ -98,14 +98,10 @@ public class Utils {
                                 .autoConnect(0));
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(torrentStatusController.isStartDownloadingFlux(),
-                        torrentStatusController.isStartUploadingFlux())
-                        .filter(isStarted -> isStarted)
-                        .take(1)
-                        .flatMap(__ -> Flux.merge(peersListener.getPeersConnectedToMeFlux()
-                                // SocketException == When I shutdown the SocketServer after/before
-                                // the tests inside Utils::removeEverythingRelatedToTorrent.
-                                .onErrorResume(SocketException.class, throwable -> Flux.empty()), searchingPeers$))
+                Flux.merge(peersListener.getPeersConnectedToMeFlux()
+                        // SocketException == When I shutdown the SocketServer after/before
+                        // the tests inside Utils::removeEverythingRelatedToTorrent.
+                        .onErrorResume(SocketException.class, throwable -> Flux.empty()), searchingPeers$)
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
                         // every time and then I will connect to all the peers again and again...
@@ -157,11 +153,7 @@ public class Utils {
                                 .autoConnect(0));
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(torrentStatusController.isStartDownloadingFlux(),
-                        torrentStatusController.isStartUploadingFlux())
-                        .filter(isStarted -> isStarted)
-                        .take(1)
-                        .flatMap(__ -> Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchingPeers$))
+                Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchingPeers$)
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
                         // every time and then I will connect to all the peers again and again...
@@ -197,13 +189,11 @@ public class Utils {
     }
 
     public static TorrentDownloader createCustomTorrentDownloader(TorrentInfo torrentInfo,
+                                                                  TorrentStatusController torrentStatusController,
                                                                   TorrentFileSystemManager torrentFileSystemManager,
                                                                   Flux<TrackerConnection> trackerConnectionConnectableFlux) {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
-
-        TorrentStatusController torrentStatusController =
-                TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
 
         peersListener = new PeersListener(torrentStatusController);
 
@@ -212,15 +202,13 @@ public class Utils {
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                                 .autoConnect(0));
 
+        Flux<Link> incomingPeers$ = peersListener.getPeersConnectedToMeFlux()
+                // SocketException == When I shutdown the SocketServer after/before
+                // the tests inside Utils::removeEverythingRelatedToTorrent.
+                .onErrorResume(SocketException.class, throwable -> Flux.empty());
+
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(torrentStatusController.isStartDownloadingFlux(),
-                        torrentStatusController.isStartUploadingFlux())
-                        .filter(isStarted -> isStarted)
-                        .take(1)
-                        .flatMap(__ -> Flux.merge(peersListener.getPeersConnectedToMeFlux()
-                                // SocketException == When I shutdown the SocketServer after/before
-                                // the tests inside Utils::removeEverythingRelatedToTorrent.
-                                .onErrorResume(SocketException.class, throwable -> Flux.empty()), searchingPeers$))
+                Flux.merge(incomingPeers$, searchingPeers$)
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
                         // every time and then I will connect to all the peers again and again...

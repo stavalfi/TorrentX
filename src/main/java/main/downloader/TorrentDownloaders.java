@@ -83,25 +83,23 @@ public class TorrentDownloaders {
                 trackerProvider.connectToTrackersFlux()
                         .autoConnect();
 
-        PeersListener peersListener = new PeersListener();
-
         TorrentStatusController torrentStatusController =
                 TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
 
+        PeersListener peersListener = new PeersListener(torrentStatusController);
+
+        Flux<Link> searchingPeers$ = torrentStatusController.notifyWhenStartSearchingPeers()
+                .flatMapMany(__ ->
+                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                                .autoConnect(0));
+
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(torrentStatusController.isStartedDownloadingFlux(),
-                        torrentStatusController.isStartedUploadingFlux())
-                        .filter(isStarted -> isStarted)
-                        .take(1)
-                        .flatMap(__ ->
-                                Flux.merge(peersListener.getPeersConnectedToMeFlux(),
-                                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                                                .autoConnect()))
+                Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchingPeers$)
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
                         // every time and then I will connect to all the peers again and again...
                         .publish()
-                        .autoConnect();
+                        .autoConnect(0);
 
         TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
