@@ -29,6 +29,8 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     private Flux<Boolean> isDownloadingFlux;
     private Flux<Boolean> isUploadingFlux;
     private Flux<Boolean> isCompletedDownloadingFlux;
+    private Flux<Boolean> isStartedListeningToIncomingPeersFlux;
+    private Flux<Boolean> isListeningToIncomingPeersFlux;
 
     private Mono<TorrentStatusType> notifyWhenStartedDownloading;
     private Mono<TorrentStatusType> notifyWhenStartedUploading;
@@ -116,6 +118,20 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
                 .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.REMOVE_FILES) ||
                         torrentStatusType.equals(TorrentStatusType.NOT_REMOVE_FILES))
                 .map(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.REMOVE_FILES))
+                .replay(1)
+                .autoConnect(0);
+
+        this.isStartedListeningToIncomingPeersFlux = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.START_LISTENING_TO_INCOMING_PEERS) ||
+                        torrentStatusType.equals(TorrentStatusType.NOT_START_LISTENING_TO_INCOMING_PEERS))
+                .map(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.START_LISTENING_TO_INCOMING_PEERS))
+                .replay(1)
+                .autoConnect(0);
+
+        this.isListeningToIncomingPeersFlux = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.RESUME_LISTENING_TO_INCOMING_PEERS) ||
+                        torrentStatusType.equals(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS))
+                .map(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.RESUME_LISTENING_TO_INCOMING_PEERS))
                 .replay(1)
                 .autoConnect(0);
 
@@ -239,6 +255,16 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     @Override
     public Flux<Boolean> isFilesRemovedFlux() {
         return this.isFilesRemovedFlux;
+    }
+
+    @Override
+    public Flux<Boolean> isStartedListeningToIncomingPeersFlux() {
+        return this.isStartedListeningToIncomingPeersFlux;
+    }
+
+    @Override
+    public Flux<Boolean> isListeningToIncomingPeersFlux() {
+        return this.isListeningToIncomingPeersFlux;
     }
 
     @Override

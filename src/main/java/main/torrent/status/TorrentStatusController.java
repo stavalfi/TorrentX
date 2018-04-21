@@ -22,6 +22,8 @@ public interface TorrentStatusController extends TorrentStatus {
 
     void startListeningToIncomingPeers();
 
+    // TODO: if there is an error which made us stop listening,
+    // I can't resume it without adding logic.
     void resumeListeningToIncomingPeers();
 
     void pauseListeningToIncomingPeers();

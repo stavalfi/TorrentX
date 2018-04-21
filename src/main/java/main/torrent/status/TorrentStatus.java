@@ -23,6 +23,10 @@ public interface TorrentStatus {
 
     Flux<Boolean> isFilesRemovedFlux();
 
+    Flux<Boolean> isStartedListeningToIncomingPeersFlux();
+
+    Flux<Boolean> isListeningToIncomingPeersFlux();
+
     Mono<TorrentStatusType> notifyWhenStartedDownloading();
 
     Mono<TorrentStatusType> notifyWhenStartedUploading();
