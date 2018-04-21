@@ -89,9 +89,9 @@ Feature: create get and delete active torrents
     When application save the all the pieces of torrent: "<torrent>"
     Then the saved pieces flux send complete signal - for torrent: "<torrent>"
     Then the saved blocks flux send  complete signal - for torrent: "<torrent>"
-    Then torrent-status for torrent "<torrent>" will be:
-      | PAUSE_DOWNLOAD        |
-      | COMPLETED_DOWNLOADING |
+#    Then torrent-status for torrent "<torrent>" will be:
+#      | PAUSE_DOWNLOAD        |
+#      | COMPLETED_DOWNLOADING |
 
     Examples:
       | torrent                       | downloadLocation |
