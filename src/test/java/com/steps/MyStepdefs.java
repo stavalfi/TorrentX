@@ -2,7 +2,6 @@ package com.steps;
 
 import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
-import cucumber.api.PendingException;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
@@ -1051,8 +1050,8 @@ public class MyStepdefs {
 
     }
 
-    @When("^application save the all the pieces of torrent: \"([^\"]*)\",\"([^\"]*)\"$")
-    public void applicationSaveTheAllThePiecesOfTorrent(String torrentFileName, String downloadLocation) throws Throwable {
+    @When("^application save the all the pieces of torrent: \"([^\"]*)\"$")
+    public void applicationSaveTheAllThePiecesOfTorrent(String torrentFileName) throws Throwable {
 
     }
 
