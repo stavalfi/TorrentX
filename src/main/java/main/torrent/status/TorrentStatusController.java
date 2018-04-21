@@ -19,4 +19,10 @@ public interface TorrentStatusController extends TorrentStatus {
     void removeFiles();
 
     void completedDownloading();
+
+    void startListeningToIncomingPeers();
+
+    void resumeListeningToIncomingPeers();
+
+    void pauseListeningToIncomingPeers();
 }

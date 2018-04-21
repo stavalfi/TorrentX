@@ -36,4 +36,8 @@ public interface TorrentStatus {
     Mono<TorrentStatusType> notifyWhenTorrentRemoved();
 
     Mono<TorrentStatusType> notifyWhenFilesRemoved();
+
+    Mono<TorrentStatusType> notifyWhenStartedListeningToIncomingPeers();
+
+    Flux<TorrentStatusType> notifyWhenListeningToIncomingPeers();
 }
