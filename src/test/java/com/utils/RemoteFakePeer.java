@@ -1,6 +1,5 @@
 package com.utils;
 
-import lombok.SneakyThrows;
 import main.peer.Link;
 
 public class RemoteFakePeer extends Link {
@@ -35,8 +34,11 @@ public class RemoteFakePeer extends Link {
                 .autoConnect(0);
     }
 
-    @SneakyThrows
     private void blockThread(int durationInMillis) {
-        Thread.sleep(100);
+        try {
+            Thread.sleep(durationInMillis);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }

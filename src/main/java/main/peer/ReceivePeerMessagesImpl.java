@@ -4,7 +4,6 @@ import main.App;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.Mono;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -32,12 +31,12 @@ class ReceivePeerMessagesImpl implements ReceivePeerMessages {
         this.peerCurrentStatus = peerCurrentStatus;
 
         this.peerMessageResponseFlux = Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, me, peer, dataInputStream))
-                .subscribeOn(App.MyScheduler)
                 // it is important to publish from source on different thread then the
                 // subscription to this source's thread every time because:
                 // if not and we subscribe to this specific source multiple times then only the
                 // first subscription will be activated and the source will never end
-                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
+                .subscribeOn(App.MyScheduler)
+                //.onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                 // there are multiple subscribers to this source (every specific peer-message flux).
                 // all of them must get the same message and ***not activate this source more then once***.
                 .doOnNext(peerMessage -> {

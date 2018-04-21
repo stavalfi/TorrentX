@@ -1069,7 +1069,10 @@ public class MyStepdefs {
     @Then("^application doesn't receive the following blocks from him - for torrent: \"([^\"]*)\":$")
     public void applicationDoesnTReceiveTheFollowingBlocksFromHimForTorrent(String torrentFileName,
                                                                             List<BlockOfPiece> notExpectedBlockFromFakePeerList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
+        StepVerifier.create(this.actualSavedBlocks$)
+                .verifyComplete();
     }
 
     @Then("^fake-peer on port \"([^\"]*)\" choke me: \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
