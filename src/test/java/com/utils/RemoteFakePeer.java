@@ -1,10 +1,12 @@
 package com.utils;
 
 import main.peer.Link;
+import reactor.core.publisher.Mono;
 
 public class RemoteFakePeer extends Link {
     public RemoteFakePeer(Link link, FakePeerType fakePeerType) {
         super(link);
+
         this.receivePeerMessages()
                 .getRequestMessageResponseFlux()
                 .doOnNext(requestMessage -> {
@@ -21,6 +23,13 @@ public class RemoteFakePeer extends Link {
                     }
                 })
                 .flatMap(requestMessage -> {
+                    boolean doesFakePeerHaveThePiece = this.getPeerCurrentStatus()
+                            .getPiecesStatus()
+                            .get(requestMessage.getIndex());
+
+                    if (!doesFakePeerHaveThePiece)
+                        return Mono.empty();
+
                     switch (fakePeerType) {
                         case VALID:
                         case RESPOND_WITH_DELAY_100:
@@ -29,7 +38,8 @@ public class RemoteFakePeer extends Link {
                                     .sendPieceMessage(requestMessage.getIndex(), requestMessage.getBegin(),
                                             new byte[requestMessage.getBlockLength()]);
                     }
-                    return null;
+                    // we will never be here...
+                    return Mono.empty();
                 }).publish()
                 .autoConnect(0);
     }
