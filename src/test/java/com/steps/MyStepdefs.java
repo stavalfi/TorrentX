@@ -2,6 +2,7 @@ package com.steps;
 
 import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
+import cucumber.api.PendingException;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
@@ -1044,9 +1045,24 @@ public class MyStepdefs {
 
     }
 
-    @Then("^application cloudn't downloaded the following pieces - for torrent: \"([^\"]*)\":$")
+    @Then("^application couldn't downloaded the following pieces - for torrent: \"([^\"]*)\":$")
     public void applicationCloudnTDownloadedTheFollowingPiecesForTorrent(String torrentFileName,
                                                                          List<Integer> piecesNotDownloadedList) throws Throwable {
+
+    }
+
+    @When("^application save the all the pieces of torrent: \"([^\"]*)\",\"([^\"]*)\"$")
+    public void applicationSaveTheAllThePiecesOfTorrent(String torrentFileName, String downloadLocation) throws Throwable {
+
+    }
+
+    @Then("^the saved pieces flux send complete signal - for torrent: \"([^\"]*)\"$")
+    public void theSavedPiecesFluxSendCompleteSignalForTorrent(String torrentFileName) throws Throwable {
+
+    }
+
+    @Then("^the saved blocks flux send  complete signal - for torrent: \"([^\"]*)\"$")
+    public void theSavedBlocksFluxSendCompleteSignalForTorrent(String torrentFileName) throws Throwable {
 
     }
 }
