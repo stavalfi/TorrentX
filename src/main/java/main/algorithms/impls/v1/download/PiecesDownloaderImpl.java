@@ -35,8 +35,8 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
         this.torrentFileSystemManager = torrentFileSystemManager;
         this.blockDownloader = blockDownloader;
 
-        downloadedPiecesFlux = torrentStatus.notifyWhenStartedDownloading()
-                .flatMapMany(__ -> this.peersToPiecesMapper.pieceToRequestFlux())
+        downloadedPiecesFlux = torrentStatus.notifyWhenStartDownloading()
+                .flatMapMany(__ -> this.peersToPiecesMapper.getAvailablePiecesFlux())
                 .flatMap(pieceIndex -> downloadPieceMono(pieceIndex)
                         // couldn't download a block from this piece in the specified time.
                         // I will try to download the next piece.

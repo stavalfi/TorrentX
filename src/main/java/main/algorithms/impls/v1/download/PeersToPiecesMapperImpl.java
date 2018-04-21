@@ -17,7 +17,7 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
 
 
     // to outside
-    private Flux<Integer> pieceToRequestFlux;
+    private Flux<Integer> availablePiecesFlux;
 
     public PeersToPiecesMapperImpl(Flux<Link> linkFlux, BitSet updatedPieceState) {
         this.linkFlux = linkFlux;
@@ -40,15 +40,15 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
                             return Flux.fromIterable(pieceList);
                         });
 
-        this.pieceToRequestFlux =
+        this.availablePiecesFlux =
                 Flux.merge(piecesFromHaveMessageFlux, piecesFromBitFieldMessageFlux)
                         .distinct()
                         .filter(pieceIndex -> !this.updatedPieceState.get(pieceIndex));
     }
 
     @Override
-    public Flux<Integer> pieceToRequestFlux() {
-        return this.pieceToRequestFlux;
+    public Flux<Integer> getAvailablePiecesFlux() {
+        return this.availablePiecesFlux;
     }
 
     @Override
