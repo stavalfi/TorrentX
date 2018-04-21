@@ -20,6 +20,8 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     private AtomicBoolean isCompletedDownloading;
     private AtomicBoolean isStartedListeningToIncomingPeers;
     private AtomicBoolean isListeningToIncomingPeers;
+    private AtomicBoolean isStartedSearchingPeers;
+    private AtomicBoolean isSearchingPeers;
     private Flux<TorrentStatusType> statusTypeFlux;
     private FluxSink<TorrentStatusType> statusTypeFluxSink;
     private Flux<Boolean> isStartedDownloadingFlux;
@@ -31,6 +33,8 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     private Flux<Boolean> isCompletedDownloadingFlux;
     private Flux<Boolean> isStartedListeningToIncomingPeersFlux;
     private Flux<Boolean> isListeningToIncomingPeersFlux;
+    private Flux<Boolean> isStartedSearchingPeersFlux;
+    private Flux<Boolean> isSearchingPeersFlux;
 
     private Mono<TorrentStatusType> notifyWhenStartedDownloading;
     private Mono<TorrentStatusType> notifyWhenStartedUploading;
@@ -41,6 +45,8 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     private Mono<TorrentStatusType> notifyWhenFilesRemoved;
     private Mono<TorrentStatusType> notifyWhenStartedListeningToIncomingPeers;
     private Flux<TorrentStatusType> notifyWhenListeningToIncomingPeers;
+    private Mono<TorrentStatusType> notifyWhenStartSearchingPeers;
+    private Flux<TorrentStatusType> notifyWhenSearchingPeers;
 
     public TorrentStatusControllerImpl(TorrentInfo torrentInfo,
                                        boolean isStartedDownload,
@@ -51,7 +57,9 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
                                        boolean isDownloading,
                                        boolean isCompletedDownloading,
                                        boolean isStartedListeningToIncomingPeers,
-                                       boolean isListeningToIncomingPeers) {
+                                       boolean isListeningToIncomingPeers,
+                                       boolean isStartedSearchingPeers,
+                                       boolean isSearchingPeers) {
         this.torrentInfo = torrentInfo;
 
         this.isStartedDownload = new AtomicBoolean(isStartedDownload);
@@ -63,6 +71,8 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
         this.isCompletedDownloading = new AtomicBoolean(isCompletedDownloading);
         this.isStartedListeningToIncomingPeers = new AtomicBoolean(isStartedListeningToIncomingPeers);
         this.isListeningToIncomingPeers = new AtomicBoolean(isListeningToIncomingPeers);
+        this.isStartedSearchingPeers = new AtomicBoolean(isStartedSearchingPeers);
+        this.isSearchingPeers = new AtomicBoolean(isSearchingPeers);
 
         this.statusTypeFlux = Flux.<TorrentStatusType>create(sink -> this.statusTypeFluxSink = sink)
                 // we have to make it publishOn and not subscribeOn because if we use subscribeOn,
@@ -135,6 +145,20 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
                 .replay(1)
                 .autoConnect(0);
 
+        this.isStartedSearchingPeersFlux = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.START_SEARCHING_PEERS) ||
+                        torrentStatusType.equals(TorrentStatusType.NOT_START_SEARCHING_PEERS))
+                .map(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.START_SEARCHING_PEERS))
+                .replay(1)
+                .autoConnect(0);
+
+        this.isSearchingPeersFlux = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.RESUME_SEARCHING_PEERS) ||
+                        torrentStatusType.equals(TorrentStatusType.PAUSE_SEARCHING_PEERS))
+                .map(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.RESUME_SEARCHING_PEERS))
+                .replay(1)
+                .autoConnect(0);
+
         this.notifyWhenStartedDownloading = this.statusTypeFlux
                 .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.START_DOWNLOAD))
                 .replay(1)
@@ -175,7 +199,7 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
 
         this.notifyWhenFilesRemoved = this.statusTypeFlux
                 .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.REMOVE_FILES))
-                .replay(1)
+                .replay()
                 .autoConnect(0)
                 .take(1)
                 .single();
@@ -189,6 +213,18 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
 
         this.notifyWhenListeningToIncomingPeers = this.statusTypeFlux
                 .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.RESUME_LISTENING_TO_INCOMING_PEERS))
+                .replay(1)
+                .autoConnect(0);
+
+        this.notifyWhenStartSearchingPeers = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.START_SEARCHING_PEERS))
+                .replay(1)
+                .autoConnect(0)
+                .take(1)
+                .single();
+
+        this.notifyWhenListeningToIncomingPeers = this.statusTypeFlux
+                .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.RESUME_SEARCHING_PEERS))
                 .replay(1)
                 .autoConnect(0);
 
@@ -230,6 +266,14 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
             statusTypeFluxSink.next(TorrentStatusType.RESUME_LISTENING_TO_INCOMING_PEERS);
         else
             statusTypeFluxSink.next(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS);
+        if (isStartedSearchingPeers)
+            statusTypeFluxSink.next(TorrentStatusType.START_SEARCHING_PEERS);
+        else
+            statusTypeFluxSink.next(TorrentStatusType.NOT_START_SEARCHING_PEERS);
+        if (isSearchingPeers)
+            statusTypeFluxSink.next(TorrentStatusType.RESUME_SEARCHING_PEERS);
+        else
+            statusTypeFluxSink.next(TorrentStatusType.PAUSE_SEARCHING_PEERS);
     }
 
     @Override
@@ -238,12 +282,12 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     }
 
     @Override
-    public Flux<Boolean> isStartedDownloadingFlux() {
+    public Flux<Boolean> isStartDownloadingFlux() {
         return this.isStartedDownloadingFlux;
     }
 
     @Override
-    public Flux<Boolean> isStartedUploadingFlux() {
+    public Flux<Boolean> isStartUploadingFlux() {
         return this.isStartedUploadingFlux;
     }
 
@@ -258,13 +302,23 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     }
 
     @Override
-    public Flux<Boolean> isStartedListeningToIncomingPeersFlux() {
+    public Flux<Boolean> isStartListeningToIncomingPeersFlux() {
         return this.isStartedListeningToIncomingPeersFlux;
     }
 
     @Override
     public Flux<Boolean> isListeningToIncomingPeersFlux() {
         return this.isListeningToIncomingPeersFlux;
+    }
+
+    @Override
+    public Flux<Boolean> isStartSearchingPeersFlux() {
+        return this.isStartedSearchingPeersFlux;
+    }
+
+    @Override
+    public Flux<Boolean> isSearchingPeersFlux() {
+        return this.isSearchingPeersFlux;
     }
 
     @Override
@@ -349,8 +403,13 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
                 this.isStartedDownload.get() &&
                 !this.isTorrentRemoved.get() &&
                 !this.isFilesRemoved.get()) {
-            if (this.isDownloading.compareAndSet(true, false)) {
+            boolean wasDownloading = this.isDownloading.compareAndSet(true, false);
+            boolean wasSearchingPeers = this.isSearchingPeers.compareAndSet(true, false);
+            if (wasDownloading) {
                 this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_DOWNLOAD);
+            }
+            if (wasSearchingPeers) {
+                this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_SEARCHING_PEERS);
             }
             this.statusTypeFluxSink.next(TorrentStatusType.COMPLETED_DOWNLOADING);
         }
@@ -388,11 +447,46 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     }
 
     @Override
+    public synchronized void startSearchingPeersFlux() {
+        if (this.isStartedSearchingPeers.compareAndSet(false, true) &&
+                !this.isCompletedDownloading.get() &&
+                !this.isTorrentRemoved.get() &&
+                !this.isFilesRemoved.get()) {
+            this.isSearchingPeers.set(true);
+            this.statusTypeFluxSink.next(TorrentStatusType.START_SEARCHING_PEERS);
+            this.statusTypeFluxSink.next(TorrentStatusType.RESUME_SEARCHING_PEERS);
+        }
+    }
+
+    @Override
+    public synchronized void resumeSearchingPeersFlux() {
+        if (this.isSearchingPeers.compareAndSet(false, true) &&
+                this.isStartedSearchingPeers.get() &&
+                !this.isCompletedDownloading.get() &&
+                !this.isTorrentRemoved.get() &&
+                !this.isFilesRemoved.get()) {
+            this.statusTypeFluxSink.next(TorrentStatusType.RESUME_SEARCHING_PEERS);
+        }
+    }
+
+    @Override
+    public synchronized void pauseSearchingPeersFlux() {
+        if (this.isSearchingPeers.compareAndSet(true, false) &&
+                this.isStartedSearchingPeers.get() &&
+                !this.isCompletedDownloading.get() &&
+                !this.isTorrentRemoved.get() &&
+                !this.isFilesRemoved.get()) {
+            this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_SEARCHING_PEERS);
+        }
+    }
+
+    @Override
     public synchronized void removeTorrent() {
         if (this.isTorrentRemoved.compareAndSet(false, true)) {
             boolean wasDownloading = this.isDownloading.compareAndSet(true, false);
             boolean wasUploading = this.isUploading.compareAndSet(true, false);
             boolean wasListeningToIncomingPeers = this.isListeningToIncomingPeers.compareAndSet(true, false);
+            boolean wasSearchingPeers = this.isSearchingPeers.compareAndSet(true, false);
             if (wasDownloading) {
                 this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_DOWNLOAD);
             }
@@ -401,6 +495,9 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
             }
             if (wasListeningToIncomingPeers) {
                 this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS);
+            }
+            if (wasSearchingPeers) {
+                this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_SEARCHING_PEERS);
             }
             this.statusTypeFluxSink.next(TorrentStatusType.REMOVE_TORRENT);
         }
@@ -412,6 +509,7 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
             boolean wasDownloading = this.isDownloading.compareAndSet(true, false);
             boolean wasUploading = this.isUploading.compareAndSet(true, false);
             boolean wasListeningToIncomingPeers = this.isListeningToIncomingPeers.compareAndSet(true, false);
+            boolean wasSearchingPeers = this.isSearchingPeers.compareAndSet(true, false);
             if (wasDownloading) {
                 this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_DOWNLOAD);
             }
@@ -421,17 +519,20 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
             if (wasListeningToIncomingPeers) {
                 this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS);
             }
+            if (wasSearchingPeers) {
+                this.statusTypeFluxSink.next(TorrentStatusType.PAUSE_SEARCHING_PEERS);
+            }
             this.statusTypeFluxSink.next(TorrentStatusType.REMOVE_FILES);
         }
     }
 
     @Override
-    public Mono<TorrentStatusType> notifyWhenStartedDownloading() {
+    public Mono<TorrentStatusType> notifyWhenStartDownloading() {
         return this.notifyWhenStartedDownloading;
     }
 
     @Override
-    public Mono<TorrentStatusType> notifyWhenStartedUploading() {
+    public Mono<TorrentStatusType> notifyWhenStartUploading() {
         return this.notifyWhenStartedUploading;
     }
 
@@ -462,12 +563,22 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
 
     @Override
     public Mono<TorrentStatusType> notifyWhenStartedListeningToIncomingPeers() {
-        return null;
+        return this.notifyWhenStartedListeningToIncomingPeers;
     }
 
     @Override
     public Flux<TorrentStatusType> notifyWhenListeningToIncomingPeers() {
-        return null;
+        return this.notifyWhenListeningToIncomingPeers;
+    }
+
+    @Override
+    public Mono<TorrentStatusType> notifyWhenStartSearchingPeers() {
+        return this.notifyWhenStartSearchingPeers;
+    }
+
+    @Override
+    public Flux<TorrentStatusType> notifySearchingPeers() {
+        return this.notifyWhenSearchingPeers;
     }
 
     @Override
@@ -477,6 +588,8 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
 
     public static TorrentStatusController createDefaultTorrentStatusController(TorrentInfo torrentInfo) {
         return new TorrentStatusControllerImpl(torrentInfo,
+                false,
+                false,
                 false,
                 false,
                 false,

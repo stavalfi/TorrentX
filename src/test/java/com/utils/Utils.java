@@ -20,7 +20,6 @@ import main.torrent.status.TorrentStatusController;
 import main.torrent.status.TorrentStatusControllerImpl;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
-import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -84,6 +83,64 @@ public class Utils {
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
+                                                                   Flux<TrackerConnection> trackerConnectionConnectableFlux) {
+        TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
+        PeersProvider peersProvider = new PeersProvider(torrentInfo);
+
+        TorrentStatusController torrentStatusController =
+                TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
+
+        peersListener = new PeersListener(torrentStatusController);
+
+        Flux<Link> searchingPeers$ = torrentStatusController.notifyWhenStartSearchingPeers()
+                .flatMapMany(__ ->
+                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                                .autoConnect(0));
+
+        Flux<Link> peersCommunicatorFlux =
+                Flux.merge(torrentStatusController.isStartDownloadingFlux(),
+                        torrentStatusController.isStartUploadingFlux())
+                        .filter(isStarted -> isStarted)
+                        .take(1)
+                        .flatMap(__ -> Flux.merge(peersListener.getPeersConnectedToMeFlux()
+                                // SocketException == When I shutdown the SocketServer after/before
+                                // the tests inside Utils::removeEverythingRelatedToTorrent.
+                                .onErrorResume(SocketException.class, throwable -> Flux.empty()), searchingPeers$))
+                        // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
+                        // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
+                        // every time and then I will connect to all the peers again and again...
+                        .publish()
+                        .autoConnect(0);
+
+        TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
+                .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
+                        peersCommunicatorFlux.map(Link::receivePeerMessages)
+                                .flatMap(ReceivePeerMessages::getPieceMessageResponseFlux))
+                .block();
+
+        BittorrentAlgorithm bittorrentAlgorithm =
+                BittorrentAlgorithmInitializer.v1(torrentInfo,
+                        torrentStatusController,
+                        torrentFileSystemManager,
+                        peersCommunicatorFlux);
+
+        SpeedStatistics torrentSpeedStatistics =
+                new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
+                        peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
+
+        return TorrentDownloaders.getInstance()
+                .createTorrentDownloader(torrentInfo,
+                        torrentFileSystemManager,
+                        bittorrentAlgorithm,
+                        torrentStatusController,
+                        torrentSpeedStatistics,
+                        trackerProvider,
+                        peersProvider,
+                        trackerConnectionConnectableFlux,
+                        peersCommunicatorFlux);
+    }
+
+    public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
                                                                    TorrentStatusController torrentStatusController) {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
@@ -92,23 +149,24 @@ public class Utils {
                 trackerProvider.connectToTrackersFlux()
                         .autoConnect();
 
-        peersListener = new PeersListener();
+        peersListener = new PeersListener(torrentStatusController);
+
+        Flux<Link> searchingPeers$ = torrentStatusController.notifyWhenStartSearchingPeers()
+                .flatMapMany(__ ->
+                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                                .autoConnect(0));
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(torrentStatusController.isStartedDownloadingFlux(),
-                        torrentStatusController.isStartedUploadingFlux())
+                Flux.merge(torrentStatusController.isStartDownloadingFlux(),
+                        torrentStatusController.isStartUploadingFlux())
                         .filter(isStarted -> isStarted)
                         .take(1)
-                        .flatMap(__ ->
-                                Flux.merge(peersListener.getPeersConnectedToMeFlux()
-                                                .autoConnect(),
-                                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                                                .autoConnect()))
+                        .flatMap(__ -> Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchingPeers$))
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
                         // every time and then I will connect to all the peers again and again...
                         .publish()
-                        .autoConnect();
+                        .autoConnect(0);
 
         TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
@@ -144,32 +202,30 @@ public class Utils {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
-        ConnectableFlux<Link> peersCommunicatorFromTrackerFlux =
-                peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux);
-
-        peersListener = new PeersListener();
-
         TorrentStatusController torrentStatusController =
                 TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
 
+        peersListener = new PeersListener(torrentStatusController);
+
+        Flux<Link> searchingPeers$ = torrentStatusController.notifyWhenStartSearchingPeers()
+                .flatMapMany(__ ->
+                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                                .autoConnect(0));
+
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(torrentStatusController.isStartedDownloadingFlux(),
-                        torrentStatusController.isStartedUploadingFlux())
+                Flux.merge(torrentStatusController.isStartDownloadingFlux(),
+                        torrentStatusController.isStartUploadingFlux())
                         .filter(isStarted -> isStarted)
                         .take(1)
-                        .flatMap(__ ->
-                                Flux.merge(peersListener.getPeersConnectedToMeFlux()
-                                                .autoConnect()
-                                                // SocketException == When I shutdown the SocketServer after/before
-                                                // the tests inside Utils::removeEverythingRelatedToTorrent.
-                                                .onErrorResume(SocketException.class, throwable -> Flux.empty()),
-                                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                                                .autoConnect()))
+                        .flatMap(__ -> Flux.merge(peersListener.getPeersConnectedToMeFlux()
+                                // SocketException == When I shutdown the SocketServer after/before
+                                // the tests inside Utils::removeEverythingRelatedToTorrent.
+                                .onErrorResume(SocketException.class, throwable -> Flux.empty()), searchingPeers$))
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
                         // every time and then I will connect to all the peers again and again...
                         .publish()
-                        .autoConnect();
+                        .autoConnect(0);
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 BittorrentAlgorithmInitializer.v1(torrentInfo,
