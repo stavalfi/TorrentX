@@ -80,7 +80,8 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
                 // must initialize statusTypeFluxSink asap.
                 .publishOn(App.MyScheduler)
                 .publish()
-                .autoConnect(0);
+                .autoConnect(0)
+                .doOnNext(s -> System.out.println(s));
 
         this.isStartedDownloadingFlux = this.statusTypeFlux
                 .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.START_DOWNLOAD) ||
@@ -199,7 +200,7 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
 
         this.notifyWhenFilesRemoved = this.statusTypeFlux
                 .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.REMOVE_FILES))
-                .replay()
+                .replay(1)
                 .autoConnect(0)
                 .take(1)
                 .single();
@@ -223,7 +224,7 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
                 .take(1)
                 .single();
 
-        this.notifyWhenListeningToIncomingPeers = this.statusTypeFlux
+        this.notifyWhenSearchingPeers = this.statusTypeFlux
                 .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.RESUME_SEARCHING_PEERS))
                 .replay(1)
                 .autoConnect(0);
@@ -447,7 +448,7 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     }
 
     @Override
-    public synchronized void startSearchingPeersFlux() {
+    public synchronized void startSearchingPeers() {
         if (this.isStartedSearchingPeers.compareAndSet(false, true) &&
                 !this.isCompletedDownloading.get() &&
                 !this.isTorrentRemoved.get() &&
@@ -459,7 +460,7 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     }
 
     @Override
-    public synchronized void resumeSearchingPeersFlux() {
+    public synchronized void resumeSearchingPeers() {
         if (this.isSearchingPeers.compareAndSet(false, true) &&
                 this.isStartedSearchingPeers.get() &&
                 !this.isCompletedDownloading.get() &&
@@ -470,7 +471,7 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     }
 
     @Override
-    public synchronized void pauseSearchingPeersFlux() {
+    public synchronized void pauseSearchingPeers() {
         if (this.isSearchingPeers.compareAndSet(true, false) &&
                 this.isStartedSearchingPeers.get() &&
                 !this.isCompletedDownloading.get() &&

@@ -110,7 +110,7 @@ Feature: start/stop downloading/uploading
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test/   |
 
-  Scenario Outline: start downloading & uploading and then remove torrent
+  Scenario Outline: start downloading & uploading & listen for incoming peers and then remove torrent
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
       | START_DOWNLOAD                     | true  |
       | START_UPLOAD                       | true  |

@@ -28,9 +28,9 @@ public interface TorrentStatusController extends TorrentStatus {
 
     void pauseListeningToIncomingPeers();
 
-    void startSearchingPeersFlux();
+    void startSearchingPeers();
 
-    void resumeSearchingPeersFlux();
+    void resumeSearchingPeers();
 
-    void pauseSearchingPeersFlux();
+    void pauseSearchingPeers();
 }
