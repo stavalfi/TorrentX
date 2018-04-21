@@ -1030,5 +1030,24 @@ public class MyStepdefs {
     public void applicationReceiveTheNoneAvailablePiecesForTorrent(String torrentFileName) throws Throwable {
 
     }
+
+    @Then("^application download the following pieces - concurrent piece's downloads: \"([^\"]*)\" - for torrent: \"([^\"]*)\":$")
+    public void applicationDownloadTheFollowingPiecesConcurrentPieceSDownloadsForTorrent(int concurrentPieceDownloads,
+                                                                                         String torrentFileName,
+                                                                                         List<Integer> piecesToDownloadList) throws Throwable {
+
+    }
+
+    @Then("^application downloaded the following pieces - for torrent: \"([^\"]*)\":$")
+    public void applicationDownloadedTheFollowingPiecesForTorrent(String torrentFileName,
+                                                                  List<Integer> piecesDownloadedList) throws Throwable {
+
+    }
+
+    @Then("^application cloudn't downloaded the following pieces - for torrent: \"([^\"]*)\":$")
+    public void applicationCloudnTDownloadedTheFollowingPiecesForTorrent(String torrentFileName,
+                                                                         List<Integer> piecesNotDownloadedList) throws Throwable {
+
+    }
 }
 
