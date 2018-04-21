@@ -13,18 +13,27 @@ public class Link {
     private Peer me;
     private Peer peer;
     private Socket peerSocket;
+    private DataInputStream dataInputStream;
+    private DataOutputStream dataOutputStream;
     private TorrentInfo torrentInfo;
     private PeerCurrentStatus peerCurrentStatus;
     private SendPeerMessages sendMessages;
     private ReceivePeerMessages receivePeerMessages;
     private SpeedStatistics peerSpeedStatistics;
 
+    public Link(Link link) {
+        this(link.torrentInfo, link.peer, link.peerSocket,
+                link.dataInputStream, link.dataOutputStream);
+    }
+
     public Link(TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
                 DataInputStream dataInputStream,
-                DataOutputStream peerDataOutputStream) {
+                DataOutputStream dataOutputStream) {
         assert peerSocket != null;
         this.peer = peer;
         this.peerSocket = peerSocket;
+        this.dataInputStream = dataInputStream;
+        this.dataOutputStream = dataOutputStream;
         this.torrentInfo = torrentInfo;
         this.me = new Peer("localhost", peerSocket.getLocalPort());
 
@@ -32,7 +41,7 @@ public class Link {
         this.sendMessages = new SendPeerMessagesImpl(this.me, this.peer,
                 this.peerCurrentStatus,
                 this::closeConnection,
-                peerDataOutputStream);
+                dataOutputStream);
         this.receivePeerMessages = new ReceivePeerMessagesImpl(this.me, this.peer,
                 this.peerCurrentStatus,
                 dataInputStream);

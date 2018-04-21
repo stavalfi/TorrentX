@@ -42,7 +42,6 @@ class SendPeerMessagesImpl implements SendPeerMessages {
                 monoSink.error(e);
             }
         }).subscribeOn(App.MyScheduler)
-                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                 .doOnNext(peersCommunicator -> {
                     if (this.sentMessagesFluxSink != null)
                         this.sentMessagesFluxSink.next(peerMessage);

@@ -3,7 +3,7 @@ package main.file.system;
 import christophedetroyer.torrent.TorrentFile;
 import main.App;
 import main.TorrentInfo;
-import main.downloader.TorrentPieceChanged;
+import main.downloader.PieceEvent;
 import main.downloader.TorrentPieceStatus;
 import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
@@ -26,11 +26,11 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
 
     private final List<ActiveTorrentFile> activeTorrentFileList;
     private final BitSet piecesStatus;
-    private final int[] piecesPartialStatus;
+    private final int[] downloadedBytesInPieces;
     private final String downloadPath;
     private TorrentStatusController torrentStatusController;
     private Flux<Integer> savedPieceFlux;
-    private Flux<TorrentPieceChanged> startListenForIncomingPiecesFlux;
+    private Flux<PieceEvent> startListenForIncomingPiecesFlux;
 
     public ActiveTorrent(TorrentInfo torrentInfo, String downloadPath,
                          TorrentStatusController torrentStatusController,
@@ -39,7 +39,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
         this.downloadPath = downloadPath;
         this.torrentStatusController = torrentStatusController;
         this.piecesStatus = new BitSet(getPieces().size());
-        this.piecesPartialStatus = new int[getPieces().size()];
+        this.downloadedBytesInPieces = new int[getPieces().size()];
 
         createFolders(torrentInfo, downloadPath);
         createFiles(torrentInfo, downloadPath).block();
@@ -68,7 +68,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
 
         this.savedPieceFlux = this.startListenForIncomingPiecesFlux
                 .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
-                .map(TorrentPieceChanged::getReceivedPiece)
+                .map(PieceEvent::getReceivedPiece)
                 .map(PieceMessage::getIndex)
                 .distinct()
                 .publish()
@@ -106,7 +106,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     }
 
     @Override
-    public Flux<TorrentPieceChanged> savedBlockFlux() {
+    public Flux<PieceEvent> savedBlockFlux() {
         return this.startListenForIncomingPiecesFlux;
     }
 
@@ -114,12 +114,6 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     public Flux<Integer> savedPieceFlux() {
         return this.savedPieceFlux;
     }
-
-//    @Override
-//    public void startListenForSavedBlockFlux() {
-//        if (this.isStartListenForIncomingPieces.compareAndSet(false, true))
-//            this.startListenForIncomingPiecesFlux.connect();
-//    }
 
     public Mono<Boolean> deleteActiveTorrentOnlyMono(String torrentInfoHash) {
         boolean deletedActiveTorrent = ActiveTorrents.getInstance()
@@ -162,8 +156,8 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     }
 
     @Override
-    public int[] getPiecesEstimatedStatus() {
-        return this.piecesPartialStatus;
+    public int[] getDownloadedBytesInPieces() {
+        return this.downloadedBytesInPieces;
     }
 
     @Override
@@ -226,9 +220,9 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
         return activeTorrentFileList;
     }
 
-    private Mono<TorrentPieceChanged> writeBlock(PieceMessage pieceMessage) {
+    private Mono<PieceEvent> writeBlock(PieceMessage pieceMessage) {
 
-        return Mono.<TorrentPieceChanged>create(sink -> {
+        return Mono.<PieceEvent>create(sink -> {
             long from = pieceMessage.getIndex() * this.getPieceLength() + pieceMessage.getBegin();
             long to = pieceMessage.getIndex() * this.getPieceLength()
                     + pieceMessage.getBegin() + pieceMessage.getBlock().length;
@@ -253,25 +247,25 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
             // update pieces status:
             // there maybe multiple writes of the same pieceRequest during one execution...
             long pieceLength = getPieceLength(pieceMessage.getIndex());
-            this.piecesPartialStatus[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
-            if (pieceLength < this.piecesPartialStatus[pieceMessage.getIndex()])
-                this.piecesPartialStatus[pieceMessage.getIndex()] = getPieceLength(pieceMessage.getIndex());
+            this.downloadedBytesInPieces[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
+            if (pieceLength < this.downloadedBytesInPieces[pieceMessage.getIndex()])
+                this.downloadedBytesInPieces[pieceMessage.getIndex()] = getPieceLength(pieceMessage.getIndex());
 
-            long howMuchWeWroteUntilNowInThisPiece = this.piecesPartialStatus[pieceMessage.getIndex()];
+            long howMuchWeWroteUntilNowInThisPiece = this.downloadedBytesInPieces[pieceMessage.getIndex()];
             if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
                 // update pieces partial status array:
                 // TODO: WARNING: this line *only* must be synchronized among multiple threads!
                 this.piecesStatus.set(pieceMessage.getIndex());
-                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(TorrentPieceStatus.COMPLETED, pieceMessage);
-                sink.success(torrentPieceChanged);
+                PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.COMPLETED, pieceMessage);
+                sink.success(pieceEvent);
 
                 if (minMissingPieceIndex() == -1)
                     this.torrentStatusController.completedDownloading();
             } else {
                 // update pieces partial status array:
                 // TODO: WARNING: this line *only* must be synchronized among multiple threads!
-                TorrentPieceChanged torrentPieceChanged = new TorrentPieceChanged(TorrentPieceStatus.DOWNLOADING, pieceMessage);
-                sink.success(torrentPieceChanged);
+                PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.DOWNLOADING, pieceMessage);
+                sink.success(pieceEvent);
             }
         }).subscribeOn(Schedulers.single());
     }

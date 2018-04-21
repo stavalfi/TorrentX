@@ -7,9 +7,9 @@ import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
 import main.AppConfig;
 import main.TorrentInfo;
+import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
@@ -42,6 +42,7 @@ import java.io.File;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -428,7 +429,7 @@ public class MyStepdefs {
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, pieceMessageFlux)
                 .block();
 
-        Flux<TorrentPieceChanged> recordedTorrentPieceChangedFlux =
+        Flux<PieceEvent> recordedTorrentPieceChangedFlux =
                 activeTorrent.savedBlockFlux()
                         .replay()
                         .autoConnect(0);
@@ -549,7 +550,7 @@ public class MyStepdefs {
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, lastPieceFlux)
                 .block();
 
-        Flux<TorrentPieceChanged> recordedTorrentPieceChangedFlux =
+        Flux<PieceEvent> recordedTorrentPieceChangedFlux =
                 activeTorrent.savedBlockFlux()
                         .replay()
                         .autoConnect(0);
@@ -722,11 +723,6 @@ public class MyStepdefs {
                 initialTorrentStatusTypeMap.get(TorrentStatusType.RESUME_UPLOAD),
                 initialTorrentStatusTypeMap.get(TorrentStatusType.RESUME_DOWNLOAD),
                 initialTorrentStatusTypeMap.get(TorrentStatusType.COMPLETED_DOWNLOADING));
-
-        TorrentDownloaders.getInstance()
-                .createTorrentDownloader(torrentInfo, null, null,
-                        torrentStatusController, null, null, null,
-                        null, null);
 
         Utils.createDefaultTorrentDownloader(torrentInfo,
                 System.getProperty("user.dir") + "/" + downloadLocation,
@@ -943,29 +939,140 @@ public class MyStepdefs {
 
     @Given("^torrent: \"([^\"]*)\",\"([^\"]*)\"$")
     public void torrent(String torrentFileName, String downloadLocation) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
+        // delete everything from the last test.
+        Utils.removeEverythingRelatedToTorrent(torrentInfo);
+
+        // close the connection of all the fake peers from the last test and clear their map.
+        this.fakePeersToMeLinkMap.clear();
+        // we can close our connection instead of closing theirs. its the same.
+        if (this.recordedMeToFakePeersLinks$ != null) {
+            this.recordedMeToFakePeersLinks$
+                    .doOnNext(Link::closeConnection)
+                    .blockLast(Duration.ofMillis(500));
+        }
+        this.recordedFakePeersToMeLinks$ = null;
+        this.actualSavedBlocks$ = null;
+
+        Utils.createDefaultTorrentDownloader(torrentInfo,
+                System.getProperty("user.dir") + "/" + downloadLocation);
     }
+
+    private Flux<Link> recordedMeToFakePeersLinks$;
+    private Flux<RemoteFakePeer> recordedFakePeersToMeLinks$;
+    private Map<Integer, Mono<RemoteFakePeer>> fakePeersToMeLinkMap = new HashMap<>();
 
     @Given("^link to \"([^\"]*)\" - fake-peer on port \"([^\"]*)\" with the following pieces - for torrent: \"([^\"]*)\"$")
-    public void linkToFakePeerWithTheFollowingPiecesForTorrent(FakePeerType fakePeerType, Integer fakePeerPort, String torrentFileName, List<Integer> fakePeerCompletedPieces) throws Throwable {
+    public void linkToFakePeerWithTheFollowingPiecesForTorrent(FakePeerType fakePeerType,
+                                                               Integer fakePeerPort,
+                                                               String torrentFileName,
+                                                               List<Integer> fakePeerCompletedPieces) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .get();
 
+        this.recordedMeToFakePeersLinks$ = torrentDownloader.getPeersCommunicatorFlux()
+                // send interested message to the fake-peer.
+                .flatMap(link -> link.sendMessages().sendInterestedMessage()
+                        .map(sendPeerMessages -> link))
+                .replay()
+                .autoConnect(0);
+
+        Peer me = new Peer("localhost", AppConfig.getInstance().getMyListeningPort());
+        Peer fakePeer = new Peer("localhost", fakePeerPort);
+
+        Mono<RemoteFakePeer> fakePeerToMeLink$ = new PeersProvider(torrentInfo)
+                .connectToPeerMono(me)
+                .map(link -> new RemoteFakePeer(link, fakePeerType));
+
+        this.fakePeersToMeLinkMap.put(fakePeerPort, fakePeerToMeLink$);
     }
 
-    @When("^application request the following blocks from him - for torrent: \"([^\"]*)\":$")
-    public void applicationRequestTheFollowingBlocksFromHimForTorrent(String torrentFileName, List<BlockOfPiece> peerRequestBlockList) throws Throwable {
+    private Flux<PieceEvent> actualSavedBlocks$;
 
+    @When("^application request the following blocks from him - for torrent: \"([^\"]*)\":$")
+    public void applicationRequestTheFollowingBlocksFromHimForTorrent(String torrentFileName,
+                                                                      List<BlockOfPiece> peerRequestBlockList) throws Throwable {
+        // at this point, we already started listening for incoming links from the fake-peers.
+
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .get();
+
+        // all fake peers connect to me. In this test there must be only one fake-peer.
+        this.recordedFakePeersToMeLinks$ = Flux.fromIterable(this.fakePeersToMeLinkMap.entrySet())
+                .flatMap(Map.Entry::getValue)
+                .replay()
+                .autoConnect(0);
+
+        Link meToFakePeerLink = this.recordedMeToFakePeersLinks$.take(1)
+                .single()
+                .block();
+
+        BiFunction<Link, BlockOfPiece, RequestMessage> buildRequestMessage = (link, blockOfPiece) -> {
+            int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
+                    blockOfPiece.getPieceIndex() :
+                    torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
+
+            int requestBlockSize = blockOfPiece.getLength() != null ?
+                    blockOfPiece.getLength() :
+                    torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getFrom();
+
+            return new RequestMessage(link.getMe(), link.getPeer(), pieceIndex, blockOfPiece.getFrom(), requestBlockSize);
+        };
+
+        // download the blocks.
+        this.actualSavedBlocks$ = Flux.fromIterable(peerRequestBlockList)
+                .map(blockOfPiece -> buildRequestMessage.apply(meToFakePeerLink, blockOfPiece))
+                .flatMap(requestMessage -> torrentDownloader
+                        .getBittorrentAlgorithm()
+                        .getDownloadAlgorithm()
+                        .getBlockDownloader()
+                        .downloadBlock(meToFakePeerLink, requestMessage)
+                        .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty()), 1, 1);
     }
 
     @Then("^application receive the following blocks from him - for torrent: \"([^\"]*)\":$")
     public void applicationReceiveTheFollowingBlocksFromHimForTorrent(String torrentFileName,
                                                                       List<BlockOfPiece> expectedBlockFromFakePeerList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
+        Function<BlockOfPiece, BlockOfPiece> fixBlockOfPiece = blockOfPiece -> {
+            int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
+                    blockOfPiece.getPieceIndex() :
+                    torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
+
+            int requestBlockSize = blockOfPiece.getLength() != null ?
+                    blockOfPiece.getLength() :
+                    torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getFrom();
+
+            return new BlockOfPiece(pieceIndex, blockOfPiece.getFrom(), requestBlockSize);
+        };
+
+        List<BlockOfPiece> fixedExpectedBlockFromFakePeerList = expectedBlockFromFakePeerList.stream()
+                .map(fixBlockOfPiece)
+                .collect(Collectors.toList());
+
+        List<BlockOfPiece> actualDownloadedBlocks = this.actualSavedBlocks$.take(expectedBlockFromFakePeerList.size())
+                .map(PieceEvent::getReceivedPiece)
+                .map(pieceEvent -> new BlockOfPiece(pieceEvent.getIndex(),
+                        pieceEvent.getBegin(), pieceEvent.getBlock().length))
+                .collectList()
+                .block();
+
+        Assert.assertArrayEquals(fixedExpectedBlockFromFakePeerList.toArray(), actualDownloadedBlocks.toArray());
     }
 
     @Then("^application doesn't receive the following blocks from him - for torrent: \"([^\"]*)\":$")
     public void applicationDoesnTReceiveTheFollowingBlocksFromHimForTorrent(String torrentFileName,
                                                                             List<BlockOfPiece> notExpectedBlockFromFakePeerList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
+        StepVerifier.create(this.actualSavedBlocks$)
+                .verifyComplete();
     }
 
     @Then("^fake-peer on port \"([^\"]*)\" choke me: \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
@@ -1028,6 +1135,40 @@ public class MyStepdefs {
 
     @Then("^application receive the none available pieces - for torrent: \"([^\"]*)\"$")
     public void applicationReceiveTheNoneAvailablePiecesForTorrent(String torrentFileName) throws Throwable {
+
+    }
+
+    @Then("^application download the following pieces - concurrent piece's downloads: \"([^\"]*)\" - for torrent: \"([^\"]*)\":$")
+    public void applicationDownloadTheFollowingPiecesConcurrentPieceSDownloadsForTorrent(int concurrentPieceDownloads,
+                                                                                         String torrentFileName,
+                                                                                         List<Integer> piecesToDownloadList) throws Throwable {
+
+    }
+
+    @Then("^application downloaded the following pieces - for torrent: \"([^\"]*)\":$")
+    public void applicationDownloadedTheFollowingPiecesForTorrent(String torrentFileName,
+                                                                  List<Integer> piecesDownloadedList) throws Throwable {
+
+    }
+
+    @Then("^application couldn't downloaded the following pieces - for torrent: \"([^\"]*)\":$")
+    public void applicationCloudnTDownloadedTheFollowingPiecesForTorrent(String torrentFileName,
+                                                                         List<Integer> piecesNotDownloadedList) throws Throwable {
+
+    }
+
+    @When("^application save the all the pieces of torrent: \"([^\"]*)\"$")
+    public void applicationSaveTheAllThePiecesOfTorrent(String torrentFileName) throws Throwable {
+
+    }
+
+    @Then("^the saved pieces flux send complete signal - for torrent: \"([^\"]*)\"$")
+    public void theSavedPiecesFluxSendCompleteSignalForTorrent(String torrentFileName) throws Throwable {
+
+    }
+
+    @Then("^the saved blocks flux send  complete signal - for torrent: \"([^\"]*)\"$")
+    public void theSavedBlocksFluxSendCompleteSignalForTorrent(String torrentFileName) throws Throwable {
 
     }
 }

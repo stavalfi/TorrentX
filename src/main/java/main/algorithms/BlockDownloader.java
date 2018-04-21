@@ -1,6 +1,6 @@
 package main.algorithms;
 
-import main.downloader.TorrentPieceChanged;
+import main.downloader.PieceEvent;
 import main.peer.Link;
 import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Mono;
@@ -15,5 +15,5 @@ public interface BlockDownloader {
     /**
      * send the request and check that we received the correct block.
      */
-    Mono<TorrentPieceChanged> downloadBlock(Link link, RequestMessage requestMessage);
+    Mono<PieceEvent> downloadBlock(Link link, RequestMessage requestMessage);
 }

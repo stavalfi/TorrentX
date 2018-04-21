@@ -84,3 +84,17 @@ Feature: create get and delete active torrents
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test/   |
 
+  Scenario Outline: we save all the pieces and expect to see that the fluxes are completed
+    Given torrent: "<torrent>","<downloadLocation>"
+    When application save the all the pieces of torrent: "<torrent>"
+    Then the saved pieces flux send complete signal - for torrent: "<torrent>"
+    Then the saved blocks flux send  complete signal - for torrent: "<torrent>"
+#    Then torrent-status for torrent "<torrent>" will be:
+#      | PAUSE_DOWNLOAD        |
+#      | COMPLETED_DOWNLOADING |
+
+    Examples:
+      | torrent                       | downloadLocation |
+      | torrent-file-example1.torrent | torrents-test/   |
+
+

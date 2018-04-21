@@ -5,6 +5,8 @@ Feature: download blocks from fake-peer
     Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
       | 0 |
       | 1 |
+    When torrent-status for torrent "<torrent>" is trying to change to:
+      | START_DOWNLOAD |
     When application request the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
@@ -30,18 +32,16 @@ Feature: download blocks from fake-peer
       | -1 |
       #second last block:
       | -2 |
+    When torrent-status for torrent "<torrent>" is trying to change to:
+      | START_DOWNLOAD |
     When application request the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
-      | -2         | 0    | 10     |
-      | -1         | 0    | 10     |
       | -2         | 0    |        |
       | -1         | 0    | 10     |
     Then application receive the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
-      | -2         | 0    | 10     |
-      | -1         | 0    | 10     |
       | -2         | 0    |        |
       | -1         | 0    | 10     |
 
@@ -54,18 +54,16 @@ Feature: download blocks from fake-peer
     Given link to "CLOSE_IN_FIRST_REQUEST" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
       | 0 |
       | 1 |
+    When torrent-status for torrent "<torrent>" is trying to change to:
+      | START_DOWNLOAD |
     When application request the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
-      | -2         | 0    | 10     |
-      | -1         | 0    | 10     |
       | -2         | 0    |        |
       | -1         | 0    | 10     |
     Then application doesn't receive the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
-      | -2         | 0    | 10     |
-      | -1         | 0    | 10     |
       | -2         | 0    |        |
       | -1         | 0    | 10     |
 
@@ -83,18 +81,16 @@ Feature: download blocks from fake-peer
       | -1 |
       #second last block:
       | -2 |
+    When torrent-status for torrent "<torrent>" is trying to change to:
+      | START_DOWNLOAD |
     When application request the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
-      | -2         | 0    | 10     |
-      | -1         | 0    | 10     |
       | -2         | 0    |        |
       | -1         | 0    | 10     |
     Then application receive the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
-      | -2         | 0    | 10     |
-      | -1         | 0    | 10     |
       | -2         | 0    |        |
       | -1         | 0    | 10     |
 
@@ -111,18 +107,16 @@ Feature: download blocks from fake-peer
       | -1 |
       #second last block:
       | -2 |
+    When torrent-status for torrent "<torrent>" is trying to change to:
+      | START_DOWNLOAD |
     When application request the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
-      | -2         | 0    | 10     |
-      | -1         | 0    | 10     |
       | -2         | 0    |        |
       | -1         | 0    | 10     |
     Then application doesn't receive the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
-      | -2         | 0    | 10     |
-      | -1         | 0    | 10     |
       | -2         | 0    |        |
       | -1         | 0    | 10     |
 

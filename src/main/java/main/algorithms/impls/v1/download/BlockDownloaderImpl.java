@@ -2,7 +2,7 @@ package main.algorithms.impls.v1.download;
 
 import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
-import main.downloader.TorrentPieceChanged;
+import main.downloader.PieceEvent;
 import main.file.system.TorrentFileSystemManager;
 import main.peer.Link;
 import main.peer.peerMessages.RequestMessage;
@@ -15,7 +15,7 @@ public class BlockDownloaderImpl implements BlockDownloader {
     private TorrentInfo torrentInfo;
     private TorrentFileSystemManager torrentFileSystemManager;
 
-    private Flux<TorrentPieceChanged> recordedSavedBlockFlux;
+    private Flux<PieceEvent> recordedSavedBlockFlux;
 
     public BlockDownloaderImpl(TorrentInfo torrentInfo,
                                TorrentFileSystemManager torrentFileSystemManager) {
@@ -36,8 +36,8 @@ public class BlockDownloaderImpl implements BlockDownloader {
      * @return
      */
     @Override
-    public Mono<TorrentPieceChanged> downloadBlock(Link link,
-                                                   RequestMessage requestMessage) {
+    public Mono<PieceEvent> downloadBlock(Link link,
+                                          RequestMessage requestMessage) {
         return link.sendMessages().sendRequestMessage(requestMessage)
                 .flatMapMany(__ -> this.recordedSavedBlockFlux)
                 .filter(torrentPieceChanged -> requestMessage.getIndex() == torrentPieceChanged.getReceivedPiece().getIndex())

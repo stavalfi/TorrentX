@@ -1,7 +1,7 @@
 package main.file.system;
 
 import main.TorrentInfo;
-import main.downloader.TorrentPieceChanged;
+import main.downloader.PieceEvent;
 import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -29,11 +29,11 @@ public interface TorrentFileSystemManager {
 
     int maxMissingPieceIndex();
 
-    int[] getPiecesEstimatedStatus();
+    int[] getDownloadedBytesInPieces();
 
     Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
 
-    Flux<TorrentPieceChanged> savedBlockFlux();
+    Flux<PieceEvent> savedBlockFlux();
 
     Flux<Integer> savedPieceFlux();
 

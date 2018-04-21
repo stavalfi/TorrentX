@@ -3,7 +3,7 @@ package main;
 import christophedetroyer.torrent.TorrentParser;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.downloader.TorrentPieceChanged;
+import main.downloader.PieceEvent;
 import main.peer.Link;
 import main.peer.SendPeerMessages;
 import main.peer.peerMessages.RequestMessage;
@@ -32,7 +32,7 @@ public class App {
 
         torrentDownloader.getTorrentFileSystemManager()
                 .savedBlockFlux()
-                .map(TorrentPieceChanged::getReceivedPiece)
+                .map(PieceEvent::getReceivedPiece)
                 .map(pieceMessage -> "received: index: " + pieceMessage.getIndex() +
                         ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
                 .subscribe(System.out::println, Throwable::printStackTrace);
