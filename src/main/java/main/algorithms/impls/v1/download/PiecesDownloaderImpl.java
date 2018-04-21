@@ -58,7 +58,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
                 Math.min(REQUEST_BLOCK_SIZE, pieceLength - requestFrom);
 
         Flux<Integer> requestBlockFromPosition = Flux.generate(sink -> {
-            int requestFrom = this.torrentFileSystemManager.getPiecesEstimatedStatus()[pieceIndex];
+            int requestFrom = this.torrentFileSystemManager.getDownloadedBytesInPieces()[pieceIndex];
             if (requestFrom < pieceLength)
                 sink.next(requestFrom);
             else

@@ -26,7 +26,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
 
     private final List<ActiveTorrentFile> activeTorrentFileList;
     private final BitSet piecesStatus;
-    private final int[] piecesPartialStatus;
+    private final int[] downloadedBytesInPieces;
     private final String downloadPath;
     private TorrentStatusController torrentStatusController;
     private Flux<Integer> savedPieceFlux;
@@ -39,7 +39,7 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
         this.downloadPath = downloadPath;
         this.torrentStatusController = torrentStatusController;
         this.piecesStatus = new BitSet(getPieces().size());
-        this.piecesPartialStatus = new int[getPieces().size()];
+        this.downloadedBytesInPieces = new int[getPieces().size()];
 
         createFolders(torrentInfo, downloadPath);
         createFiles(torrentInfo, downloadPath).block();
@@ -115,12 +115,6 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
         return this.savedPieceFlux;
     }
 
-//    @Override
-//    public void startListenForSavedBlockFlux() {
-//        if (this.isStartListenForIncomingPieces.compareAndSet(false, true))
-//            this.startListenForIncomingPiecesFlux.connect();
-//    }
-
     public Mono<Boolean> deleteActiveTorrentOnlyMono(String torrentInfoHash) {
         boolean deletedActiveTorrent = ActiveTorrents.getInstance()
                 .deleteActiveTorrentOnly(torrentInfoHash);
@@ -162,8 +156,8 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     }
 
     @Override
-    public int[] getPiecesEstimatedStatus() {
-        return this.piecesPartialStatus;
+    public int[] getDownloadedBytesInPieces() {
+        return this.downloadedBytesInPieces;
     }
 
     @Override
@@ -253,11 +247,11 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
             // update pieces status:
             // there maybe multiple writes of the same pieceRequest during one execution...
             long pieceLength = getPieceLength(pieceMessage.getIndex());
-            this.piecesPartialStatus[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
-            if (pieceLength < this.piecesPartialStatus[pieceMessage.getIndex()])
-                this.piecesPartialStatus[pieceMessage.getIndex()] = getPieceLength(pieceMessage.getIndex());
+            this.downloadedBytesInPieces[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
+            if (pieceLength < this.downloadedBytesInPieces[pieceMessage.getIndex()])
+                this.downloadedBytesInPieces[pieceMessage.getIndex()] = getPieceLength(pieceMessage.getIndex());
 
-            long howMuchWeWroteUntilNowInThisPiece = this.piecesPartialStatus[pieceMessage.getIndex()];
+            long howMuchWeWroteUntilNowInThisPiece = this.downloadedBytesInPieces[pieceMessage.getIndex()];
             if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
                 // update pieces partial status array:
                 // TODO: WARNING: this line *only* must be synchronized among multiple threads!

@@ -29,7 +29,7 @@ public interface TorrentFileSystemManager {
 
     int maxMissingPieceIndex();
 
-    int[] getPiecesEstimatedStatus();
+    int[] getDownloadedBytesInPieces();
 
     Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
 
