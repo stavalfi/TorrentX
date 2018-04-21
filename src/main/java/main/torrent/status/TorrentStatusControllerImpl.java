@@ -80,8 +80,7 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
                 // must initialize statusTypeFluxSink asap.
                 .publishOn(App.MyScheduler)
                 .publish()
-                .autoConnect(0)
-                .doOnNext(s -> System.out.println(s));
+                .autoConnect(0);
 
         this.isStartedDownloadingFlux = this.statusTypeFlux
                 .filter(torrentStatusType -> torrentStatusType.equals(TorrentStatusType.START_DOWNLOAD) ||
