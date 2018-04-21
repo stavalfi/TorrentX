@@ -2,7 +2,7 @@ package main.algorithms.impls.v1.notification;
 
 import main.TorrentInfo;
 import main.algorithms.NotifyAboutCompletedPieceAlgorithm;
-import main.downloader.TorrentPieceChanged;
+import main.downloader.PieceEvent;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.TorrentFileSystemManager;
 import main.peer.Link;
@@ -34,7 +34,7 @@ public class NotifyAboutCompletedPieceAlgorithmImpl implements NotifyAboutComple
         this.notifiedCompletedPiecesFlux =
                 this.torrentFileSystemManager.savedBlockFlux()
                         .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
-                        .map(TorrentPieceChanged::getReceivedPiece)
+                        .map(PieceEvent::getReceivedPiece)
                         .map(PieceMessage::getIndex)
                         .flatMap(completedPiece ->
                                 this.recordedFreePeerFlux.map(Link::sendMessages)

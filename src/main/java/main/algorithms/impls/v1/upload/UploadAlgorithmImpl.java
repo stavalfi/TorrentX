@@ -2,7 +2,7 @@ package main.algorithms.impls.v1.upload;
 
 import main.TorrentInfo;
 import main.algorithms.UploadAlgorithm;
-import main.downloader.TorrentPieceChanged;
+import main.downloader.PieceEvent;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.TorrentFileSystemManager;
 import main.peer.Link;
@@ -15,7 +15,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
     private TorrentFileSystemManager torrentFileSystemManager;
     private Flux<Link> peersCommunicatorFlux;
 
-    private Flux<TorrentPieceChanged> uploadedBlocksFlux;
+    private Flux<PieceEvent> uploadedBlocksFlux;
 
     public UploadAlgorithmImpl(TorrentInfo torrentInfo,
                         TorrentStatus torrentStatus,
@@ -39,13 +39,13 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                                         .flatMap(pieceMessage ->
                                                 peersCommunicator.sendMessages().sendPieceMessage(pieceMessage.getIndex(),
                                                         pieceMessage.getBegin(), pieceMessage.getBlock())
-                                                        .map(___ -> new TorrentPieceChanged(TorrentPieceStatus.UPLOADING, pieceMessage))))
+                                                        .map(___ -> new PieceEvent(TorrentPieceStatus.UPLOADING, pieceMessage))))
                         .publish()
                         .autoConnect(0);
     }
 
     @Override
-    public Flux<TorrentPieceChanged> getUploadedBlocksFlux() {
+    public Flux<PieceEvent> getUploadedBlocksFlux() {
         return this.uploadedBlocksFlux;
     }
 }

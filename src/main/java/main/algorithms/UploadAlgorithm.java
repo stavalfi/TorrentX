@@ -1,8 +1,8 @@
 package main.algorithms;
 
-import main.downloader.TorrentPieceChanged;
+import main.downloader.PieceEvent;
 import reactor.core.publisher.Flux;
 
 public interface UploadAlgorithm {
-    Flux<TorrentPieceChanged> getUploadedBlocksFlux();
+    Flux<PieceEvent> getUploadedBlocksFlux();
 }

@@ -2,12 +2,12 @@ package main.downloader;
 
 import main.peer.peerMessages.PieceMessage;
 
-public class TorrentPieceChanged {
+public class PieceEvent {
     private PieceMessage receivedPiece;
     private TorrentPieceStatus torrentPieceStatus;
 
-    public TorrentPieceChanged(TorrentPieceStatus torrentPieceStatus,
-                               PieceMessage receivedPiece) {
+    public PieceEvent(TorrentPieceStatus torrentPieceStatus,
+                      PieceMessage receivedPiece) {
         this.receivedPiece = receivedPiece;
         this.torrentPieceStatus = torrentPieceStatus;
     }
@@ -23,7 +23,7 @@ public class TorrentPieceChanged {
 
     @Override
     public String toString() {
-        return "TorrentPieceChanged{" +
+        return "PieceEvent{" +
                 " receivedPiece=" + receivedPiece +
                 ", torrentPieceStatus=" + torrentPieceStatus +
                 '}';

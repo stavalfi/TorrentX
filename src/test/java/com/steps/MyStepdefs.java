@@ -7,9 +7,9 @@ import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
 import main.AppConfig;
 import main.TorrentInfo;
+import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.downloader.TorrentPieceChanged;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
@@ -428,7 +428,7 @@ public class MyStepdefs {
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, pieceMessageFlux)
                 .block();
 
-        Flux<TorrentPieceChanged> recordedTorrentPieceChangedFlux =
+        Flux<PieceEvent> recordedTorrentPieceChangedFlux =
                 activeTorrent.savedBlockFlux()
                         .replay()
                         .autoConnect(0);
@@ -549,7 +549,7 @@ public class MyStepdefs {
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, lastPieceFlux)
                 .block();
 
-        Flux<TorrentPieceChanged> recordedTorrentPieceChangedFlux =
+        Flux<PieceEvent> recordedTorrentPieceChangedFlux =
                 activeTorrent.savedBlockFlux()
                         .replay()
                         .autoConnect(0);
