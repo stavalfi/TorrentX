@@ -1,5 +1,7 @@
 package com.utils;
 
+import java.util.Objects;
+
 public class BlockOfPiece {
     private int pieceIndex;
     private int from;
@@ -21,6 +23,21 @@ public class BlockOfPiece {
 
     public Integer getLength() {
         return length;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof BlockOfPiece)) return false;
+        BlockOfPiece that = (BlockOfPiece) o;
+        return getPieceIndex() == that.getPieceIndex() &&
+                getFrom() == that.getFrom() &&
+                Objects.equals(getLength(), that.getLength());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getPieceIndex(), getFrom(), getLength());
     }
 
     @Override
