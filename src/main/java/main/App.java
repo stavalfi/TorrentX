@@ -1,9 +1,9 @@
 package main;
 
 import christophedetroyer.torrent.TorrentParser;
+import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.downloader.PieceEvent;
 import main.peer.Link;
 import main.peer.SendPeerMessages;
 import main.peer.peerMessages.RequestMessage;
@@ -11,11 +11,12 @@ import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
+import java.io.File;
 import java.io.IOException;
 
 public class App {
     public static Scheduler MyScheduler = Schedulers.elastic();
-    private static String downloadPath = System.getProperty("user.dir") + "/" + "torrents-test/";
+    private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test/";
 
     private static void f4() throws IOException {
         TorrentDownloader torrentDownloader = TorrentDownloaders

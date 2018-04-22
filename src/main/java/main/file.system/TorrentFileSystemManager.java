@@ -13,31 +13,31 @@ import java.util.BitSet;
 import java.util.List;
 
 public interface TorrentFileSystemManager {
-    String getDownloadPath();
+	String getDownloadPath();
 
-    TorrentInfo getTorrentInfo();
+	TorrentInfo getTorrentInfo();
 
-    boolean havePiece(int pieceIndex);
+	boolean havePiece(int pieceIndex);
 
-    List<? extends TorrentFile> getTorrentFiles();
+	List<? extends TorrentFile> getTorrentFiles();
 
-    BitSet getUpdatedPiecesStatus();
+	BitSet getUpdatedPiecesStatus();
 
-    BitFieldMessage buildBitFieldMessage(Peer from, Peer to);
+	BitFieldMessage buildBitFieldMessage(Peer from, Peer to);
 
-    int minMissingPieceIndex();
+	int minMissingPieceIndex();
 
-    int maxMissingPieceIndex();
+	int maxMissingPieceIndex();
 
-    int[] getDownloadedBytesInPieces();
+	int[] getDownloadedBytesInPieces();
 
-    Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
+	Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
 
-    Flux<PieceEvent> savedBlockFlux();
+	Flux<PieceEvent> savedBlockFlux();
 
-    Flux<Integer> savedPieceFlux();
+	Flux<Integer> savedPieceFlux();
 
-    Mono<Boolean> deleteActiveTorrentOnlyMono(String torrentInfoHash);
+	Mono<Void> deleteActiveTorrentOnlyMono();
 
-    Mono<Boolean> deleteFileOnlyMono(String torrentInfoHash);
+	Mono<Void> deleteFileOnlyMono();
 }

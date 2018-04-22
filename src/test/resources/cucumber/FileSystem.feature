@@ -7,8 +7,8 @@ Feature: create get and delete active torrents
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
-      | torrent-file-example2.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
+      | torrent-file-example2.torrent | torrents-test   |
 
   Scenario Outline: we delete active torrent only
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -18,8 +18,8 @@ Feature: create get and delete active torrents
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
-      | torrent-file-example2.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
+      | torrent-file-example2.torrent | torrents-test   |
 
   Scenario Outline: we delete torrent files only
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -29,8 +29,8 @@ Feature: create get and delete active torrents
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
-      | torrent-file-example2.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
+      | torrent-file-example2.torrent | torrents-test   |
 
   Scenario Outline: we delete active torrent and file
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -41,8 +41,8 @@ Feature: create get and delete active torrents
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
-      | torrent-file-example2.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
+      | torrent-file-example2.torrent | torrents-test   |
 
   Scenario Outline: we save random blocks inside files and if a piece completely downloaded, we check it has been marked as downloaded
     # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
@@ -61,7 +61,7 @@ Feature: create get and delete active torrents
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: we save piece of active torrent
     # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
@@ -74,7 +74,7 @@ Feature: create get and delete active torrents
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: we save the last piece of active torrent
     # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
@@ -82,7 +82,7 @@ Feature: create get and delete active torrents
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: we save all the pieces and expect to see that the fluxes are completed
     Given torrent: "<torrent>","<downloadLocation>"
@@ -95,6 +95,6 @@ Feature: create get and delete active torrents
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
 
