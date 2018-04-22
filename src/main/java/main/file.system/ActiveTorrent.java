@@ -50,6 +50,10 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                 .filter(isFilesRemoved -> isFilesRemoved)
                 // I can be here only once.
                 .flatMap(__ -> deleteFileOnlyMono(torrentInfo.getTorrentInfoHash()))
+                .flatMap(__ -> Flux.fromIterable(this.activeTorrentFileList))
+                .flatMap(ActiveTorrentFile::closeRandomAccessFiles)
+                .collectList()
+                .flux()
                 .publish()
                 .autoConnect(0);
 
@@ -57,6 +61,10 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                 .filter(isTorrentRemoved -> isTorrentRemoved)
                 // I can be here only once.
                 .flatMap(__ -> deleteActiveTorrentOnlyMono(torrentInfo.getTorrentInfoHash()))
+                .flatMap(__ -> Flux.fromIterable(this.activeTorrentFileList))
+                .flatMap(ActiveTorrentFile::closeRandomAccessFiles)
+                .collectList()
+                .flux()
                 .publish()
                 .autoConnect(0);
 

@@ -7,6 +7,7 @@ import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
 import main.AppConfig;
 import main.TorrentInfo;
+import main.algorithms.BlockDownloader;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
@@ -1115,6 +1116,10 @@ public class MyStepdefs {
                 .replay()
                 .autoConnect(0);
 
+        // sleep until we actually start listening for new peers.
+        //TODO: add a notification in PeersListener class to notify when we actually started listening.
+        Thread.sleep(1000);
+
         Link meToFakePeerLink = this.recordedMeToFakePeersLinks$.take(1)
                 .single()
                 .block();
@@ -1132,14 +1137,16 @@ public class MyStepdefs {
         };
 
         // download the blocks.
+        BlockDownloader blockDownloader = torrentDownloader
+                .getBittorrentAlgorithm()
+                .getDownloadAlgorithm()
+                .getBlockDownloader();
+        int concurrentRequestsToSend = peerRequestBlockList.size();
         this.actualSavedBlocks$ = Flux.fromIterable(peerRequestBlockList)
                 .map(blockOfPiece -> buildRequestMessage.apply(meToFakePeerLink, blockOfPiece))
-                .flatMap(requestMessage -> torrentDownloader
-                        .getBittorrentAlgorithm()
-                        .getDownloadAlgorithm()
-                        .getBlockDownloader()
-                        .downloadBlock(meToFakePeerLink, requestMessage)
-                        .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty()), 1, 1);
+                .flatMap(requestMessage ->
+                        blockDownloader.downloadBlock(meToFakePeerLink, requestMessage)
+                                .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty()), concurrentRequestsToSend);
     }
 
     @Then("^application receive the following blocks from him - for torrent: \"([^\"]*)\":$")
@@ -1170,7 +1177,11 @@ public class MyStepdefs {
                 .collectList()
                 .block();
 
-        Assert.assertArrayEquals(fixedExpectedBlockFromFakePeerList.toArray(), actualDownloadedBlocks.toArray());
+        Assert.assertTrue(fixedExpectedBlockFromFakePeerList.stream()
+                .allMatch(actualDownloadedBlocks::contains));
+
+        Assert.assertTrue(actualDownloadedBlocks.stream()
+                .allMatch(fixedExpectedBlockFromFakePeerList::contains));
     }
 
     @Then("^application doesn't receive the following blocks from him - for torrent: \"([^\"]*)\":$")

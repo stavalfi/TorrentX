@@ -18,7 +18,10 @@ public class RemoteFakePeer extends Link {
                             blockThread(100);
                             return;
                         case RESPOND_WITH_DELAY_3000:
-                            blockThread(3000);
+                            //TODO: in some operating systems, the IO operations are extremely slow.
+                            // for example the first use of randomAccessFile object. in linux all good.
+                            // we need to remmber to change back 20->3.
+                            blockThread(3 * 1000);
                             return;
                     }
                 })

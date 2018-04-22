@@ -75,7 +75,6 @@ public class PeersListener {
                                 .filter(isListeningToIncomingPeers -> isListeningToIncomingPeers)
                                 .map(__ -> link))
                         .subscribeOn(App.MyScheduler)
-                        .doOnNext(x -> System.out.println(x))
                         .publish()
                         .autoConnect(0);
     }
