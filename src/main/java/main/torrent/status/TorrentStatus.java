@@ -9,9 +9,9 @@ public interface TorrentStatus {
 
     Flux<TorrentStatusType> getStatusTypeFlux();
 
-    Flux<Boolean> isStartedDownloadingFlux();
+    Flux<Boolean> isStartDownloadingFlux();
 
-    Flux<Boolean> isStartedUploadingFlux();
+    Flux<Boolean> isStartUploadingFlux();
 
     Flux<Boolean> isDownloadingFlux();
 
@@ -23,9 +23,17 @@ public interface TorrentStatus {
 
     Flux<Boolean> isFilesRemovedFlux();
 
-    Mono<TorrentStatusType> notifyWhenStartedDownloading();
+    Flux<Boolean> isStartListeningToIncomingPeersFlux();
 
-    Mono<TorrentStatusType> notifyWhenStartedUploading();
+    Flux<Boolean> isListeningToIncomingPeersFlux();
+
+    Flux<Boolean> isStartSearchingPeersFlux();
+
+    Flux<Boolean> isSearchingPeersFlux();
+
+    Mono<TorrentStatusType> notifyWhenStartDownloading();
+
+    Mono<TorrentStatusType> notifyWhenStartUploading();
 
     Flux<TorrentStatusType> notifyWhenResumeDownload();
 
@@ -36,4 +44,12 @@ public interface TorrentStatus {
     Mono<TorrentStatusType> notifyWhenTorrentRemoved();
 
     Mono<TorrentStatusType> notifyWhenFilesRemoved();
+
+    Mono<TorrentStatusType> notifyWhenStartedListeningToIncomingPeers();
+
+    Flux<TorrentStatusType> notifyWhenListeningToIncomingPeers();
+
+    Mono<TorrentStatusType> notifyWhenStartSearchingPeers();
+
+    Flux<TorrentStatusType> notifySearchingPeers();
 }

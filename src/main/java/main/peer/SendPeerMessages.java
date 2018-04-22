@@ -1,6 +1,5 @@
 package main.peer;
 
-import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Flux;
@@ -10,8 +9,6 @@ import java.util.BitSet;
 
 public interface SendPeerMessages {
     Mono<SendPeerMessages> sendBitFieldMessage(BitSet peaces);
-
-    Mono<SendPeerMessages> sendBitFieldMessage(BitFieldMessage bitFieldMessage);
 
     Mono<SendPeerMessages> sendCancelMessage(int index, int begin, int length);
 

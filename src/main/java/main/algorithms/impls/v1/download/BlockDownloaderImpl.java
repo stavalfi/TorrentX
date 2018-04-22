@@ -43,6 +43,9 @@ public class BlockDownloaderImpl implements BlockDownloader {
                 .filter(torrentPieceChanged -> requestMessage.getIndex() == torrentPieceChanged.getReceivedPiece().getIndex())
                 .filter(torrentPieceChanged -> requestMessage.getBegin() == torrentPieceChanged.getReceivedPiece().getBegin())
                 // max wait to the correct block back from peer.
+                //TODO: in some operating systems, the IO operations are extremely slow.
+                // for example the first use of randomAccessFile object. in linux all good.
+                // we need to remmber to change back 20->2.
                 .timeout(Duration.ofMillis(2 * 1000))
                 .take(1)
                 .single();

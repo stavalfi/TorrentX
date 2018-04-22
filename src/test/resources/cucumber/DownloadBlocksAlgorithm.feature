@@ -6,7 +6,7 @@ Feature: download blocks from fake-peer
       | 0 |
       | 1 |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | START_DOWNLOAD |
+      | START_LISTENING_TO_INCOMING_PEERS |
     When application request the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
@@ -16,7 +16,6 @@ Feature: download blocks from fake-peer
       | pieceIndex | from | length |
       | 0          | 0    |        |
       | 1          | 0    | 10     |
-      | 2          | 0    |        |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -33,7 +32,7 @@ Feature: download blocks from fake-peer
       #second last block:
       | -2 |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | START_DOWNLOAD |
+      | START_LISTENING_TO_INCOMING_PEERS |
     When application request the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
@@ -55,7 +54,7 @@ Feature: download blocks from fake-peer
       | 0 |
       | 1 |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | START_DOWNLOAD |
+      | START_LISTENING_TO_INCOMING_PEERS |
     When application request the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
@@ -82,7 +81,7 @@ Feature: download blocks from fake-peer
       #second last block:
       | -2 |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | START_DOWNLOAD |
+      | START_LISTENING_TO_INCOMING_PEERS |
     When application request the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
@@ -108,7 +107,7 @@ Feature: download blocks from fake-peer
       #second last block:
       | -2 |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | START_DOWNLOAD |
+      | START_LISTENING_TO_INCOMING_PEERS |
     When application request the following blocks from him - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |

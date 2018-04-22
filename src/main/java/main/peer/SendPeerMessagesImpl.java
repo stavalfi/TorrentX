@@ -51,17 +51,14 @@ class SendPeerMessagesImpl implements SendPeerMessages {
     @Override
     public Mono<SendPeerMessages> sendPieceMessage(int index, int begin, byte[] block) {
         PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(), index, begin, block);
-        return send(pieceMessage);
+        return send(pieceMessage)
+                .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(index));
     }
 
     @Override
-    public Mono<SendPeerMessages> sendBitFieldMessage(BitSet peaces) {
-        return send(new BitFieldMessage(this.getMe(), this.getPeer(), peaces));
-    }
-
-    @Override
-    public Mono<SendPeerMessages> sendBitFieldMessage(BitFieldMessage bitFieldMessage) {
-        return sendBitFieldMessage(bitFieldMessage.getPiecesStatus());
+    public Mono<SendPeerMessages> sendBitFieldMessage(BitSet completedPieces) {
+        return send(new BitFieldMessage(this.getMe(), this.getPeer(), completedPieces))
+                .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(completedPieces));
     }
 
     @Override
@@ -77,7 +74,8 @@ class SendPeerMessagesImpl implements SendPeerMessages {
 
     @Override
     public Mono<SendPeerMessages> sendHaveMessage(int pieceIndex) {
-        return send(new HaveMessage(this.getMe(), this.getPeer(), pieceIndex));
+        return send(new HaveMessage(this.getMe(), this.getPeer(), pieceIndex))
+                .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(pieceIndex));
     }
 
     @Override

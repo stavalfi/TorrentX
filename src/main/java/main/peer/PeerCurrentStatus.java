@@ -136,12 +136,12 @@ public class PeerCurrentStatus {
         return piecesStatus;
     }
 
-    public void updatePiecesStatus(BitSet piecesStatus) {
+    public synchronized void updatePiecesStatus(BitSet piecesStatus) {
         this.piecesStatus.or(piecesStatus);
         this.peerCurrentStatusTypeFluxSink.next(PeerCurrentStatusType.PIECES_STATUS_CHANGE);
     }
 
-    public void updatePiecesStatus(int pieceIndex) {
+    public synchronized  void updatePiecesStatus(int pieceIndex) {
         this.piecesStatus.set(pieceIndex);
         this.peerCurrentStatusTypeFluxSink.next(PeerCurrentStatusType.PIECES_STATUS_CHANGE);
     }

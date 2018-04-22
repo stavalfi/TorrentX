@@ -34,7 +34,10 @@ class ReceivePeerMessagesImpl implements ReceivePeerMessages {
                 // it is important to publish from source on different thread then the
                 // subscription to this source's thread every time because:
                 // if not and we subscribe to this specific source multiple times then only the
-                // first subscription will be activated and the source will never end
+                // first subscription will be activated and the source will never end.
+                // Also some methods are waiting for notification from torrent-status class and then listen to this.
+                // because this is a blocking stream, I will block the notificator thread which will cause
+                // that no one else will get notifications.
                 .subscribeOn(App.MyScheduler)
                 //.onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                 // there are multiple subscribers to this source (every specific peer-message flux).
