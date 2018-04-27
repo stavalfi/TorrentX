@@ -6,20 +6,21 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 
-public class ActiveTorrentFile implements TorrentFile {
+public class ActualFileImpl implements ActualFile {
     private String filePath;
     // 0 <= from <=to <= Hole-Torrent.size
     private long from, to; // inclusive.
     private SeekableByteChannel seekableByteChannel;
 
-    public ActiveTorrentFile(String filePath, long from, long to, SeekableByteChannel seekableByteChannel) {
+    public ActualFileImpl(String filePath, long from, long to, SeekableByteChannel seekableByteChannel) {
         this.filePath = filePath;
         this.from = from;
         this.to = to;
         this.seekableByteChannel = seekableByteChannel;
     }
 
-    public synchronized Mono<ActiveTorrentFile> closeFileChannel() {
+    @Override
+    public synchronized Mono<ActualFileImpl> closeFileChannel() {
         try {
             if (this.seekableByteChannel.isOpen())
                 this.seekableByteChannel.close();
@@ -29,8 +30,7 @@ public class ActiveTorrentFile implements TorrentFile {
         return Mono.just(this);
     }
 
-    // as implied here: https://stackoverflow.com/questions/45396252/concurrency-of-randomaccessfile-in-java/45490504
-    // something can go wrong if multiple threads try to read/write concurrently.
+    @Override
     public synchronized void writeBlock(long begin, byte[] block, int arrayIndexFrom, int howMuchToWriteFromArray) throws IOException {
         assert this.from <= begin && begin < this.to;
         assert howMuchToWriteFromArray <= this.to - this.from;
@@ -48,9 +48,7 @@ public class ActiveTorrentFile implements TorrentFile {
         this.seekableByteChannel.write(ByteBuffer.wrap(myBlock));
     }
 
-
-    // as implied here: https://stackoverflow.com/questions/45396252/concurrency-of-randomaccessfile-in-java/45490504
-    // something can go wrong if multiple threads try to read/write concurrently.
+    @Override
     public synchronized byte[] readBlock(long begin, int blockLength) throws IOException {
         assert this.from <= begin && begin < this.to;
         assert blockLength <= this.to - this.from;

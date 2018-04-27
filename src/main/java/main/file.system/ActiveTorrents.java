@@ -15,11 +15,11 @@ import java.util.stream.Collectors;
 
 public class ActiveTorrents {
 
-	private List<ActiveTorrent> activeTorrentList = new ArrayList<>();
+	private List<FileSystemLinkImpl> fileSystemLinkImplTorrentList = new ArrayList<>();
 
-	public synchronized Mono<ActiveTorrent> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath,
-																	TorrentStatusController torrentStatusController,
-																	Flux<PieceMessage> peerResponsesFlux) {
+	public synchronized Mono<FileSystemLinkImpl> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath,
+                                                                         TorrentStatusController torrentStatusController,
+                                                                         Flux<PieceMessage> peerResponsesFlux) {
 		// TODO: check if this torrent exist in db.
 		// firstly, check if there is an active-torrent exist already.
 		// if yes, return it, else create one using the above Mono: "createActiveTorrentMono"
@@ -29,10 +29,10 @@ public class ActiveTorrents {
 						return Mono.just(activeTorrentOptional.get());
 					else {
 						try {
-							ActiveTorrent activeTorrent = new ActiveTorrent(torrentInfo, downloadPath,
+							FileSystemLinkImpl fileSystemLinkImplTorrent = new FileSystemLinkImpl(torrentInfo, downloadPath,
 									torrentStatusController, peerResponsesFlux);
-							this.activeTorrentList.add(activeTorrent);
-							return Mono.just(activeTorrent);
+							this.fileSystemLinkImplTorrentList.add(fileSystemLinkImplTorrent);
+							return Mono.just(fileSystemLinkImplTorrent);
 						} catch (IOException e) {
 							return Mono.error(e);
 						}
@@ -41,26 +41,26 @@ public class ActiveTorrents {
 	}
 
 	public synchronized boolean deleteActiveTorrentOnly(String torrentInfoHash) {
-		boolean present = this.activeTorrentList.stream()
+		boolean present = this.fileSystemLinkImplTorrentList.stream()
 				.anyMatch(activeTorrent1 -> activeTorrent1.getTorrentInfoHash().equals(torrentInfoHash));
 
-		this.activeTorrentList = this.activeTorrentList.stream()
+		this.fileSystemLinkImplTorrentList = this.fileSystemLinkImplTorrentList.stream()
 				.filter(activeTorrent1 -> !activeTorrent1.getTorrentInfoHash().equals(torrentInfoHash))
 				.collect(Collectors.toCollection(CopyOnWriteArrayList::new));
 
 		return present;
 	}
 
-	public synchronized Mono<Optional<ActiveTorrent>> findActiveTorrentByHashMono(String torrentInfoHash) {
-		Optional<ActiveTorrent> first = this.activeTorrentList.stream()
+	public synchronized Mono<Optional<FileSystemLinkImpl>> findActiveTorrentByHashMono(String torrentInfoHash) {
+		Optional<FileSystemLinkImpl> first = this.fileSystemLinkImplTorrentList.stream()
 				.filter(activeTorrent -> activeTorrent.getTorrentInfoHash().equals(torrentInfoHash))
 				.findFirst();
 		return Mono.just(first);
 	}
 
-	public synchronized Flux<ActiveTorrent> getActiveTorrentsFlux() {
+	public synchronized Flux<FileSystemLinkImpl> getActiveTorrentsFlux() {
 		// TODO: get and load all torrents from db.
-		return Flux.fromIterable(this.activeTorrentList);
+		return Flux.fromIterable(this.fileSystemLinkImplTorrentList);
 	}
 
 	private static ActiveTorrents instance = new ActiveTorrents();

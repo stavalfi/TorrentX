@@ -4,7 +4,7 @@ import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
 import main.algorithms.PeersToPiecesMapper;
 import main.algorithms.PiecesDownloader;
-import main.file.system.TorrentFileSystemManager;
+import main.file.system.FileSystemLink;
 import main.peer.PeerExceptions;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatus;
@@ -19,20 +19,20 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
 	private TorrentInfo torrentInfo;
 	private TorrentStatus torrentStatus;
 	private PeersToPiecesMapper peersToPiecesMapper;
-	private TorrentFileSystemManager torrentFileSystemManager;
+	private FileSystemLink fileSystemLink;
 	private BlockDownloader blockDownloader;
 
 	private Flux<Integer> downloadedPiecesFlux;
 
 	public PiecesDownloaderImpl(TorrentInfo torrentInfo,
 								TorrentStatus torrentStatus,
-								TorrentFileSystemManager torrentFileSystemManager,
+								FileSystemLink fileSystemLink,
 								PeersToPiecesMapper peersToPiecesMapper,
 								BlockDownloader blockDownloader) {
 		this.torrentInfo = torrentInfo;
 		this.torrentStatus = torrentStatus;
 		this.peersToPiecesMapper = peersToPiecesMapper;
-		this.torrentFileSystemManager = torrentFileSystemManager;
+		this.fileSystemLink = fileSystemLink;
 		this.blockDownloader = blockDownloader;
 
 		downloadedPiecesFlux = torrentStatus.notifyWhenStartDownloading()
@@ -59,7 +59,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
 				Math.min(REQUEST_BLOCK_SIZE, pieceLength - requestFrom);
 
 		Flux<Integer> requestBlockFromPosition = Flux.generate(sink -> {
-			long requestFrom = this.torrentFileSystemManager.getDownloadedBytesInPieces()[pieceIndex];
+			long requestFrom = this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex];
 			if (requestFrom < pieceLength)
 				// TODO: remove the (int)
 				sink.next((int) requestFrom);

@@ -4,7 +4,7 @@ import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.file.system.ActiveTorrents;
-import main.file.system.TorrentFileSystemManager;
+import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.PeersListener;
 import main.peer.PeersProvider;
@@ -34,7 +34,7 @@ public class TorrentDownloaders {
 	}
 
 	public synchronized TorrentDownloader createTorrentDownloader(TorrentInfo torrentInfo,
-																  TorrentFileSystemManager torrentFileSystemManager,
+																  FileSystemLink fileSystemLink,
 																  BittorrentAlgorithm bittorrentAlgorithm,
 																  TorrentStatusController torrentStatusController,
 																  SpeedStatistics torrentSpeedStatistics,
@@ -45,7 +45,7 @@ public class TorrentDownloaders {
 		return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
 				.orElseGet(() -> {
 					TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
-							torrentFileSystemManager,
+                            fileSystemLink,
 							bittorrentAlgorithm,
 							torrentStatusController,
 							torrentSpeedStatistics,
@@ -109,7 +109,7 @@ public class TorrentDownloaders {
 						.publish()
 						.autoConnect(0);
 
-		TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
+		FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
 				.createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusController,
 						peersCommunicatorFlux.map(Link::receivePeerMessages)
 								.flatMap(ReceivePeerMessages::getPieceMessageResponseFlux))
@@ -118,7 +118,7 @@ public class TorrentDownloaders {
 		BittorrentAlgorithm bittorrentAlgorithm =
 				BittorrentAlgorithmInitializer.v1(torrentInfo,
 						torrentStatusController,
-						torrentFileSystemManager,
+                        fileSystemLink,
 						peersCommunicatorFlux);
 
 		SpeedStatistics torrentSpeedStatistics =
@@ -127,7 +127,7 @@ public class TorrentDownloaders {
 
 		return TorrentDownloaders.getInstance()
 				.createTorrentDownloader(torrentInfo,
-						torrentFileSystemManager,
+                        fileSystemLink,
 						bittorrentAlgorithm,
 						torrentStatusController,
 						torrentSpeedStatistics,

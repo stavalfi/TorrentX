@@ -12,14 +12,14 @@ import reactor.core.publisher.Mono;
 import java.util.BitSet;
 import java.util.List;
 
-public interface TorrentFileSystemManager {
+public interface FileSystemLink {
 	String getDownloadPath();
 
 	TorrentInfo getTorrentInfo();
 
 	boolean havePiece(int pieceIndex);
 
-	List<? extends TorrentFile> getTorrentFiles();
+	List<ActualFile> getTorrentFiles();
 
 	BitSet getUpdatedPiecesStatus();
 
@@ -37,11 +37,11 @@ public interface TorrentFileSystemManager {
 
 	Flux<Integer> savedPieceFlux();
 
-	Mono<ActiveTorrent> deleteActiveTorrentOnlyMono();
+	Mono<FileSystemLinkImpl> deleteActiveTorrentOnlyMono();
 
-	Mono<ActiveTorrent> deleteFileOnlyMono();
+	Mono<FileSystemLinkImpl> deleteFileOnlyMono();
 
-	Mono<ActiveTorrent> getNotifyWhenActiveTorrentDeleted();
+	Mono<FileSystemLinkImpl> getNotifyWhenActiveTorrentDeleted();
 
-	Mono<ActiveTorrent> getNotifyWhenFilesDeleted();
+	Mono<FileSystemLinkImpl> getNotifyWhenFilesDeleted();
 }

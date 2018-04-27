@@ -57,7 +57,7 @@ public class App {
 						", begin: " + requestMessage.getBegin() + ", from: " + requestMessage.getTo())
 				.subscribe(System.out::println, Throwable::printStackTrace);
 
-		torrentDownloader.getTorrentFileSystemManager()
+		torrentDownloader.getFileSystemLink()
 				.savedBlockFlux()
 				.map(PieceEvent::getReceivedPiece)
 				.map(pieceMessage -> "received: index: " + pieceMessage.getIndex() +

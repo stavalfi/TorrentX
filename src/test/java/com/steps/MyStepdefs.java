@@ -11,9 +11,9 @@ import main.TorrentInfo;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.file.system.ActiveTorrent;
+import main.file.system.FileSystemLinkImpl;
 import main.file.system.ActiveTorrents;
-import main.file.system.TorrentFileSystemManager;
+import main.file.system.FileSystemLink;
 import main.peer.*;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
@@ -304,7 +304,7 @@ public class MyStepdefs {
     public void activeTorrentExistForTorrent(boolean isActiveTorrentExist, String torrentFileName) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        Mono<Optional<ActiveTorrent>> activeTorrentMono =
+        Mono<Optional<FileSystemLinkImpl>> activeTorrentMono =
                 ActiveTorrents.getInstance()
                         .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash());
 
@@ -366,19 +366,19 @@ public class MyStepdefs {
                                                       boolean deleteTorrentFiles) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        TorrentFileSystemManager torrentFileSystemManager = TorrentDownloaders.getInstance()
+        FileSystemLink fileSystemLink = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .get()
-                .getTorrentFileSystemManager();
+                .getFileSystemLink();
 
-        Mono<ActiveTorrent> deletionTaskMono;
+        Mono<FileSystemLinkImpl> deletionTaskMono;
         if (deleteTorrentFiles && deleteActiveTorrent)
-            deletionTaskMono = torrentFileSystemManager.deleteFileOnlyMono()
+            deletionTaskMono = fileSystemLink.deleteFileOnlyMono()
                     .flatMap(activeTorrent -> activeTorrent.deleteActiveTorrentOnlyMono());
         else if (deleteTorrentFiles)
-            deletionTaskMono = torrentFileSystemManager.deleteFileOnlyMono();
+            deletionTaskMono = fileSystemLink.deleteFileOnlyMono();
         else // deleteActiveTorrent == true
-            deletionTaskMono = torrentFileSystemManager.deleteActiveTorrentOnlyMono();
+            deletionTaskMono = fileSystemLink.deleteActiveTorrentOnlyMono();
 
         StepVerifier.create(deletionTaskMono)
                 .expectNextCount(1)
@@ -404,16 +404,16 @@ public class MyStepdefs {
                 TorrentStatusControllerImpl.createDefault(torrentInfo);
 
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-        TorrentFileSystemManager torrentFileSystemManager = ActiveTorrents.getInstance()
+        FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, TorrentStatusControllerImpl.createDefault(torrentInfo), pieceMessagesFlux)
                 .block();
 
-        Flux<PieceEvent> recordedTorrentPieceChangedFlux = torrentFileSystemManager
+        Flux<PieceEvent> recordedTorrentPieceChangedFlux = fileSystemLink
                 .savedBlockFlux()
                 .replay()
                 .autoConnect(0);
 
-        // this subscription to pieceMessagesFlux flux will cause ActiveTorrent
+        // this subscription to pieceMessagesFlux flux will cause FileSystemLinkImpl
         // to start recording signals in activeTorrent.savedBlockFlux().
         Set<PieceMessage> expectedSavedPieces = pieceMessagesFlux
                 .collect(Collectors.toSet())
@@ -454,7 +454,7 @@ public class MyStepdefs {
 
         Set<PieceMessage> actualCompletedSavedPiecesReadByFileSytem = Flux.fromIterable(expectedCompletedSavedPieces)
                 .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(), pieceMessage.getBegin(), pieceMessage.getBlock().length))
-                .flatMap(torrentFileSystemManager::buildPieceMessage)
+                .flatMap(fileSystemLink::buildPieceMessage)
                 .collect(Collectors.toSet())
                 .block();
 
@@ -468,7 +468,7 @@ public class MyStepdefs {
         // If I'm not creating TorrentDownloader object here, I will create 2 different torrentStatusController objects.
         TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
-                        torrentFileSystemManager,
+                        fileSystemLink,
                         null,
                         torrentStatusController,
                         null,
@@ -488,7 +488,7 @@ public class MyStepdefs {
                         torrentInfo.getPieces().size() + pieceIndex)
                 .collect(Collectors.toList());
 
-        ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
+        FileSystemLinkImpl fileSystemLinkImplTorrent = ActiveTorrents.getInstance()
                 .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
                 .filter(Optional::isPresent)
                 .map(Optional::get)
@@ -497,10 +497,10 @@ public class MyStepdefs {
         String errorMessage1 = "the piece is not completed but it should be.";
 
         fixedCompletedPiecesIndexList.forEach(completedPiecesIndex ->
-                Assert.assertTrue(errorMessage1, activeTorrent.havePiece(completedPiecesIndex)));
+                Assert.assertTrue(errorMessage1, fileSystemLinkImplTorrent.havePiece(completedPiecesIndex)));
 
-        // check again in other way: (by ActiveTorrent::buildBitFieldMessage)
-        BitFieldMessage allPiecesStatus = activeTorrent.buildBitFieldMessage(null, null);
+        // check again in other way: (by FileSystemLinkImpl::buildBitFieldMessage)
+        BitFieldMessage allPiecesStatus = fileSystemLinkImplTorrent.buildBitFieldMessage(null, null);
         fixedCompletedPiecesIndexList.forEach(completedPiecesIndex ->
                 Assert.assertTrue(errorMessage1, allPiecesStatus.getPiecesStatus().get(completedPiecesIndex)));
 
@@ -833,7 +833,7 @@ public class MyStepdefs {
                                                                   List<BlockOfPiece> peerRequestBlockList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        // The last step created ActiveTorrent object which listen to custom
+        // The last step created FileSystemLinkImpl object which listen to custom
         // peerResponsesFlux. So I can't expect it to react to the original peerResponsesFlux.
         // Also the last test created torrentStatusController object.
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
@@ -842,7 +842,7 @@ public class MyStepdefs {
 
         TorrentStatusController torrentStatusController = torrentDownloader.getTorrentStatusController();
 
-        TorrentFileSystemManager torrentFileSystemManager = torrentDownloader.getTorrentFileSystemManager();
+        FileSystemLink fileSystemLink = torrentDownloader.getFileSystemLink();
 
         // this flux is empty because if not, the application will get the peers from
         // them and then it will connect to all those peers and then those peers will
@@ -855,7 +855,7 @@ public class MyStepdefs {
         // represent this application TorrentDownloader. (not the fake-peer TorrentDownloader).
         TorrentDownloader torrentDownloaderNew =
                 Utils.createCustomTorrentDownloader(torrentInfo, torrentStatusController,
-                        torrentFileSystemManager, trackerConnectionFlux);
+                        fileSystemLink, trackerConnectionFlux);
 
         // the fake-peer will connect to me.
         Peer me = new Peer("localhost", AppConfig.getInstance().getMyListeningPort());
@@ -1235,7 +1235,7 @@ public class MyStepdefs {
                 .publish();
 
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-        ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
+        FileSystemLinkImpl fileSystemLinkImplTorrent = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, allPieceMessages$)
                 .block();
 
@@ -1247,7 +1247,7 @@ public class MyStepdefs {
                 .take(1)
                 .single();
 
-        Flux<Integer> allSavedPiecesRecorded$ = activeTorrent.savedPieceFlux()
+        Flux<Integer> allSavedPiecesRecorded$ = fileSystemLinkImplTorrent.savedPieceFlux()
                 .replay()
                 .autoConnect(0);
 
@@ -1257,7 +1257,7 @@ public class MyStepdefs {
                 .expectNextCount(torrentInfo.getPieces().size())
                 .verifyComplete();
 
-        Flux<PieceEvent> savedBlocks$ = activeTorrent.savedBlockFlux()
+        Flux<PieceEvent> savedBlocks$ = fileSystemLinkImplTorrent.savedBlockFlux()
                 .replay()
                 .autoConnect(0);
 
@@ -1265,7 +1265,7 @@ public class MyStepdefs {
                 .expectNextCount(piecesAmount$.block())
                 .verifyComplete();
 
-        Assert.assertEquals(activeTorrent.minMissingPieceIndex(), -1);
+        Assert.assertEquals(fileSystemLinkImplTorrent.minMissingPieceIndex(), -1);
     }
 
     @And("^the saved-pieces-flux send complete signal - for torrent: \"([^\"]*)\",\"([^\"]*)\"$")
