@@ -2,7 +2,7 @@ package main.downloader;
 
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
-import main.file.system.TorrentFileSystemManager;
+import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.PeersProvider;
 import main.statistics.SpeedStatistics;
@@ -14,7 +14,7 @@ import reactor.core.publisher.Flux;
 public class TorrentDownloader {
 
     private TorrentInfo torrentInfo;
-    private TorrentFileSystemManager torrentFileSystemManager;
+    private FileSystemLink fileSystemLink;
     private BittorrentAlgorithm bittorrentAlgorithm;
     private TorrentStatusController torrentStatusController;
     private SpeedStatistics torrentSpeedStatistics;
@@ -25,7 +25,7 @@ public class TorrentDownloader {
     private Flux<Link> peersCommunicatorFlux;
 
     public TorrentDownloader(TorrentInfo torrentInfo,
-                             TorrentFileSystemManager torrentFileSystemManager,
+                             FileSystemLink fileSystemLink,
                              BittorrentAlgorithm bittorrentAlgorithm,
                              TorrentStatusController torrentStatusController,
                              SpeedStatistics torrentSpeedStatistics,
@@ -34,7 +34,7 @@ public class TorrentDownloader {
                              Flux<TrackerConnection> trackerConnectionFlux,
                              Flux<Link> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
-        this.torrentFileSystemManager = torrentFileSystemManager;
+        this.fileSystemLink = fileSystemLink;
         this.bittorrentAlgorithm = bittorrentAlgorithm;
         this.torrentStatusController = torrentStatusController;
         this.torrentSpeedStatistics = torrentSpeedStatistics;
@@ -52,8 +52,8 @@ public class TorrentDownloader {
         return torrentStatusController;
     }
 
-    public TorrentFileSystemManager getTorrentFileSystemManager() {
-        return torrentFileSystemManager;
+    public FileSystemLink getFileSystemLink() {
+        return fileSystemLink;
     }
 
     public SpeedStatistics getTorrentSpeedStatistics() {

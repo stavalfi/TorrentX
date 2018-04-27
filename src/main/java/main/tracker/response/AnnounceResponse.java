@@ -56,7 +56,7 @@ public class AnnounceResponse extends TrackerResponse {
                     try {
                         peerIp = receiveData.getInt();
                     } catch (BufferUnderflowException e) {
-                        e.printStackTrace();
+                        //e.printStackTrace();
                     }
                     InetAddress inetAddress = castIntegerToInetAddress(peerIp);
                     String hostAddress = inetAddress.getHostAddress();
@@ -75,7 +75,7 @@ public class AnnounceResponse extends TrackerResponse {
         try {
             return InetAddress.getByAddress(bytes);
         } catch (UnknownHostException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
             return null;
         }
     }

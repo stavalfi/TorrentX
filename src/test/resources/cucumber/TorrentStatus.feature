@@ -24,7 +24,7 @@ Feature: start/stop downloading/uploading
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: start downloading & uploading and then stop uploading
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -57,7 +57,7 @@ Feature: start/stop downloading/uploading
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: torrent-status is in downloading & uploading state and then stop uploading
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -82,7 +82,7 @@ Feature: start/stop downloading/uploading
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: start downloading & uploading and then stop uploading and downloading
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -108,7 +108,7 @@ Feature: start/stop downloading/uploading
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: start downloading & uploading & listen for incoming peers and then remove torrent
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -136,7 +136,7 @@ Feature: start/stop downloading/uploading
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: start downloading & uploading when torrent is removed
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -162,7 +162,7 @@ Feature: start/stop downloading/uploading
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: start downloading & uploading when files are removed
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -186,7 +186,7 @@ Feature: start/stop downloading/uploading
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: start downloading & uploading when torrent and files are removed
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -211,7 +211,7 @@ Feature: start/stop downloading/uploading
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: complete downloading & uploading when torrent and files are removed
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -236,7 +236,7 @@ Feature: start/stop downloading/uploading
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: starting download and upload which already download and upload already started
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -262,7 +262,7 @@ Feature: start/stop downloading/uploading
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: starting a torrent twice
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -300,7 +300,7 @@ Feature: start/stop downloading/uploading
 
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: remove torrent twice
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -323,7 +323,7 @@ Feature: start/stop downloading/uploading
       | PAUSE_LISTENING_TO_INCOMING_PEERS |
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: remove files twice
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -344,7 +344,7 @@ Feature: start/stop downloading/uploading
       | REMOVE_FILES |
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: complete torrent twice
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -366,7 +366,7 @@ Feature: start/stop downloading/uploading
       | COMPLETED_DOWNLOADING |
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: start listening for incoming peers
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -388,7 +388,7 @@ Feature: start/stop downloading/uploading
       | RESUME_LISTENING_TO_INCOMING_PEERS |
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: stop listening for incoming peers
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -410,7 +410,7 @@ Feature: start/stop downloading/uploading
       | PAUSE_LISTENING_TO_INCOMING_PEERS |
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: stop listening for incoming peers while keep searching peers
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -434,7 +434,7 @@ Feature: start/stop downloading/uploading
       | RESUME_SEARCHING_PEERS            |
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: remove torrent while searching peers
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -457,7 +457,7 @@ Feature: start/stop downloading/uploading
       | PAUSE_SEARCHING_PEERS |
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: remove files while searching peers
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -480,7 +480,7 @@ Feature: start/stop downloading/uploading
       | PAUSE_SEARCHING_PEERS |
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: start search peers when the download is already completed
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -502,7 +502,7 @@ Feature: start/stop downloading/uploading
       | COMPLETED_DOWNLOADING |
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |
 
   Scenario Outline: start search peers while downloading
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is:
@@ -526,4 +526,4 @@ Feature: start/stop downloading/uploading
       | RESUME_SEARCHING_PEERS |
     Examples:
       | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test/   |
+      | torrent-file-example1.torrent | torrents-test   |

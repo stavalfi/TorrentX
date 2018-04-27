@@ -3,6 +3,8 @@ package main.peer.peerMessages;
 import main.peer.Peer;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Objects;
 
 public class PieceMessage extends PeerMessage {
     private static final byte messageId = 7;
@@ -50,11 +52,29 @@ public class PieceMessage extends PeerMessage {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        PieceMessage that = (PieceMessage) o;
+        return index == that.index &&
+                begin == that.begin &&
+                Arrays.equals(block, that.block);
+    }
+
+    @Override
+    public int hashCode() {
+
+        int result = Objects.hash(index, begin);
+        result = 31 * result + Arrays.hashCode(block);
+        return result;
+    }
+
+    @Override
     public String toString() {
         return "PieceMessage{" +
                 "index=" + index +
                 ", begin=" + begin +
-                ", blockLength=" + block.length +
+                ", block-length=" + Arrays.toString(block) +
                 "} " + super.toString();
     }
 }

@@ -3,7 +3,7 @@ package main.algorithms.impls.v1.download;
 import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
 import main.downloader.PieceEvent;
-import main.file.system.TorrentFileSystemManager;
+import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Flux;
@@ -13,16 +13,16 @@ import java.time.Duration;
 
 public class BlockDownloaderImpl implements BlockDownloader {
     private TorrentInfo torrentInfo;
-    private TorrentFileSystemManager torrentFileSystemManager;
+    private FileSystemLink fileSystemLink;
 
     private Flux<PieceEvent> recordedSavedBlockFlux;
 
     public BlockDownloaderImpl(TorrentInfo torrentInfo,
-                               TorrentFileSystemManager torrentFileSystemManager) {
+                               FileSystemLink fileSystemLink) {
         this.torrentInfo = torrentInfo;
-        this.torrentFileSystemManager = torrentFileSystemManager;
+        this.fileSystemLink = fileSystemLink;
 
-        this.recordedSavedBlockFlux = this.torrentFileSystemManager
+        this.recordedSavedBlockFlux = this.fileSystemLink
                 .savedBlockFlux()
                 .replay()
                 .autoConnect(0);

@@ -29,7 +29,7 @@ public class RemoteFakePeerCopyCat extends Peer {
         try {
             this.listenToPeerConnection = new ServerSocket(this.getPeerPort());
         } catch (IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
     }
 
@@ -81,7 +81,7 @@ public class RemoteFakePeerCopyCat extends Peer {
         try {
             this.listenToPeerConnection.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
         this.peerConnections.forEach(socket -> {
             try {

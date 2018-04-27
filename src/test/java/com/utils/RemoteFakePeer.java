@@ -51,7 +51,7 @@ public class RemoteFakePeer extends Link {
         try {
             Thread.sleep(durationInMillis);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
     }
 }

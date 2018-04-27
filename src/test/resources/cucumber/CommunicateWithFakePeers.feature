@@ -4,7 +4,7 @@ Feature: connect to a fake peers and communicate with them
 #  1. the fake peers response with the same peer-message they received
 #  2. the second response will be delayed in 2 seconds
 #  3. the third response will cause the peer to shutdown the connection and not responding anything
-    Given new torrent file: "tor.torrent"
+    Given new torrent file: "multiple-active-seeders-torrent-1.torrent"
     Then application send to [peer ip: "localhost", peer port: "8980"] and receive the following messages:
       | sendMessageType | receiveMessageType | errorSignalType |
       | BitFieldMessage | BitFieldMessage    |                 |
@@ -34,7 +34,7 @@ Feature: connect to a fake peers and communicate with them
 #  1. the fake peers response with the same peer-message they received
 #  2. the second response will be delayed in 2 seconds
 #  3. the third response will cause the peer to shutdown the connection and not responding anything
-    Given new torrent file: "tor.torrent"
+    Given new torrent file: "multiple-active-seeders-torrent-1.torrent"
     Then application send to [peer ip: "localhost", peer port: "8985"] and receive the following messages:
       | sendMessageType | receiveMessageType | errorSignalType |
       | BitFieldMessage | BitFieldMessage    |                 |
@@ -61,7 +61,7 @@ Feature: connect to a fake peers and communicate with them
 
     Examples:
       | torrent     | downloadLocation |
-      | tor.torrent | torrents-test/   |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test   |
 
   Scenario Outline: fake peer request pieces from me but I don't have nothing to give
     Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
@@ -76,4 +76,4 @@ Feature: connect to a fake peers and communicate with them
 
     Examples:
       | torrent     | downloadLocation |
-      | tor.torrent | torrents-test/   |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test   |

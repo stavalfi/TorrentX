@@ -33,15 +33,17 @@ public class TorrentInfo {
         return this.torrent.isSingleFileTorrent();
     }
 
-    public int getPieceLength() {
-        return Math.toIntExact(this.torrent.getPieceLength());
+    public long getPieceLength() {
+        return this.torrent.getPieceLength();
     }
 
-    public int getPieceLength(int pieceIndex) {
+    public long getPieceLength(int pieceIndex) {
+        long totalSize = getTotalSize();
+        long pieceLength = this.torrent.getPieceLength();
+        int piecesAmount = this.torrent.getPieces().size() - 1;
         if (pieceIndex == this.torrent.getPieces().size() - 1)
-            return Math.toIntExact(this.torrent.getTotalSize() -
-                    ((this.torrent.getPieces().size() - 1) * this.torrent.getPieceLength()));
-        return Math.toIntExact(this.torrent.getPieceLength());
+            return totalSize - (piecesAmount * pieceLength);
+        return pieceLength;
     }
 
     public byte[] getPiecesBlob() {
@@ -53,7 +55,19 @@ public class TorrentInfo {
     }
 
     public long getTotalSize() {
-        return this.torrent.getTotalSize();
+        return this.getFileList()
+                .stream()
+                .mapToLong(TorrentFile::getFileLength)
+                .sum();
+    }
+
+    public long getPieceStartPosition(int pieceIndex) {
+        long totalSize = getTotalSize();
+        long thisPieceLength = getPieceLength(pieceIndex);
+        long position = pieceIndex < getPieces().size() - 1 ?
+                pieceIndex * getPieceLength() :
+                totalSize - thisPieceLength;
+        return position;
     }
 
 
@@ -93,7 +107,8 @@ public class TorrentInfo {
 
     public List<TorrentFile> getFileList() {
         if (isSingleFileTorrent()) {
-            return Collections.singletonList(new TorrentFile(getTotalSize(), Collections.singletonList(getName())));
+            Long totalSize = this.torrent.getTotalSize();
+            return Collections.singletonList(new TorrentFile(totalSize, Collections.singletonList(getName())));
         }
         return this.torrent.getFileList();
     }
@@ -107,9 +122,9 @@ public class TorrentInfo {
                 .collect(Collectors.joining("\n"));
 
         String fileList = getFileList()
-                        .stream()
-                        .map(TorrentFile::toString)
-                        .collect(Collectors.joining("\n"));
+                .stream()
+                .map(TorrentFile::toString)
+                .collect(Collectors.joining("\n"));
 
         return "TorrentInfo{" +
                 "Created By: " + this.torrent.getCreatedBy() + "\n" +
@@ -119,7 +134,7 @@ public class TorrentInfo {
                 "Name: " + this.torrent.getName() + "\n" +
                 "Piece Length: " + this.torrent.getPieceLength() + "\n" +
                 "Pieces: " + this.torrent.getPieces().size() + "\n" +
-                "Total Size: " + this.torrent.getTotalSize() + "\n" +
+                "Total Size: " + this.getTotalSize() + "\n" +
                 "Is Single File Torrent: " + this.torrent.isSingleFileTorrent() + "\n" +
                 "File List:\n" + fileList + "\n" +
                 "Tracker List: \n" + trackers;

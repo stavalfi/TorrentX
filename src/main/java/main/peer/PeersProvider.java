@@ -37,7 +37,7 @@ public class PeersProvider {
                 try {
                     peerSocket.close();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    //e.printStackTrace();
                 }
             });
             try {
@@ -69,7 +69,7 @@ public class PeersProvider {
                     peerSocket.close();
                 } catch (IOException e1) {
                     // TODO: do something with this shit
-                    e1.printStackTrace();
+                    //e1.printStackTrace();
                 }
                 sink.error(e);
             }
