@@ -127,7 +127,7 @@ class ReceivePeerMessagesImpl implements ReceivePeerMessages {
                     dataInputStream.close();
                 } catch (IOException e1) {
                     // TODO: do something better... it's a fatal problem with my design!!!
-                    e1.printStackTrace();
+                    //e1.printStackTrace();
                 }
                 if (!sink.isCancelled())
                     sink.error(e);

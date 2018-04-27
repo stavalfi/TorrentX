@@ -68,7 +68,7 @@ public class Link {
             this.peerSocket.close();
         } catch (IOException exception) {
             // TODO: do something better... it's a fatal problem with my design!!!
-            exception.printStackTrace();
+            //exception.printStackTrace();
         }
     }
 

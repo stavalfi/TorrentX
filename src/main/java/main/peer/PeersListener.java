@@ -45,7 +45,7 @@ public class PeersListener {
                                         this.listenToPeerConnection = new ServerSocket(this.tcpPort);
                                     } catch (IOException e) {
                                         // TODO: do something with this shit
-                                        e.printStackTrace();
+                                        //e.printStackTrace();
                                         sink.error(e);
                                         torrentStatusController.pauseListeningToIncomingPeers();
                                         return;

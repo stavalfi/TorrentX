@@ -17,7 +17,7 @@ Feature: connect to real peers and communicate with them
 #
 #    Examples:
 #      | torrent     | downloadLocation |
-#      | tor.torrent | torrents-test/   |
+#      | multiple-active-seeders-torrent-1.torrent | torrents-test/   |
 #      | torrent-file-example3.torrent | torrents-test/   |
 
   Scenario: we connect to all peers and get their bitfield status

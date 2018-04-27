@@ -89,15 +89,15 @@ Feature: create get and delete active torrents
       | torrent-file-example3.torrent             | torrents-test    |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
-  Scenario Outline: we save all the pieces and expect to see that the fluxes are completed
-    # this step is extremely slow because we manually send to the app every piece one by one.
-    When application save the all the pieces of torrent: "<torrent>","<downloadLocation>"
-    Then torrent-status for torrent "<torrent>" will be:
-      | START_DOWNLOAD        |
-      | COMPLETED_DOWNLOADING |
-    And the saved-pieces-flux send complete signal - for torrent: "<torrent>","<downloadLocation>"
-    And the saved-blocks-flux send  complete signal - for torrent: "<torrent>","<downloadLocation>"
-
-    Examples:
-      | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test    |
+#  Scenario Outline: we save all the pieces and expect to see that the fluxes are completed
+#    # this step is extremely slow because we manually send to the app every piece one by one.
+#    When application save the all the pieces of torrent: "<torrent>","<downloadLocation>"
+#    Then torrent-status for torrent "<torrent>" will be:
+#      | START_DOWNLOAD        |
+#      | COMPLETED_DOWNLOADING |
+#    And the saved-pieces-flux send complete signal - for torrent: "<torrent>","<downloadLocation>"
+#    And the saved-blocks-flux send  complete signal - for torrent: "<torrent>","<downloadLocation>"
+#
+#    Examples:
+#      | torrent                       | downloadLocation |
+#      | torrent-file-example1.torrent | torrents-test    |

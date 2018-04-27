@@ -62,7 +62,7 @@ public class Utils {
         try {
             activeTorrentsListMono.block();
         } catch (Exception e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
 
 
@@ -78,7 +78,7 @@ public class Utils {
         try {
             torrentDownloadersListMono.block();
         } catch (Exception e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
 
         if (peersListener != null) {
@@ -388,7 +388,7 @@ public class Utils {
                 deleteDirectory(file);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            //e.printStackTrace();
         }
     }
 
