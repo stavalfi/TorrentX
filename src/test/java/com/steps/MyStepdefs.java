@@ -286,7 +286,7 @@ public class MyStepdefs {
                 .verifyComplete();
     }
 
-    @Then("^application create active-torrent for: \"([^\"]*)\",\"([^\"]*)\"$")
+    @When("^application create active-torrent for: \"([^\"]*)\",\"([^\"]*)\"$")
     public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
