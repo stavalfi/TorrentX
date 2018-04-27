@@ -29,7 +29,7 @@ public interface TorrentFileSystemManager {
 
 	int maxMissingPieceIndex();
 
-	int[] getDownloadedBytesInPieces();
+	long[] getDownloadedBytesInPieces();
 
 	Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
 
@@ -37,7 +37,11 @@ public interface TorrentFileSystemManager {
 
 	Flux<Integer> savedPieceFlux();
 
-	Mono<Void> deleteActiveTorrentOnlyMono();
+	Mono<ActiveTorrent> deleteActiveTorrentOnlyMono();
 
-	Mono<Void> deleteFileOnlyMono();
+	Mono<ActiveTorrent> deleteFileOnlyMono();
+
+	Mono<ActiveTorrent> getNotifyWhenActiveTorrentDeleted();
+
+	Mono<ActiveTorrent> getNotifyWhenFilesDeleted();
 }

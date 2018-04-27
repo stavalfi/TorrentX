@@ -8,6 +8,7 @@ import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
+import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrentFile;
 import main.file.system.ActiveTorrents;
 import main.file.system.TorrentFileSystemManager;
@@ -27,6 +28,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.SocketException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -34,20 +40,47 @@ public class Utils {
 	public static PeersListener peersListener;
 
 	public static TorrentInfo createTorrentInfo(String torrentFilePath) throws IOException {
-		String torrentFilesPath = "src/test/resources/torrents/" + torrentFilePath;
+		String torrentFilesPath = "src" + File.separator +
+				"test" + File.separator +
+				"resources" + File.separator +
+				"torrents" + File.separator +
+				torrentFilePath;
 		return new TorrentInfo(torrentFilesPath, TorrentParser.parseTorrent(torrentFilesPath));
 	}
 
-	public static void removeEverythingRelatedToTorrent(TorrentInfo torrentInfo) {
-		TorrentDownloaders.getInstance()
-				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+	public static void removeEverythingRelatedToLastTest() {
+
+		Mono<List<ActiveTorrent>> activeTorrentsListMono = ActiveTorrents.getInstance()
+				.getActiveTorrentsFlux()
+				.flatMap(activeTorrent -> activeTorrent.deleteFileOnlyMono()
+						// if the test deleted the files then I will get NoSuchFileException and we will not delete the ActiveTorrent object.
+						.onErrorResume(Throwable.class, throwable -> Mono.just(activeTorrent)))
+				.flatMap(activeTorrent -> activeTorrent.deleteActiveTorrentOnlyMono()
+						// if the test deleted the ActiveTorrent object then I may get an exception which I clearly don't want.
+						.onErrorResume(Throwable.class, throwable -> Mono.just(activeTorrent)))
+
+				.collectList();
+		try {
+			activeTorrentsListMono.block();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+
+		Mono<List<TorrentStatusController>> torrentDownloadersListMono = TorrentDownloaders.getInstance()
+				.getTorrentDownloadersFlux()
+				.doOnNext(torrentDownloader -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash()))
 				.map(TorrentDownloader::getTorrentStatusController)
-				.ifPresent(torrentStatusController -> {
+				.doOnNext(torrentStatusController -> {
 					torrentStatusController.pauseDownload();
 					torrentStatusController.pauseUpload();
-					torrentStatusController.removeFiles();
-					torrentStatusController.removeTorrent();
-				});
+				})
+				.collectList();
+		try {
+			torrentDownloadersListMono.block();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 
 		if (peersListener != null) {
 			try {
@@ -58,30 +91,13 @@ public class Utils {
 			peersListener = null;
 		}
 
-		TorrentDownloaders.getInstance()
-				.deleteTorrentDownloader(torrentInfo.getTorrentInfoHash());
-
-		// some tests directly create ActiveTorrent object without creating
-		// TorrentDownloader object so we must remove ActiveTorrent also.
-		ActiveTorrents.getInstance()
-				.findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
-				.filter(Optional::isPresent)
-				.map(Optional::get)
-				.flatMap(activeTorrent ->
-						Mono.zip(activeTorrent.deleteFileOnlyMono(),
-								activeTorrent.deleteActiveTorrentOnlyMono())
-								.map(objects -> objects.getT1()))
-				// I need to ignore errors
-				.subscribe(null, throwable -> {
-				});
-
 		// delete download folder from last test
 		Utils.deleteDownloadFolder();
 	}
 
 	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
 		return createDefaultTorrentDownloader(torrentInfo, downloadPath,
-				TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo));
+				TorrentStatusControllerImpl.createDefault(torrentInfo));
 	}
 
 	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
@@ -90,7 +106,7 @@ public class Utils {
 		PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
 		TorrentStatusController torrentStatusController =
-				TorrentStatusControllerImpl.createDefaultTorrentStatusController(torrentInfo);
+				TorrentStatusControllerImpl.createDefault(torrentInfo);
 
 		peersListener = new PeersListener(torrentStatusController);
 
@@ -327,64 +343,78 @@ public class Utils {
 			long to = position + torrentFile.getFileLength();
 			position = to;
 
-			ActiveTorrentFile activeTorrentFile = new ActiveTorrentFile(completeFilePath, from, to);
+			ActiveTorrentFile activeTorrentFile = new ActiveTorrentFile(completeFilePath, from, to, null);
 			activeTorrentFileList.add(activeTorrentFile);
 		}
 
-		// read from the file
+		// read from the file:
+
+		long from = torrentInfo.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
+		long to = from + requestMessage.getBlockLength();
 
 		byte[] result = new byte[requestMessage.getBlockLength()];
 		int resultFreeIndex = 0;
-		long from = requestMessage.getIndex() * torrentInfo.getPieceLength() + requestMessage.getBegin();
-		long to = requestMessage.getIndex() * torrentInfo.getPieceLength() + requestMessage.getBegin() + requestMessage.getBlockLength();
-
+		long amountOfBytesOfFileWeCovered = 0;
 		for (ActiveTorrentFile activeTorrentFile : activeTorrentFileList) {
 			if (activeTorrentFile.getFrom() <= from && from <= activeTorrentFile.getTo()) {
-				RandomAccessFile randomAccessFile = new RandomAccessFile(activeTorrentFile.getFilePath(), "rw");
-				randomAccessFile.seek(from);
-				if (activeTorrentFile.getTo() < to) {
-					byte[] tempResult = new byte[(int) (activeTorrentFile.getTo() - from)];
-					randomAccessFile.read(tempResult);
-					for (byte aTempResult : tempResult)
-						result[resultFreeIndex++] = aTempResult;
-				} else {
-					byte[] tempResult = new byte[(int) (to - from)];
-					randomAccessFile.read(tempResult);
-					for (byte aTempResult : tempResult)
-						result[resultFreeIndex++] = aTempResult;
-					return result;
-				}
+				RandomAccessFile randomAccessFile = new RandomAccessFile(activeTorrentFile.getFilePath(), "r");
+				long fromWhereToReadInThisFile = from - amountOfBytesOfFileWeCovered;
+				randomAccessFile.seek(fromWhereToReadInThisFile);
+
+				int howMuchToReadFromThisFile = (int) Math.min(activeTorrentFile.getTo() - from, to - from);
+				byte[] tempResult = new byte[howMuchToReadFromThisFile];
+				randomAccessFile.read(tempResult);
+				for (byte aTempResult : tempResult)
+					result[resultFreeIndex++] = aTempResult;
+				from += howMuchToReadFromThisFile;
+
+				randomAccessFile.close();
 			}
+			if (from == to)
+				return result;
+			amountOfBytesOfFileWeCovered = activeTorrentFile.getTo();
 		}
 		throw new Exception("we shouldn't be here - never!");
 	}
 
 	public static void deleteDownloadFolder() {
-		// delete download folder
 		try {
-			File file = new File(System.getProperty("user.dir") + "/torrents-test/");
+			File file = new File(System.getProperty("user.dir") + File.separator + "torrents-test");
 			if (file.exists()) {
-				boolean deleted = deleteDirectory(file);
-				if (!deleted)
-					System.out.println("could not delete torrent-test folder: " +
-							System.getProperty("user.dir") + "/torrents-test");
+				deleteDirectory(file);
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
-	private static boolean deleteDirectory(File directoryToBeDeleted) {
-		File[] allContents = directoryToBeDeleted.listFiles();
-		if (allContents != null) {
-			for (File file : allContents) {
-				if (!deleteDirectory(file)) {
-					System.out.println("could not delete: " +
-							file.getAbsolutePath());
-					return false;
-				}
+	private static void deleteDirectory(File directoryToBeDeleted) throws IOException {
+		Files.walkFileTree(directoryToBeDeleted.toPath(), new HashSet<>(), Integer.MAX_VALUE, new FileVisitor<Path>() {
+			@Override
+			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+					throws IOException {
+				return FileVisitResult.CONTINUE;
 			}
-		}
-		return directoryToBeDeleted.delete();
+
+			@Override
+			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+					throws IOException {
+				Files.delete(file);
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult visitFileFailed(Path file, IOException exc)
+					throws IOException {
+				return FileVisitResult.CONTINUE;
+			}
+
+			@Override
+			public FileVisitResult postVisitDirectory(Path dir, IOException exc)
+					throws IOException {
+				Files.delete(dir);
+				return FileVisitResult.CONTINUE;
+			}
+		});
 	}
 }

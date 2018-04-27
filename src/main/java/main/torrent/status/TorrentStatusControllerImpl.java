@@ -586,7 +586,7 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
         return this.torrentInfo;
     }
 
-    public static TorrentStatusController createDefaultTorrentStatusController(TorrentInfo torrentInfo) {
+    public static TorrentStatusController createDefault(TorrentInfo torrentInfo) {
         return new TorrentStatusControllerImpl(torrentInfo,
                 false,
                 false,

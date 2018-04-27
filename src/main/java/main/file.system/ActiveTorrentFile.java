@@ -2,59 +2,61 @@ package main.file.system;
 
 import reactor.core.publisher.Mono;
 
-import java.io.*;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 
 public class ActiveTorrentFile implements TorrentFile {
 	private String filePath;
-	private long from, to; // not closed range: [from,to).
-	private RandomAccessFile randomAccessFileRead;
-	private RandomAccessFile randomAccessFileWrite;
+	// 0 <= from <=to <= Hole-Torrent.size
+	private long from, to; // inclusive.
+	private SeekableByteChannel seekableByteChannel;
 
-	public ActiveTorrentFile(String filePath, long from, long to) {
+	public ActiveTorrentFile(String filePath, long from, long to, SeekableByteChannel seekableByteChannel) {
 		this.filePath = filePath;
 		this.from = from;
 		this.to = to;
+		this.seekableByteChannel = seekableByteChannel;
 	}
 
-	public synchronized Mono<Void> closeRandomAccessFiles() {
+	public synchronized Mono<ActiveTorrentFile> closeFileChannel() {
 		try {
-			if (this.randomAccessFileRead != null)
-				this.randomAccessFileRead.close();
-			if (this.randomAccessFileWrite != null)
-				this.randomAccessFileWrite.close();
+			if (this.seekableByteChannel.isOpen())
+				this.seekableByteChannel.close();
 		} catch (IOException e) {
 			return Mono.error(e);
 		}
-		return Mono.empty();
-	}
-
-	public synchronized RandomAccessFile getRandomAccessFileRead() throws FileNotFoundException {
-		if (this.randomAccessFileRead == null)
-			this.randomAccessFileRead = new RandomAccessFile(filePath, "rw");
-		return this.randomAccessFileRead;
-	}
-
-	public synchronized RandomAccessFile getRandomAccessFileWrite() throws FileNotFoundException {
-		if (this.randomAccessFileWrite == null)
-			this.randomAccessFileWrite = new RandomAccessFile(filePath, "rw");
-		return this.randomAccessFileWrite;
+		return Mono.just(this);
 	}
 
 	// as implied here: https://stackoverflow.com/questions/45396252/concurrency-of-randomaccessfile-in-java/45490504
 	// something can go wrong if multiple threads try to read/write concurrently.
 	public synchronized void writeBlock(long begin, byte[] block, int arrayIndexFrom, int howMuchToWriteFromArray) throws IOException {
-		this.getRandomAccessFileWrite().seek(begin);
-		this.getRandomAccessFileWrite().write(block, arrayIndexFrom, howMuchToWriteFromArray);
+		assert this.from <= begin && begin < this.to;
+		assert howMuchToWriteFromArray <= this.to - this.from;
+		assert arrayIndexFrom < block.length;
+		assert howMuchToWriteFromArray <= block.length;
+
+		long writeFrom = begin - this.from;
+		this.seekableByteChannel.position(writeFrom);
+		ByteBuffer blockFromArrayIndex = ByteBuffer.wrap(block);
+		blockFromArrayIndex.position(arrayIndexFrom);
+		blockFromArrayIndex.limit(howMuchToWriteFromArray);
+		this.seekableByteChannel.write(blockFromArrayIndex);
 	}
 
 
 	// as implied here: https://stackoverflow.com/questions/45396252/concurrency-of-randomaccessfile-in-java/45490504
 	// something can go wrong if multiple threads try to read/write concurrently.
 	public synchronized byte[] readBlock(long begin, int blockLength) throws IOException {
-		this.getRandomAccessFileRead().seek(begin);
-		byte[] result = new byte[blockLength];
-		this.getRandomAccessFileRead().read(result);
-		return result;
+		assert this.from <= begin && begin < this.to;
+		assert blockLength <= this.to - this.from;
+
+		long readFrom = begin - this.from;
+		this.seekableByteChannel.position(readFrom);
+		ByteBuffer block = ByteBuffer.allocate(blockLength);
+		this.seekableByteChannel.read(block);
+		return block.array();
 	}
 
 	@Override
