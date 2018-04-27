@@ -12,130 +12,135 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class TorrentInfo {
-	private String torrentFilePath;
-	private final Torrent torrent;
+    private String torrentFilePath;
+    private final Torrent torrent;
 
-	public TorrentInfo(String torrentFilePath, Torrent torrent) {
-		this.torrentFilePath = torrentFilePath;
-		this.torrent = torrent;
-	}
+    public TorrentInfo(String torrentFilePath, Torrent torrent) {
+        this.torrentFilePath = torrentFilePath;
+        this.torrent = torrent;
+    }
 
-	public TorrentInfo(TorrentInfo torrentInfo) {
-		this.torrentFilePath = torrentInfo.getTorrentFilePath();
-		this.torrent = torrentInfo.torrent;
-	}
+    public TorrentInfo(TorrentInfo torrentInfo) {
+        this.torrentFilePath = torrentInfo.getTorrentFilePath();
+        this.torrent = torrentInfo.torrent;
+    }
 
-	public String getName() {
-		return this.torrent.getName();
-	}
+    public String getName() {
+        return this.torrent.getName();
+    }
 
-	public boolean isSingleFileTorrent() {
-		return this.torrent.isSingleFileTorrent();
-	}
+    public boolean isSingleFileTorrent() {
+        return this.torrent.isSingleFileTorrent();
+    }
 
-	public long getPieceLength() {
-		return this.torrent.getPieceLength();
-	}
+    public long getPieceLength() {
+        return this.torrent.getPieceLength();
+    }
 
-	public long getPieceLength(int pieceIndex) {
-		if (pieceIndex == this.torrent.getPieces().size() - 1)
-			return this.getTotalSize() -
-					((this.torrent.getPieces().size() - 1) * this.torrent.getPieceLength());
-		return this.torrent.getPieceLength();
-	}
+    public long getPieceLength(int pieceIndex) {
+        long totalSize = getTotalSize();
+        long pieceLength = this.torrent.getPieceLength();
+        int piecesAmount = this.torrent.getPieces().size() - 1;
+        if (pieceIndex == this.torrent.getPieces().size() - 1)
+            return totalSize - (piecesAmount * pieceLength);
+        return pieceLength;
+    }
 
-	public byte[] getPiecesBlob() {
-		return this.torrent.getPiecesBlob();
-	}
+    public byte[] getPiecesBlob() {
+        return this.torrent.getPiecesBlob();
+    }
 
-	public List<String> getPieces() {
-		return this.torrent.getPieces();
-	}
+    public List<String> getPieces() {
+        return this.torrent.getPieces();
+    }
 
-	public int getTotalSize() {
-		return (int) this.getFileList()
-				.stream()
-				.mapToLong(TorrentFile::getFileLength)
-				.sum();
-	}
+    public long getTotalSize() {
+        return this.getFileList()
+                .stream()
+                .mapToLong(TorrentFile::getFileLength)
+                .sum();
+    }
 
-	public long getPieceStartPosition(int pieceIndex) {
-		return pieceIndex < getPieces().size() - 1 ?
-				pieceIndex * getPieceLength() :
-				getTotalSize() - getPieceLength(pieceIndex);
-	}
-
-
-	public String getComment() {
-		return this.torrent.getComment();
-	}
-
-
-	public String getCreatedBy() {
-		return this.torrent.getCreatedBy();
-	}
+    public long getPieceStartPosition(int pieceIndex) {
+        long totalSize = getTotalSize();
+        long thisPieceLength = getPieceLength(pieceIndex);
+        long position = pieceIndex < getPieces().size() - 1 ?
+                pieceIndex * getPieceLength() :
+                totalSize - thisPieceLength;
+        return position;
+    }
 
 
-	public Date getCreationDate() {
-		return this.torrent.getCreationDate();
-	}
+    public String getComment() {
+        return this.torrent.getComment();
+    }
 
 
-	public List<Tracker> getTrackerList() {
-		// tracker pattern example: udp://tracker.coppersurfer.tk:6969/scrapeMono
-		String trackerPattern = "^(.*)://(\\d*\\.)?(.*):(\\d*)(.*)?$";
+    public String getCreatedBy() {
+        return this.torrent.getCreatedBy();
+    }
 
-		return this.torrent.getAnnounceList()
-				.stream()
-				.filter((String tracker) -> !tracker.equals("udp://9.rarbg.com:2710/scrapeMono")) // problematic tracker !!!!
-				.map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
-				.filter(Matcher::matches)
-				.map((Matcher matcher) -> new Tracker(matcher.group(1), matcher.group(3), Integer.parseInt(matcher.group(4))))
-				.filter(tracker -> !tracker.getConnectionType().equals("http"))
-				.filter(tracker -> !tracker.getConnectionType().equals("https"))
-				.collect(Collectors.toList());
-	}
 
-	public String getTorrentInfoHash() {
-		return this.torrent.getInfo_hash();
-	}
+    public Date getCreationDate() {
+        return this.torrent.getCreationDate();
+    }
 
-	public List<TorrentFile> getFileList() {
-		if (isSingleFileTorrent()) {
-			Long totalSize = this.torrent.getTotalSize();
-			return Collections.singletonList(new TorrentFile(totalSize, Collections.singletonList(getName())));
-		}
-		return this.torrent.getFileList();
-	}
 
-	@Override
-	public String toString() {
+    public List<Tracker> getTrackerList() {
+        // tracker pattern example: udp://tracker.coppersurfer.tk:6969/scrapeMono
+        String trackerPattern = "^(.*)://(\\d*\\.)?(.*):(\\d*)(.*)?$";
 
-		String trackers = getTrackerList()
-				.stream()
-				.map(tracker -> tracker.toString())
-				.collect(Collectors.joining("\n"));
+        return this.torrent.getAnnounceList()
+                .stream()
+                .filter((String tracker) -> !tracker.equals("udp://9.rarbg.com:2710/scrapeMono")) // problematic tracker !!!!
+                .map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
+                .filter(Matcher::matches)
+                .map((Matcher matcher) -> new Tracker(matcher.group(1), matcher.group(3), Integer.parseInt(matcher.group(4))))
+                .filter(tracker -> !tracker.getConnectionType().equals("http"))
+                .filter(tracker -> !tracker.getConnectionType().equals("https"))
+                .collect(Collectors.toList());
+    }
 
-		String fileList = getFileList()
-				.stream()
-				.map(TorrentFile::toString)
-				.collect(Collectors.joining("\n"));
+    public String getTorrentInfoHash() {
+        return this.torrent.getInfo_hash();
+    }
 
-		return "TorrentInfo{" +
-				"Created By: " + this.torrent.getCreatedBy() + "\n" +
-				"Main tracker: " + this.torrent.getAnnounce() + "\n" +
-				"Comment: " + this.torrent.getComment() + "\n" +
-				"Info_hash: " + this.torrent.getInfo_hash() + "\n" +
-				"Name: " + this.torrent.getName() + "\n" +
-				"Piece Length: " + this.torrent.getPieceLength() + "\n" +
-				"Pieces: " + this.torrent.getPieces().size() + "\n" +
-				"Total Size: " + this.getTotalSize() + "\n" +
-				"Is Single File Torrent: " + this.torrent.isSingleFileTorrent() + "\n" +
-				"File List:\n" + fileList + "\n" +
-				"Tracker List: \n" + trackers;
-	}
+    public List<TorrentFile> getFileList() {
+        if (isSingleFileTorrent()) {
+            Long totalSize = this.torrent.getTotalSize();
+            return Collections.singletonList(new TorrentFile(totalSize, Collections.singletonList(getName())));
+        }
+        return this.torrent.getFileList();
+    }
 
-	public String getTorrentFilePath() {
-		return torrentFilePath;
-	}
+    @Override
+    public String toString() {
+
+        String trackers = getTrackerList()
+                .stream()
+                .map(tracker -> tracker.toString())
+                .collect(Collectors.joining("\n"));
+
+        String fileList = getFileList()
+                .stream()
+                .map(TorrentFile::toString)
+                .collect(Collectors.joining("\n"));
+
+        return "TorrentInfo{" +
+                "Created By: " + this.torrent.getCreatedBy() + "\n" +
+                "Main tracker: " + this.torrent.getAnnounce() + "\n" +
+                "Comment: " + this.torrent.getComment() + "\n" +
+                "Info_hash: " + this.torrent.getInfo_hash() + "\n" +
+                "Name: " + this.torrent.getName() + "\n" +
+                "Piece Length: " + this.torrent.getPieceLength() + "\n" +
+                "Pieces: " + this.torrent.getPieces().size() + "\n" +
+                "Total Size: " + this.getTotalSize() + "\n" +
+                "Is Single File Torrent: " + this.torrent.isSingleFileTorrent() + "\n" +
+                "File List:\n" + fileList + "\n" +
+                "Tracker List: \n" + trackers;
+    }
+
+    public String getTorrentFilePath() {
+        return torrentFilePath;
+    }
 }
