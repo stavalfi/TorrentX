@@ -2,6 +2,7 @@ package com.steps;
 
 import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
+import cucumber.api.java.en.And;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
@@ -31,6 +32,7 @@ import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
 import org.junit.Assert;
 import org.mockito.Mockito;
+import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
@@ -392,32 +394,8 @@ public class MyStepdefs {
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        Function<BlockOfPiece, List<PieceMessage>> createPieceMessages = blockOfPiece -> {
-            int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
-                    blockOfPiece.getPieceIndex() :
-                    torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
-
-            long requestBlockSize = blockOfPiece.getLength() != null ?
-                    blockOfPiece.getLength() :
-                    torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getFrom();
-
-            List<PieceMessage> pieceMessages = new ArrayList<>();
-            for (int blockStartPosition = 0; blockStartPosition < requestBlockSize; ) {
-                int REQUEST_BLOCK_SIZE = 4_000_000;
-                // I can cast safely to integer because REQUEST_BLOCK_SIZE is integer and we find the min.
-                int blockLength = (int) Math.min(REQUEST_BLOCK_SIZE, requestBlockSize - blockStartPosition);
-                byte[] block = new byte[blockLength];
-                for (int i = 0; i < blockLength; i++)
-                    block[i] = 3;
-                PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex, blockStartPosition, block);
-                pieceMessages.add(pieceMessage);
-                blockStartPosition += blockLength;
-            }
-            return pieceMessages;
-        };
-
         Flux<PieceMessage> pieceMessagesFlux = Flux.fromIterable(blockList)
-                .map(createPieceMessages)
+                .map((BlockOfPiece blockOfPiece) -> Utils.createPieceMessages(torrentInfo, blockOfPiece, 17_000))
                 .flatMap(Flux::fromIterable)
                 .publish()
                 .autoConnect(2);
@@ -1240,19 +1218,64 @@ public class MyStepdefs {
 
     }
 
-    @When("^application save the all the pieces of torrent: \"([^\"]*)\"$")
-    public void applicationSaveTheAllThePiecesOfTorrent(String torrentFileName) throws Throwable {
+    @When("^application save the all the pieces of torrent: \"([^\"]*)\",\"([^\"]*)\"$")
+    public void applicationSaveTheAllThePiecesOfTorrent(String torrentFileName, String downloadLocation) throws Throwable {
+        Utils.removeEverythingRelatedToLastTest();
 
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        TorrentStatusController torrentStatusController = TorrentStatusControllerImpl.createDefault(torrentInfo);
+
+        Thread.sleep(50);// wait until torrentStatusController is initialized.
+
+        ConnectableFlux<PieceMessage> allPieceMessages$ = Flux.range(0, torrentInfo.getPieces().size())
+                .map(pieceIndex -> new BlockOfPiece(pieceIndex, 0, null))
+                .map(blockOfPiece -> Utils.createPieceMessages(torrentInfo, blockOfPiece, 1_000_000_000))
+                .flatMap(Flux::fromIterable)
+                .publish();
+
+        String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
+        ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
+                .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, allPieceMessages$)
+                .block();
+
+        Mono<Integer> piecesAmount$ = allPieceMessages$.collectList()
+                .map(List::size)
+                .flux()
+                .replay()
+                .autoConnect(0)
+                .take(1)
+                .single();
+
+        Flux<Integer> allSavedPiecesRecorded$ = activeTorrent.savedPieceFlux()
+                .replay()
+                .autoConnect(0);
+
+        allPieceMessages$.connect();
+
+        StepVerifier.create(allSavedPiecesRecorded$)
+                .expectNextCount(torrentInfo.getPieces().size())
+                .verifyComplete();
+
+        Flux<PieceEvent> savedBlocks$ = activeTorrent.savedBlockFlux()
+                .replay()
+                .autoConnect(0);
+
+        StepVerifier.create(savedBlocks$)
+                .expectNextCount(piecesAmount$.block())
+                .verifyComplete();
+
+        Assert.assertEquals(activeTorrent.minMissingPieceIndex(), -1);
     }
 
-    @Then("^the saved pieces flux send complete signal - for torrent: \"([^\"]*)\"$")
-    public void theSavedPiecesFluxSendCompleteSignalForTorrent(String torrentFileName) throws Throwable {
-
+    @And("^the saved-pieces-flux send complete signal - for torrent: \"([^\"]*)\",\"([^\"]*)\"$")
+    public void theSavedPiecesFluxSendCompleteSignalForTorrent(String torrentFileName, String downloadLocation) throws Throwable {
+        Utils.removeEverythingRelatedToLastTest();
     }
 
-    @Then("^the saved blocks flux send  complete signal - for torrent: \"([^\"]*)\"$")
-    public void theSavedBlocksFluxSendCompleteSignalForTorrent(String torrentFileName) throws Throwable {
-
+    @And("^the saved-blocks-flux send  complete signal - for torrent: \"([^\"]*)\",\"([^\"]*)\"$")
+    public void theSavedBlocksFluxSendCompleteSignalForTorrent(String torrentFileName, String downloadLocation) throws Throwable {
+        Utils.removeEverythingRelatedToLastTest();
     }
 }
 

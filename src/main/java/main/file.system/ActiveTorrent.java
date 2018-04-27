@@ -33,8 +33,8 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
     private final long[] downloadedBytesInPieces;
     private final String downloadPath;
     private TorrentStatusController torrentStatusController;
-    private Flux<Integer> savedPieceFlux;
-    private Flux<PieceEvent> startListenForIncomingPiecesFlux;
+    private Flux<Integer> savedPiecesFlux;
+    private Flux<PieceEvent> savedBlocksFlux;
     private Mono<ActiveTorrent> notifyWhenActiveTorrentDeleted;
     private Mono<ActiveTorrent> notifyWhenFilesDeleted;
 
@@ -67,13 +67,29 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                 .autoConnect(0)
                 .single();
 
-        this.startListenForIncomingPiecesFlux = peerResponsesFlux
+        this.savedBlocksFlux = this.torrentStatusController
+                .isCompletedDownloadingFlux()
+                .take(1)
+                .flatMap(isCompletedDownloading -> {
+                    if (isCompletedDownloading) {
+                        this.piecesStatus.set(0, this.piecesStatus.size());
+                        return Mono.empty();
+                    }
+                    return peerResponsesFlux;
+                })
                 .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
                 .flatMap(this::writeBlock)
+                .doOnNext(pieceEvent -> {
+                    if (minMissingPieceIndex() == -1)
+                        this.torrentStatusController.completedDownloading();
+                })
+                // takeUntil will signal the last next signal he received and then he will send complete signal.
+                .takeUntil(pieceEvent -> minMissingPieceIndex() == -1)
+                .doOnComplete(() -> System.out.println("hi"))
                 .publish()
                 .autoConnect(0);
 
-        this.savedPieceFlux = this.startListenForIncomingPiecesFlux
+        this.savedPiecesFlux = this.savedBlocksFlux
                 .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
                 .map(PieceEvent::getReceivedPiece)
                 .map(PieceMessage::getIndex)
@@ -117,12 +133,12 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
 
     @Override
     public Flux<PieceEvent> savedBlockFlux() {
-        return this.startListenForIncomingPiecesFlux;
+        return this.savedBlocksFlux;
     }
 
     @Override
     public Flux<Integer> savedPieceFlux() {
-        return this.savedPieceFlux;
+        return this.savedPiecesFlux;
     }
 
     public Mono<ActiveTorrent> deleteActiveTorrentOnlyMono() {
@@ -258,9 +274,6 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
                 this.piecesStatus.set(pieceMessage.getIndex());
                 PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.COMPLETED, pieceMessage);
                 sink.success(pieceEvent);
-
-                if (minMissingPieceIndex() == -1)
-                    this.torrentStatusController.completedDownloading();
             } else {
                 // update pieces partial status array:
                 // TODO: WARNING: this line *only* must be synchronized among multiple threads!

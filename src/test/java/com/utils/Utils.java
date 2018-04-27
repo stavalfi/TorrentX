@@ -14,6 +14,7 @@ import main.file.system.ActiveTorrents;
 import main.file.system.TorrentFileSystemManager;
 import main.peer.*;
 import main.peer.peerMessages.PeerMessage;
+import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
@@ -420,4 +421,29 @@ public class Utils {
             }
         });
     }
+
+    public static List<PieceMessage> createPieceMessages(TorrentInfo torrentInfo, BlockOfPiece blockOfPiece, int maxRequestBlockSize) {
+        int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
+                blockOfPiece.getPieceIndex() :
+                torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
+
+        long requestBlockSize = blockOfPiece.getLength() != null ?
+                blockOfPiece.getLength() :
+                torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getFrom();
+
+        List<PieceMessage> pieceMessages = new ArrayList<>();
+        for (int blockStartPosition = 0; blockStartPosition < requestBlockSize; ) {
+            // I can cast safely to integer because REQUEST_BLOCK_SIZE is integer and we find the min.
+            int blockLength = (int) Math.min(maxRequestBlockSize, requestBlockSize - blockStartPosition);
+            byte[] block = new byte[blockLength];
+            for (int i = 0; i < blockLength; i++)
+                block[i] = 3;
+            PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex, blockStartPosition, block);
+            pieceMessages.add(pieceMessage);
+            blockStartPosition += blockLength;
+        }
+        return pieceMessages;
+    }
+
+    ;
 }
