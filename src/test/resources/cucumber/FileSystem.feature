@@ -6,10 +6,11 @@ Feature: create get and delete active torrents
     Then files of torrent: "<torrent>" exist: "true" in "<downloadLocation>"
 
     Examples:
-      | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test    |
-      | torrent-file-example2.torrent | torrents-test    |
-      | torrent-file-example3.torrent | torrents-test    |
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | torrent-file-example3.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
   Scenario Outline: we delete torrent files only
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -18,10 +19,11 @@ Feature: create get and delete active torrents
     Then active-torrent exist: "true" for torrent: "<torrent>"
 
     Examples:
-      | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test    |
-      | torrent-file-example2.torrent | torrents-test    |
-      | torrent-file-example3.torrent | torrents-test    |
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | torrent-file-example3.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
   Scenario Outline: we delete active torrent only
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -30,10 +32,11 @@ Feature: create get and delete active torrents
     Then active-torrent exist: "false" for torrent: "<torrent>"
 
     Examples:
-      | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test    |
-      | torrent-file-example2.torrent | torrents-test    |
-      | torrent-file-example3.torrent | torrents-test    |
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | torrent-file-example3.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
   Scenario Outline: we delete active torrent and file
     Then application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -43,59 +46,36 @@ Feature: create get and delete active torrents
     Then active-torrent exist: "false" for torrent: "<torrent>"
 
     Examples:
-      | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test    |
-      | torrent-file-example2.torrent | torrents-test    |
-      | torrent-file-example3.torrent | torrents-test    |
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | torrent-file-example3.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
   Scenario Outline: we save piece of active torrent
     # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
-    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
+    When application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
       | 0          | 0    |        |
-#      | 1          | 0    | 1      |
-#      | -1         | 0    | 1      |
-#      | -2         | 0    |        |
-#    Then completed pieces are for torrent: "<torrent>" in "<downloadLocation>":
-#      | 0  |
-#      | -2 |
+      | 1          | 100  | 100    |
+      | 3          | 0    |        |
+      | 4          | 100  | 100    |
+      | -1         | 100  | 100    |
+      | -2         | 0    |        |
+      | -7         | 100  | 100    |
+      | -6         | 100  |        |
+    Then the only completed pieces are - for torrent: "<torrent>":
+      | 0  |
+      | 3  |
+      | -2 |
 
     Examples:
-      | torrent                       | downloadLocation |
-#      | torrent-file-example1.torrent | torrents-test    |
-      | torrent-file-example2.torrent | torrents-test    |
-#      | torrent-file-example3.torrent | torrents-test    |
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | torrent-file-example3.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
-  Scenario Outline: we save random blocks inside files and if a piece completely downloaded, we check it has been marked as downloaded
-    # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
-    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
-      | pieceIndex | from | length |
-      | 0          | 0    | 10     |
-      | 1          | 0    | 10     |
-      | 0          | 10   | 11     |
-      | 1          | 0    | 10     |
-      | 1          | 10   | 2      |
-      | 1          | 12   |        |
-      | 2          | 0    |        |
-    Then completed pieces are for torrent: "<torrent>" in "<downloadLocation>":
-      | 1 |
-      | 2 |
-
-    Examples:
-      | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test    |
-      | torrent-file-example2.torrent | torrents-test    |
-      | torrent-file-example3.torrent | torrents-test    |
-
-  Scenario Outline: we save the last piece of active torrent
-    # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
-    Then application save the last piece of torrent: "<torrent>","<downloadLocation>"
-
-    Examples:
-      | torrent                       | downloadLocation |
-#      | torrent-file-example1.torrent | torrents-test    |
-#      | torrent-file-example2.torrent | torrents-test    |
-      | torrent-file-example3.torrent | torrents-test    |
 
   Scenario Outline: we save all the pieces and expect to see that the fluxes are completed
     Given torrent: "<torrent>","<downloadLocation>"
@@ -107,10 +87,10 @@ Feature: create get and delete active torrents
 #      | COMPLETED_DOWNLOADING |
 
     Examples:
-      | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test    |
-      | torrent-file-example2.torrent | torrents-test    |
-      | torrent-file-example3.torrent | torrents-test    |
-
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | torrent-file-example3.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
 

@@ -104,6 +104,9 @@ public class ActiveTorrent extends TorrentInfo implements TorrentFileSystemManag
 
     @Override
     public boolean havePiece(int pieceIndex) {
+        assert 0 <= pieceIndex;
+        assert pieceIndex <= super.getPieces().size();
+
         return this.piecesStatus.get(pieceIndex);
     }
 

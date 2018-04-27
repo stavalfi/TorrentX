@@ -74,7 +74,7 @@ public class PieceMessage extends PeerMessage {
         return "PieceMessage{" +
                 "index=" + index +
                 ", begin=" + begin +
-                ", block=" + Arrays.toString(block) +
+                ", block-length=" + Arrays.toString(block) +
                 "} " + super.toString();
     }
 }

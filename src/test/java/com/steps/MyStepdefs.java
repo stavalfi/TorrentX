@@ -10,7 +10,6 @@ import main.TorrentInfo;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.downloader.TorrentPieceStatus;
 import main.file.system.ActiveTorrent;
 import main.file.system.ActiveTorrents;
 import main.file.system.TorrentFileSystemManager;
@@ -384,7 +383,7 @@ public class MyStepdefs {
                 .verifyComplete();
     }
 
-    @Then("^application save random blocks for torrent: \"([^\"]*)\" in \"([^\"]*)\" and check it saved$")
+    @When("^application save random blocks for torrent: \"([^\"]*)\" in \"([^\"]*)\" and check it saved$")
     public void applicationSaveARandomBlockInsideTorrentInAndCheckItSaved(String torrentFileName,
                                                                           String downloadLocation,
                                                                           List<BlockOfPiece> blockList) throws Throwable {
@@ -404,12 +403,12 @@ public class MyStepdefs {
 
             List<PieceMessage> pieceMessages = new ArrayList<>();
             for (int blockStartPosition = 0; blockStartPosition < requestBlockSize; ) {
-                int REQUEST_BLOCK_SIZE = 2_097_152;
+                int REQUEST_BLOCK_SIZE = 4_000_000;
                 // I can cast safely to integer because REQUEST_BLOCK_SIZE is integer and we find the min.
                 int blockLength = (int) Math.min(REQUEST_BLOCK_SIZE, requestBlockSize - blockStartPosition);
                 byte[] block = new byte[blockLength];
                 for (int i = 0; i < blockLength; i++)
-                    block[i] = 1;
+                    block[i] = 3;
                 PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex, blockStartPosition, block);
                 pieceMessages.add(pieceMessage);
                 blockStartPosition += blockLength;
@@ -442,13 +441,15 @@ public class MyStepdefs {
                 .collect(Collectors.toSet())
                 .block();
 
-        Set<PieceMessage> actualSavedPiecesFromFileSystem = expectedSavedPieces.stream()
+        Set<PieceMessage> actualSavedPiecesFromFileSystem = recordedTorrentPieceChangedFlux
+                .map(PieceEvent::getReceivedPiece)
                 .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(), pieceMessage.getBegin(), pieceMessage.getBlock().length))
                 .map(requestMessage -> {
                     byte[] actualWrittenBytes = Utils.readFromFile(torrentInfo, fullDownloadPath, requestMessage);
                     return new PieceMessage(null, null, requestMessage.getIndex(), requestMessage.getBegin(), actualWrittenBytes);
                 })
-                .collect(Collectors.toSet());
+                .collect(Collectors.toSet())
+                .block();
 
         Assert.assertEquals("the pieces we read from filesystem are not equal to the pieces we tried to save to the filesystem.",
                 expectedSavedPieces, actualSavedPiecesFromFileSystem);
@@ -499,134 +500,39 @@ public class MyStepdefs {
                         null);
     }
 
-    @Then("^completed pieces are for torrent: \"([^\"]*)\" in \"([^\"]*)\":$")
+    @Then("^the only completed pieces are - for torrent: \"([^\"]*)\":$")
     public void completedPiecesAreForTorrent(String torrentFileName,
-                                             String downloadLocation,
                                              List<Integer> completedPiecesIndexList) throws Throwable {
-        // TODO: complete the step implementation.
-//		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-//		String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-//		ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
-//				.findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
-//				.filter(Optional::isPresent)
-//				.map(Optional::get)
-//				.block();
-//
-//		String errorMessage1 = "the piece is not completed but it should be.";
-//		String errorMessage2 = "The read operation failed to read exactly what we wrote";
-//
-//		completedPiecesIndexList.forEach(completedPiecesIndex ->
-//				Assert.assertTrue(errorMessage1, activeTorrent.havePiece(completedPiecesIndex)));
-//
-//		// check again in other way: (by ActiveTorrent::buildBitFieldMessage)
-//		BitFieldMessage allPiecesStatus = activeTorrent.buildBitFieldMessage(null, null);
-//		completedPiecesIndexList.forEach(completedPiecesIndex ->
-//				Assert.assertTrue(errorMessage1, allPiecesStatus.getPiecesStatus().get(completedPiecesIndex)));
-//
-//		// check again in other way: (by ActiveTorrent::buildPieceMessage)
-//
-//		Flux<PieceMessage> completedPiecesMessageFlux = Flux.fromIterable(completedPiecesIndexList)
-//				.map(pieceIndex -> new RequestMessage(null, null,
-//						pieceIndex,
-//						0,
-//						activeTorrent.getPieceLength()))
-//				// if the above piece is not completed, ActiveTorrent::buildPieceMessage will throw exception.
-//				// but it must complete because the piece is in completedPiecesIndexList list.
-//				.flatMap(requestMessage -> activeTorrent.buildPieceMessage(requestMessage))
-//				.doOnNext(pieceMessage -> {
-//					RequestMessage requestMessage =
-//							new RequestMessage(null, null,
-//									pieceMessage.getIndex(),
-//									pieceMessage.getBegin(),
-//									pieceMessage.getBlock().length);
-//					byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestMessage);
-//					Assert.assertArrayEquals(errorMessage2, actualWrittenBytes, pieceMessage.getBlock());
-//				});
-//
-//		// check that all other pieces are not in complete mode.
-//		for (int i = 0; i < torrentInfo.getPieces().size(); i++) {
-//			if (!completedPiecesIndexList.contains(i)) {
-//				String errorMessage3 = "piece is not completed but it is specified as completed piece: " + i;
-//				Assert.assertFalse(errorMessage3, allPiecesStatus.getPiecesStatus().get(i));
-//			}
-//		}
-//
-//		StepVerifier.create(completedPiecesMessageFlux)
-//				.expectNextCount(completedPiecesIndexList.size())
-//				.verifyComplete();
-//
-//		// delete everything from the last test.
-//		Utils.removeEverythingRelatedToLastTest();
-    }
-
-    @Then("^application save the last piece of torrent: \"([^\"]*)\",\"([^\"]*)\"$")
-    public void applicationSaveAllTheLastPieceOfTorrent(String torrentFileName, String downloadLocation) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-        // delete everything from the last test.
-        Utils.removeEverythingRelatedToLastTest();
-
-        String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-
-        int lastPieceLength = (int) Math.min(torrentInfo.getPieceLength(), torrentInfo.getTotalSize() - (torrentInfo.getPieces().size() - 1) * torrentInfo.getPieceLength());
-
-        // generate random complete piece.
-        byte[] lastPiece = new byte[lastPieceLength];
-        byte content = 0;
-        for (int i = 0; i < lastPieceLength; i++, content++)
-            lastPiece[i] = content;
-
-        int lastPieceIndex = torrentInfo.getPieces().size() - 1;
-        PieceMessage lastPieceMessage = new PieceMessage(null, null, lastPieceIndex, 0, lastPiece);
-        RequestMessage requestLastPieceMessage = new RequestMessage(null, null,
-                lastPieceMessage.getIndex(),
-                lastPieceMessage.getBegin(),
-                lastPieceMessage.getBlock().length);
-
-        TorrentStatusController torrentStatusController =
-                TorrentStatusControllerImpl.createDefault(torrentInfo);
-
-        Flux<PieceMessage> lastPieceFlux = Flux.just(lastPieceMessage)
-                .replay()
-                .autoConnect(2);
+        List<Integer> fixedCompletedPiecesIndexList = completedPiecesIndexList.stream()
+                .map(pieceIndex -> pieceIndex >= 0 ?
+                        pieceIndex :
+                        torrentInfo.getPieces().size() + pieceIndex)
+                .collect(Collectors.toList());
 
         ActiveTorrent activeTorrent = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, lastPieceFlux)
+                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
+                .filter(Optional::isPresent)
+                .map(Optional::get)
                 .block();
 
-        Flux<PieceEvent> recordedTorrentPieceChangedFlux =
-                activeTorrent.savedBlockFlux()
-                        .replay()
-                        .autoConnect(0);
+        String errorMessage1 = "the piece is not completed but it should be.";
 
-        // start recording only after I listen to activeTorrent.savedBlockFlux(). Now I won't lose signals.
-        lastPieceFlux.subscribe();
+        fixedCompletedPiecesIndexList.forEach(completedPiecesIndex ->
+                Assert.assertTrue(errorMessage1, activeTorrent.havePiece(completedPiecesIndex)));
 
-        Mono<PieceMessage> readLastPieceTaskMono =
-                recordedTorrentPieceChangedFlux
-                        .doOnNext(torrentPieceChanged -> {
-                            String message = "the last piece must be completed but it's not.";
-                            Assert.assertEquals(message, TorrentPieceStatus.COMPLETED, torrentPieceChanged.getTorrentPieceStatus());
-                        })
-                        // assert that we wrote to the file what we should have.
-                        .doOnNext(torrentPieceChanged -> {
-                            byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
-                            String errorMessage = "The read operation failed to read exactly what we wrote";
-                            Assert.assertArrayEquals(errorMessage, actualWrittenBytes, lastPieceMessage.getBlock());
-                        })
-                        // assert that we can read the last piece successfully.
-                        .flatMap(torrentPieceChanged -> activeTorrent.buildPieceMessage(requestLastPieceMessage))
-                        .doOnNext(pieceMessage -> {
-                            byte[] actualWrittenBytes = Utils.readFromFile(activeTorrent, fullDownloadPath, requestLastPieceMessage);
-                            String errorMessage = "The read operation failed to read exactly what we wrote";
-                            Assert.assertArrayEquals(errorMessage, actualWrittenBytes, pieceMessage.getBlock());
-                        })
-                        .take(1)
-                        .single();
+        // check again in other way: (by ActiveTorrent::buildBitFieldMessage)
+        BitFieldMessage allPiecesStatus = activeTorrent.buildBitFieldMessage(null, null);
+        fixedCompletedPiecesIndexList.forEach(completedPiecesIndex ->
+                Assert.assertTrue(errorMessage1, allPiecesStatus.getPiecesStatus().get(completedPiecesIndex)));
 
-        StepVerifier.create(readLastPieceTaskMono)
-                .expectNextCount(1)
-                .verifyComplete();
+        // check that all other pieces are not in complete mode.
+        for (int i = 0; i < torrentInfo.getPieces().size(); i++) {
+            if (!fixedCompletedPiecesIndexList.contains(i)) {
+                String errorMessage3 = "piece is not completed but it is specified as completed piece: " + i;
+                Assert.assertFalse(errorMessage3, allPiecesStatus.getPiecesStatus().get(i));
+            }
+        }
 
         // delete everything from the last test.
         Utils.removeEverythingRelatedToLastTest();

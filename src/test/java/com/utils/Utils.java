@@ -26,12 +26,10 @@ import reactor.core.publisher.Mono;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.net.SocketException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.FileVisitor;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -357,19 +355,23 @@ public class Utils {
         long amountOfBytesOfFileWeCovered = 0;
         for (ActiveTorrentFile activeTorrentFile : activeTorrentFileList) {
             if (activeTorrentFile.getFrom() <= from && from <= activeTorrentFile.getTo()) {
-                RandomAccessFile randomAccessFile = new RandomAccessFile(activeTorrentFile.getFilePath(), "r");
+
+                OpenOption[] options = {StandardOpenOption.READ};
+                SeekableByteChannel seekableByteChannel = Files.newByteChannel(Paths.get(activeTorrentFile.getFilePath()), options);
+
                 long fromWhereToReadInThisFile = from - amountOfBytesOfFileWeCovered;
-                randomAccessFile.seek(fromWhereToReadInThisFile);
+                seekableByteChannel.position(fromWhereToReadInThisFile);
 
                 // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
                 int howMuchToReadFromThisFile = (int) Math.min(activeTorrentFile.getTo() - from, to - from);
-                byte[] tempResult = new byte[howMuchToReadFromThisFile];
-                randomAccessFile.read(tempResult);
-                for (byte aTempResult : tempResult)
+                ByteBuffer block = ByteBuffer.allocate(howMuchToReadFromThisFile);
+                seekableByteChannel.read(block);
+
+                for (byte aTempResult : block.array())
                     result[resultFreeIndex++] = aTempResult;
                 from += howMuchToReadFromThisFile;
 
-                randomAccessFile.close();
+                seekableByteChannel.close();
             }
             if (from == to)
                 return result;
