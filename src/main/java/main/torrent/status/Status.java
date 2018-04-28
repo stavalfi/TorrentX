@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 public class Status {
-    private TorrentStatusType changed;
+    private StatusType changed;
 
     private boolean isStartedDownload;
     private boolean isStartedUpload;
@@ -43,7 +43,7 @@ public class Status {
         this.isSearchingPeers = isSearchingPeers;
     }
 
-    public Status(TorrentStatusType changed,
+    public Status(StatusType changed,
                   boolean isStartedDownload,
                   boolean isStartedUpload,
                   boolean isTorrentRemoved,
@@ -69,7 +69,7 @@ public class Status {
         this.isSearchingPeers = isSearchingPeers;
     }
 
-    public Optional<TorrentStatusType> getChanged() {
+    public Optional<StatusType> getChanged() {
         return Optional.ofNullable(changed);
     }
 
@@ -137,8 +137,17 @@ public class Status {
 
     @Override
     public int hashCode() {
-
-        return Objects.hash(isStartedDownload(), isStartedUpload(), isTorrentRemoved(), isFilesRemoved(), isUploading(), isDownloading(), isCompletedDownloading(), isStartedListeningToIncomingPeers(), isListeningToIncomingPeers(), isStartedSearchingPeers(), isSearchingPeers());
+        return Objects.hash(isStartedDownload(),
+                isStartedUpload(),
+                isTorrentRemoved(),
+                isFilesRemoved(),
+                isUploading(),
+                isDownloading(),
+                isCompletedDownloading(),
+                isStartedListeningToIncomingPeers(),
+                isListeningToIncomingPeers(),
+                isStartedSearchingPeers(),
+                isSearchingPeers());
     }
 
     @Override

@@ -40,7 +40,7 @@ public class StatusChanger {
         return statusNotifications;
     }
 
-    public Mono<Status> changeStatus(TorrentStatusType change) {
+    public Mono<Status> changeStatus(StatusType change) {
         // TODO: replace this shit with something better.
         return this.latestStatus$
                 .take(1)
@@ -68,7 +68,7 @@ public class StatusChanger {
      * @param change     what to change in the status.
      * @return the new status.
      */
-    private Status changeStatus(Status lastStatus, TorrentStatusType change) {
+    private Status changeStatus(Status lastStatus, StatusType change) {
         switch (change) {
             case START_DOWNLOAD:
                 if (!lastStatus.isStartedDownload() &&

@@ -7,7 +7,7 @@ import main.downloader.TorrentDownloaders;
 import main.peer.Link;
 import main.peer.SendPeerMessages;
 import main.peer.peerMessages.RequestMessage;
-import main.torrent.status.TorrentStatusType;
+import main.torrent.status.StatusType;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -65,8 +65,8 @@ public class App {
                         ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
-        torrentDownloader.getStatusChanger().changeStatus(TorrentStatusType.START_DOWNLOAD).block();
-        torrentDownloader.getStatusChanger().changeStatus(TorrentStatusType.START_UPLOAD).block();
+        torrentDownloader.getStatusChanger().changeStatus(StatusType.START_DOWNLOAD).block();
+        torrentDownloader.getStatusChanger().changeStatus(StatusType.START_UPLOAD).block();
     }
 
     public static void main(String[] args) throws Exception {

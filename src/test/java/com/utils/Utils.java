@@ -71,10 +71,10 @@ public class Utils {
                 .doOnNext(torrentDownloader -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash()))
                 .map(TorrentDownloader::getStatusChanger)
                 .doOnNext(statusChanger -> {
-//                    statusChanger.changeStatus(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
-//                    statusChanger.changeStatus(TorrentStatusType.PAUSE_SEARCHING_PEERS).block();
-//                    statusChanger.changeStatus(TorrentStatusType.PAUSE_DOWNLOAD).block();
-//                    statusChanger.changeStatus(TorrentStatusType.PAUSE_UPLOAD).block();
+//                    statusChanger.changeStatus(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
+//                    statusChanger.changeStatus(StatusType.PAUSE_SEARCHING_PEERS).block();
+//                    statusChanger.changeStatus(StatusType.PAUSE_DOWNLOAD).block();
+//                    statusChanger.changeStatus(StatusType.PAUSE_UPLOAD).block();
                 })
                 .collectList();
         try {

@@ -8,7 +8,7 @@ import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.peer.peerMessages.HandShake;
 import main.torrent.status.StatusChanger;
-import main.torrent.status.TorrentStatusType;
+import main.torrent.status.StatusType;
 import main.tracker.BadResponseException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
@@ -48,7 +48,7 @@ public class PeersListener {
                                         // TODO: do something with this shit
                                         //e.printStackTrace();
                                         sink.error(e);
-                                        statusChanger.changeStatus(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
+                                        statusChanger.changeStatus(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
                                         return;
                                     }
                                     while (!this.listenToPeerConnection.isClosed() && !sink.isCancelled())

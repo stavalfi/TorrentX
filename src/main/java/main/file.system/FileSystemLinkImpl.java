@@ -11,7 +11,7 @@ import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.Status;
 import main.torrent.status.StatusChanger;
-import main.torrent.status.TorrentStatusType;
+import main.torrent.status.StatusType;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -85,7 +85,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .flatMap(this::writeBlock)
                 .doOnNext(pieceEvent -> {
                     if (minMissingPieceIndex() == -1)
-                        this.statusChanger.changeStatus(TorrentStatusType.COMPLETED_DOWNLOADING).block();
+                        this.statusChanger.changeStatus(StatusType.COMPLETED_DOWNLOADING).block();
                 })
                 // takeUntil will signal the last next signal he received and then he will send complete signal.
                 .takeUntil(pieceEvent -> minMissingPieceIndex() == -1)
