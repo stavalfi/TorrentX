@@ -11,8 +11,6 @@ public class StatusChanger {
     private Flux<Status> latestStatus$;
     private Flux<Status> history$;
 
-    private StatusNotifications statusNotifications;
-
     public StatusChanger(Status initialStatus) {
         this.latestStatus$ = Flux.<Status>create(sink -> this.latestStatusSink = sink)
                 .publishOn(App.MyScheduler)
@@ -23,8 +21,6 @@ public class StatusChanger {
 
         this.history$ = this.latestStatus$.replay(10) // how much statuses to save.
                 .autoConnect(0);
-
-        this.statusNotifications = new StatusNotificationsImpl(this.latestStatus$);
     }
 
     public Mono<Status> getLatestStatus$() {
@@ -32,12 +28,12 @@ public class StatusChanger {
                 .single();
     }
 
-    public Flux<Status> getHistory$() {
-        return history$;
+    public Flux<Status> getStatus$() {
+        return latestStatus$;
     }
 
-    public StatusNotifications getStatusNotifications() {
-        return statusNotifications;
+    public Flux<Status> getHistory$() {
+        return history$;
     }
 
     public Mono<Status> changeStatus(StatusType change) {

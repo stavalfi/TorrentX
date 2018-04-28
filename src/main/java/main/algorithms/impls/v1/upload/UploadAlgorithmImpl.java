@@ -6,6 +6,7 @@ import main.downloader.PieceEvent;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
+import main.torrent.status.Status;
 import main.torrent.status.StatusChanger;
 import reactor.core.publisher.Flux;
 
@@ -27,15 +28,18 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
         this.peersCommunicatorFlux = peersCommunicatorFlux;
 
         this.uploadedBlocksFlux = this.statusChanger
-                .getStatusNotifications()
-                .notifyWhenStartUploading()
-                .flatMapMany(__ -> this.peersCommunicatorFlux)
+                .getStatus$()
+                .filter(Status::isStartedUpload)
+                .take(1)
+                .flatMap(__ -> this.peersCommunicatorFlux)
                 .flatMap(peersCommunicator ->
                         // if getRequestMessageResponseFlux is not running on unique thread, then I will block
                         // notifyWhenStartUploading() thread. Watch out.
                         peersCommunicator.receivePeerMessages().getRequestMessageResponseFlux()
                                 .filter(requestMessage -> this.fileSystemLink.havePiece(requestMessage.getIndex()))
-                                .flatMap(requestMessage -> this.statusChanger.getStatusNotifications().notifyWhenResumeUpload()
+                                .flatMap(requestMessage -> this.statusChanger.getStatus$()
+                                        .filter(Status::isUploading)
+                                        .take(1)
                                         .flatMap(___ -> this.fileSystemLink.buildPieceMessage(requestMessage)))
                                 .flatMap(pieceMessage ->
                                         peersCommunicator.sendMessages().sendPieceMessage(pieceMessage.getIndex(),

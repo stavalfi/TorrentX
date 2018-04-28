@@ -7,6 +7,7 @@ import main.TorrentInfo;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.peer.peerMessages.HandShake;
+import main.torrent.status.Status;
 import main.torrent.status.StatusChanger;
 import main.torrent.status.StatusType;
 import main.tracker.BadResponseException;
@@ -34,13 +35,15 @@ public class PeersListener {
     public PeersListener(StatusChanger statusChanger, Integer tcpPort) {
         this.tcpPort = tcpPort;
         this.peersConnectedToMeFlux =
-                statusChanger.getStatusNotifications().notifyWhenStartedListeningToIncomingPeers()
+                statusChanger.getStatus$()
+                        .filter(Status::isStartedListeningToIncomingPeers)
+                        .take(1)
                         // Important note: While we are waiting for new connections,
                         // we are going to block the running thread.
                         // the running thread belongs to notifyWhenStartedListeningToIncomingPeers()
                         // so I block others from getting signals from him!
                         .publishOn(App.MyScheduler)
-                        .flatMapMany(__ ->
+                        .flatMap(__ ->
                                 Flux.create((FluxSink<Link> sink) -> {
                                     try {
                                         this.listenToPeerConnection = new ServerSocket(this.tcpPort);

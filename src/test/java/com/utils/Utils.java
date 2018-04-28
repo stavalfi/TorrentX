@@ -130,9 +130,10 @@ public class Utils {
 
         peersListener = new PeersListener(statusChanger);
 
-        Flux<Link> searchingPeers$ = statusChanger.getStatusNotifications()
-                .notifyWhenStartSearchingPeers()
-                .flatMapMany(__ ->
+        Flux<Link> searchingPeers$ = statusChanger.getStatus$()
+                .filter(Status::isStartedSearchingPeers)
+                .take(1)
+                .flatMap(__ ->
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                                 .autoConnect(0));
 
@@ -186,9 +187,10 @@ public class Utils {
 
         peersListener = new PeersListener(statusChanger);
 
-        Flux<Link> searchingPeers$ = statusChanger.getStatusNotifications()
-                .notifyWhenStartSearchingPeers()
-                .flatMapMany(__ ->
+        Flux<Link> searchingPeers$ = statusChanger.getStatus$()
+                .filter(Status::isStartedSearchingPeers)
+                .take(1)
+                .flatMap(__ ->
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                                 .autoConnect(0));
 
@@ -237,9 +239,10 @@ public class Utils {
 
         peersListener = new PeersListener(statusChanger);
 
-        Flux<Link> searchingPeers$ = statusChanger.getStatusNotifications()
-                .notifyWhenStartSearchingPeers()
-                .flatMapMany(__ ->
+        Flux<Link> searchingPeers$ = statusChanger.getStatus$()
+                .filter(Status::isStartedSearchingPeers)
+                .take(1)
+                .flatMap(__ ->
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                                 .autoConnect(0));
 

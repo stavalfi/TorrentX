@@ -54,19 +54,19 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         this.actualFileImplList = createActiveTorrentFileList(torrentInfo, downloadPath);
 
         this.notifyWhenActiveTorrentDeleted = this.statusChanger
-                .getStatusNotifications()
-                .notifyWhenFilesRemoved()
+                .getStatus$()
+                .filter(Status::isTorrentRemoved)
+                .take(1)
                 .flatMap(__ -> deleteFileOnlyMono())
-                .flux()
                 .replay(1)
                 .autoConnect(0)
                 .single();
 
         this.notifyWhenFilesDeleted = this.statusChanger
-                .getStatusNotifications()
-                .notifyWhenTorrentRemoved()
+                .getStatus$()
+                .filter(Status::isFilesRemoved)
+                .take(1)
                 .flatMap(__ -> deleteActiveTorrentOnlyMono())
-                .flux()
                 .replay(1)
                 .autoConnect(0)
                 .single();
