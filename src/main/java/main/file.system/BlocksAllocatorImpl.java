@@ -100,4 +100,10 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
     public int getAmountOfBlocks() {
         return this.amountOfBlocks;
     }
+
+    private static BlocksAllocator instance = new BlocksAllocatorImpl(20, 17_000);
+
+    public static BlocksAllocator getInstance() {
+        return instance;
+    }
 }
