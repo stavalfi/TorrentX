@@ -7,7 +7,7 @@ import main.algorithms.PiecesDownloader;
 import main.file.system.FileSystemLink;
 import main.peer.PeerExceptions;
 import main.peer.peerMessages.RequestMessage;
-import main.torrent.status.TorrentStatus;
+import main.torrent.status.StatusChanger;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -17,7 +17,7 @@ import java.util.function.Function;
 
 public class PiecesDownloaderImpl implements PiecesDownloader {
 	private TorrentInfo torrentInfo;
-	private TorrentStatus torrentStatus;
+	private StatusChanger statusChanger;
 	private PeersToPiecesMapper peersToPiecesMapper;
 	private FileSystemLink fileSystemLink;
 	private BlockDownloader blockDownloader;
@@ -25,17 +25,17 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
 	private Flux<Integer> downloadedPiecesFlux;
 
 	public PiecesDownloaderImpl(TorrentInfo torrentInfo,
-								TorrentStatus torrentStatus,
+								StatusChanger statusChanger,
 								FileSystemLink fileSystemLink,
 								PeersToPiecesMapper peersToPiecesMapper,
 								BlockDownloader blockDownloader) {
 		this.torrentInfo = torrentInfo;
-		this.torrentStatus = torrentStatus;
+		this.statusChanger = statusChanger;
 		this.peersToPiecesMapper = peersToPiecesMapper;
 		this.fileSystemLink = fileSystemLink;
 		this.blockDownloader = blockDownloader;
 
-		downloadedPiecesFlux = torrentStatus.notifyWhenStartDownloading()
+		downloadedPiecesFlux = statusChanger.getStatusNotifications().notifyWhenStartDownloading()
 				.flatMapMany(__ -> this.peersToPiecesMapper.getAvailablePiecesFlux())
 				.flatMap(pieceIndex -> downloadPieceMono(pieceIndex)
 						// couldn't download a block from this piece in the specified time.

@@ -11,9 +11,9 @@ import main.TorrentInfo;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.file.system.FileSystemLinkImpl;
 import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
+import main.file.system.FileSystemLinkImpl;
 import main.peer.*;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
@@ -21,9 +21,8 @@ import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
-import main.torrent.status.TorrentStatus;
-import main.torrent.status.TorrentStatusController;
-import main.torrent.status.TorrentStatusControllerImpl;
+import main.torrent.status.Status;
+import main.torrent.status.StatusChanger;
 import main.torrent.status.TorrentStatusType;
 import main.tracker.Tracker;
 import main.tracker.TrackerConnection;
@@ -281,7 +280,7 @@ public class MyStepdefs {
                         .take(1)
                         .single();
 
-        torrentDownloader.getTorrentStatusController().startUpload();
+        torrentDownloader.getStatusChanger().changeStatus(TorrentStatusType.START_UPLOAD).block();
 
         StepVerifier.create(receiveSinglePieceMono)
                 .expectNextCount(1)
@@ -400,12 +399,21 @@ public class MyStepdefs {
                 .publish()
                 .autoConnect(2);
 
-        TorrentStatusController torrentStatusController =
-                TorrentStatusControllerImpl.createDefault(torrentInfo);
+        StatusChanger statusChanger = new StatusChanger(new Status(
+                false,
+                false,
+                false,
+                false,
+                false, false,
+                false,
+                false,
+                false,
+                false,
+                false));
 
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, fullDownloadPath, TorrentStatusControllerImpl.createDefault(torrentInfo), pieceMessagesFlux)
+                .createActiveTorrentMono(torrentInfo, fullDownloadPath, statusChanger, pieceMessagesFlux)
                 .block();
 
         Flux<PieceEvent> recordedTorrentPieceChangedFlux = fileSystemLink
@@ -470,7 +478,7 @@ public class MyStepdefs {
                 .createTorrentDownloader(torrentInfo,
                         fileSystemLink,
                         null,
-                        torrentStatusController,
+                        statusChanger,
                         null,
                         null,
                         null,
@@ -612,15 +620,15 @@ public class MyStepdefs {
                 .flatMap(Flux::fromIterable)
                 .sort()
                 // I'm going to get this peers again AFTER:
-                // torrentDownloader.getTorrentStatusController().start();
+                // torrentDownloader.getStatusChanger().start();
                 .replay()
                 .autoConnect();
 
         // for recording all the peers without blocking the main thread.
         peersFromResponsesMono.subscribe();
 
-        torrentDownloader.getTorrentStatusController().startDownload();
-        torrentDownloader.getTorrentStatusController().startUpload();
+        torrentDownloader.getStatusChanger().changeStatus(TorrentStatusType.START_DOWNLOAD).block();
+        torrentDownloader.getStatusChanger().changeStatus(TorrentStatusType.START_UPLOAD).block();
 
         List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
         List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
@@ -643,7 +651,7 @@ public class MyStepdefs {
         // delete everything from the last test.
         Utils.removeEverythingRelatedToLastTest();
 
-        TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(
+        Status initialStatus = new Status(
                 initialTorrentStatusTypeMap.get(TorrentStatusType.START_DOWNLOAD),
                 initialTorrentStatusTypeMap.get(TorrentStatusType.START_UPLOAD),
                 initialTorrentStatusTypeMap.get(TorrentStatusType.REMOVE_TORRENT),
@@ -660,7 +668,7 @@ public class MyStepdefs {
                 .createTorrentDownloader(torrentInfo,
                         null,
                         null,
-                        torrentStatusController,
+                        new StatusChanger(initialStatus),
                         null,
                         null,
                         null,
@@ -672,57 +680,57 @@ public class MyStepdefs {
     public void torrentStatusForIsTryingToChangeTo(String torrentFileName,
                                                    List<TorrentStatusType> changeTorrentStatusTypeList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-        TorrentStatusController torrentStatusController = TorrentDownloaders.getInstance()
+        StatusChanger statusChanger = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .get()
-                .getTorrentStatusController();
+                .getStatusChanger();
 
         changeTorrentStatusTypeList.forEach(torrentStatusType -> {
             switch (torrentStatusType) {
                 case START_DOWNLOAD:
-                    torrentStatusController.startDownload();
+                    statusChanger.changeStatus(TorrentStatusType.START_DOWNLOAD).block();
                     break;
                 case START_UPLOAD:
-                    torrentStatusController.startUpload();
+                    statusChanger.changeStatus(TorrentStatusType.START_UPLOAD).block();
                     break;
                 case PAUSE_DOWNLOAD:
-                    torrentStatusController.pauseDownload();
+                    statusChanger.changeStatus(TorrentStatusType.PAUSE_DOWNLOAD).block();
                     break;
                 case RESUME_DOWNLOAD:
-                    torrentStatusController.resumeDownload();
+                    statusChanger.changeStatus(TorrentStatusType.RESUME_DOWNLOAD).block();
                     break;
                 case PAUSE_UPLOAD:
-                    torrentStatusController.pauseUpload();
+                    statusChanger.changeStatus(TorrentStatusType.PAUSE_UPLOAD).block();
                     break;
                 case RESUME_UPLOAD:
-                    torrentStatusController.resumeUpload();
+                    statusChanger.changeStatus(TorrentStatusType.RESUME_UPLOAD).block();
                     break;
                 case COMPLETED_DOWNLOADING:
-                    torrentStatusController.completedDownloading();
+                    statusChanger.changeStatus(TorrentStatusType.COMPLETED_DOWNLOADING).block();
                     break;
                 case REMOVE_TORRENT:
-                    torrentStatusController.removeTorrent();
+                    statusChanger.changeStatus(TorrentStatusType.REMOVE_TORRENT).block();
                     break;
                 case REMOVE_FILES:
-                    torrentStatusController.removeFiles();
+                    statusChanger.changeStatus(TorrentStatusType.REMOVE_FILES).block();
                     break;
                 case START_LISTENING_TO_INCOMING_PEERS:
-                    torrentStatusController.startListeningToIncomingPeers();
+                    statusChanger.changeStatus(TorrentStatusType.START_LISTENING_TO_INCOMING_PEERS).block();
                     break;
                 case RESUME_LISTENING_TO_INCOMING_PEERS:
-                    torrentStatusController.resumeListeningToIncomingPeers();
+                    statusChanger.changeStatus(TorrentStatusType.RESUME_LISTENING_TO_INCOMING_PEERS).block();
                     break;
                 case PAUSE_LISTENING_TO_INCOMING_PEERS:
-                    torrentStatusController.pauseListeningToIncomingPeers();
+                    statusChanger.changeStatus(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
                     break;
                 case START_SEARCHING_PEERS:
-                    torrentStatusController.startSearchingPeers();
+                    statusChanger.changeStatus(TorrentStatusType.START_SEARCHING_PEERS).block();
                     break;
                 case RESUME_SEARCHING_PEERS:
-                    torrentStatusController.resumeSearchingPeers();
+                    statusChanger.changeStatus(TorrentStatusType.RESUME_SEARCHING_PEERS).block();
                     break;
                 case PAUSE_SEARCHING_PEERS:
-                    torrentStatusController.pauseSearchingPeers();
+                    statusChanger.changeStatus(TorrentStatusType.PAUSE_SEARCHING_PEERS).block();
                     break;
             }
         });
@@ -732,88 +740,93 @@ public class MyStepdefs {
     public void torrentStatusForWillBe(String torrentFileName,
                                        List<TorrentStatusType> expectedTorrentStatusTypeList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-        TorrentStatus torrentStatus = TorrentDownloaders.getInstance()
+        StatusChanger statusChanger = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .get()
-                .getTorrentStatusController();
+                .getStatusChanger();
 
-        // assert that the state is changed.
+        Status expectedFinalStatus = new Status(
+                expectedTorrentStatusTypeList.contains(TorrentStatusType.START_DOWNLOAD),
+                expectedTorrentStatusTypeList.contains(TorrentStatusType.START_UPLOAD),
+                expectedTorrentStatusTypeList.contains(TorrentStatusType.REMOVE_TORRENT),
+                expectedTorrentStatusTypeList.contains(TorrentStatusType.REMOVE_FILES),
+                expectedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_UPLOAD),
+                expectedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_DOWNLOAD),
+                expectedTorrentStatusTypeList.contains(TorrentStatusType.COMPLETED_DOWNLOADING),
+                expectedTorrentStatusTypeList.contains(TorrentStatusType.START_LISTENING_TO_INCOMING_PEERS),
+                expectedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_LISTENING_TO_INCOMING_PEERS),
+                expectedTorrentStatusTypeList.contains(TorrentStatusType.START_SEARCHING_PEERS),
+                expectedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_SEARCHING_PEERS));
+
+        Assert.assertEquals(expectedFinalStatus, statusChanger.getLatestStatus$().block());
+
+        // same test but here we check using the notify API.
+
         boolean expectedStartDownload = expectedTorrentStatusTypeList.contains(TorrentStatusType.START_DOWNLOAD);
-        Assert.assertEquals(expectedStartDownload, torrentStatus.isStartDownloadingFlux()
-                .filter(isTrue -> isTrue == expectedStartDownload)
-                .blockFirst());
         if (expectedStartDownload)
-            Assert.assertTrue(torrentStatus.notifyWhenStartDownloading().map(__ -> true).block(Duration.ofMillis(500)));
+            statusChanger.getStatusNotifications()
+                    .notifyWhenStartDownloading()
+                    .block(Duration.ofMillis(500));
 
         boolean expectedStartUpload = expectedTorrentStatusTypeList.contains(TorrentStatusType.START_UPLOAD);
-        Assert.assertEquals(expectedStartUpload, torrentStatus.isStartUploadingFlux()
-                .filter(isTrue -> isTrue == expectedStartUpload)
-                .blockFirst());
         if (expectedStartUpload)
-            Assert.assertTrue(torrentStatus.notifyWhenStartUploading().map(__ -> true).block(Duration.ofMillis(500)));
+            statusChanger.getStatusNotifications()
+                    .notifyWhenStartUploading()
+                    .block(Duration.ofMillis(500));
 
         boolean expectedDownloading = expectedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_DOWNLOAD);
-        Assert.assertEquals(expectedDownloading, torrentStatus.isDownloadingFlux()
-                .filter(isTrue -> isTrue == expectedDownloading)
-                .blockFirst());
         if (expectedDownloading)
-            Assert.assertTrue(torrentStatus.notifyWhenResumeDownload().map(__ -> true).blockFirst(Duration.ofMillis(500)));
+            statusChanger.getStatusNotifications()
+                    .notifyWhenResumeDownload()
+                    .blockFirst(Duration.ofMillis(500));
 
         boolean expectedUploading = expectedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_UPLOAD);
-        Assert.assertEquals(expectedUploading, torrentStatus.isUploadingFlux()
-                .filter(isTrue -> isTrue == expectedUploading)
-                .blockFirst());
         if (expectedUploading)
-            Assert.assertTrue(torrentStatus.notifyWhenResumeUpload().map(__ -> true).blockFirst(Duration.ofMillis(500)));
+            statusChanger.getStatusNotifications()
+                    .notifyWhenResumeUpload()
+                    .blockFirst(Duration.ofMillis(500));
 
         boolean expectedCompletedDownload = expectedTorrentStatusTypeList.contains(TorrentStatusType.COMPLETED_DOWNLOADING);
-        Assert.assertEquals(expectedCompletedDownload, torrentStatus.isCompletedDownloadingFlux()
-                .filter(isTrue -> isTrue == expectedCompletedDownload)
-                .blockFirst());
         if (expectedCompletedDownload)
-            Assert.assertTrue(torrentStatus.notifyWhenCompletedDownloading().map(__ -> true).block(Duration.ofMillis(500)));
+            statusChanger.getStatusNotifications()
+                    .notifyWhenCompletedDownloading()
+                    .block(Duration.ofMillis(500));
 
         boolean expectedRemovedFiles = expectedTorrentStatusTypeList.contains(TorrentStatusType.REMOVE_FILES);
-        Assert.assertEquals(expectedRemovedFiles, torrentStatus.isFilesRemovedFlux()
-                .filter(isTrue -> isTrue == expectedRemovedFiles)
-                .blockFirst());
         if (expectedRemovedFiles)
-            Assert.assertTrue(torrentStatus.notifyWhenFilesRemoved().map(__ -> true).block(Duration.ofMillis(500)));
+            statusChanger.getStatusNotifications()
+                    .notifyWhenFilesRemoved()
+                    .block(Duration.ofMillis(500));
 
         boolean expectedRemoveTorrent = expectedTorrentStatusTypeList.contains(TorrentStatusType.REMOVE_TORRENT);
-        Assert.assertEquals(expectedRemoveTorrent, torrentStatus.isTorrentRemovedFlux()
-                .filter(isTrue -> isTrue == expectedRemoveTorrent)
-                .blockFirst());
         if (expectedRemoveTorrent)
-            Assert.assertTrue(torrentStatus.notifyWhenTorrentRemoved().map(__ -> true).block(Duration.ofMillis(500)));
+            statusChanger.getStatusNotifications()
+                    .notifyWhenTorrentRemoved()
+                    .block(Duration.ofMillis(500));
 
         boolean expectedStartListeningIncomingPeers = expectedTorrentStatusTypeList.contains(TorrentStatusType.START_LISTENING_TO_INCOMING_PEERS);
-        Assert.assertEquals(expectedStartListeningIncomingPeers, torrentStatus.isStartListeningToIncomingPeersFlux()
-                .filter(isTrue -> isTrue == expectedStartListeningIncomingPeers)
-                .blockFirst());
         if (expectedStartListeningIncomingPeers)
-            Assert.assertTrue(torrentStatus.notifyWhenStartedListeningToIncomingPeers().map(__ -> true).block(Duration.ofMillis(500)));
+            statusChanger.getStatusNotifications()
+                    .notifyWhenStartedListeningToIncomingPeers()
+                    .block(Duration.ofMillis(500));
 
         boolean expectedListeningIncomingPeers = expectedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_LISTENING_TO_INCOMING_PEERS);
-        Assert.assertEquals(expectedListeningIncomingPeers, torrentStatus.isListeningToIncomingPeersFlux()
-                .filter(isTrue -> isTrue == expectedListeningIncomingPeers)
-                .blockFirst());
         if (expectedListeningIncomingPeers)
-            Assert.assertTrue(torrentStatus.notifyWhenListeningToIncomingPeers().map(__ -> true).blockFirst(Duration.ofMillis(500)));
+            statusChanger.getStatusNotifications()
+                    .notifyWhenListeningToIncomingPeers()
+                    .blockFirst(Duration.ofMillis(500));
 
         boolean expectedStartSearchingPeers = expectedTorrentStatusTypeList.contains(TorrentStatusType.START_SEARCHING_PEERS);
-        Assert.assertEquals(expectedStartSearchingPeers, torrentStatus.isStartSearchingPeersFlux()
-                .filter(isTrue -> isTrue == expectedStartSearchingPeers)
-                .blockFirst());
         if (expectedStartSearchingPeers)
-            Assert.assertTrue(torrentStatus.notifyWhenStartSearchingPeers().map(__ -> true).block(Duration.ofMillis(500)));
+            statusChanger.getStatusNotifications()
+                    .notifyWhenStartSearchingPeers()
+                    .block(Duration.ofMillis(500));
 
         boolean expectedSearchingPeers = expectedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_SEARCHING_PEERS);
-        Assert.assertEquals(expectedSearchingPeers, torrentStatus.isSearchingPeersFlux()
-                .filter(isTrue -> isTrue == expectedSearchingPeers)
-                .blockFirst());
         if (expectedSearchingPeers)
-            Assert.assertTrue(torrentStatus.notifySearchingPeers().map(__ -> true).blockFirst(Duration.ofMillis(500)));
+            statusChanger.getStatusNotifications()
+                    .notifyWhenSearchingPeers()
+                    .blockFirst(Duration.ofMillis(500));
     }
 
     private Mono<Link> meToFakePeerLink;
@@ -831,7 +844,7 @@ public class MyStepdefs {
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .get();
 
-        TorrentStatusController torrentStatusController = torrentDownloader.getTorrentStatusController();
+        StatusChanger statusChanger = torrentDownloader.getStatusChanger();
 
         FileSystemLink fileSystemLink = torrentDownloader.getFileSystemLink();
 
@@ -845,7 +858,7 @@ public class MyStepdefs {
 
         // represent this application TorrentDownloader. (not the fake-peer TorrentDownloader).
         TorrentDownloader torrentDownloaderNew =
-                Utils.createCustomTorrentDownloader(torrentInfo, torrentStatusController,
+                Utils.createCustomTorrentDownloader(torrentInfo, statusChanger,
                         fileSystemLink, trackerConnectionFlux);
 
         // the fake-peer will connect to me.
@@ -858,12 +871,10 @@ public class MyStepdefs {
                 .single();
 
         // my application start listening for new peers.
-        torrentStatusController
-                .startListeningToIncomingPeers();
+        statusChanger.changeStatus(TorrentStatusType.START_LISTENING_TO_INCOMING_PEERS).block();
 
         // listen for incoming request messages and response to them.
-        torrentStatusController
-                .startUpload();
+        statusChanger.changeStatus(TorrentStatusType.START_UPLOAD).block();
 
         // wait until the app will start listen for new incoming peers
         // and wait until torrent-status signal "RESUME_LISTENING_TO_INCOMING_PEERS".
@@ -1215,7 +1226,17 @@ public class MyStepdefs {
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        TorrentStatusController torrentStatusController = TorrentStatusControllerImpl.createDefault(torrentInfo);
+        StatusChanger statusChanger = new StatusChanger(new Status(
+                false,
+                false,
+                false,
+                false,
+                false, false,
+                false,
+                false,
+                false,
+                false,
+                false));
 
         Thread.sleep(50);// wait until torrentStatusController is initialized.
 
@@ -1227,7 +1248,7 @@ public class MyStepdefs {
 
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
         FileSystemLinkImpl fileSystemLinkImplTorrent = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, fullDownloadPath, torrentStatusController, allPieceMessages$)
+                .createActiveTorrentMono(torrentInfo, fullDownloadPath, statusChanger, allPieceMessages$)
                 .block();
 
         Mono<Integer> piecesAmount$ = allPieceMessages$.collectList()

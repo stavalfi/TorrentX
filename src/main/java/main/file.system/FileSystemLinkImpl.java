@@ -9,7 +9,9 @@ import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
-import main.torrent.status.TorrentStatusController;
+import main.torrent.status.Status;
+import main.torrent.status.StatusChanger;
+import main.torrent.status.TorrentStatusType;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -32,18 +34,18 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private final BitSet piecesStatus;
     private final long[] downloadedBytesInPieces;
     private final String downloadPath;
-    private TorrentStatusController torrentStatusController;
+    private StatusChanger statusChanger;
     private Flux<Integer> savedPiecesFlux;
     private Flux<PieceEvent> savedBlocksFlux;
     private Mono<FileSystemLinkImpl> notifyWhenActiveTorrentDeleted;
     private Mono<FileSystemLinkImpl> notifyWhenFilesDeleted;
 
     public FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
-                              TorrentStatusController torrentStatusController,
+                              StatusChanger statusChanger,
                               Flux<PieceMessage> peerResponsesFlux) throws IOException {
         super(torrentInfo);
         this.downloadPath = downloadPath;
-        this.torrentStatusController = torrentStatusController;
+        this.statusChanger = statusChanger;
         this.piecesStatus = new BitSet(getPieces().size());
         this.downloadedBytesInPieces = new long[getPieces().size()];
 
@@ -51,7 +53,8 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
         this.actualFileImplList = createActiveTorrentFileList(torrentInfo, downloadPath);
 
-        this.notifyWhenActiveTorrentDeleted = this.torrentStatusController
+        this.notifyWhenActiveTorrentDeleted = this.statusChanger
+                .getStatusNotifications()
                 .notifyWhenFilesRemoved()
                 .flatMap(__ -> deleteFileOnlyMono())
                 .flux()
@@ -59,7 +62,8 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .autoConnect(0)
                 .single();
 
-        this.notifyWhenFilesDeleted = this.torrentStatusController
+        this.notifyWhenFilesDeleted = this.statusChanger
+                .getStatusNotifications()
                 .notifyWhenTorrentRemoved()
                 .flatMap(__ -> deleteActiveTorrentOnlyMono())
                 .flux()
@@ -67,10 +71,10 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .autoConnect(0)
                 .single();
 
-        this.savedBlocksFlux = this.torrentStatusController
-                .isCompletedDownloadingFlux()
-                .take(1)
-                .flatMap(isCompletedDownloading -> {
+        this.savedBlocksFlux = this.statusChanger
+                .getLatestStatus$()
+                .map(Status::isCompletedDownloading)
+                .flatMapMany(isCompletedDownloading -> {
                     if (isCompletedDownloading) {
                         this.piecesStatus.set(0, this.piecesStatus.size());
                         return Mono.empty();
@@ -81,7 +85,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .flatMap(this::writeBlock)
                 .doOnNext(pieceEvent -> {
                     if (minMissingPieceIndex() == -1)
-                        this.torrentStatusController.completedDownloading();
+                        this.statusChanger.changeStatus(TorrentStatusType.COMPLETED_DOWNLOADING).block();
                 })
                 // takeUntil will signal the last next signal he received and then he will send complete signal.
                 .takeUntil(pieceEvent -> minMissingPieceIndex() == -1)

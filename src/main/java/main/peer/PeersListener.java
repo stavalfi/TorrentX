@@ -7,7 +7,8 @@ import main.TorrentInfo;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.peer.peerMessages.HandShake;
-import main.torrent.status.TorrentStatusController;
+import main.torrent.status.StatusChanger;
+import main.torrent.status.TorrentStatusType;
 import main.tracker.BadResponseException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
@@ -26,14 +27,14 @@ public class PeersListener {
     private Flux<Link> peersConnectedToMeFlux;
     private AtomicBoolean didIStop = new AtomicBoolean(false);
 
-    public PeersListener(TorrentStatusController torrentStatusController) {
-        this(torrentStatusController, AppConfig.getInstance().getMyListeningPort());
+    public PeersListener(StatusChanger statusChanger) {
+        this(statusChanger, AppConfig.getInstance().getMyListeningPort());
     }
 
-    public PeersListener(TorrentStatusController torrentStatusController, Integer tcpPort) {
+    public PeersListener(StatusChanger statusChanger, Integer tcpPort) {
         this.tcpPort = tcpPort;
         this.peersConnectedToMeFlux =
-                torrentStatusController.notifyWhenStartedListeningToIncomingPeers()
+                statusChanger.getStatusNotifications().notifyWhenStartedListeningToIncomingPeers()
                         // Important note: While we are waiting for new connections,
                         // we are going to block the running thread.
                         // the running thread belongs to notifyWhenStartedListeningToIncomingPeers()
@@ -47,7 +48,7 @@ public class PeersListener {
                                         // TODO: do something with this shit
                                         //e.printStackTrace();
                                         sink.error(e);
-                                        torrentStatusController.pauseListeningToIncomingPeers();
+                                        statusChanger.changeStatus(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
                                         return;
                                     }
                                     while (!this.listenToPeerConnection.isClosed() && !sink.isCancelled())
@@ -67,12 +68,12 @@ public class PeersListener {
                                             return;
                                         }
                                 }))
-                        .flatMap(link -> torrentStatusController.isListeningToIncomingPeersFlux()
-                                .doOnNext(isListeningToIncomingPeers -> {
-                                    if (!isListeningToIncomingPeers)
+                        .flatMap(link -> statusChanger.getLatestStatus$()
+                                .doOnNext(status -> {
+                                    if (!status.isListeningToIncomingPeers())
                                         link.closeConnection();
                                 })
-                                .filter(isListeningToIncomingPeers -> isListeningToIncomingPeers)
+                                .filter(status -> status.isListeningToIncomingPeers())
                                 .map(__ -> link))
                         .subscribeOn(App.MyScheduler)
                         .publish()

@@ -6,27 +6,28 @@ import main.downloader.PieceEvent;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
-import main.torrent.status.TorrentStatus;
+import main.torrent.status.StatusChanger;
 import reactor.core.publisher.Flux;
 
 public class UploadAlgorithmImpl implements UploadAlgorithm {
     private TorrentInfo torrentInfo;
-    private TorrentStatus torrentStatus;
+    private StatusChanger statusChanger;
     private FileSystemLink fileSystemLink;
     private Flux<Link> peersCommunicatorFlux;
 
     private Flux<PieceEvent> uploadedBlocksFlux;
 
     public UploadAlgorithmImpl(TorrentInfo torrentInfo,
-                               TorrentStatus torrentStatus,
+                               StatusChanger statusChanger,
                                FileSystemLink fileSystemLink,
                                Flux<Link> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
-        this.torrentStatus = torrentStatus;
+        this.statusChanger = statusChanger;
         this.fileSystemLink = fileSystemLink;
         this.peersCommunicatorFlux = peersCommunicatorFlux;
 
-        this.uploadedBlocksFlux = this.torrentStatus
+        this.uploadedBlocksFlux = this.statusChanger
+                .getStatusNotifications()
                 .notifyWhenStartUploading()
                 .flatMapMany(__ -> this.peersCommunicatorFlux)
                 .flatMap(peersCommunicator ->
@@ -34,7 +35,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                         // notifyWhenStartUploading() thread. Watch out.
                         peersCommunicator.receivePeerMessages().getRequestMessageResponseFlux()
                                 .filter(requestMessage -> this.fileSystemLink.havePiece(requestMessage.getIndex()))
-                                .flatMap(requestMessage -> this.torrentStatus.notifyWhenResumeUpload()
+                                .flatMap(requestMessage -> this.statusChanger.getStatusNotifications().notifyWhenResumeUpload()
                                         .flatMap(___ -> this.fileSystemLink.buildPieceMessage(requestMessage)))
                                 .flatMap(pieceMessage ->
                                         peersCommunicator.sendMessages().sendPieceMessage(pieceMessage.getIndex(),
