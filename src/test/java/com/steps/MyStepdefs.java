@@ -1239,5 +1239,47 @@ public class MyStepdefs {
     public void torrentStatusChangeAndNotifyOnlyAboutTheChangesForTorrent(StatusType statusTypeChanging, String torrentFileName) throws Throwable {
 
     }
+
+    /////////////////
+
+    @Given("^allocator for \"([^\"]*)\" blocks with \"([^\"]*)\" bytes each$")
+    public void allocatorForBlocksWithBytesEach(int amountOfBlocksToAllocate, int blockLength) throws Throwable {
+
+    }
+
+    @When("^the application allocate the following blocks from \"([^\"]*)\" threads:$")
+    public void theApplicationAllocateTheFollowingBlocksFromThreads(int threadsAmount, List<Integer> allocationsList) throws Throwable {
+
+    }
+
+    @Then("^the allocator have the following free blocks:$")
+    public void theAllocatorHaveTheFollowingFreeBlocks(List<Integer> freeBlocksList) throws Throwable {
+
+    }
+
+    @Then("^the allocator have the following used blocks:$")
+    public void theAllocatorHaveTheFollowingUsedBlocks(List<Integer> usedBlocksList) throws Throwable {
+
+    }
+
+    @Then("^the allocator have the following free blocks - none$")
+    public void theAllocatorHaveTheFollowingFreeBlocksNone() throws Throwable {
+
+    }
+
+    @When("^the application free the following blocks:$")
+    public void theApplicationFreeTheFollowingBlocks(List<Integer> allocationToFreeList) throws Throwable {
+
+    }
+
+    @Then("^the allocator have the following used blocks - none$")
+    public void theAllocatorHaveTheFollowingUsedBlocksNone() throws Throwable {
+
+    }
+
+    @When("^the application allocate \"([^\"]*)\" blocks from \"([^\"]*)\" threads:$")
+    public void theApplicationAllocateBlocksFromThreads(int amountOfAllocations, int threadsAmount) throws Throwable {
+
+    }
 }
 
