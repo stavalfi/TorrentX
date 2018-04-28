@@ -15,11 +15,11 @@ public interface BlocksAllocator {
     // here because someone will maybe save
     // it but it's not safe because it's content
     // will be changed in the future.
-    Flux<Integer> allocations$();
+    Flux<Integer> allocated$();
 
     Flux<Integer> frees$();
 
-    BitSet currentFreeBlocksStatus();
+    BitSet getFreeBlocksStatus();
 
     int getBlockLength();
 

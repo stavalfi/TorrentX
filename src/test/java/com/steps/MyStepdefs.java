@@ -1256,29 +1256,26 @@ public class MyStepdefs {
 
         this.actualAllocations = Flux.range(0, amountOfAllocations)
                 .flatMap(blockIndex -> this.blocksAllocator.allocate(), threadsAmount)
-                .doOnNext(allocatedBlock -> Assert.assertFalse(this.blocksAllocator.currentFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
+                .doOnNext(allocatedBlock -> Assert.assertFalse(this.blocksAllocator.getFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
                 .collect(Collectors.toSet())
                 .block();
 
         int actualFreesAmount = this.blocksAllocator.getAmountOfBlocks() - amountOfAllocations;
         frees$.take(actualFreesAmount)
-                .doOnNext(freeIndex -> Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(freeIndex)))
+                .doOnNext(freeIndex -> Assert.assertTrue(this.blocksAllocator.getFreeBlocksStatus().get(freeIndex)))
                 .collect(Collectors.toSet())
                 .block();
     }
 
     @When("^the application allocate the following blocks from \"([^\"]*)\" threads:$")
-    public void theApplicationAllocateTheFollowingBlocksFromThreads(int threadsAmount, Set<Integer> expectedAllocationsList) throws Throwable {
-        Flux<Integer> allocations$ = this.blocksAllocator.allocations$()
-                .replay()
-                .autoConnect(0);
-        Flux<Integer> frees$ = this.blocksAllocator.frees$()
+    public void theApplicationAllocateTheFollowingBlocksFromThreads(int threadsAmount, List<Integer> expectedAllocationsList) throws Throwable {
+        Flux<Integer> allocations$ = this.blocksAllocator.allocated$()
                 .replay()
                 .autoConnect(0);
 
         this.actualAllocations = Flux.range(0, expectedAllocationsList.size())
                 .flatMap(blockIndex -> this.blocksAllocator.allocate(), threadsAmount)
-                .doOnNext(allocatedBlock -> Assert.assertFalse(this.blocksAllocator.currentFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
+                .doOnNext(allocatedBlock -> Assert.assertFalse(this.blocksAllocator.getFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
                 .collect(Collectors.toSet())
                 .block();
 
@@ -1286,56 +1283,60 @@ public class MyStepdefs {
                 .collect(Collectors.toSet())
                 .block();
 
-        int actualFreesAmount = this.blocksAllocator.getAmountOfBlocks() - expectedAllocationsList.size();
-        frees$.take(actualFreesAmount)
-                .doOnNext(freeIndex -> Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(freeIndex)))
-                .collect(Collectors.toSet())
-                .block();
-
-        Assert.assertEquals(expectedAllocationsList,
+        Assert.assertEquals(expectedAllocationsList.stream()
+                        .collect(Collectors.toSet()),
                 actualAllocations.stream()
                         .map(AllocatedBlock::getBlockIndex)
                         .collect(Collectors.toSet()));
-        Assert.assertEquals(expectedAllocationsList, actualAllocationsFromNotifier);
+        Assert.assertEquals(expectedAllocationsList.stream().collect(Collectors.toSet()), actualAllocationsFromNotifier);
     }
 
     @Then("^the allocator have the following free blocks:$")
     public void theAllocatorHaveTheFollowingFreeBlocks(List<Integer> freeBlocksList) throws Throwable {
         for (int i = 0; i < this.blocksAllocator.getAmountOfBlocks(); i++)
             if (freeBlocksList.contains(i))
-                Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(i));
+                Assert.assertTrue(this.blocksAllocator.getFreeBlocksStatus().get(i));
             else
-                Assert.assertFalse(this.blocksAllocator.currentFreeBlocksStatus().get(i));
+                Assert.assertFalse(this.blocksAllocator.getFreeBlocksStatus().get(i));
     }
 
     @Then("^the allocator have the following used blocks:$")
     public void theAllocatorHaveTheFollowingUsedBlocks(List<Integer> usedBlocksList) throws Throwable {
         for (int i = 0; i < this.blocksAllocator.getAmountOfBlocks(); i++)
             if (usedBlocksList.contains(i))
-                Assert.assertFalse(this.blocksAllocator.currentFreeBlocksStatus().get(i));
+                Assert.assertFalse(this.blocksAllocator.getFreeBlocksStatus().get(i));
             else
-                Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(i));
+                Assert.assertTrue(this.blocksAllocator.getFreeBlocksStatus().get(i));
     }
 
     @Then("^the allocator have the following free blocks - none$")
     public void theAllocatorHaveTheFollowingFreeBlocksNone() throws Throwable {
         for (int i = 0; i < this.blocksAllocator.getAmountOfBlocks(); i++)
-            Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(i));
+            Assert.assertFalse(this.blocksAllocator.getFreeBlocksStatus().get(i));
     }
 
     @When("^the application free the following blocks:$")
     public void theApplicationFreeTheFollowingBlocks(List<Integer> allocationToFreeList) throws Throwable {
+        Flux<Integer> frees$ = this.blocksAllocator.frees$()
+                .replay()
+                .autoConnect(0);
+
         this.actualAllocations.stream()
                 .filter(allocatedBlock -> allocationToFreeList.contains(allocatedBlock.getBlockIndex()))
                 .peek(allocatedBlock -> this.blocksAllocator.free(allocatedBlock))
                 .map(AllocatedBlock::getBlockIndex)
-                .forEach(freedIndex -> Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(freedIndex)));
+                .forEach(freedIndex -> Assert.assertTrue(this.blocksAllocator.getFreeBlocksStatus().get(freedIndex)));
+
+        frees$.take(allocationToFreeList.size())
+                .doOnNext(freeIndex -> Assert.assertTrue(this.blocksAllocator.getFreeBlocksStatus().get(freeIndex)))
+                .collect(Collectors.toSet())
+                .block();
     }
 
     @Then("^the allocator have the following used blocks - none$")
     public void theAllocatorHaveTheFollowingUsedBlocksNone() throws Throwable {
         for (int i = 0; i < this.blocksAllocator.getAmountOfBlocks(); i++)
-            Assert.assertFalse(this.blocksAllocator.currentFreeBlocksStatus().get(i));
+            Assert.assertTrue(this.blocksAllocator.getFreeBlocksStatus().get(i));
     }
 }
 
