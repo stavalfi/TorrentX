@@ -11,9 +11,17 @@ public interface BlocksAllocator {
 
     void free(AllocatedBlock allocatedBlock);
 
+    // I can't send the actual AllocatedBlock
+    // here because someone will maybe save
+    // it but it's not safe because it's content
+    // will be changed in the future.
     Flux<Integer> allocations$();
 
     Flux<Integer> frees$();
 
-    BitSet currentStatus();
+    BitSet currentFreeBlocksStatus();
+
+    int getBlockLength();
+
+    int getAmountOfBlocks();
 }

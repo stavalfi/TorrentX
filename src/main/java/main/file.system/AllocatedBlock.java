@@ -1,12 +1,13 @@
 package main.file.system;
 
 public class AllocatedBlock {
-    int blockIndex;
-    byte[] allocation;
-    int from;
-    int to;
+    private int blockIndex;
+    private byte[] allocation;
+    private int from;
+    private int to;
 
-    public AllocatedBlock(byte[] allocation, int from, int to) {
+    public AllocatedBlock(int blockIndex, byte[] allocation, int from, int to) {
+        this.blockIndex = blockIndex;
         this.allocation = allocation;
         this.from = from;
         this.to = to;
@@ -23,4 +24,10 @@ public class AllocatedBlock {
     public int getTo() {
         return to;
     }
+
+    public int getBlockIndex() {
+        return blockIndex;
+    }
+
+
 }

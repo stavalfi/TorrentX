@@ -11,9 +11,7 @@ import main.TorrentInfo;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.file.system.ActiveTorrents;
-import main.file.system.FileSystemLink;
-import main.file.system.FileSystemLinkImpl;
+import main.file.system.*;
 import main.peer.*;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
@@ -407,7 +405,8 @@ public class MyStepdefs {
                 false,
                 false,
                 false,
-                false, false,
+                false,
+                false,
                 false,
                 false,
                 false,
@@ -1240,46 +1239,103 @@ public class MyStepdefs {
 
     }
 
-    /////////////////
+    private BlocksAllocator blocksAllocator;
 
     @Given("^allocator for \"([^\"]*)\" blocks with \"([^\"]*)\" bytes each$")
     public void allocatorForBlocksWithBytesEach(int amountOfBlocksToAllocate, int blockLength) throws Throwable {
+        this.blocksAllocator = new BlocksAllocatorImpl(amountOfBlocksToAllocate, blockLength);
+    }
 
+    private Set<AllocatedBlock> actualAllocations;
+
+    @When("^the application allocate \"([^\"]*)\" blocks from \"([^\"]*)\" threads:$")
+    public void theApplicationAllocateBlocksFromThreads(int amountOfAllocations, int threadsAmount) throws Throwable {
+        Flux<Integer> frees$ = this.blocksAllocator.frees$()
+                .replay()
+                .autoConnect(0);
+
+        this.actualAllocations = Flux.range(0, amountOfAllocations)
+                .flatMap(blockIndex -> this.blocksAllocator.allocate(), threadsAmount)
+                .doOnNext(allocatedBlock -> Assert.assertFalse(this.blocksAllocator.currentFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
+                .collect(Collectors.toSet())
+                .block();
+
+        int actualFreesAmount = this.blocksAllocator.getAmountOfBlocks() - amountOfAllocations;
+        frees$.take(actualFreesAmount)
+                .doOnNext(freeIndex -> Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(freeIndex)))
+                .collect(Collectors.toSet())
+                .block();
     }
 
     @When("^the application allocate the following blocks from \"([^\"]*)\" threads:$")
-    public void theApplicationAllocateTheFollowingBlocksFromThreads(int threadsAmount, List<Integer> allocationsList) throws Throwable {
+    public void theApplicationAllocateTheFollowingBlocksFromThreads(int threadsAmount, Set<Integer> expectedAllocationsList) throws Throwable {
+        Flux<Integer> allocations$ = this.blocksAllocator.allocations$()
+                .replay()
+                .autoConnect(0);
+        Flux<Integer> frees$ = this.blocksAllocator.frees$()
+                .replay()
+                .autoConnect(0);
 
+        this.actualAllocations = Flux.range(0, expectedAllocationsList.size())
+                .flatMap(blockIndex -> this.blocksAllocator.allocate(), threadsAmount)
+                .doOnNext(allocatedBlock -> Assert.assertFalse(this.blocksAllocator.currentFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
+                .collect(Collectors.toSet())
+                .block();
+
+        Set<Integer> actualAllocationsFromNotifier = allocations$.take(expectedAllocationsList.size())
+                .collect(Collectors.toSet())
+                .block();
+
+        int actualFreesAmount = this.blocksAllocator.getAmountOfBlocks() - expectedAllocationsList.size();
+        frees$.take(actualFreesAmount)
+                .doOnNext(freeIndex -> Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(freeIndex)))
+                .collect(Collectors.toSet())
+                .block();
+
+        Assert.assertEquals(expectedAllocationsList,
+                actualAllocations.stream()
+                        .map(AllocatedBlock::getBlockIndex)
+                        .collect(Collectors.toSet()));
+        Assert.assertEquals(expectedAllocationsList, actualAllocationsFromNotifier);
     }
 
     @Then("^the allocator have the following free blocks:$")
     public void theAllocatorHaveTheFollowingFreeBlocks(List<Integer> freeBlocksList) throws Throwable {
-
+        for (int i = 0; i < this.blocksAllocator.getAmountOfBlocks(); i++)
+            if (freeBlocksList.contains(i))
+                Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(i));
+            else
+                Assert.assertFalse(this.blocksAllocator.currentFreeBlocksStatus().get(i));
     }
 
     @Then("^the allocator have the following used blocks:$")
     public void theAllocatorHaveTheFollowingUsedBlocks(List<Integer> usedBlocksList) throws Throwable {
-
+        for (int i = 0; i < this.blocksAllocator.getAmountOfBlocks(); i++)
+            if (usedBlocksList.contains(i))
+                Assert.assertFalse(this.blocksAllocator.currentFreeBlocksStatus().get(i));
+            else
+                Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(i));
     }
 
     @Then("^the allocator have the following free blocks - none$")
     public void theAllocatorHaveTheFollowingFreeBlocksNone() throws Throwable {
-
+        for (int i = 0; i < this.blocksAllocator.getAmountOfBlocks(); i++)
+            Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(i));
     }
 
     @When("^the application free the following blocks:$")
     public void theApplicationFreeTheFollowingBlocks(List<Integer> allocationToFreeList) throws Throwable {
-
+        this.actualAllocations.stream()
+                .filter(allocatedBlock -> allocationToFreeList.contains(allocatedBlock.getBlockIndex()))
+                .peek(allocatedBlock -> this.blocksAllocator.free(allocatedBlock))
+                .map(AllocatedBlock::getBlockIndex)
+                .forEach(freedIndex -> Assert.assertTrue(this.blocksAllocator.currentFreeBlocksStatus().get(freedIndex)));
     }
 
     @Then("^the allocator have the following used blocks - none$")
     public void theAllocatorHaveTheFollowingUsedBlocksNone() throws Throwable {
-
-    }
-
-    @When("^the application allocate \"([^\"]*)\" blocks from \"([^\"]*)\" threads:$")
-    public void theApplicationAllocateBlocksFromThreads(int amountOfAllocations, int threadsAmount) throws Throwable {
-
+        for (int i = 0; i < this.blocksAllocator.getAmountOfBlocks(); i++)
+            Assert.assertFalse(this.blocksAllocator.currentFreeBlocksStatus().get(i));
     }
 }
 

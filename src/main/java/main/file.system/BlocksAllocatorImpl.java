@@ -7,10 +7,14 @@ import java.util.BitSet;
 
 public class BlocksAllocatorImpl implements BlocksAllocator {
     private byte[] allocation;
+    private int blockLength;
+    private int amountOfBlocks;
 
-    public BlocksAllocatorImpl(int blockLength, int amountOfBlocks) {
+    public BlocksAllocatorImpl(int amountOfBlocks, int blockLength) {
         assert blockLength > 0;
         assert amountOfBlocks > 0;
+        this.blockLength = blockLength;
+        this.amountOfBlocks = amountOfBlocks;
         this.allocation = new byte[blockLength * amountOfBlocks];
     }
 
@@ -35,7 +39,17 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
     }
 
     @Override
-    public BitSet currentStatus() {
+    public BitSet currentFreeBlocksStatus() {
         return null;
+    }
+
+    @Override
+    public int getBlockLength() {
+        return blockLength;
+    }
+
+    @Override
+    public int getAmountOfBlocks() {
+        return amountOfBlocks;
     }
 }
