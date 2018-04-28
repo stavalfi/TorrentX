@@ -70,7 +70,7 @@ public class StatusNotificationsImpl implements StatusNotifications {
                 .filter(status -> !status.isListeningToIncomingPeers());
 
         this.notifyWhenStartSearchingPeers = latestStatus$
-                .filter(status -> status.isStartedListeningToIncomingPeers())
+                .filter(status -> status.isStartedSearchingPeers())
                 .take(1)
                 .single();
 

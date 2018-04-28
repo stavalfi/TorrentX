@@ -41,6 +41,7 @@ public class StatusChanger {
     }
 
     public Mono<Status> changeStatus(TorrentStatusType change) {
+        // TODO: replace this shit with something better.
         return this.latestStatus$
                 .take(1)
                 .single()
@@ -49,7 +50,13 @@ public class StatusChanger {
                     if (lastStatus.equals(newStatus))
                         return Mono.empty();
                     this.latestStatusSink.next(newStatus);
-                    return Mono.just(newStatus);
+                    return Mono.just(newStatus)
+                            // we need to assert that the new state is available.
+                            .flatMapMany(status -> this.latestStatus$)
+                            // status == "lastStatus" or "newStatus". there is no other option.
+                            .filter(status -> status.equals(newStatus))
+                            .take(1)
+                            .single();
                 });
     }
 
@@ -192,7 +199,7 @@ public class StatusChanger {
                             .setUploading(false)
                             .setListeningToIncomingPeers(false)
                             .setSearchingPeers(false)
-                            .setFilesRemoved(false)
+                            .setFilesRemoved(true)
                             .build();
                 break;
             case REMOVE_TORRENT:
@@ -202,7 +209,7 @@ public class StatusChanger {
                             .setUploading(false)
                             .setListeningToIncomingPeers(false)
                             .setSearchingPeers(false)
-                            .setTorrentRemoved(false)
+                            .setTorrentRemoved(true)
                             .build();
                 break;
 

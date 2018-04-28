@@ -676,9 +676,14 @@ public class MyStepdefs {
                         null);
     }
 
+    private Status actualLastStatus = null;
+
     @When("^torrent-status for torrent \"([^\"]*)\" is trying to change to:$")
     public void torrentStatusForIsTryingToChangeTo(String torrentFileName,
                                                    List<TorrentStatusType> changeTorrentStatusTypeList) throws Throwable {
+        // remove every state from the last test.
+        this.actualLastStatus = null;
+
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         StatusChanger statusChanger = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
@@ -688,49 +693,49 @@ public class MyStepdefs {
         changeTorrentStatusTypeList.forEach(torrentStatusType -> {
             switch (torrentStatusType) {
                 case START_DOWNLOAD:
-                    statusChanger.changeStatus(TorrentStatusType.START_DOWNLOAD).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.START_DOWNLOAD).block();
                     break;
                 case START_UPLOAD:
-                    statusChanger.changeStatus(TorrentStatusType.START_UPLOAD).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.START_UPLOAD).block();
                     break;
                 case PAUSE_DOWNLOAD:
-                    statusChanger.changeStatus(TorrentStatusType.PAUSE_DOWNLOAD).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.PAUSE_DOWNLOAD).block();
                     break;
                 case RESUME_DOWNLOAD:
-                    statusChanger.changeStatus(TorrentStatusType.RESUME_DOWNLOAD).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.RESUME_DOWNLOAD).block();
                     break;
                 case PAUSE_UPLOAD:
-                    statusChanger.changeStatus(TorrentStatusType.PAUSE_UPLOAD).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.PAUSE_UPLOAD).block();
                     break;
                 case RESUME_UPLOAD:
-                    statusChanger.changeStatus(TorrentStatusType.RESUME_UPLOAD).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.RESUME_UPLOAD).block();
                     break;
                 case COMPLETED_DOWNLOADING:
-                    statusChanger.changeStatus(TorrentStatusType.COMPLETED_DOWNLOADING).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.COMPLETED_DOWNLOADING).block();
                     break;
                 case REMOVE_TORRENT:
-                    statusChanger.changeStatus(TorrentStatusType.REMOVE_TORRENT).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.REMOVE_TORRENT).block();
                     break;
                 case REMOVE_FILES:
-                    statusChanger.changeStatus(TorrentStatusType.REMOVE_FILES).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.REMOVE_FILES).block();
                     break;
                 case START_LISTENING_TO_INCOMING_PEERS:
-                    statusChanger.changeStatus(TorrentStatusType.START_LISTENING_TO_INCOMING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.START_LISTENING_TO_INCOMING_PEERS).block();
                     break;
                 case RESUME_LISTENING_TO_INCOMING_PEERS:
-                    statusChanger.changeStatus(TorrentStatusType.RESUME_LISTENING_TO_INCOMING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.RESUME_LISTENING_TO_INCOMING_PEERS).block();
                     break;
                 case PAUSE_LISTENING_TO_INCOMING_PEERS:
-                    statusChanger.changeStatus(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
                     break;
                 case START_SEARCHING_PEERS:
-                    statusChanger.changeStatus(TorrentStatusType.START_SEARCHING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.START_SEARCHING_PEERS).block();
                     break;
                 case RESUME_SEARCHING_PEERS:
-                    statusChanger.changeStatus(TorrentStatusType.RESUME_SEARCHING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.RESUME_SEARCHING_PEERS).block();
                     break;
                 case PAUSE_SEARCHING_PEERS:
-                    statusChanger.changeStatus(TorrentStatusType.PAUSE_SEARCHING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeStatus(TorrentStatusType.PAUSE_SEARCHING_PEERS).block();
                     break;
             }
         });
@@ -758,7 +763,12 @@ public class MyStepdefs {
                 expectedTorrentStatusTypeList.contains(TorrentStatusType.START_SEARCHING_PEERS),
                 expectedTorrentStatusTypeList.contains(TorrentStatusType.RESUME_SEARCHING_PEERS));
 
+        // test with the status we received from the "last-status-mono"
         Assert.assertEquals(expectedFinalStatus, statusChanger.getLatestStatus$().block());
+        // test with the actual last status we received in the last time we tried to change the status
+        if (this.actualLastStatus != null)
+            Assert.assertEquals(expectedFinalStatus, this.actualLastStatus);
+        this.actualLastStatus = null;
 
         // same test but here we check using the notify API.
 

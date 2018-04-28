@@ -20,7 +20,6 @@ import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.Status;
 import main.torrent.status.StatusChanger;
-import main.torrent.status.TorrentStatusType;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import reactor.core.publisher.Flux;
@@ -72,10 +71,10 @@ public class Utils {
                 .doOnNext(torrentDownloader -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash()))
                 .map(TorrentDownloader::getStatusChanger)
                 .doOnNext(statusChanger -> {
-                    statusChanger.changeStatus(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
-                    statusChanger.changeStatus(TorrentStatusType.PAUSE_SEARCHING_PEERS).block();
-                    statusChanger.changeStatus(TorrentStatusType.PAUSE_DOWNLOAD).block();
-                    statusChanger.changeStatus(TorrentStatusType.PAUSE_UPLOAD).block();
+//                    statusChanger.changeStatus(TorrentStatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
+//                    statusChanger.changeStatus(TorrentStatusType.PAUSE_SEARCHING_PEERS).block();
+//                    statusChanger.changeStatus(TorrentStatusType.PAUSE_DOWNLOAD).block();
+//                    statusChanger.changeStatus(TorrentStatusType.PAUSE_UPLOAD).block();
                 })
                 .collectList();
         try {

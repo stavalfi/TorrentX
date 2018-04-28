@@ -1,8 +1,11 @@
 package main.torrent.status;
 
 import java.util.Objects;
+import java.util.Optional;
 
 public class Status {
+    private TorrentStatusType changed;
+
     private boolean isStartedDownload;
     private boolean isStartedUpload;
     private boolean isTorrentRemoved;
@@ -26,6 +29,7 @@ public class Status {
                   boolean isListeningToIncomingPeers,
                   boolean isStartedSearchingPeers,
                   boolean isSearchingPeers) {
+        this.changed = null;
         this.isStartedDownload = isStartedDownload;
         this.isStartedUpload = isStartedUpload;
         this.isTorrentRemoved = isTorrentRemoved;
@@ -37,6 +41,36 @@ public class Status {
         this.isListeningToIncomingPeers = isListeningToIncomingPeers;
         this.isStartedSearchingPeers = isStartedSearchingPeers;
         this.isSearchingPeers = isSearchingPeers;
+    }
+
+    public Status(TorrentStatusType changed,
+                  boolean isStartedDownload,
+                  boolean isStartedUpload,
+                  boolean isTorrentRemoved,
+                  boolean isFilesRemoved,
+                  boolean isUploading,
+                  boolean isDownloading,
+                  boolean isCompletedDownloading,
+                  boolean isStartedListeningToIncomingPeers,
+                  boolean isListeningToIncomingPeers,
+                  boolean isStartedSearchingPeers,
+                  boolean isSearchingPeers) {
+        this.changed = changed;
+        this.isStartedDownload = isStartedDownload;
+        this.isStartedUpload = isStartedUpload;
+        this.isTorrentRemoved = isTorrentRemoved;
+        this.isFilesRemoved = isFilesRemoved;
+        this.isUploading = isUploading;
+        this.isDownloading = isDownloading;
+        this.isCompletedDownloading = isCompletedDownloading;
+        this.isStartedListeningToIncomingPeers = isStartedListeningToIncomingPeers;
+        this.isListeningToIncomingPeers = isListeningToIncomingPeers;
+        this.isStartedSearchingPeers = isStartedSearchingPeers;
+        this.isSearchingPeers = isSearchingPeers;
+    }
+
+    public Optional<TorrentStatusType> getChanged() {
+        return Optional.ofNullable(changed);
     }
 
     public boolean isStartedDownload() {
