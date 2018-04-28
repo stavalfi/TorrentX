@@ -23,6 +23,10 @@ public class PeerMessageFactory {
         return create(from, to, byteBuffer.array()); // initialize message object from byte[]
     }
 
+//    public static PieceMessage createPieceMessage(Peer from, Peer to, int index, int begin, AllocatedBlock allocatedBlock) {
+//        return new PieceMessage(from, to, index, begin, allocatedBlock);
+//    }
+
     public static PeerMessage create(Peer from, Peer to, byte[] peerMessage) {
         PeerMessageId messageId = PeerMessageId.fromValue(PeerMessage.getMessageId(peerMessage));
         switch (Objects.requireNonNull(messageId)) {

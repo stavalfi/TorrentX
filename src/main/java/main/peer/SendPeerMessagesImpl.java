@@ -35,7 +35,10 @@ class SendPeerMessagesImpl implements SendPeerMessages {
     private Mono<SendPeerMessages> send(PeerMessage peerMessage) {
         return Mono.create((MonoSink<SendPeerMessages> monoSink) -> {
             try {
-                this.peerDataOutputStream.write(peerMessage.createPacketFromObject());
+                if (peerMessage instanceof PieceMessage) {
+                    // TODO: we need to write this message one by one.
+                } else
+                    this.peerDataOutputStream.write(peerMessage.createPacketFromObject());
                 monoSink.success(this);
             } catch (IOException e) {
                 this.closeConnectionMethod.run();
