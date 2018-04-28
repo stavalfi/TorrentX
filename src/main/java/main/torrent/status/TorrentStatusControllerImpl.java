@@ -9,8 +9,6 @@ import reactor.core.publisher.Mono;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TorrentStatusControllerImpl implements TorrentStatusController {
-
-    private TorrentInfo torrentInfo;
     private AtomicBoolean isStartedDownload;
     private AtomicBoolean isStartedUpload;
     private AtomicBoolean isTorrentRemoved;
@@ -48,8 +46,7 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
     private Mono<TorrentStatusType> notifyWhenStartSearchingPeers;
     private Flux<TorrentStatusType> notifyWhenSearchingPeers;
 
-    public TorrentStatusControllerImpl(TorrentInfo torrentInfo,
-                                       boolean isStartedDownload,
+    public TorrentStatusControllerImpl(boolean isStartedDownload,
                                        boolean isStartedUpload,
                                        boolean isTorrentRemoved,
                                        boolean isFilesRemoved,
@@ -60,8 +57,6 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
                                        boolean isListeningToIncomingPeers,
                                        boolean isStartedSearchingPeers,
                                        boolean isSearchingPeers) {
-        this.torrentInfo = torrentInfo;
-
         this.isStartedDownload = new AtomicBoolean(isStartedDownload);
         this.isStartedUpload = new AtomicBoolean(isStartedUpload);
         this.isTorrentRemoved = new AtomicBoolean(isTorrentRemoved);
@@ -274,11 +269,6 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
             statusTypeFluxSink.next(TorrentStatusType.RESUME_SEARCHING_PEERS);
         else
             statusTypeFluxSink.next(TorrentStatusType.PAUSE_SEARCHING_PEERS);
-    }
-
-    @Override
-    public Flux<TorrentStatusType> getStatusTypeFlux() {
-        return this.statusTypeFlux;
     }
 
     @Override
@@ -581,14 +571,8 @@ public class TorrentStatusControllerImpl implements TorrentStatusController {
         return this.notifyWhenSearchingPeers;
     }
 
-    @Override
-    public TorrentInfo getTorrentInfo() {
-        return this.torrentInfo;
-    }
-
     public static TorrentStatusController createDefault(TorrentInfo torrentInfo) {
-        return new TorrentStatusControllerImpl(torrentInfo,
-                false,
+        return new TorrentStatusControllerImpl(false,
                 false,
                 false,
                 false,

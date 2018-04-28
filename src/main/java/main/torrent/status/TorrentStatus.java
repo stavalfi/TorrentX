@@ -1,14 +1,9 @@
 package main.torrent.status;
 
-import main.TorrentInfo;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public interface TorrentStatus {
-    TorrentInfo getTorrentInfo();
-
-    Flux<TorrentStatusType> getStatusTypeFlux();
-
     Flux<Boolean> isStartDownloadingFlux();
 
     Flux<Boolean> isStartUploadingFlux();

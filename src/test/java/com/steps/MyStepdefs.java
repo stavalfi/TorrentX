@@ -643,7 +643,7 @@ public class MyStepdefs {
         // delete everything from the last test.
         Utils.removeEverythingRelatedToLastTest();
 
-        TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(torrentInfo,
+        TorrentStatusController torrentStatusController = new TorrentStatusControllerImpl(
                 initialTorrentStatusTypeMap.get(TorrentStatusType.START_DOWNLOAD),
                 initialTorrentStatusTypeMap.get(TorrentStatusType.START_UPLOAD),
                 initialTorrentStatusTypeMap.get(TorrentStatusType.REMOVE_TORRENT),
@@ -668,8 +668,6 @@ public class MyStepdefs {
                         null);
     }
 
-    private List<TorrentStatusType> torrentStatusTypeFlux = new ArrayList<>();
-
     @When("^torrent-status for torrent \"([^\"]*)\" is trying to change to:$")
     public void torrentStatusForIsTryingToChangeTo(String torrentFileName,
                                                    List<TorrentStatusType> changeTorrentStatusTypeList) throws Throwable {
@@ -678,13 +676,6 @@ public class MyStepdefs {
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .get()
                 .getTorrentStatusController();
-
-        Flux<TorrentStatusType> torrentStatusTypeFlux =
-                torrentStatusController.getStatusTypeFlux()
-                        .replay()
-                        .autoConnect(0);
-        this.torrentStatusTypeFlux = new ArrayList<>();
-        torrentStatusTypeFlux.subscribe(this.torrentStatusTypeFlux::add);
 
         changeTorrentStatusTypeList.forEach(torrentStatusType -> {
             switch (torrentStatusType) {
