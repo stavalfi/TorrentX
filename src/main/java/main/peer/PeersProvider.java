@@ -60,8 +60,7 @@ public class PeersProvider {
                             " with the wrong torrent-info-hash: " + receivedTorrentInfoHash));
                 } else {
                     // all went well, I accept this connection.
-                    Link link = new Link(this.torrentInfo, peer,
-                            peerSocket, receiveMessages, sendMessages);
+                    Link link = new Link(this.torrentInfo, peer, peerSocket, receiveMessages, sendMessages);
                     sink.success(link);
                 }
             } catch (IOException e) {

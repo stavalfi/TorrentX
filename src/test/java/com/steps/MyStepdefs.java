@@ -51,6 +51,9 @@ import static org.mockito.Mockito.mock;
 public class MyStepdefs {
 
     static {
+        Hooks.onErrorDropped(throwable -> {
+        });
+
         // active debug mode in reactor
         Hooks.onOperatorDebug();
 
