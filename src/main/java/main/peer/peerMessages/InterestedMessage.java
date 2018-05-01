@@ -18,8 +18,14 @@ public class InterestedMessage extends PeerMessage {
         return messageId;
     }
 
-    public InterestedMessage(Peer from, Peer to, byte[] peerMessage) {
-        super(to, from);
+    @Override
+    public int getMessageLength() {
+        return length;
+    }
+
+    @Override
+    public byte[] getMessagePayload() {
+        return new byte[0];
     }
 
     @Override

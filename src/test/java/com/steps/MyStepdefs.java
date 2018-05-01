@@ -188,8 +188,7 @@ public class MyStepdefs {
 
         Flux<? extends PeerMessage> recordedResponseFlux =
                 Flux.fromIterable(messageToSendList)
-                        .flatMap(peerMessageType ->
-                                Utils.getSpecificMessageResponseFluxByMessageType(fakePeer, peerMessageType))
+                        .flatMap(peerMessageType -> Utils.getSpecificMessageResponseFluxByMessageType(fakePeer, peerMessageType))
                         .replay()
                         // start record incoming messages from fake peer
                         .autoConnect(0);
@@ -201,29 +200,26 @@ public class MyStepdefs {
                 .collectList();
 
         if (expectResponseToEveryRequest)
-            StepVerifier
-                    .create(sentMessagesMono
-                            .flatMapMany(peersCommunicator -> recordedResponseFlux)
-                            .take(messageToSendList.size()))
+            StepVerifier.create(sentMessagesMono
+                    .flatMapMany(peersCommunicator -> recordedResponseFlux)
+                    .take(messageToSendList.size()))
                     .expectNextCount(messageToSendList.size())
                     .verifyComplete();
 
         errorSignalTypeOptional.map(ErrorSignalType::getErrorSignal)
                 .ifPresent(errorSignalType ->
-                        StepVerifier
-                                .create(sentMessagesMono
-                                        .flatMapMany(peersCommunicator -> recordedResponseFlux)
-                                        .take(messageToSendList.size() - 1))
+                        StepVerifier.create(sentMessagesMono
+                                .flatMapMany(peersCommunicator -> recordedResponseFlux)
+                                .take(messageToSendList.size() - 1))
                                 .expectNextCount(messageToSendList.size() - 1)
                                 .expectError(errorSignalType)
                                 .verify());
 
         completeSignalOptional.map(PeerFakeRequestResponse::getSendMessageType)
                 .ifPresent(errorSignalType1 ->
-                        StepVerifier
-                                .create(sentMessagesMono
-                                        .flatMapMany(peersCommunicator -> recordedResponseFlux)
-                                        .take(messageToSendList.size() - 1))
+                        StepVerifier.create(sentMessagesMono
+                                .flatMapMany(peersCommunicator -> recordedResponseFlux)
+                                .take(messageToSendList.size() - 1))
                                 .expectNextCount(messageToSendList.size() - 1)
                                 .verifyComplete());
 
@@ -395,7 +391,7 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         Flux<PieceMessage> pieceMessagesFlux = Flux.fromIterable(blockList)
-                .map((BlockOfPiece blockOfPiece) -> Utils.createPieceMessages(torrentInfo, blockOfPiece, 17_000))
+                .map((BlockOfPiece blockOfPiece) -> Utils.createPieceMessages(torrentInfo, blockOfPiece, 9_000_000))
                 .flatMap(Flux::fromIterable)
                 .publish()
                 .autoConnect(2);
@@ -462,7 +458,7 @@ public class MyStepdefs {
                         }))
                 .collect(Collectors.toSet());
 
-        Set<PieceMessage> actualCompletedSavedPiecesReadByFileSytem = Flux.fromIterable(expectedCompletedSavedPieces)
+        Set<PieceMessage> actualCompletedSavedPiecesReadByFileSystem = Flux.fromIterable(expectedCompletedSavedPieces)
                 .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(), pieceMessage.getBegin(), pieceMessage.getBlock().length))
                 .flatMap(fileSystemLink::buildPieceMessage)
                 .collect(Collectors.toSet())
@@ -472,7 +468,7 @@ public class MyStepdefs {
         Assert.assertEquals("the filesystem module tells that he saved different pieces.",
                 expectedSavedPieces, actualSavedPiecesFromEvents);
         Assert.assertEquals("the filesystem module read other completed pieces than the completed pieces we saved by using this filesystem module.",
-                expectedCompletedSavedPieces, actualCompletedSavedPiecesReadByFileSytem);
+                expectedCompletedSavedPieces, actualCompletedSavedPiecesReadByFileSystem);
 
         // I must create it here because later I need to get the torrentStatusController which was already created here.
         // If I'm not creating TorrentDownloader object here, I will create 2 different torrentStatusController objects.
@@ -991,8 +987,8 @@ public class MyStepdefs {
 //					blockOfPiece.getPieceIndex() :
 //					torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
 //
-////			int requestBlockSize = blockOfPiece.getLength() != null ?
-////					blockOfPiece.getLength() :
+////			int requestBlockSize = blockOfPiece.getMessageLength() != null ?
+////					blockOfPiece.getMessageLength() :
 ////					torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getFrom();
 //
 //			return new RequestMessage(link.getMe(), link.getPeer(), pieceIndex, blockOfPiece.getFrom(), requestBlockSize);
@@ -1022,8 +1018,8 @@ public class MyStepdefs {
 //					blockOfPiece.getPieceIndex() :
 //					torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
 //
-//			int requestBlockSize = blockOfPiece.getLength() != null ?
-//					blockOfPiece.getLength() :
+//			int requestBlockSize = blockOfPiece.getMessageLength() != null ?
+//					blockOfPiece.getMessageLength() :
 //					torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getFrom();
 //
 //			return new BlockOfPiece(pieceIndex, blockOfPiece.getFrom(), requestBlockSize);

@@ -16,22 +16,21 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
         this.to = to;
     }
 
-    public abstract byte[] createPacketFromObject();
-//    {
-//        ByteBuffer buffer = ByteBuffer.allocate(4 + this.length);
-//
-//        buffer.putInt(this.length);
-//        // when receiving a peerMessage,
-//        // I first check what is the value of "length".
-//        // if length == 0 then I don't read any more bytes.
-//        // so there is no reason to send dummy bytes.
-//        if (this.length > 0) {
-//            buffer.put(this.messageId);
-//            buffer.put(this.payload);
-//        }
-//
-//        return buffer.array();
-//    }
+    public byte[] createPacketFromObject() {
+        ByteBuffer buffer = ByteBuffer.allocate(4 + getMessageLength());
+
+        buffer.putInt(getMessageLength());
+        // when receiving a peerMessage,
+        // I first check what is the value of "length".
+        // if length == 0 then I don't read any more bytes.
+        // so there is no reason to send dummy bytes.
+        if (getMessageLength() > 0) {
+            buffer.put(getMessageId());
+            buffer.put(getMessagePayload());
+        }
+
+        return buffer.array();
+    }
 
     public static int getMessageId(byte[] peerMessage) {
         ByteBuffer buffer = ByteBuffer.wrap(peerMessage);
@@ -42,6 +41,10 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
     }
 
     public abstract byte getMessageId();
+
+    public abstract int getMessageLength();
+
+    public abstract byte[] getMessagePayload();
 
     public Peer getFrom() {
         return from;

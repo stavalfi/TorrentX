@@ -17,21 +17,34 @@ public class HaveMessage extends PeerMessage {
      * @param pieceIndex is the piece (not block, which is a piece inside a piece) we tell the other peers we have.
      */
     public HaveMessage(Peer from, Peer to, int pieceIndex) {
-        super(to, from, length, messageId, ByteBuffer.allocate(4).putInt(pieceIndex).array());
+        super(to, from);
         this.pieceIndex = pieceIndex;
     }
 
-    public HaveMessage(Peer from, Peer to, byte[] peerMessage) {
-        super(to, peerMessage, from);
-        this.pieceIndex = ByteBuffer.wrap(this.getPayload()).getInt();
+    @Override
+    public byte getMessageId() {
+        return messageId;
     }
+
+    @Override
+    public int getMessageLength() {
+        return length;
+    }
+
+    @Override
+    public byte[] getMessagePayload() {
+        return ByteBuffer.allocate(4)
+                .putInt(this.pieceIndex)
+                .array();
+    }
+
+    public int getPieceIndex() {
+        return this.pieceIndex;
+    }
+
 
     @Override
     public String toString() {
         return "HaveMessage{} " + super.toString();
-    }
-
-    public int getPieceIndex() {
-        return pieceIndex;
     }
 }

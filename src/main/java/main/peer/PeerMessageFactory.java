@@ -5,55 +5,80 @@ import main.peer.peerMessages.*;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.BitSet;
 import java.util.Objects;
 
 public class PeerMessageFactory {
     public static PeerMessage create(Peer from, Peer to, DataInputStream dataInputStream) throws IOException {
         final int messageLengthSize = 4;
-        byte[] data1 = new byte[messageLengthSize];
-        dataInputStream.readFully(data1);
-        int lengthOfTheRestOfData = ByteBuffer.wrap(data1).getInt(); // how much do we need to read more
-        byte[] data2 = new byte[lengthOfTheRestOfData];
+        byte[] messageLengthSizeByteArray = new byte[messageLengthSize];
+        dataInputStream.readFully(messageLengthSizeByteArray);
+        // lengthOfTheRestOfData == messageLength == // how much do we need to read more
+        int lengthOfTheRestOfData = ByteBuffer.wrap(messageLengthSizeByteArray)
+                .getInt();
 
-        dataInputStream.readFully(data2);
+        if (lengthOfTheRestOfData == 0) {
+            byte keepAliveMessageId = 10;
+            return create(from, to, keepAliveMessageId, new byte[0]);
+        }
+        int messageIdLength = 1;
+        byte[] messageIdByteArray = new byte[1];
+        dataInputStream.readFully(messageIdByteArray);
 
-        ByteBuffer byteBuffer = ByteBuffer.allocate(messageLengthSize + lengthOfTheRestOfData);
-        byteBuffer.putInt(lengthOfTheRestOfData);
-        byteBuffer.put(data2);
-        return create(from, to, byteBuffer.array()); // initialize message object from byte[]
+        int messagePayloadLength = lengthOfTheRestOfData - messageIdLength;
+        byte[] messagePayloadByteArray = new byte[messagePayloadLength];
+        dataInputStream.readFully(messagePayloadByteArray);
+
+        return create(from, to, messageIdByteArray[0], messagePayloadByteArray);
     }
 
-//    public static PieceMessage createPieceMessage(Peer from, Peer to, int index, int begin, AllocatedBlock allocatedBlock) {
-//        return new PieceMessage(from, to, index, begin, allocatedBlock);
-//    }
-
-    public static PeerMessage create(Peer from, Peer to, byte[] peerMessage) {
-        PeerMessageId messageId = PeerMessageId.fromValue(PeerMessage.getMessageId(peerMessage));
-        switch (Objects.requireNonNull(messageId)) {
+    public static PeerMessage create(Peer from, Peer to, byte messageId, byte[] payload) {
+        PeerMessageId peerMessageId = PeerMessageId.fromValue(messageId);
+        switch (Objects.requireNonNull(peerMessageId)) {
             case bitFieldMessage:
-                return new BitFieldMessage(from, to, peerMessage);
-            case cancelMessage:
-                return new CancelMessage(from, to, peerMessage);
+                return new BitFieldMessage(from, to, BitSet.valueOf(payload));
+            case cancelMessage: {
+                ByteBuffer wrap = ByteBuffer.wrap(payload);
+                int index = wrap.getInt();
+                int begin = wrap.getInt();
+                int blockLength = wrap.getInt();
+                return new CancelMessage(from, to, index, begin, blockLength);
+            }
             case chokeMessage:
-                return new ChokeMessage(from, to, peerMessage);
+                return new ChokeMessage(from, to);
             case haveMessage:
-                return new HaveMessage(from, to, peerMessage);
+                int pieceIndex = ByteBuffer.wrap(payload).getInt();
+                return new HaveMessage(from, to, pieceIndex);
             case interestedMessage:
-                return new InterestedMessage(from, to, peerMessage);
+                return new InterestedMessage(from, to);
             case keepAliveMessage:
-                return new KeepAliveMessage(from, to, peerMessage);
+                return new KeepAliveMessage(from, to);
             case notInterestedMessage:
-                return new NotInterestedMessage(from, to, peerMessage);
-            case pieceMessage:
-                return new PieceMessage(from, to, peerMessage);
-            case portMessage:
-                return new PortMessage(from, to, peerMessage);
-            case requestMessage:
-                return new RequestMessage(from, to, peerMessage);
+                return new NotInterestedMessage(from, to);
+            case pieceMessage: {
+                ByteBuffer wrap = ByteBuffer.wrap(payload);
+                int index = wrap.getInt();
+                int begin = wrap.getInt();
+                byte[] block = new byte[payload.length - 8];
+                wrap.get(block);
+                return new PieceMessage(from, to, index, begin, block);
+            }
+            case portMessage: {
+                ByteBuffer wrap = ByteBuffer.wrap(payload);
+                short portNumber = wrap.getShort();
+                return new PortMessage(from, to, portNumber);
+            }
+            case requestMessage: {
+                ByteBuffer wrap = ByteBuffer.wrap(payload);
+                int index = wrap.getInt();
+                int begin = wrap.getInt();
+                int blockLength = wrap.getInt();
+                return new RequestMessage(from, to, index, begin, blockLength);
+            }
             case unchokeMessage:
-                return new UnchokeMessage(from, to, peerMessage);
+                return new UnchokeMessage(from, to);
             case extendedMessage:
-                return new ExtendedMessage(from, to, peerMessage);
+                return new ExtendedMessage(from, to);
             default:
                 throw new IllegalArgumentException("illegal message-id: " + messageId);
         }

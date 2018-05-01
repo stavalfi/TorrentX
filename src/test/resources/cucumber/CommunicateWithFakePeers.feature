@@ -60,8 +60,8 @@ Feature: connect to a fake peers and communicate with them
       | 2          | 0    | 15     |
 
     Examples:
-      | torrent     | downloadLocation |
-      | multiple-active-seeders-torrent-1.torrent | torrents-test   |
+      | torrent                                   | downloadLocation |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
   Scenario Outline: fake peer request pieces from me but I don't have nothing to give
     Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
@@ -75,5 +75,5 @@ Feature: connect to a fake peers and communicate with them
       | pieceIndex | from | length |
 
     Examples:
-      | torrent     | downloadLocation |
-      | multiple-active-seeders-torrent-1.torrent | torrents-test   |
+      | torrent                                   | downloadLocation |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
