@@ -26,7 +26,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
         this.blockLength = blockLength;
         this.amountOfBlocks = amountOfBlocks;
         this.allocations = IntStream.range(0, amountOfBlocks)
-                .mapToObj(allocationIndex -> new AllocatedBlock(allocationIndex, blockLength))
+                .mapToObj(allocationIndex -> new AllocatedBlock(allocationIndex, blockLength, 0, blockLength))
                 .toArray(AllocatedBlock[]::new);
         this.freeBlocksStatus = new BitSet(amountOfBlocks);
         this.freeBlocksStatus.set(0, amountOfBlocks);
