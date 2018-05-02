@@ -41,7 +41,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                                 .flatMap(requestMessage -> this.statusChanger.getStatus$()
                                         .filter(Status::isUploading)
                                         .take(1)
-                                        .flatMap(__ -> BlocksAllocatorImpl.getInstance().allocate())
+                                        .flatMap(__ -> BlocksAllocatorImpl.getInstance().allocate(0, requestMessage.getBlockLength()))
                                         .flatMap(allocatedBlock ->
                                                 this.fileSystemLink.buildPieceMessage(requestMessage, allocatedBlock)
                                                         .flatMap(pieceMessage ->

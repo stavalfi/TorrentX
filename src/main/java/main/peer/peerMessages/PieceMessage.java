@@ -22,7 +22,8 @@ public class PieceMessage extends PeerMessage {
      * @param begin          integer specifying the zero-based byte offset within the piece
      * @param allocatedBlock allocatedBlock of data, which is a subset of the piece specified by index.
      */
-    public PieceMessage(Peer from, Peer to, int index, int begin, int blockLength, AllocatedBlock allocatedBlock) {
+    public PieceMessage(Peer from, Peer to, int index, int begin,
+                        int blockLength, AllocatedBlock allocatedBlock) {
         super(to, from);
         this.index = index;
         this.begin = begin;

@@ -7,7 +7,7 @@ import java.util.BitSet;
 
 public interface BlocksAllocator {
 
-    Mono<AllocatedBlock> allocate();
+    Mono<AllocatedBlock> allocate(int offset, int length);
 
     // TODO: add support that only who allocated block X can free block X.
     void free(AllocatedBlock allocatedBlock);

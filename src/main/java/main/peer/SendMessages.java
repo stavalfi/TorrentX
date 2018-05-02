@@ -11,11 +11,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class SendMessages {
-    private DataOutputStream peerDataOutputStream;
+    private DataOutputStream dataOutputStream;
     private Runnable closeConnectionMethod;
 
-    public SendMessages(DataOutputStream peerDataOutputStream, Runnable closeConnectionMethod) {
-        this.peerDataOutputStream = peerDataOutputStream;
+    public SendMessages(DataOutputStream dataOutputStream, Runnable closeConnectionMethod) {
+        this.dataOutputStream = dataOutputStream;
         this.closeConnectionMethod = closeConnectionMethod;
     }
 
@@ -33,7 +33,7 @@ public class SendMessages {
                     buffer.put(peerMessage.getMessageId());
                     buffer.put(peerMessage.getMessagePayload());
                 }
-                this.peerDataOutputStream.write(buffer.array());
+                this.dataOutputStream.write(buffer.array());
                 monoSink.success(this);
             } catch (IOException e) {
                 this.closeConnectionMethod.run();
@@ -51,8 +51,8 @@ public class SendMessages {
                 buffer.put(pieceMessage.getMessageId());
                 buffer.putInt(pieceMessage.getIndex());
                 buffer.putInt(pieceMessage.getBegin());
-                this.peerDataOutputStream.write(buffer.array());
-                this.peerDataOutputStream.write(pieceMessage.getAllocatedBlock().getBlock(),
+                this.dataOutputStream.write(buffer.array());
+                this.dataOutputStream.write(pieceMessage.getAllocatedBlock().getBlock(),
                         pieceMessage.getAllocatedBlock().getOffset(), pieceMessage.getAllocatedBlock().getLength());
                 monoSink.success(this);
             } catch (IOException e) {

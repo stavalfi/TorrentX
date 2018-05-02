@@ -38,8 +38,10 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     }
 
     @Override
-    public Mono<SendMessagesNotifications> sendPieceMessage(int index, int begin, int blockLength, AllocatedBlock allocatedBlock) {
-        PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(), index, begin, blockLength, allocatedBlock);
+    public Mono<SendMessagesNotifications> sendPieceMessage(int index, int begin,
+                                                            int blockLength, AllocatedBlock allocatedBlock) {
+        PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(),
+                index, begin, blockLength, allocatedBlock);
         return send(pieceMessage)
                 .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(index));
     }

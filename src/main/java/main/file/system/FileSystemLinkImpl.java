@@ -218,8 +218,6 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
             // TODO: make test for it.
             long to = from + requestMessage.getBlockLength();
             int actualBlockLength = (int) (to - from); // to-from <= requestMessage.getBlockLength() which is integer.
-            allocatedBlock.setOffset(0)
-                    .setLength(actualBlockLength);
 
             for (ActualFile actualFile : this.actualFileImplList) {
                 if (from != to)

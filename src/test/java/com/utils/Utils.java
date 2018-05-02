@@ -291,10 +291,8 @@ public class Utils {
                 return link.sendMessages().sendChokeMessage();
             case PieceMessage:
                 AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                        .allocate()
-                        .block()
-                        .setOffset(0)
-                        .setLength(10);
+                        .allocate(0, 10)
+                        .block();
                 return link.sendMessages()
                         .sendPieceMessage(0, 0, allocatedBlock.getLength(), allocatedBlock)
                         .doOnEach(signal -> {
@@ -390,10 +388,8 @@ public class Utils {
         long to = from + requestMessage.getBlockLength();
 
         AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                .allocate()
-                .block()
-                .setOffset(0)
-                .setLength(requestMessage.getBlockLength());
+                .allocate(0,requestMessage.getBlockLength())
+                .block();
 
         int resultFreeIndex = 0;
         long amountOfBytesOfFileWeCovered = 0;
@@ -479,10 +475,9 @@ public class Utils {
                 // I can cast safely to integer because REQUEST_BLOCK_SIZE is integer and we find the min.
                 int blockLength = (int) Math.min(maxRequestBlockSize, requestBlockSize - blockStartPosition);
                 AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                        .allocate()
-                        .block()
-                        .setOffset(0)
-                        .setLength(blockLength);
+                        .allocate(0,blockLength)
+                        .block();
+
                 for (int i = 0; i < blockLength; i++)
                     allocatedBlock.getBlock()[i] = (byte) i;
                 PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex,

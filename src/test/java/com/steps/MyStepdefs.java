@@ -465,7 +465,8 @@ public class MyStepdefs {
         Set<PieceMessage> actualCompletedSavedPiecesReadByFileSystem = Flux.fromIterable(expectedCompletedSavedPieces)
                 .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(),
                         pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength()))
-                .flatMap((RequestMessage requestMessage) -> BlocksAllocatorImpl.getInstance().allocate()
+                .flatMap((RequestMessage requestMessage) -> BlocksAllocatorImpl.getInstance()
+                        .allocate(0, requestMessage.getBlockLength())
                         .flatMap(allocatedBlock -> fileSystemLink.buildPieceMessage(requestMessage, allocatedBlock)))
                 .collect(Collectors.toSet())
                 .block();
@@ -1190,8 +1191,9 @@ public class MyStepdefs {
                 .autoConnect(0);
 
         this.actualAllocations = Flux.range(0, amountOfAllocations)
-                .flatMap(blockIndex -> this.blocksAllocator.allocate(), threadsAmount)
-                .doOnNext(allocatedBlock -> Assert.assertFalse(this.blocksAllocator.getFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
+                .flatMap(blockIndex -> this.blocksAllocator.allocate(0, 0), threadsAmount)
+                .doOnNext(allocatedBlock ->
+                        Assert.assertFalse(this.blocksAllocator.getFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
                 .collect(Collectors.toSet())
                 .block();
 
@@ -1209,7 +1211,7 @@ public class MyStepdefs {
                 .autoConnect(0);
 
         this.actualAllocations = Flux.range(0, expectedAllocationsList.size())
-                .flatMap(blockIndex -> this.blocksAllocator.allocate(), threadsAmount)
+                .flatMap(blockIndex -> this.blocksAllocator.allocate(0,0), threadsAmount)
                 .doOnNext(allocatedBlock -> Assert.assertFalse(this.blocksAllocator.getFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
                 .collect(Collectors.toSet())
                 .block();

@@ -39,8 +39,9 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
                 .autoConnect(0);
     }
 
+    // TODO: change to: Mono<AllocatedBlockReader>
     @Override
-    public Mono<AllocatedBlock> allocate() {
+    public Mono<AllocatedBlock> allocate(int offset, int length) {
         return Mono.<AllocatedBlock>create(sink -> {
             while (true) {
                 synchronized (this.notifyOnFreeIndex) {
@@ -49,7 +50,12 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
                             .findAny();
                     if (freeBlock.isPresent()) {
                         this.freeBlocksStatus.set(freeBlock.getAsInt(), false);
-                        sink.success(this.allocations[freeBlock.getAsInt()]);
+                        AllocatedBlock oldAllocatedBlock = this.allocations[freeBlock.getAsInt()];
+                        AllocatedBlock newAllocatedBlock = new AllocatedBlock(oldAllocatedBlock.getBlockIndex(),
+                                this.allocations[freeBlock.getAsInt()].getBlock(),
+                                offset, length);
+                        this.allocations[freeBlock.getAsInt()] = newAllocatedBlock;
+                        sink.success(newAllocatedBlock);
                         return;
                     }
                     try {

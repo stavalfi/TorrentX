@@ -43,11 +43,9 @@ public class PeerMessageFactory {
         int blockLength = messagePayloadLength - 8;
         // we will come here when he receive piece message. We need to assert that in all the places we finally free this allocated block even if we got error or complete signal.
         AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                .allocate()
+                .allocate(0, blockLength)
                 .block();
 
-        allocatedBlock.setOffset(0);
-        allocatedBlock.setLength(messagePayloadLength - 8);
         dataInputStream.readFully(allocatedBlock.getBlock(), allocatedBlock.getOffset(), allocatedBlock.getLength());
 
         return new PieceMessage(from, to, index, begin, blockLength, allocatedBlock);

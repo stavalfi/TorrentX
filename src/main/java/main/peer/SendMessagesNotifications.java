@@ -23,7 +23,8 @@ public interface SendMessagesNotifications {
 
     Mono<SendMessagesNotifications> sendNotInterestedMessage();
 
-    Mono<SendMessagesNotifications> sendPieceMessage(int index, int begin,int blockLength, AllocatedBlock allocatedBlock);
+    Mono<SendMessagesNotifications> sendPieceMessage(int index, int begin,
+                                                     int blockLength, AllocatedBlock allocatedBlock);
 
     Mono<SendMessagesNotifications> sendPortMessage(short listenPort);
 

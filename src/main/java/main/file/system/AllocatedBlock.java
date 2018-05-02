@@ -12,6 +12,15 @@ public class AllocatedBlock {
         this.block = new byte[blockSize];
     }
 
+    public AllocatedBlock(int blockIndex, byte[] block, int offset, int length) {
+        assert 0 <= offset && offset < block.length;
+        assert length < block.length - offset;
+        this.blockIndex = blockIndex;
+        this.block = block;
+        this.offset = offset;
+        this.length = length;
+    }
+
     public byte[] getBlock() {
         return block;
     }
@@ -26,18 +35,6 @@ public class AllocatedBlock {
 
     public int getLength() {
         return length;
-    }
-
-    public AllocatedBlock setOffset(int offset) {
-        assert 0 <= offset && offset < this.block.length;
-        this.offset = offset;
-        return this;
-    }
-
-    public AllocatedBlock setLength(int length) {
-        assert length < this.block.length - offset;
-        this.length = length;
-        return this;
     }
 
     @Override

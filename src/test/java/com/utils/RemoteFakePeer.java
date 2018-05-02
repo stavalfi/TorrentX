@@ -40,10 +40,8 @@ public class RemoteFakePeer extends Link {
                         case RESPOND_WITH_DELAY_100:
                         case RESPOND_WITH_DELAY_3000:
                             AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                                    .allocate()
+                                    .allocate(0, requestMessage.getBlockLength())
                                     .block();
-                            allocatedBlock.setOffset(0)
-                                    .setLength(requestMessage.getBlockLength());
                             return this.sendMessages()
                                     .sendPieceMessage(requestMessage.getIndex(), requestMessage.getBegin(),
                                             requestMessage.getBlockLength(),
