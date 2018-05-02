@@ -4,6 +4,7 @@ import main.TorrentInfo;
 import main.algorithms.UploadAlgorithm;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentPieceStatus;
+import main.file.system.BlocksAllocatorImpl;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.torrent.status.Status;
@@ -40,11 +41,18 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                                 .flatMap(requestMessage -> this.statusChanger.getStatus$()
                                         .filter(Status::isUploading)
                                         .take(1)
-                                        .flatMap(___ -> this.fileSystemLink.buildPieceMessage(requestMessage)))
-                                .flatMap(pieceMessage ->
-                                        peersCommunicator.sendMessages().sendPieceMessage(pieceMessage.getIndex(),
-                                                pieceMessage.getBegin(), pieceMessage.getBlock())
-                                                .map(___ -> new PieceEvent(TorrentPieceStatus.UPLOADING, pieceMessage))))
+                                        .flatMap(__ -> BlocksAllocatorImpl.getInstance().allocate())
+                                        .flatMap(allocatedBlock ->
+                                                this.fileSystemLink.buildPieceMessage(requestMessage, allocatedBlock)
+                                                        .flatMap(pieceMessage ->
+                                                                peersCommunicator.sendMessages().sendPieceMessage(pieceMessage.getIndex(),
+                                                                        pieceMessage.getBegin(), pieceMessage.getBlockLength(), pieceMessage.getAllocatedBlock())
+                                                                        .map(___ -> new PieceEvent(TorrentPieceStatus.UPLOADING, pieceMessage)))
+                                                        .doOnEach(signal -> {
+                                                            // TODO: assert that we didn't miss any signal type or we will have a damn bug or a memory leak!
+                                                            if (signal.isOnError() || signal.isOnNext())
+                                                                BlocksAllocatorImpl.getInstance().free(allocatedBlock);
+                                                        }))))
                 .publish()
                 .autoConnect(0);
     }

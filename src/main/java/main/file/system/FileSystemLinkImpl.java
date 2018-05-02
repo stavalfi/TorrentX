@@ -1,7 +1,6 @@
 package main.file.system;
 
 import christophedetroyer.torrent.TorrentFile;
-import main.App;
 import main.TorrentInfo;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentPieceStatus;
@@ -37,8 +36,8 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private StatusChanger statusChanger;
     private Flux<Integer> savedPiecesFlux;
     private Flux<PieceEvent> savedBlocksFlux;
-    private Mono<FileSystemLinkImpl> notifyWhenActiveTorrentDeleted;
-    private Mono<FileSystemLinkImpl> notifyWhenFilesDeleted;
+    private Mono<FileSystemLink> notifyWhenActiveTorrentDeleted;
+    private Mono<FileSystemLink> notifyWhenFilesDeleted;
 
     public FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
                               StatusChanger statusChanger,
@@ -144,7 +143,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         return this.savedPiecesFlux;
     }
 
-    public Mono<FileSystemLinkImpl> deleteActiveTorrentOnlyMono() {
+    public Mono<FileSystemLink> deleteActiveTorrentOnlyMono() {
         return Flux.fromIterable(this.actualFileImplList)
                 .flatMap(ActualFile::closeFileChannel)
                 .collectList()
@@ -157,7 +156,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 });
     }
 
-    public Mono<FileSystemLinkImpl> deleteFileOnlyMono() {
+    public Mono<FileSystemLink> deleteFileOnlyMono() {
         return Flux.fromIterable(this.actualFileImplList)
                 .flatMap(ActualFile::closeFileChannel)
                 .collectList()
@@ -194,63 +193,81 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     }
 
     @Override
-    public Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage) {
-//		if (!havePiece(requestMessage.getIndex()))
-//			return Mono.error(new PieceNotDownloadedYetException(requestMessage.getIndex()));
+    public Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage, AllocatedBlock allocatedBlock) {
+        if (!havePiece(requestMessage.getIndex()))
+            return Mono.error(new PieceNotDownloadedYetException(requestMessage.getIndex()));
+        // TODO: we can't return as an answer more bytes than the size
+        // of an allocatedBlock!!!!
+        // TODO: make test for it.
 
-        return Mono.<PieceMessage>create(sink -> {
-            byte[] result = new byte[requestMessage.getBlockLength()];
+        // TODO: assert that the begin+length is legal because it may
+        // overlap with the next piece (if there is a next piece).
+//        return BlocksAllocatorImpl.getInstance()
+//                .allocate()
+//                .doOnNext(allocatedBlock -> allocatedBlock.setOffset(0))
+//                // TODO: assert that the begin+length is legal because it may
+//                // overlap with the next piece (if there is a next piece).
+//                // TODO: make test for it.
+//                .doOnNext(allocatedBlock -> allocatedBlock.setLength(requestMessage.getBlockLength()))
+        return Mono.create(sink -> {
             int freeIndexInResultArray = 0;
 
             long from = super.getPieceStartPosition(requestMessage.getIndex());
+            // TODO: assert that the begin+length is legal because it may
+            // overlap with the next piece (if there is a next piece).
+            // TODO: make test for it.
             long to = from + requestMessage.getBlockLength();
+            int actualBlockLength = (int) (to - from); // to-from <= requestMessage.getBlockLength() which is integer.
+            allocatedBlock.setOffset(0)
+                    .setLength(actualBlockLength);
 
             for (ActualFile actualFile : this.actualFileImplList) {
-                if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
-                    // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
-                    int howMuchToReadFromThisFile = (int) Math.min(actualFile.getTo() - from, to - from);
-                    byte[] tempResult;
-                    try {
-                        tempResult = actualFile.readBlock(from, howMuchToReadFromThisFile);
-                    } catch (IOException e) {
-                        sink.error(e);
-                        return;
-                    }
-                    for (byte aTempResult : tempResult)
-                        result[freeIndexInResultArray++] = aTempResult;
+                if (from != to)
+                    if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
+                        // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
+                        int howMuchToReadFromThisFile = (int) Math.min(actualFile.getTo() - from, to - from);
+                        byte[] tempResult;
+                        try {
+                            // TODO: read directly to the allocated block. or else we won't have memory.
+                            tempResult = actualFile.readBlock(from, howMuchToReadFromThisFile);
+                        } catch (IOException e) {
+                            sink.error(e);
+                            return;
+                        }
+                        for (byte aTempResult : tempResult)
+                            allocatedBlock.getBlock()[freeIndexInResultArray++] = aTempResult;
 
-                    from += howMuchToReadFromThisFile;
-                    if (from == to) {
-                        PieceMessage pieceMessage = new PieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
-                                requestMessage.getIndex(), requestMessage.getBegin(), result);
-                        sink.success(pieceMessage);
-                        return;
+                        from += howMuchToReadFromThisFile;
                     }
-                }
             }
-        }).subscribeOn(App.MyScheduler);
+            PieceMessage pieceMessage = new PieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
+                    requestMessage.getIndex(), requestMessage.getBegin(), actualBlockLength, allocatedBlock);
+            sink.success(pieceMessage);
+        });
     }
 
     private Mono<PieceEvent> writeBlock(PieceMessage pieceMessage) {
         if (havePiece(pieceMessage.getIndex()) ||
-                this.downloadedBytesInPieces[pieceMessage.getIndex()] > pieceMessage.getBegin() + pieceMessage.getBlock().length)
+                this.downloadedBytesInPieces[pieceMessage.getIndex()] > pieceMessage.getBegin() +
+                        pieceMessage.getAllocatedBlock().getLength())
             // I already have the received block. I don't need it.
             return Mono.empty();
 
         return Mono.<PieceEvent>create(sink -> {
             long from = super.getPieceStartPosition(pieceMessage.getIndex()) + pieceMessage.getBegin();
-            long to = from + pieceMessage.getBlock().length;
+            long to = from + pieceMessage.getAllocatedBlock().getLength();
 
             // from which position the ActualFileImpl object needs to write to filesystem from the given block array.
-            int arrayIndexFrom = 0;
+            int arrayIndexFrom = pieceMessage.getAllocatedBlock().getOffset();
 
             for (ActualFile actualFile : this.actualFileImplList)
                 if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
                     // (to-from)<=piece.length <= file.size , request.length<= Integer.MAX_VALUE
-                    // so: (Math.min(to, actualFileImpl.getTo()) - from) <= Integer.MAX_VALUE
+                    // so: (Math.min(to, actualFileImpl.getLength()) - from) <= Integer.MAX_VALUE
                     int howMuchToWriteFromArray = (int) Math.min(actualFile.getTo() - from, to - from);
                     try {
-                        actualFile.writeBlock(from, pieceMessage.getBlock(), arrayIndexFrom, howMuchToWriteFromArray);
+                        actualFile.writeBlock(from, pieceMessage.getAllocatedBlock().getBlock(), arrayIndexFrom,
+                                howMuchToWriteFromArray);
                     } catch (IOException e) {
                         sink.error(e);
                         return;
@@ -266,7 +283,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
             // there maybe multiple writes of the same pieceRequest during one execution...
             long pieceLength = getPieceLength(pieceMessage.getIndex());
-            this.downloadedBytesInPieces[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
+            this.downloadedBytesInPieces[pieceMessage.getIndex()] += pieceMessage.getAllocatedBlock().getLength();
             if (pieceLength < this.downloadedBytesInPieces[pieceMessage.getIndex()])
                 this.downloadedBytesInPieces[pieceMessage.getIndex()] = getPieceLength(pieceMessage.getIndex());
 
@@ -300,7 +317,8 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     .stream()
                     .collect(Collectors.joining(File.separator, mainFolder, ""));
             SeekableByteChannel seekableByteChannel = createFile(filePath);
-            ActualFile actualFile = new ActualFileImpl(filePath, position, position + torrentFile.getFileLength(), seekableByteChannel);
+            ActualFile actualFile = new ActualFileImpl(filePath, position, position + torrentFile.getFileLength(),
+                    seekableByteChannel);
             actualFileList.add(actualFile);
             position += torrentFile.getFileLength();
         }
@@ -362,11 +380,11 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         Files.delete(directoryToBeDeleted.toPath());
     }
 
-    public Mono<FileSystemLinkImpl> getNotifyWhenActiveTorrentDeleted() {
+    public Mono<FileSystemLink> getNotifyWhenActiveTorrentDeleted() {
         return this.notifyWhenActiveTorrentDeleted;
     }
 
-    public Mono<FileSystemLinkImpl> getNotifyWhenFilesDeleted() {
+    public Mono<FileSystemLink> getNotifyWhenFilesDeleted() {
         return this.notifyWhenFilesDeleted;
     }
 }

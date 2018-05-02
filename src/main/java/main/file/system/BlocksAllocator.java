@@ -9,7 +9,10 @@ public interface BlocksAllocator {
 
     Mono<AllocatedBlock> allocate();
 
+    // TODO: add support that only who allocated block X can free block X.
     void free(AllocatedBlock allocatedBlock);
+
+    void freeAll();
 
     // I can't send the actual AllocatedBlock
     // here because someone will maybe save
@@ -24,4 +27,5 @@ public interface BlocksAllocator {
     int getBlockLength();
 
     int getAmountOfBlocks();
+
 }

@@ -36,8 +36,7 @@ public class TorrentSpeedSpeedStatisticsImpl implements SpeedStatistics {
                 messageFlux -> messageFlux
                         .filter(peerMessage -> peerMessage instanceof PieceMessage)
                         .cast(PieceMessage.class)
-                        .map(PieceMessage::getBlock)
-                        .map(array -> array.length)
+                        .map(PieceMessage::getBlockLength)
                         .map(Double::new);
 
         Function<Flux<? extends PeerMessage>, Flux<Double>> messagesToSpeedFlux =

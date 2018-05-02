@@ -2,10 +2,12 @@ package com.utils;
 
 import main.peer.Peer;
 import main.peer.PeerMessageFactory;
+import main.peer.SendMessages;
 import main.peer.peerMessages.HandShake;
 import main.peer.peerMessages.PeerMessage;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
@@ -57,6 +59,13 @@ public class RemoteFakePeerCopyCat extends Peer {
         int receivedMessagesAmount = 0;
         DataInputStream dataInputStream = new DataInputStream(peerConnection.getInputStream());
         OutputStream outputStream = peerConnection.getOutputStream();
+        SendMessages sendMessages = new SendMessages(new DataOutputStream(outputStream), () -> {
+            try {
+                peerConnection.close();
+            } catch (IOException e) {
+
+            }
+        });
         if (!this.closeEverything) {
             HandShake handShakeReceived = new HandShake(dataInputStream);
             outputStream.write(handShakeReceived.createPacketFromObject());
@@ -71,7 +80,7 @@ public class RemoteFakePeerCopyCat extends Peer {
                 peerConnection.close();
                 return;
             }
-            outputStream.write(peerMessage.createPacketFromObject());
+            peerMessage.sendMessage(sendMessages).block();
             receivedMessagesAmount++;
         }
     }

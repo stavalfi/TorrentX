@@ -8,7 +8,7 @@ import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.PeersListener;
 import main.peer.PeersProvider;
-import main.peer.ReceivePeerMessages;
+import main.peer.ReceiveMessagesNotifications;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.Status;
@@ -124,7 +124,7 @@ public class TorrentDownloaders {
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, statusChanger,
                         peersCommunicatorFlux.map(Link::receivePeerMessages)
-                                .flatMap(ReceivePeerMessages::getPieceMessageResponseFlux))
+                                .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =

@@ -8,7 +8,7 @@ import reactor.core.publisher.FluxSink;
 import java.io.DataInputStream;
 import java.io.IOException;
 
-class ReceivePeerMessagesImpl implements ReceivePeerMessages {
+class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
     private Flux<? extends PeerMessage> peerMessageResponseFlux;
 
     private Flux<BitFieldMessage> bitFieldMessageResponseFlux;
@@ -26,8 +26,8 @@ class ReceivePeerMessagesImpl implements ReceivePeerMessages {
 
     private PeerCurrentStatus peerCurrentStatus;
 
-    public ReceivePeerMessagesImpl(Peer me, Peer peer,
-                                   PeerCurrentStatus peerCurrentStatus, DataInputStream dataInputStream) {
+    public ReceiveMessagesNotificationsImpl(Peer me, Peer peer,
+                                            PeerCurrentStatus peerCurrentStatus, DataInputStream dataInputStream) {
         this.peerCurrentStatus = peerCurrentStatus;
 
         this.peerMessageResponseFlux = Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, me, peer, dataInputStream))

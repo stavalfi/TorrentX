@@ -1,5 +1,7 @@
 package main.peer;
 
+import main.file.system.AllocatedBlock;
+import main.file.system.BlocksAllocatorImpl;
 import main.peer.peerMessages.*;
 
 import java.io.DataInputStream;
@@ -8,12 +10,13 @@ import java.nio.ByteBuffer;
 import java.util.BitSet;
 import java.util.Objects;
 
+// TODO: implement visitor.
 public class PeerMessageFactory {
     public static PeerMessage create(Peer from, Peer to, DataInputStream dataInputStream) throws IOException {
         final int messageLengthSize = 4;
         byte[] messageLengthSizeByteArray = new byte[messageLengthSize];
         dataInputStream.readFully(messageLengthSizeByteArray);
-        // lengthOfTheRestOfData == messageLength == // how much do we need to read more
+        // lengthOfTheRestOfData == messageLength == how much do we need to read more
         int lengthOfTheRestOfData = ByteBuffer.wrap(messageLengthSizeByteArray)
                 .getInt();
 
@@ -22,14 +25,32 @@ public class PeerMessageFactory {
             return create(from, to, keepAliveMessageId, new byte[0]);
         }
         int messageIdLength = 1;
-        byte[] messageIdByteArray = new byte[1];
+        byte[] messageIdByteArray = new byte[messageIdLength];
         dataInputStream.readFully(messageIdByteArray);
 
         int messagePayloadLength = lengthOfTheRestOfData - messageIdLength;
+        if (messageIdByteArray[0] == PeerMessageId.pieceMessage.getMessageId())
+            return createPieceMessage(from, to, messagePayloadLength, dataInputStream);
         byte[] messagePayloadByteArray = new byte[messagePayloadLength];
         dataInputStream.readFully(messagePayloadByteArray);
 
         return create(from, to, messageIdByteArray[0], messagePayloadByteArray);
+    }
+
+    public static PieceMessage createPieceMessage(Peer from, Peer to, int messagePayloadLength, DataInputStream dataInputStream) throws IOException {
+        int index = dataInputStream.readInt();
+        int begin = dataInputStream.readInt();
+        int blockLength = messagePayloadLength - 8;
+        // we will come here when he receive piece message. We need to assert that in all the places we finally free this allocated block even if we got error or complete signal.
+        AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
+                .allocate()
+                .block();
+
+        allocatedBlock.setOffset(0);
+        allocatedBlock.setLength(messagePayloadLength - 8);
+        dataInputStream.readFully(allocatedBlock.getBlock(), allocatedBlock.getOffset(), allocatedBlock.getLength());
+
+        return new PieceMessage(from, to, index, begin, blockLength, allocatedBlock);
     }
 
     public static PeerMessage create(Peer from, Peer to, byte messageId, byte[] payload) {
@@ -55,14 +76,6 @@ public class PeerMessageFactory {
                 return new KeepAliveMessage(from, to);
             case notInterestedMessage:
                 return new NotInterestedMessage(from, to);
-            case pieceMessage: {
-                ByteBuffer wrap = ByteBuffer.wrap(payload);
-                int index = wrap.getInt();
-                int begin = wrap.getInt();
-                byte[] block = new byte[payload.length - 8];
-                wrap.get(block);
-                return new PieceMessage(from, to, index, begin, block);
-            }
             case portMessage: {
                 ByteBuffer wrap = ByteBuffer.wrap(payload);
                 short portNumber = wrap.getShort();

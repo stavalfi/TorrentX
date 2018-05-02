@@ -1,6 +1,8 @@
 package main.peer.peerMessages;
 
 import main.peer.Peer;
+import main.peer.SendMessages;
+import reactor.core.publisher.Mono;
 
 import java.nio.ByteBuffer;
 
@@ -16,20 +18,8 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
         this.to = to;
     }
 
-    public byte[] createPacketFromObject() {
-        ByteBuffer buffer = ByteBuffer.allocate(4 + getMessageLength());
-
-        buffer.putInt(getMessageLength());
-        // when receiving a peerMessage,
-        // I first check what is the value of "length".
-        // if length == 0 then I don't read any more bytes.
-        // so there is no reason to send dummy bytes.
-        if (getMessageLength() > 0) {
-            buffer.put(getMessageId());
-            buffer.put(getMessagePayload());
-        }
-
-        return buffer.array();
+    public Mono<SendMessages> sendMessage(SendMessages sendMessages) {
+        return sendMessages.send(this);
     }
 
     public static int getMessageId(byte[] peerMessage) {
@@ -44,6 +34,9 @@ public abstract class PeerMessage implements Comparable<PeerMessage> {
 
     public abstract int getMessageLength();
 
+    // TODO: remove it because we will have a unique method inside
+    // SendMessages class for each message type and it will know
+    // what is the message payload (if any) to send the message.
     public abstract byte[] getMessagePayload();
 
     public Peer getFrom() {

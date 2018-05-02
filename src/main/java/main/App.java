@@ -5,7 +5,7 @@ import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.peer.Link;
-import main.peer.SendPeerMessages;
+import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.StatusType;
 import reactor.core.scheduler.Scheduler;
@@ -51,7 +51,7 @@ public class App {
 
         torrentDownloader.getPeersCommunicatorFlux()
                 .map(Link::sendMessages)
-                .flatMap(SendPeerMessages::sentPeerMessagesFlux)
+                .flatMap(SendMessagesNotifications::sentPeerMessagesFlux)
                 .filter(peerMessage -> peerMessage instanceof RequestMessage)
                 .cast(RequestMessage.class)
                 .map(requestMessage -> "request: index: " + requestMessage.getIndex() +

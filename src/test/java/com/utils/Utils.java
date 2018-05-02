@@ -8,10 +8,7 @@ import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.file.system.ActiveTorrents;
-import main.file.system.ActualFileImpl;
-import main.file.system.FileSystemLink;
-import main.file.system.FileSystemLinkImpl;
+import main.file.system.*;
 import main.peer.*;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -49,7 +46,9 @@ public class Utils {
 
     public static void removeEverythingRelatedToLastTest() {
 
-        Mono<List<FileSystemLinkImpl>> activeTorrentsListMono = ActiveTorrents.getInstance()
+        BlocksAllocatorImpl.getInstance().freeAll();
+
+        Mono<List<FileSystemLink>> activeTorrentsListMono = ActiveTorrents.getInstance()
                 .getActiveTorrentsFlux()
                 .flatMap(activeTorrent -> activeTorrent.deleteFileOnlyMono()
                         // if the test deleted the files then I will get NoSuchFileException and we will not delete the FileSystemLinkImpl object.
@@ -71,6 +70,7 @@ public class Utils {
                 .doOnNext(torrentDownloader -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash()))
                 .map(TorrentDownloader::getStatusChanger)
                 .doOnNext(statusChanger -> {
+                    // TODO: check why I comment those lines.
 //                    statusChanger.changeStatus(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
 //                    statusChanger.changeStatus(StatusType.PAUSE_SEARCHING_PEERS).block();
 //                    statusChanger.changeStatus(StatusType.PAUSE_DOWNLOAD).block();
@@ -151,7 +151,7 @@ public class Utils {
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, statusChanger,
                         peersCommunicatorFlux.map(Link::receivePeerMessages)
-                                .flatMap(ReceivePeerMessages::getPieceMessageResponseFlux))
+                                .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
@@ -205,7 +205,7 @@ public class Utils {
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
                 .createActiveTorrentMono(torrentInfo, downloadPath, statusChanger,
                         peersCommunicatorFlux.map(Link::receivePeerMessages)
-                                .flatMap(ReceivePeerMessages::getPieceMessageResponseFlux))
+                                .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
@@ -281,7 +281,7 @@ public class Utils {
                         peersCommunicatorFlux);
     }
 
-    public static Mono<SendPeerMessages> sendFakeMessage(Link link, PeerMessageType peerMessageType) {
+    public static Mono<SendMessagesNotifications> sendFakeMessage(Link link, PeerMessageType peerMessageType) {
         switch (peerMessageType) {
             case HaveMessage:
                 return link.sendMessages().sendHaveMessage(0);
@@ -290,7 +290,18 @@ public class Utils {
             case ChokeMessage:
                 return link.sendMessages().sendChokeMessage();
             case PieceMessage:
-                return link.sendMessages().sendPieceMessage(0, 0, new byte[10]);
+                AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
+                        .allocate()
+                        .block()
+                        .setOffset(0)
+                        .setLength(10);
+                return link.sendMessages()
+                        .sendPieceMessage(0, 0, allocatedBlock.getLength(), allocatedBlock)
+                        .doOnEach(signal -> {
+                            // TODO: assert that we didn't miss any signal type or we will have a damn bug or a memory leak!
+                            if (signal.isOnError() || signal.isOnNext())
+                                BlocksAllocatorImpl.getInstance().free(allocatedBlock);
+                        });
             case CancelMessage:
                 return link.sendMessages().sendCancelMessage(0, 0, 10);
             case KeepAliveMessage:
@@ -353,7 +364,7 @@ public class Utils {
     }
 
     @SneakyThrows
-    public static byte[] readFromFile(TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
+    public static AllocatedBlock readFromFile(TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
         List<TorrentFile> fileList = torrentInfo.getFileList();
 
         List<ActualFileImpl> actualFileImplList = new ArrayList<>();
@@ -378,7 +389,12 @@ public class Utils {
         long from = torrentInfo.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
         long to = from + requestMessage.getBlockLength();
 
-        byte[] result = new byte[requestMessage.getBlockLength()];
+        AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
+                .allocate()
+                .block()
+                .setOffset(0)
+                .setLength(requestMessage.getBlockLength());
+
         int resultFreeIndex = 0;
         long amountOfBytesOfFileWeCovered = 0;
         for (ActualFileImpl actualFileImpl : actualFileImplList) {
@@ -396,13 +412,13 @@ public class Utils {
                 seekableByteChannel.read(block);
 
                 for (byte aTempResult : block.array())
-                    result[resultFreeIndex++] = aTempResult;
+                    allocatedBlock.getBlock()[resultFreeIndex++] = aTempResult;
                 from += howMuchToReadFromThisFile;
 
                 seekableByteChannel.close();
             }
             if (from == to)
-                return result;
+                return allocatedBlock;
             amountOfBytesOfFileWeCovered = actualFileImpl.getTo();
         }
         throw new Exception("we shouldn't be here - never!");
@@ -449,7 +465,7 @@ public class Utils {
         });
     }
 
-    public static List<PieceMessage> createPieceMessages(TorrentInfo torrentInfo, BlockOfPiece blockOfPiece, int maxRequestBlockSize) {
+    public static Flux<PieceMessage> createRandomPieceMessages(TorrentInfo torrentInfo, BlockOfPiece blockOfPiece, int maxRequestBlockSize) {
         int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
                 blockOfPiece.getPieceIndex() :
                 torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
@@ -458,18 +474,24 @@ public class Utils {
                 blockOfPiece.getLength() :
                 torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getFrom();
 
-        List<PieceMessage> pieceMessages = new ArrayList<>();
-        for (int blockStartPosition = 0; blockStartPosition < requestBlockSize; ) {
-            // I can cast safely to integer because REQUEST_BLOCK_SIZE is integer and we find the min.
-            int blockLength = (int) Math.min(maxRequestBlockSize, requestBlockSize - blockStartPosition);
-            byte[] block = new byte[blockLength];
-            for (int i = 0; i < blockLength; i++)
-                block[i] = 3;
-            PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex, blockStartPosition, block);
-            pieceMessages.add(pieceMessage);
-            blockStartPosition += blockLength;
-        }
-        return pieceMessages;
+        return Flux.create(sink -> {
+            for (int blockStartPosition = 0; blockStartPosition < requestBlockSize; ) {
+                // I can cast safely to integer because REQUEST_BLOCK_SIZE is integer and we find the min.
+                int blockLength = (int) Math.min(maxRequestBlockSize, requestBlockSize - blockStartPosition);
+                AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
+                        .allocate()
+                        .block()
+                        .setOffset(0)
+                        .setLength(blockLength);
+                for (int i = 0; i < blockLength; i++)
+                    allocatedBlock.getBlock()[i] = (byte) i;
+                PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex,
+                        blockStartPosition, blockLength, allocatedBlock);
+                sink.next(pieceMessage);
+                blockStartPosition += blockLength;
+            }
+            sink.complete();
+        });
     }
 
     ;

@@ -1,10 +1,11 @@
 package main.file.system;
 
-import main.App;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.OptionalInt;
 import java.util.stream.IntStream;
@@ -18,7 +19,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
     private FluxSink<Integer> freesSink;
     private Flux<Integer> allocated$;
     private FluxSink<Integer> allocatedSink;
-    private Object notifyOnFreeIndex = new Object();
+    private final Object notifyOnFreeIndex = new Object();
 
     public BlocksAllocatorImpl(int amountOfBlocks, int blockLength) {
         assert blockLength > 0;
@@ -26,7 +27,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
         this.blockLength = blockLength;
         this.amountOfBlocks = amountOfBlocks;
         this.allocations = IntStream.range(0, amountOfBlocks)
-                .mapToObj(allocationIndex -> new AllocatedBlock(allocationIndex, blockLength, 0, blockLength))
+                .mapToObj(allocationIndex -> new AllocatedBlock(allocationIndex, blockLength))
                 .toArray(AllocatedBlock[]::new);
         this.freeBlocksStatus = new BitSet(amountOfBlocks);
         this.freeBlocksStatus.set(0, amountOfBlocks);
@@ -59,7 +60,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
                     }
                 }
             }
-        }).subscribeOn(App.MyScheduler)
+        }).subscribeOn(Schedulers.elastic())
                 .doOnNext(allocatedBlock -> this.allocatedSink.next(allocatedBlock.getBlockIndex()));
     }
 
@@ -74,6 +75,12 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
             this.notifyOnFreeIndex.notify();
             this.freesSink.next(allocatedBlock.getBlockIndex());
         }
+    }
+
+    @Override
+    public void freeAll() {
+        Arrays.stream(this.allocations)
+                .forEach(this::free);
     }
 
     @Override
@@ -101,7 +108,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
         return this.amountOfBlocks;
     }
 
-    private static BlocksAllocator instance = new BlocksAllocatorImpl(20, 17_000);
+    private static BlocksAllocator instance = new BlocksAllocatorImpl(20_000, 17_000);
 
     public static BlocksAllocator getInstance() {
         return instance;

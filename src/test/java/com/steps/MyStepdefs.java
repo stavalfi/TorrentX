@@ -17,8 +17,6 @@ import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
-import main.statistics.SpeedStatistics;
-import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.Status;
 import main.torrent.status.StatusChanger;
 import main.torrent.status.StatusType;
@@ -29,12 +27,11 @@ import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
 import org.junit.Assert;
 import org.mockito.Mockito;
-import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
-import reactor.util.function.Tuple2;
 
 import java.io.File;
 import java.time.Duration;
@@ -194,7 +191,7 @@ public class MyStepdefs {
                         .autoConnect(0);
 
 
-        Mono<List<SendPeerMessages>> sentMessagesMono = Flux.fromIterable(messageToSendList)
+        Mono<List<SendMessagesNotifications>> sentMessagesMono = Flux.fromIterable(messageToSendList)
                 .flatMap(peerMessageType ->
                         Utils.sendFakeMessage(fakePeer, peerMessageType))
                 .collectList();
@@ -300,7 +297,7 @@ public class MyStepdefs {
     public void activeTorrentExistForTorrent(boolean isActiveTorrentExist, String torrentFileName) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        Mono<Optional<FileSystemLinkImpl>> activeTorrentMono =
+        Mono<Optional<FileSystemLink>> activeTorrentMono =
                 ActiveTorrents.getInstance()
                         .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash());
 
@@ -367,7 +364,7 @@ public class MyStepdefs {
                 .get()
                 .getFileSystemLink();
 
-        Mono<FileSystemLinkImpl> deletionTaskMono;
+        Mono<FileSystemLink> deletionTaskMono;
         if (deleteTorrentFiles && deleteActiveTorrent)
             deletionTaskMono = fileSystemLink.deleteFileOnlyMono()
                     .flatMap(activeTorrent -> activeTorrent.deleteActiveTorrentOnlyMono());
@@ -381,6 +378,8 @@ public class MyStepdefs {
                 .verifyComplete();
     }
 
+    // TODO: this test does not have good design because it collects all the pieceMessages to multiple sets so we can't
+    // free the allocatedBlocks objects. We may run in a situation when each block is 1gb so we will get out of memory exception.
     @When("^application save random blocks for torrent: \"([^\"]*)\" in \"([^\"]*)\" and check it saved$")
     public void applicationSaveARandomBlockInsideTorrentInAndCheckItSaved(String torrentFileName,
                                                                           String downloadLocation,
@@ -391,8 +390,8 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         Flux<PieceMessage> pieceMessagesFlux = Flux.fromIterable(blockList)
-                .map((BlockOfPiece blockOfPiece) -> Utils.createPieceMessages(torrentInfo, blockOfPiece, 9_000_000))
-                .flatMap(Flux::fromIterable)
+                .flatMap((BlockOfPiece blockOfPiece) -> Utils.createRandomPieceMessages(torrentInfo, blockOfPiece,
+                        BlocksAllocatorImpl.getInstance().getBlockLength()))
                 .publish()
                 .autoConnect(2);
 
@@ -427,10 +426,15 @@ public class MyStepdefs {
 
         Set<PieceMessage> actualSavedPiecesFromFileSystem = recordedTorrentPieceChangedFlux
                 .map(PieceEvent::getReceivedPiece)
-                .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(), pieceMessage.getBegin(), pieceMessage.getBlock().length))
+                .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(),
+                        pieceMessage.getBegin(), pieceMessage.getBlockLength()))
+                // I must change the thread because I'm going to block it in readFromFile
+                // and reactor doesn't allow to block single or parallel threads.
+                .publishOn(Schedulers.elastic())
                 .map(requestMessage -> {
-                    byte[] actualWrittenBytes = Utils.readFromFile(torrentInfo, fullDownloadPath, requestMessage);
-                    return new PieceMessage(null, null, requestMessage.getIndex(), requestMessage.getBegin(), actualWrittenBytes);
+                    AllocatedBlock actualWrittenBytes = Utils.readFromFile(torrentInfo, fullDownloadPath, requestMessage);
+                    return new PieceMessage(null, null, requestMessage.getIndex(),
+                            requestMessage.getBegin(), actualWrittenBytes.getLength(), actualWrittenBytes);
                 })
                 .collect(Collectors.toSet())
                 .block();
@@ -459,8 +463,10 @@ public class MyStepdefs {
                 .collect(Collectors.toSet());
 
         Set<PieceMessage> actualCompletedSavedPiecesReadByFileSystem = Flux.fromIterable(expectedCompletedSavedPieces)
-                .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(), pieceMessage.getBegin(), pieceMessage.getBlock().length))
-                .flatMap(fileSystemLink::buildPieceMessage)
+                .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(),
+                        pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength()))
+                .flatMap((RequestMessage requestMessage) -> BlocksAllocatorImpl.getInstance().allocate()
+                        .flatMap(allocatedBlock -> fileSystemLink.buildPieceMessage(requestMessage, allocatedBlock)))
                 .collect(Collectors.toSet())
                 .block();
 
@@ -494,7 +500,7 @@ public class MyStepdefs {
                         torrentInfo.getPieces().size() + pieceIndex)
                 .collect(Collectors.toList());
 
-        FileSystemLinkImpl fileSystemLinkImplTorrent = ActiveTorrents.getInstance()
+        FileSystemLink fileSystemLinkImplTorrent = ActiveTorrents.getInstance()
                 .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
                 .filter(Optional::isPresent)
                 .map(Optional::get)
@@ -522,67 +528,6 @@ public class MyStepdefs {
         Utils.removeEverythingRelatedToLastTest();
     }
 
-    private SpeedStatistics torrentDownloadSpeedStatistics;
-
-    @Given("^size of incoming messages every \"([^\"]*)\" mill-seconds from a peer:$")
-    public void sizeOfIncomingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> incomingMessageSizeList) {
-
-        Flux<? extends PeerMessage> receivedMessageMessages = Flux.fromIterable(incomingMessageSizeList)
-                .delayElements(Duration.ofMillis(delay))
-                .map(incomingMessageSize ->
-                        new PieceMessage(null, null, 0, 0, new byte[incomingMessageSize]));
-
-        Flux<? extends PeerMessage> sentSentMessages = Flux.empty();
-
-        this.torrentDownloadSpeedStatistics =
-                new TorrentSpeedSpeedStatisticsImpl(this.torrentInfo, receivedMessageMessages, sentSentMessages);
-    }
-
-    @Then("^download statistics every 100 mill-seconds are from a peer:$")
-    public void downloadStatisticsEveryMillSecondsAreFromAPeer(List<Double> downloadSpeedStatistics) {
-
-        Flux<Tuple2<Double, Double>> speedComparisionFlux =
-                Flux.zip(Flux.fromIterable(downloadSpeedStatistics),
-                        this.torrentDownloadSpeedStatistics.getDownloadSpeedFlux())
-                        .doOnNext(values -> {
-                            String message = "download speed expected and actual are not equal";
-                            Assert.assertEquals(message, values.getT1(), values.getT2());
-                        });
-
-        StepVerifier.create(speedComparisionFlux)
-                .expectNextCount(downloadSpeedStatistics.size())
-                .verifyComplete();
-    }
-
-    private SpeedStatistics torrentUploadSpeedStatistics;
-
-    @Given("^size of outgoing messages every \"([^\"]*)\" mill-seconds from a peer:$")
-    public void outgoingMessagesEveryMillSecondsFromAPeer(int delay, List<Integer> outgoingMessageSizeList) {
-        Flux<? extends PeerMessage> receivedMessageMessages = Flux.fromIterable(outgoingMessageSizeList)
-                .delayElements(Duration.ofMillis(delay))
-                .map(outgoingMessageSize ->
-                        new PieceMessage(null, null, 0, 0, new byte[outgoingMessageSize]));
-
-        Flux<? extends PeerMessage> sentSentMessages = Flux.empty();
-        this.torrentUploadSpeedStatistics =
-                new TorrentSpeedSpeedStatisticsImpl(this.torrentInfo, receivedMessageMessages, sentSentMessages);
-    }
-
-    @Then("^upload statistics every 100 mill-seconds are from a peer:$")
-    public void uploadStatisticsEveryMillSecondsAreFromAPeer(List<Double> uploadSpeedStatistics) {
-        Flux<Tuple2<Double, Double>> speedComparisionFlux =
-                Flux.zip(Flux.fromIterable(uploadSpeedStatistics),
-                        this.torrentUploadSpeedStatistics.getDownloadSpeedFlux())
-                        .doOnNext(values -> {
-                            String message = "upload speed expected and actual are not equal";
-                            Assert.assertEquals(message, values.getT1(), values.getT2());
-                        });
-
-        StepVerifier.create(speedComparisionFlux)
-                .expectNextCount(uploadSpeedStatistics.size())
-                .verifyComplete();
-    }
-
     @Then("^application connect to all peers and assert that we connected to them - for torrent: \"([^\"]*)\"$")
     public void applicationConnectToAllPeersAndAssertThatWeConnectedToThemForTorrent(String torrentFileName) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
@@ -608,7 +553,7 @@ public class MyStepdefs {
 
         Flux<Peer> peersFromResponsesMono = torrentDownloader.getPeersCommunicatorFlux()
                 .map(Link::receivePeerMessages)
-                .flatMap(ReceivePeerMessages::getPeerMessageResponseFlux)
+                .flatMap(ReceiveMessagesNotifications::getPeerMessageResponseFlux)
                 .map(PeerMessage::getFrom)
                 .distinct()
                 .timeout(Duration.ofMillis(1500))
@@ -770,7 +715,7 @@ public class MyStepdefs {
     }
 
     private Mono<Link> meToFakePeerLink;
-    private Mono<List<SendPeerMessages>> requestsFromFakePeerToMeListMono;
+    private Mono<List<SendMessagesNotifications>> requestsFromFakePeerToMeListMono;
 
     @Then("^random-fake-peer connect to me for torrent: \"([^\"]*)\" in \"([^\"]*)\" and he request:$")
     public void randomFakePeerConnectToMeForTorrentInAndHeRequest(String torrentFileName, String downloadLocation,
@@ -856,7 +801,7 @@ public class MyStepdefs {
         // which I don't want to lose.
         Flux<PieceMessage> recordedPieceMessageFlux = this.meToFakePeerLink
                 .map(Link::sendMessages)
-                .flatMapMany(SendPeerMessages::sentPeerMessagesFlux)
+                .flatMapMany(SendMessagesNotifications::sentPeerMessagesFlux)
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
                 .cast(PieceMessage.class)
                 .replay()
@@ -864,26 +809,18 @@ public class MyStepdefs {
 
         // send request massages from fake peer to me and get all the
         // piece messages from me to fake peer and collect them to list.
-        List<PieceMessage> actualBlockFromMeList = this.requestsFromFakePeerToMeListMono
+        Set<BlockOfPiece> actualBlockFromMeSet = this.requestsFromFakePeerToMeListMono
                 .flatMapMany(remoteFakePeerForRequestingPieces -> recordedPieceMessageFlux)
+                .map(pieceMessage -> new BlockOfPiece(pieceMessage.getIndex(), pieceMessage.getBegin(), pieceMessage.getBlockLength()))
                 .take(expectedBlockFromMeList.size())
-                .collectList()
+                .collect(Collectors.toSet())
                 .block();
 
+        Set<BlockOfPiece> expectedBlockFromMeSet = expectedBlockFromMeList.stream()
+                .collect(Collectors.toSet());
+
         // assert that both the list are equal.
-
-        expectedBlockFromMeList.forEach(blockOfPiece ->
-                Assert.assertTrue("the app didn't sendMessage the block: " + blockOfPiece, actualBlockFromMeList.stream()
-                        .anyMatch(pieceMessage -> blockOfPiece.getPieceIndex() == pieceMessage.getIndex() &&
-                                blockOfPiece.getFrom() == pieceMessage.getBegin() &&
-                                blockOfPiece.getLength() == pieceMessage.getBlock().length)));
-
-        actualBlockFromMeList.stream()
-                .forEach(pieceMessage ->
-                        Assert.assertTrue("the app sendMessage a block which it didn't suppose to sendMessage: " + pieceMessage, expectedBlockFromMeList.stream()
-                                .anyMatch(blockOfPiece -> blockOfPiece.getPieceIndex() == pieceMessage.getIndex() &&
-                                        blockOfPiece.getFrom() == pieceMessage.getBegin() &&
-                                        blockOfPiece.getLength() == pieceMessage.getBlock().length)));
+        Assert.assertEquals(expectedBlockFromMeSet, actualBlockFromMeSet);
 
         meToFakePeerLink.subscribe(Link::closeConnection);
 
@@ -989,9 +926,9 @@ public class MyStepdefs {
 //
 ////			int requestBlockSize = blockOfPiece.getMessageLength() != null ?
 ////					blockOfPiece.getMessageLength() :
-////					torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getFrom();
+////					torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getOffset();
 //
-//			return new RequestMessage(link.getMe(), link.getPeer(), pieceIndex, blockOfPiece.getFrom(), requestBlockSize);
+//			return new RequestMessage(link.getMe(), link.getPeer(), pieceIndex, blockOfPiece.getOffset(), requestBlockSize);
 //		};
 //
 //		// download the blocks.
@@ -1020,9 +957,9 @@ public class MyStepdefs {
 //
 //			int requestBlockSize = blockOfPiece.getMessageLength() != null ?
 //					blockOfPiece.getMessageLength() :
-//					torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getFrom();
+//					torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getOffset();
 //
-//			return new BlockOfPiece(pieceIndex, blockOfPiece.getFrom(), requestBlockSize);
+//			return new BlockOfPiece(pieceIndex, blockOfPiece.getOffset(), requestBlockSize);
 //		};
 //
 //		List<BlockOfPiece> fixedExpectedBlockFromFakePeerList = expectedBlockFromFakePeerList.stream()
@@ -1032,7 +969,7 @@ public class MyStepdefs {
 //		List<BlockOfPiece> actualDownloadedBlocks = this.actualSavedBlocks$.take(expectedBlockFromFakePeerList.size())
 //				.map(PieceEvent::getReceivedPiece)
 //				.map(pieceEvent -> new BlockOfPiece(pieceEvent.getIndex(),
-//						pieceEvent.getBegin(), pieceEvent.getBlock().length))
+//						pieceEvent.getBegin(), pieceEvent.getAllocatedBlock().length))
 //				.collectList()
 //				.block();
 //
@@ -1160,64 +1097,66 @@ public class MyStepdefs {
 
     }
 
+    // TODO: this test does not have good design because it collects all the pieceMessages to multiple sets so we can't
+    // free the allocatedBlocks objects. We may run in a situation when each block is 1gb so we will get out of memory exception.
     @When("^application save the all the pieces of torrent: \"([^\"]*)\",\"([^\"]*)\"$")
     public void applicationSaveTheAllThePiecesOfTorrent(String torrentFileName, String downloadLocation) throws Throwable {
-        Utils.removeEverythingRelatedToLastTest();
-
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-        StatusChanger statusChanger = new StatusChanger(new Status(
-                false,
-                false,
-                false,
-                false,
-                false, false,
-                false,
-                false,
-                false,
-                false,
-                false));
-
-        Thread.sleep(50);// wait until torrentStatusController is initialized.
-
-        ConnectableFlux<PieceMessage> allPieceMessages$ = Flux.range(0, torrentInfo.getPieces().size())
-                .map(pieceIndex -> new BlockOfPiece(pieceIndex, 0, null))
-                .map(blockOfPiece -> Utils.createPieceMessages(torrentInfo, blockOfPiece, 1_000_000_000))
-                .flatMap(Flux::fromIterable)
-                .publish();
-
-        String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-        FileSystemLinkImpl fileSystemLinkImplTorrent = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, fullDownloadPath, statusChanger, allPieceMessages$)
-                .block();
-
-        Mono<Integer> piecesAmount$ = allPieceMessages$.collectList()
-                .map(List::size)
-                .flux()
-                .replay()
-                .autoConnect(0)
-                .take(1)
-                .single();
-
-        Flux<Integer> allSavedPiecesRecorded$ = fileSystemLinkImplTorrent.savedPieceFlux()
-                .replay()
-                .autoConnect(0);
-
-        allPieceMessages$.connect();
-
-        StepVerifier.create(allSavedPiecesRecorded$)
-                .expectNextCount(torrentInfo.getPieces().size())
-                .verifyComplete();
-
-        Flux<PieceEvent> savedBlocks$ = fileSystemLinkImplTorrent.savedBlockFlux()
-                .replay()
-                .autoConnect(0);
-
-        StepVerifier.create(savedBlocks$)
-                .expectNextCount(piecesAmount$.block())
-                .verifyComplete();
-
-        Assert.assertEquals(fileSystemLinkImplTorrent.minMissingPieceIndex(), -1);
+//        Utils.removeEverythingRelatedToLastTest();
+//
+//        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+//
+//        StatusChanger statusChanger = new StatusChanger(new Status(
+//                false,
+//                false,
+//                false,
+//                false,
+//                false, false,
+//                false,
+//                false,
+//                false,
+//                false,
+//                false));
+//
+//        Thread.sleep(50);// wait until torrentStatusController is initialized.
+//
+//        ConnectableFlux<PieceMessage> allPieceMessages$ = Flux.range(0, torrentInfo.getPieces().size())
+//                .map(pieceIndex -> new BlockOfPiece(pieceIndex, 0, null))
+//                .map(blockOfPiece -> Utils.createRandomPieceMessages(torrentInfo, blockOfPiece, 1_000_000_000))
+//                .flatMap(Flux::fromIterable)
+//                .publish();
+//
+//        String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
+//        FileSystemLinkImpl fileSystemLinkImplTorrent = ActiveTorrents.getInstance()
+//                .createActiveTorrentMono(torrentInfo, fullDownloadPath, statusChanger, allPieceMessages$)
+//                .block();
+//
+//        Mono<Integer> piecesAmount$ = allPieceMessages$.collectList()
+//                .map(List::size)
+//                .flux()
+//                .replay()
+//                .autoConnect(0)
+//                .take(1)
+//                .single();
+//
+//        Flux<Integer> allSavedPiecesRecorded$ = fileSystemLinkImplTorrent.savedPieceFlux()
+//                .replay()
+//                .autoConnect(0);
+//
+//        allPieceMessages$.connect();
+//
+//        StepVerifier.create(allSavedPiecesRecorded$)
+//                .expectNextCount(torrentInfo.getPieces().size())
+//                .verifyComplete();
+//
+//        Flux<PieceEvent> savedBlocks$ = fileSystemLinkImplTorrent.savedBlockFlux()
+//                .replay()
+//                .autoConnect(0);
+//
+//        StepVerifier.create(savedBlocks$)
+//                .expectNextCount(piecesAmount$.block())
+//                .verifyComplete();
+//
+//        Assert.assertEquals(fileSystemLinkImplTorrent.minMissingPieceIndex(), -1);
     }
 
     @And("^the saved-pieces-flux send complete signal - for torrent: \"([^\"]*)\",\"([^\"]*)\"$")
