@@ -22,8 +22,8 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
     private final Object notifyOnFreeIndex = new Object();
 
     public BlocksAllocatorImpl(int amountOfBlocks, int blockLength) {
-        assert blockLength > 0;
-        assert amountOfBlocks > 0;
+        assert 0 < blockLength;
+        assert 0 < amountOfBlocks;
         this.blockLength = blockLength;
         this.amountOfBlocks = amountOfBlocks;
         this.allocations = IntStream.range(0, amountOfBlocks)
@@ -73,7 +73,6 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
     public void free(AllocatedBlock allocatedBlock) {
         assert allocatedBlock.getBlock().length == this.blockLength;
         assert 0 <= allocatedBlock.getBlockIndex() && allocatedBlock.getBlockIndex() <= this.amountOfBlocks;
-        assert !this.freeBlocksStatus.get(allocatedBlock.getBlockIndex());
 
         synchronized (this.notifyOnFreeIndex) {
             this.freeBlocksStatus.set(allocatedBlock.getBlockIndex());
@@ -116,8 +115,8 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
     @Override
     public AllocatedBlock updateLength(AllocatedBlock oldAllocatedBlock, int length) {
         assert !this.freeBlocksStatus.get(oldAllocatedBlock.getBlockIndex());
-        assert length < this.blockLength;
-        assert this.allocations[oldAllocatedBlock.getBlockIndex()].getOffset() + length < this.blockLength;
+        assert length <= this.blockLength;
+        assert this.allocations[oldAllocatedBlock.getBlockIndex()].getOffset() + length <= this.blockLength;
 
         AllocatedBlock newAllocatedBlock = new AllocatedBlock(oldAllocatedBlock.getBlockIndex(),
                 oldAllocatedBlock.getBlock(), oldAllocatedBlock.getOffset(), length);

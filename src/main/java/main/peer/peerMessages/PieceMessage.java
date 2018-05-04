@@ -32,36 +32,35 @@ public class PieceMessage extends PeerMessage {
         this.allocatedBlock = allocatedBlock;
     }
 
+    public static int fixBlockBegin(int pieceLength, int oldBegin) {
+        return Math.min(oldBegin, pieceLength - 1);
+    }
 
-    // TODO: call this method from the constructor of PieceMessage class.
-    public static PieceMessage fixPieceMessage(PieceMessage pieceMessage, long pieceLength) {
-        // TODO: piece length is integer and not long.
-        // Notes:
-        // (1) piece size can't be more than Integer.MAX_VALUE because the protocol allow me to request
-        // even the last byte of a piece and if the piece size is more than Integer.MAX_VALUE,
-        // than I can't spacify the "begin" of that request using 4 bytes.
-        // (2) in the tests, a block size is bounded to the allocatedBlock size and it's integer so
-        // we can't create a request for a block larger than Integer.MAX_VALUE. so for both reasons,
-        // a request of a block can't be more than Integer.MAX_VALUE.
-        // TODO: uncomment the following line and fix this compilation error because the above TODO.
-//        int newBegin = Math.min(pieceMessage.getBegin(), pieceLength);
+    public static int fixBlockLength(int pieceLength, int begin, int oldBlockLength) {
+        assert fixBlockBegin(pieceLength, begin) == begin;
         int maxAllocatedBlockSize = BlocksAllocatorImpl.getInstance().getBlockLength();
-        int newBlockLength = Math.min(maxAllocatedBlockSize, pieceMessage.getBlockLength());
+        int newBlockLength = Math.min(maxAllocatedBlockSize, oldBlockLength);
 
         // is pieceMessage.getBegin() + newBlockLength overlaps with the range of this piece?
-        if (pieceLength < pieceMessage.getBegin() + newBlockLength) {
+        if (pieceLength < begin + newBlockLength) {
             // (1) newBlockLength <= maxAllocatedBlockSize
             // (1) -> (2) pieceLength - pieceMessage.getBegin() < newBlockLength <= maxAllocatedBlockSize <= Integer.MAX_VALUE
             // (2) -> (3) pieceLength - pieceMessage.getBegin() < Integer.MAX_VALUE
-            newBlockLength = (int) (pieceLength - pieceMessage.getBegin());
+            newBlockLength = (int) (pieceLength - begin);
             // (4) ->  newBlockLength = (pieceLength - pieceMessage.getBegin()) <= pieceLength
             // (4) -> (5) -> newBlockLength <= pieceLength
         }
+        return newBlockLength;
+    }
 
+    // TODO: call this method from the constructor of PieceMessage class.
+    public static PieceMessage fixPieceMessage(PieceMessage pieceMessage, int pieceLength) {
+        int newBegin = fixBlockBegin(pieceLength, pieceMessage.getBegin());
+        int newBlockLength = fixBlockLength(pieceLength, newBegin, pieceMessage.getBlockLength());
         AllocatedBlock newAllocatedBlock = BlocksAllocatorImpl.getInstance()
                 .updateLength(pieceMessage.getAllocatedBlock(), newBlockLength);
         return new PieceMessage(pieceMessage.getFrom(), pieceMessage.getTo(),
-                pieceMessage.getIndex(), pieceMessage.getBegin(), newBlockLength, newAllocatedBlock);
+                pieceMessage.getIndex(), newBegin, newBlockLength, newAllocatedBlock);
     }
 
     @Override

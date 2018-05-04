@@ -14,7 +14,7 @@ public class AllocatedBlock {
 
     public AllocatedBlock(int blockIndex, byte[] block, int offset, int length) {
         assert 0 <= offset && offset < block.length;
-        assert length < block.length - offset;
+        assert length <= block.length - offset;
         this.blockIndex = blockIndex;
         this.block = block;
         this.offset = offset;

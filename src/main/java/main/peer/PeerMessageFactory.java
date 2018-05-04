@@ -40,8 +40,9 @@ public class PeerMessageFactory {
 
     public static PieceMessage createPieceMessage(TorrentInfo torrentInfo, Peer from, Peer to, int messagePayloadLength, DataInputStream dataInputStream) throws IOException {
         int index = dataInputStream.readInt();
-        int begin = dataInputStream.readInt();
-        int blockLength = messagePayloadLength - 8;
+        int pieceLength = torrentInfo.getPieceLength(index);
+        int begin = PieceMessage.fixBlockBegin(pieceLength, dataInputStream.readInt());
+        int blockLength = PieceMessage.fixBlockLength(pieceLength, begin, messagePayloadLength - 8);
         // we will come here when he receive piece message. We need to assert that in all the places we finally free this allocated block even if we got error or complete signal.
         AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
                 .allocate(0, blockLength)
@@ -50,7 +51,7 @@ public class PeerMessageFactory {
         dataInputStream.readFully(allocatedBlock.getBlock(), allocatedBlock.getOffset(), allocatedBlock.getActualLength());
 
         PieceMessage pieceMessage = new PieceMessage(from, to, index, begin, blockLength, allocatedBlock);
-        return PieceMessage.fixPieceMessage(pieceMessage, torrentInfo.getPieceLength(pieceMessage.getIndex()));
+        return PieceMessage.fixPieceMessage(pieceMessage, pieceLength);
     }
 
     public static PeerMessage create(TorrentInfo torrentInfo, Peer from, Peer to, byte messageId, byte[] payload) {
