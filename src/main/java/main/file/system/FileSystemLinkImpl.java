@@ -13,7 +13,6 @@ import main.torrent.status.StatusChanger;
 import main.torrent.status.StatusType;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.io.IOException;
@@ -233,7 +232,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
             // I already have the received block. I don't need it.
             return Mono.empty();
 
-        return Mono.<PieceEvent>create(sink -> {
+        return Mono.create(sink -> {
             long from = super.getPieceStartPosition(pieceMessage.getIndex()) + pieceMessage.getBegin();
             long to = from + pieceMessage.getAllocatedBlock().getLength();
 
@@ -260,27 +259,23 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 }
 
             // update pieces status:
-
-            // there maybe multiple writes of the same pieceRequest during one execution...
-            long pieceLength = getPieceLength(pieceMessage.getIndex());
+            // Note: The download algorithm doesn't download multiple blocks of the same piece.
+            // so we won;t update the following cell concurrently.
             this.downloadedBytesInPieces[pieceMessage.getIndex()] += pieceMessage.getAllocatedBlock().getLength();
+            long pieceLength = getPieceLength(pieceMessage.getIndex());
             if (pieceLength < this.downloadedBytesInPieces[pieceMessage.getIndex()])
                 this.downloadedBytesInPieces[pieceMessage.getIndex()] = getPieceLength(pieceMessage.getIndex());
 
             long howMuchWeWroteUntilNowInThisPiece = this.downloadedBytesInPieces[pieceMessage.getIndex()];
             if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
-                // update pieces partial status array:
-                // TODO: WARNING: this line *only* must be synchronized among multiple threads!
                 this.piecesStatus.set(pieceMessage.getIndex());
                 PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.COMPLETED, pieceMessage);
                 sink.success(pieceEvent);
             } else {
-                // update pieces partial status array:
-                // TODO: WARNING: this line *only* must be synchronized among multiple threads!
                 PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.DOWNLOADING, pieceMessage);
                 sink.success(pieceEvent);
             }
-        }).subscribeOn(Schedulers.single());
+        });
     }
 
     private List<ActualFile> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) throws IOException {
@@ -311,7 +306,6 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.SPARSE,
                 StandardOpenOption.READ
-                // TODO: think if we add CREATE if exist rule.
         };
         return Files.newByteChannel(Paths.get(filePathToCreate), options);
     }

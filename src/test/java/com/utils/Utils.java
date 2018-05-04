@@ -295,11 +295,7 @@ public class Utils {
                         .block();
                 return link.sendMessages()
                         .sendPieceMessage(0, 0, allocatedBlock)
-                        .doOnEach(signal -> {
-                            // TODO: assert that we didn't miss any signal type or we will have a damn bug or a memory leak!
-                            if (signal.isOnError() || signal.isOnNext())
-                                BlocksAllocatorImpl.getInstance().free(allocatedBlock);
-                        });
+                        .doOnTerminate(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock.getAllocationId()));
             case CancelMessage:
                 return link.sendMessages().sendCancelMessage(0, 0, 10);
             case KeepAliveMessage:
@@ -485,7 +481,7 @@ public class Utils {
                 for (int i = 0; i < blockLength; i++)
                     allocatedBlock.getBlock()[i] = (byte) i;
                 PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex,
-                        blockStartPosition, allocatedBlock,torrentInfo.getPieceLength(pieceIndex));
+                        blockStartPosition, allocatedBlock, torrentInfo.getPieceLength(pieceIndex));
                 sink.next(pieceMessage);
                 blockStartPosition += blockLength;
             }

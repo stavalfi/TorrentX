@@ -1,20 +1,29 @@
 package main.file.system;
 
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 
+// TODO: make it inner class of BlockAllocator so only he will have access to the property: blockIndex.
 public class AllocatedBlock {
+    private static AtomicLong idCounter = new AtomicLong();
+
     private int blockIndex;
+    private String allocationId;
     private byte[] block;
     private int offset, length;
 
     public AllocatedBlock(int blockIndex, int blockSize) {
         this.blockIndex = blockIndex;
         this.block = new byte[blockSize];
+        this.allocationId = String.valueOf(idCounter.getAndIncrement());
+        ;
     }
 
     public AllocatedBlock(int blockIndex, byte[] block, int offset, int length) {
         assert 0 <= offset && offset < block.length;
         assert length <= block.length - offset;
+        this.allocationId = String.valueOf(idCounter.getAndIncrement());
+        ;
         this.blockIndex = blockIndex;
         this.block = block;
         this.offset = offset;
@@ -37,19 +46,21 @@ public class AllocatedBlock {
         return length;
     }
 
+    public String getAllocationId() {
+        return allocationId;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof AllocatedBlock)) return false;
         AllocatedBlock that = (AllocatedBlock) o;
-        return getBlockIndex() == that.getBlockIndex() &&
-                getOffset() == that.getOffset() &&
-                getLength() == that.getLength();
+        return Objects.equals(getAllocationId(), that.getAllocationId());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getBlockIndex(), getOffset(), getLength());
+        return Objects.hash(getAllocationId());
     }
 
     @Override

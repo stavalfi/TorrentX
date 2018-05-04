@@ -20,9 +20,6 @@ public class RemoteFakePeer extends Link {
                             blockThread(100);
                             return;
                         case RESPOND_WITH_DELAY_3000:
-                            //TODO: in some operating systems, the IO operations are extremely slow.
-                            // for example the first use of randomAccessFile object. in linux all good.
-                            // we need to remmber to change back 20->3.
                             blockThread(3 * 1000);
                             return;
                     }
@@ -44,11 +41,7 @@ public class RemoteFakePeer extends Link {
                                     .block();
                             return this.sendMessages()
                                     .sendPieceMessage(requestMessage.getIndex(), requestMessage.getBegin(), allocatedBlock)
-                                    .doOnEach(signal -> {
-                                        // TODO: assert that we didn't miss any signal type or we will have a damn bug or a memory leak!
-                                        if (signal.isOnError() || signal.isOnNext())
-                                            BlocksAllocatorImpl.getInstance().free(allocatedBlock);
-                                    });
+                                    .doOnTerminate(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock.getAllocationId()));
                     }
                     // we will never be here...
                     return Mono.empty();

@@ -70,20 +70,26 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
     }
 
     @Override
-    public void free(AllocatedBlock allocatedBlock) {
-        assert allocatedBlock.getBlock().length == this.blockLength;
-        assert 0 <= allocatedBlock.getBlockIndex() && allocatedBlock.getBlockIndex() <= this.amountOfBlocks;
-
+    public boolean free(String AllocationId) {
         synchronized (this.notifyOnFreeIndex) {
-            this.freeBlocksStatus.set(allocatedBlock.getBlockIndex());
-            this.notifyOnFreeIndex.notify();
-            this.freesSink.next(allocatedBlock.getBlockIndex());
+            return Arrays.stream(this.allocations)
+                    .filter(allocatedBlock -> allocatedBlock.getAllocationId().equals(AllocationId))
+                    .findAny()
+                    .filter(allocatedBlock -> !this.freeBlocksStatus.get(allocatedBlock.getBlockIndex()))
+                    .map(allocatedBlock -> {
+                        this.freeBlocksStatus.set(allocatedBlock.getBlockIndex());
+                        this.notifyOnFreeIndex.notify();
+                        this.freesSink.next(allocatedBlock.getBlockIndex());
+                        return true;
+                    })
+                    .orElse(false);
         }
     }
 
     @Override
     public void freeAll() {
         Arrays.stream(this.allocations)
+                .map(AllocatedBlock::getAllocationId)
                 .forEach(this::free);
     }
 

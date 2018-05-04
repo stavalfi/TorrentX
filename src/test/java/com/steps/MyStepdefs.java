@@ -336,13 +336,7 @@ public class MyStepdefs {
                 Assert.assertTrue("file is not a directory but it needs to be: " + mainFile.getPath(),
                         mainFile.isDirectory());
             Flux<File> zip = Flux.zip(Flux.fromIterable(torrentInfo.getFileList()), Flux.fromIterable(filePathList),
-                    (torrentFile, path) -> {
-                        File file = new File(path);
-                        // TODO: we create a sparse file so it doesn't have an initial length.
-//						Assert.assertEquals("file not in the right length: " + file.getPath(),
-//								(long) torrentFile.getFileLength(), file.length());
-                        return file;
-                    })
+                    (torrentFile, path) -> new File(path))
                     .doOnNext(file -> Assert.assertTrue("file does not exist: " + file.getPath(), file.exists()))
                     .doOnNext(file -> Assert.assertTrue("we can't read from the file: " + file.getPath(), file.canRead()))
                     .doOnNext(file -> Assert.assertTrue("we can't write to the file: " + file.getPath(), file.canWrite()));
@@ -1264,7 +1258,7 @@ public class MyStepdefs {
 
         this.actualAllocations.stream()
                 .filter(allocatedBlock -> allocationToFreeList.contains(allocatedBlock.getBlockIndex()))
-                .peek(allocatedBlock -> this.blocksAllocator.free(allocatedBlock))
+                .peek(allocatedBlock -> this.blocksAllocator.free(allocatedBlock.getAllocationId()))
                 .map(AllocatedBlock::getBlockIndex)
                 .forEach(freedIndex -> Assert.assertTrue(this.blocksAllocator.getFreeBlocksStatus().get(freedIndex)));
 
