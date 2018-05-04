@@ -45,8 +45,8 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     public Mono<SendMessagesNotifications> sendPieceMessage(int index, int begin,
                                                             AllocatedBlock allocatedBlock) {
         PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(),
-                index, begin, allocatedBlock);
-        return send(PieceMessage.fixPieceMessage(pieceMessage, this.torrentInfo.getPieceLength(index)))
+                index, begin, allocatedBlock, this.torrentInfo.getPieceLength(index));
+        return send(pieceMessage)
                 .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(index));
     }
 

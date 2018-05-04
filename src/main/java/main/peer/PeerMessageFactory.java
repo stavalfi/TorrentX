@@ -50,8 +50,7 @@ public class PeerMessageFactory {
 
         dataInputStream.readFully(allocatedBlock.getBlock(), allocatedBlock.getOffset(), allocatedBlock.getLength());
 
-        PieceMessage pieceMessage = new PieceMessage(from, to, index, begin, allocatedBlock);
-        return PieceMessage.fixPieceMessage(pieceMessage, pieceLength);
+        return new PieceMessage(from, to, index, begin, allocatedBlock, pieceLength);
     }
 
     public static PeerMessage create(TorrentInfo torrentInfo, Peer from, Peer to, byte messageId, byte[] payload) {

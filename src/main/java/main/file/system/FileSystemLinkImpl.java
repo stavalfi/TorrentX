@@ -224,7 +224,8 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     }
             }
             PieceMessage pieceMessage = new PieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
-                    requestMessage.getIndex(), requestMessage.getBegin(), allocatedBlock);
+                    requestMessage.getIndex(), requestMessage.getBegin(), allocatedBlock,
+                    super.getPieceLength(requestMessage.getIndex()));
             sink.success(pieceMessage);
         });
     }

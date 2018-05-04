@@ -485,8 +485,8 @@ public class Utils {
                 for (int i = 0; i < blockLength; i++)
                     allocatedBlock.getBlock()[i] = (byte) i;
                 PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex,
-                        blockStartPosition, allocatedBlock);
-                sink.next(PieceMessage.fixPieceMessage(pieceMessage, torrentInfo.getPieceLength(pieceIndex)));
+                        blockStartPosition, allocatedBlock,torrentInfo.getPieceLength(pieceIndex));
+                sink.next(pieceMessage);
                 blockStartPosition += blockLength;
             }
             sink.complete();

@@ -435,9 +435,8 @@ public class MyStepdefs {
                 .publishOn(Schedulers.elastic())
                 .map(requestMessage -> {
                     AllocatedBlock actualWrittenBytes = Utils.readFromFile(torrentInfo, fullDownloadPath, requestMessage);
-                    PieceMessage pieceMessage = new PieceMessage(null, null, requestMessage.getIndex(),
-                            requestMessage.getBegin(), actualWrittenBytes);
-                    return PieceMessage.fixPieceMessage(pieceMessage, fileSystemLink.getTorrentInfo().getPieceLength(pieceMessage.getIndex()));
+                    return new PieceMessage(null, null, requestMessage.getIndex(),
+                            requestMessage.getBegin(), actualWrittenBytes,torrentInfo.getPieceLength(requestMessage.getIndex()));
                 })
                 .collect(Collectors.toSet())
                 .block();

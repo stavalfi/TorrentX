@@ -22,11 +22,13 @@ public class PieceMessage extends PeerMessage {
      * @param allocatedBlock allocatedBlock of data, which is a subset of the piece specified by index.
      */
     public PieceMessage(Peer from, Peer to, int index, int begin,
-                        AllocatedBlock allocatedBlock) {
+                        AllocatedBlock allocatedBlock, int pieceLength) {
         super(to, from);
         this.index = index;
-        this.begin = begin;
-        this.allocatedBlock = allocatedBlock;
+        this.begin = fixBlockBegin(pieceLength, begin);
+        int newBlockLength = fixBlockLength(pieceLength, begin, allocatedBlock.getLength());
+        this.allocatedBlock = BlocksAllocatorImpl.getInstance()
+                .updateLength(allocatedBlock, newBlockLength);
     }
 
     public static int fixBlockBegin(int pieceLength, int oldBegin) {
@@ -48,16 +50,6 @@ public class PieceMessage extends PeerMessage {
             // (4) -> (5) -> newBlockLength <= pieceLength
         }
         return newBlockLength;
-    }
-
-    // TODO: call this method from the constructor of PieceMessage class.
-    public static PieceMessage fixPieceMessage(PieceMessage pieceMessage, int pieceLength) {
-        int newBegin = fixBlockBegin(pieceLength, pieceMessage.getBegin());
-        int newBlockLength = fixBlockLength(pieceLength, newBegin, pieceMessage.getAllocatedBlock().getLength());
-        AllocatedBlock newAllocatedBlock = BlocksAllocatorImpl.getInstance()
-                .updateLength(pieceMessage.getAllocatedBlock(), newBlockLength);
-        return new PieceMessage(pieceMessage.getFrom(), pieceMessage.getTo(),
-                pieceMessage.getIndex(), newBegin, newAllocatedBlock);
     }
 
     @Override
