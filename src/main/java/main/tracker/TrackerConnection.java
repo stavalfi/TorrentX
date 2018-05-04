@@ -26,7 +26,7 @@ public class TrackerConnection extends Tracker {
     public Mono<? extends AnnounceResponse> announceMono(String torrentHash, int tcpPort) {
 
         byte[] peerId = AppConfig.getInstance().getPeerId().getBytes();
-        int howMuchPeersWeWant = 1000;
+        int howMuchPeersWeWant = 10000;
 
         AnnounceRequest announceRequest =
                 new AnnounceRequest(this, this.connectResponse.getConnectionId(),
