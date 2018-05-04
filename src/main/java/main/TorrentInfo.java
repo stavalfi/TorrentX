@@ -11,6 +11,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+// Claim: piece length is integer and not long.
+// Prof:
+// (1) piece size can't be more than Integer.MAX_VALUE because the protocol allow me to request
+// even the last byte of a piece and if the piece size is more than Integer.MAX_VALUE,
+// than I can't specify the "begin" of that request using 4 bytes.
+// (2) in the tests, a block size is bounded to the allocatedBlock size and it's integer so
+// we can't create a request for a block larger than Integer.MAX_VALUE. so for both reasons,
+// a request of a block can't be more than Integer.MAX_VALUE.
+
 public class TorrentInfo {
     private String torrentFilePath;
     private final Torrent torrent;
@@ -33,16 +42,14 @@ public class TorrentInfo {
         return this.torrent.isSingleFileTorrent();
     }
 
-    public long getPieceLength() {
-        return this.torrent.getPieceLength();
-    }
-
-    public long getPieceLength(int pieceIndex) {
+    public int getPieceLength(int pieceIndex) {
         long totalSize = getTotalSize();
-        long pieceLength = this.torrent.getPieceLength();
+        int pieceLength = this.torrent.getPieceLength().intValue();
         int piecesAmount = this.torrent.getPieces().size() - 1;
-        if (pieceIndex == this.torrent.getPieces().size() - 1)
-            return totalSize - (piecesAmount * pieceLength);
+        if (pieceIndex == this.torrent.getPieces().size() - 1) {
+            long lastPieceLength = totalSize - (piecesAmount * pieceLength);
+            return (int) lastPieceLength;
+        }
         return pieceLength;
     }
 
@@ -65,7 +72,7 @@ public class TorrentInfo {
         long totalSize = getTotalSize();
         long thisPieceLength = getPieceLength(pieceIndex);
         long position = pieceIndex < getPieces().size() - 1 ?
-                pieceIndex * getPieceLength() :
+                pieceIndex * this.torrent.getPieceLength() :
                 totalSize - thisPieceLength;
         return position;
     }
