@@ -202,24 +202,20 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         return Mono.create(sink -> {
             long from = super.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
             long to = from + requestMessage.getBlockLength();
-            int freeIndexInResultArray = 0;
+            int freeIndexInResultArray = allocatedBlock.getOffset();
 
             for (ActualFile actualFile : this.actualFileImplList) {
                 if (from != to)
                     if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
                         // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
                         int howMuchToReadFromThisFile = (int) Math.min(actualFile.getTo() - from, to - from);
-                        byte[] tempResult;
                         try {
-                            // TODO: read directly to the allocated block. or else we won't have memory.
-                            tempResult = actualFile.readBlock(from, howMuchToReadFromThisFile);
+                            actualFile.readBlock(from, howMuchToReadFromThisFile, allocatedBlock.getBlock(), freeIndexInResultArray);
+                            freeIndexInResultArray += howMuchToReadFromThisFile;
                         } catch (IOException e) {
                             sink.error(e);
                             return;
                         }
-                        for (byte aTempResult : tempResult)
-                            allocatedBlock.getBlock()[freeIndexInResultArray++] = aTempResult;
-
                         from += howMuchToReadFromThisFile;
                     }
             }

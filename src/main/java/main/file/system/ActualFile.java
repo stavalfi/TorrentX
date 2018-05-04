@@ -17,5 +17,5 @@ public interface ActualFile {
 
     void writeBlock(long begin, byte[] block, int arrayIndexFrom, int howMuchToWriteFromArray) throws IOException;
 
-    byte[] readBlock(long begin, int blockLength) throws IOException;
+    void readBlock(long begin, int blockLength, byte[] readTo, int offset) throws IOException;
 }

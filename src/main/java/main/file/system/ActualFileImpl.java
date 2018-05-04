@@ -45,15 +45,14 @@ public class ActualFileImpl implements ActualFile {
     }
 
     @Override
-    public synchronized byte[] readBlock(long begin, int blockLength) throws IOException {
+    public synchronized void readBlock(long begin, int blockLength, byte[] readTo, int offset) throws IOException {
         assert this.from <= begin && begin < this.to;
         assert blockLength <= this.to - this.from;
 
         long readFrom = begin - this.from;
         this.seekableByteChannel.position(readFrom);
-        ByteBuffer block = ByteBuffer.allocate(blockLength);
+        ByteBuffer block = ByteBuffer.wrap(readTo, offset, blockLength);
         this.seekableByteChannel.read(block);
-        return block.array();
     }
 
     @Override
