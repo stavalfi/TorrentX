@@ -428,7 +428,7 @@ public class MyStepdefs {
         Set<PieceMessage> actualSavedPiecesFromFileSystem = recordedTorrentPieceChangedFlux
                 .map(PieceEvent::getReceivedPiece)
                 .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(),
-                        pieceMessage.getBegin(), pieceMessage.getBlockLength()))
+                        pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength()))
                 .map(requestMessage -> RequestMessage.fixRequestMessage(requestMessage, torrentInfo.getPieceLength(requestMessage.getIndex())))
                 // I must change the thread because I'm going to block it in readFromFile
                 // and reactor doesn't allow to block single or parallel threads.
@@ -436,7 +436,7 @@ public class MyStepdefs {
                 .map(requestMessage -> {
                     AllocatedBlock actualWrittenBytes = Utils.readFromFile(torrentInfo, fullDownloadPath, requestMessage);
                     PieceMessage pieceMessage = new PieceMessage(null, null, requestMessage.getIndex(),
-                            requestMessage.getBegin(), actualWrittenBytes.getActualLength(), actualWrittenBytes);
+                            requestMessage.getBegin(), actualWrittenBytes);
                     return PieceMessage.fixPieceMessage(pieceMessage, fileSystemLink.getTorrentInfo().getPieceLength(pieceMessage.getIndex()));
                 })
                 .collect(Collectors.toSet())
@@ -467,7 +467,7 @@ public class MyStepdefs {
 
         Set<PieceMessage> actualCompletedSavedPiecesReadByFileSystem = Flux.fromIterable(expectedCompletedSavedPieces)
                 .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(),
-                        pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getActualLength()))
+                        pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength()))
                 .map(requestMessage -> RequestMessage.fixRequestMessage(requestMessage, torrentInfo.getPieceLength(requestMessage.getIndex())))
                 .flatMap((RequestMessage requestMessage) -> BlocksAllocatorImpl.getInstance()
                         .allocate(0, requestMessage.getBlockLength())
@@ -816,7 +816,8 @@ public class MyStepdefs {
         // piece messages from me to fake peer and collect them to list.
         Set<BlockOfPiece> actualBlockFromMeSet = this.requestsFromFakePeerToMeListMono
                 .flatMapMany(remoteFakePeerForRequestingPieces -> recordedPieceMessageFlux)
-                .map(pieceMessage -> new BlockOfPiece(pieceMessage.getIndex(), pieceMessage.getBegin(), pieceMessage.getBlockLength()))
+                .map(pieceMessage -> new BlockOfPiece(pieceMessage.getIndex(), pieceMessage.getBegin(),
+                        pieceMessage.getAllocatedBlock().getLength()))
                 .take(expectedBlockFromMeList.size())
                 .collect(Collectors.toSet())
                 .block();

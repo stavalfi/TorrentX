@@ -46,7 +46,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                                                 this.fileSystemLink.buildPieceMessage(requestMessage, allocatedBlock)
                                                         .flatMap(pieceMessage ->
                                                                 peersCommunicator.sendMessages().sendPieceMessage(pieceMessage.getIndex(),
-                                                                        pieceMessage.getBegin(), pieceMessage.getBlockLength(), pieceMessage.getAllocatedBlock())
+                                                                        pieceMessage.getBegin(), pieceMessage.getAllocatedBlock())
                                                                         .map(___ -> new PieceEvent(TorrentPieceStatus.UPLOADING, pieceMessage)))
                                                         .doOnEach(signal -> {
                                                             // TODO: assert that we didn't miss any signal type or we will have a damn bug or a memory leak!

@@ -294,7 +294,7 @@ public class Utils {
                         .allocate(0, 10)
                         .block();
                 return link.sendMessages()
-                        .sendPieceMessage(0, 0, allocatedBlock.getActualLength(), allocatedBlock)
+                        .sendPieceMessage(0, 0, allocatedBlock)
                         .doOnEach(signal -> {
                             // TODO: assert that we didn't miss any signal type or we will have a damn bug or a memory leak!
                             if (signal.isOnError() || signal.isOnNext())
@@ -485,7 +485,7 @@ public class Utils {
                 for (int i = 0; i < blockLength; i++)
                     allocatedBlock.getBlock()[i] = (byte) i;
                 PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex,
-                        blockStartPosition, blockLength, allocatedBlock);
+                        blockStartPosition, allocatedBlock);
                 sink.next(PieceMessage.fixPieceMessage(pieceMessage, torrentInfo.getPieceLength(pieceIndex)));
                 blockStartPosition += blockLength;
             }

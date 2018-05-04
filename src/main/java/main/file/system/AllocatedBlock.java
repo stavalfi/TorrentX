@@ -33,7 +33,7 @@ public class AllocatedBlock {
         return offset;
     }
 
-    public int getActualLength() {
+    public int getLength() {
         return length;
     }
 
@@ -44,12 +44,12 @@ public class AllocatedBlock {
         AllocatedBlock that = (AllocatedBlock) o;
         return getBlockIndex() == that.getBlockIndex() &&
                 getOffset() == that.getOffset() &&
-                getActualLength() == that.getActualLength();
+                getLength() == that.getLength();
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getBlockIndex(), getOffset(), getActualLength());
+        return Objects.hash(getBlockIndex(), getOffset(), getLength());
     }
 
     @Override

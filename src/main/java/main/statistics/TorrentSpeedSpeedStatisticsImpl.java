@@ -2,6 +2,7 @@ package main.statistics;
 
 import main.App;
 import main.TorrentInfo;
+import main.file.system.AllocatedBlock;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
 import reactor.core.publisher.Flux;
@@ -36,7 +37,8 @@ public class TorrentSpeedSpeedStatisticsImpl implements SpeedStatistics {
                 messageFlux -> messageFlux
                         .filter(peerMessage -> peerMessage instanceof PieceMessage)
                         .cast(PieceMessage.class)
-                        .map(PieceMessage::getBlockLength)
+                        .map(PieceMessage::getAllocatedBlock)
+                        .map(AllocatedBlock::getLength)
                         .map(Double::new);
 
         Function<Flux<? extends PeerMessage>, Flux<Double>> messagesToSpeedFlux =

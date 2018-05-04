@@ -43,9 +43,7 @@ public class RemoteFakePeer extends Link {
                                     .allocate(0, requestMessage.getBlockLength())
                                     .block();
                             return this.sendMessages()
-                                    .sendPieceMessage(requestMessage.getIndex(), requestMessage.getBegin(),
-                                            requestMessage.getBlockLength(),
-                                            allocatedBlock)
+                                    .sendPieceMessage(requestMessage.getIndex(), requestMessage.getBegin(), allocatedBlock)
                                     .doOnEach(signal -> {
                                         // TODO: assert that we didn't miss any signal type or we will have a damn bug or a memory leak!
                                         if (signal.isOnError() || signal.isOnNext())

@@ -48,9 +48,9 @@ public class PeerMessageFactory {
                 .allocate(0, blockLength)
                 .block();
 
-        dataInputStream.readFully(allocatedBlock.getBlock(), allocatedBlock.getOffset(), allocatedBlock.getActualLength());
+        dataInputStream.readFully(allocatedBlock.getBlock(), allocatedBlock.getOffset(), allocatedBlock.getLength());
 
-        PieceMessage pieceMessage = new PieceMessage(from, to, index, begin, blockLength, allocatedBlock);
+        PieceMessage pieceMessage = new PieceMessage(from, to, index, begin, allocatedBlock);
         return PieceMessage.fixPieceMessage(pieceMessage, pieceLength);
     }
 

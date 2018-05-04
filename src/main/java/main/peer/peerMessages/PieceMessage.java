@@ -12,8 +12,6 @@ public class PieceMessage extends PeerMessage {
     private static final byte messageId = 7;
     private int index;
     private int begin;
-    // TODO: remove this property because we can't update this property in an object of AllocatedBlock.
-    private int blockLength;
     private AllocatedBlock allocatedBlock;
 
     /**
@@ -24,11 +22,10 @@ public class PieceMessage extends PeerMessage {
      * @param allocatedBlock allocatedBlock of data, which is a subset of the piece specified by index.
      */
     public PieceMessage(Peer from, Peer to, int index, int begin,
-                        int blockLength, AllocatedBlock allocatedBlock) {
+                        AllocatedBlock allocatedBlock) {
         super(to, from);
         this.index = index;
         this.begin = begin;
-        this.blockLength = blockLength;
         this.allocatedBlock = allocatedBlock;
     }
 
@@ -56,11 +53,11 @@ public class PieceMessage extends PeerMessage {
     // TODO: call this method from the constructor of PieceMessage class.
     public static PieceMessage fixPieceMessage(PieceMessage pieceMessage, int pieceLength) {
         int newBegin = fixBlockBegin(pieceLength, pieceMessage.getBegin());
-        int newBlockLength = fixBlockLength(pieceLength, newBegin, pieceMessage.getBlockLength());
+        int newBlockLength = fixBlockLength(pieceLength, newBegin, pieceMessage.getAllocatedBlock().getLength());
         AllocatedBlock newAllocatedBlock = BlocksAllocatorImpl.getInstance()
                 .updateLength(pieceMessage.getAllocatedBlock(), newBlockLength);
         return new PieceMessage(pieceMessage.getFrom(), pieceMessage.getTo(),
-                pieceMessage.getIndex(), newBegin, newBlockLength, newAllocatedBlock);
+                pieceMessage.getIndex(), newBegin, newAllocatedBlock);
     }
 
     @Override
@@ -78,7 +75,7 @@ public class PieceMessage extends PeerMessage {
         int messageIdLength = 1,
                 indexLength = 4,
                 beginLength = 4;
-        return messageIdLength + indexLength + beginLength + allocatedBlock.getActualLength() - allocatedBlock.getOffset();
+        return messageIdLength + indexLength + beginLength + allocatedBlock.getLength() - allocatedBlock.getOffset();
     }
 
     @Override
@@ -120,9 +117,5 @@ public class PieceMessage extends PeerMessage {
                 ", begin=" + begin +
                 ", allocatedBlock=" + allocatedBlock +
                 "} " + super.toString();
-    }
-
-    public int getBlockLength() {
-        return blockLength;
     }
 }
