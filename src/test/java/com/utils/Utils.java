@@ -295,7 +295,7 @@ public class Utils {
                         .block();
                 return link.sendMessages()
                         .sendPieceMessage(0, 0, allocatedBlock)
-                        .doOnTerminate(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock.getAllocationId()));
+                        .doOnTerminate(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock));
             case CancelMessage:
                 return link.sendMessages().sendCancelMessage(0, 0, 10);
             case KeepAliveMessage:

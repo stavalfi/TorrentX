@@ -7,26 +7,26 @@ import java.util.BitSet;
 
 public interface BlocksAllocator {
 
-    Mono<AllocatedBlock> allocate(int offset, int length);
+	Mono<AllocatedBlock> allocate(int offset, int length);
 
-    boolean free(String AllocationId);
+	boolean free(AllocatedBlock allocatedBlock);
 
-    void freeAll();
+	void freeAll();
 
-    // I can't send the actual AllocatedBlock
-    // here because someone will maybe save
-    // it but it's not safe because it's content
-    // will be changed in the future.
-    Flux<Integer> allocated$();
+	// I can't send the actual AllocatedBlock
+	// here because someone will maybe save
+	// it but it's not safe because it's content
+	// will be changed in the future.
+	Flux<Integer> allocated$();
 
-    Flux<Integer> frees$();
+	Flux<Integer> frees$();
 
-    BitSet getFreeBlocksStatus();
+	BitSet getFreeBlocksStatus();
 
-    int getBlockLength();
+	int getBlockLength();
 
-    int getAmountOfBlocks();
+	int getAmountOfBlocks();
 
-    AllocatedBlock updateLength(AllocatedBlock old, int length);
+	AllocatedBlock updateLength(AllocatedBlock old, int length);
 
 }

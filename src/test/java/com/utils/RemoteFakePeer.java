@@ -41,7 +41,7 @@ public class RemoteFakePeer extends Link {
                                     .block();
                             return this.sendMessages()
                                     .sendPieceMessage(requestMessage.getIndex(), requestMessage.getBegin(), allocatedBlock)
-                                    .doOnTerminate(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock.getAllocationId()));
+                                    .doOnTerminate(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock));
                     }
                     // we will never be here...
                     return Mono.empty();
