@@ -13,7 +13,6 @@ import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
-// TODO: remove this class in favor of TorrentDownloads class.
 public class ActiveTorrents {
 
     private List<FileSystemLink> fileSystemLinkImplTorrentList = new ArrayList<>();
