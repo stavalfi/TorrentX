@@ -97,8 +97,8 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
 
     @Override
     public Mono<SendMessagesNotifications> sendRequestMessage(int index, int begin, int length) {
-        RequestMessage requestMessage = new RequestMessage(this.getMe(), this.getPeer(), index, begin, length);
-        return send(RequestMessage.fixRequestMessage(requestMessage, this.torrentInfo.getPieceLength(requestMessage.getIndex())));
+        RequestMessage requestMessage = new RequestMessage(this.getMe(), this.getPeer(), index, begin, length, this.torrentInfo.getPieceLength(index));
+        return send(requestMessage);
     }
 
     @Override

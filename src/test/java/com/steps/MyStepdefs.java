@@ -428,8 +428,8 @@ public class MyStepdefs {
         Set<PieceMessage> actualSavedPiecesFromFileSystem = recordedTorrentPieceChangedFlux
                 .map(PieceEvent::getReceivedPiece)
                 .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(),
-                        pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength()))
-                .map(requestMessage -> RequestMessage.fixRequestMessage(requestMessage, torrentInfo.getPieceLength(requestMessage.getIndex())))
+                        pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength(),
+                        torrentInfo.getPieceLength(pieceMessage.getIndex())))
                 // I must change the thread because I'm going to block it in readFromFile
                 // and reactor doesn't allow to block single or parallel threads.
                 .publishOn(Schedulers.elastic())
@@ -466,8 +466,8 @@ public class MyStepdefs {
 
         Set<PieceMessage> actualCompletedSavedPiecesReadByFileSystem = Flux.fromIterable(expectedCompletedSavedPieces)
                 .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(),
-                        pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength()))
-                .map(requestMessage -> RequestMessage.fixRequestMessage(requestMessage, torrentInfo.getPieceLength(requestMessage.getIndex())))
+                        pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength(),
+                        torrentInfo.getPieceLength(pieceMessage.getIndex())))
                 .flatMap((RequestMessage requestMessage) -> BlocksAllocatorImpl.getInstance()
                         .allocate(0, requestMessage.getBlockLength())
                         .flatMap(allocatedBlock -> fileSystemLink.buildPieceMessage(requestMessage, allocatedBlock)))

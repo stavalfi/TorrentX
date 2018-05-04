@@ -78,9 +78,9 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
                                 .flatMap(link -> {
                                     // System.out.println("trying to download piece: " + pieceIndex + ", begin: " + requestFromPosition + ", from: (" + link.getT1() + ") " + link.getT2().getPeer());
                                     RequestMessage requestMessage = new RequestMessage(link.getT2().getMe(), link.getT2().getPeer(),
-                                            pieceIndex, requestFromPosition, requestBlockLength.apply(requestFromPosition));
-                                    RequestMessage fixRequestMessage = RequestMessage.fixRequestMessage(requestMessage, torrentInfo.getPieceLength(requestMessage.getIndex()));
-                                    return this.blockDownloader.downloadBlock(link.getT2(), fixRequestMessage)
+                                            pieceIndex, requestFromPosition, requestBlockLength.apply(requestFromPosition),
+                                            torrentInfo.getPieceLength(pieceIndex));
+                                    return this.blockDownloader.downloadBlock(link.getT2(), requestMessage)
                                             .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty());
                                     // concurrency = 1 -> how many peers can I connect to the download the same block concurrently.
                                     // when the download will end, the stream will be canceled using take(1) operator.

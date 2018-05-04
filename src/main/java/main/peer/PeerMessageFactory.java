@@ -86,8 +86,8 @@ public class PeerMessageFactory {
                 int index = wrap.getInt();
                 int begin = wrap.getInt();
                 int blockLength = wrap.getInt();
-                RequestMessage requestMessage = new RequestMessage(from, to, index, begin, blockLength);
-                return RequestMessage.fixRequestMessage(requestMessage, torrentInfo.getPieceLength(requestMessage.getIndex()));
+                RequestMessage requestMessage = new RequestMessage(from, to, index, begin, blockLength,torrentInfo.getPieceLength(index));
+                return requestMessage;
             }
             case unchokeMessage:
                 return new UnchokeMessage(from, to);
