@@ -28,4 +28,6 @@ public interface BlocksAllocator {
 
     int getAmountOfBlocks();
 
+    AllocatedBlock updateLength(AllocatedBlock old, int length);
+
 }

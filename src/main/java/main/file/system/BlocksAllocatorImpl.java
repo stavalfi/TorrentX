@@ -39,7 +39,6 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
                 .autoConnect(0);
     }
 
-    // TODO: change to: Mono<AllocatedBlockReader>
     @Override
     public Mono<AllocatedBlock> allocate(int offset, int length) {
         return Mono.<AllocatedBlock>create(sink -> {
@@ -112,6 +111,18 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
     @Override
     public int getAmountOfBlocks() {
         return this.amountOfBlocks;
+    }
+
+    @Override
+    public AllocatedBlock updateLength(AllocatedBlock oldAllocatedBlock, int length) {
+        assert !this.freeBlocksStatus.get(oldAllocatedBlock.getBlockIndex());
+        assert length < this.blockLength;
+        assert this.allocations[oldAllocatedBlock.getBlockIndex()].getOffset() + length < this.blockLength;
+
+        AllocatedBlock newAllocatedBlock = new AllocatedBlock(oldAllocatedBlock.getBlockIndex(),
+                oldAllocatedBlock.getBlock(), oldAllocatedBlock.getOffset(), length);
+        this.allocations[oldAllocatedBlock.getBlockIndex()] = newAllocatedBlock;
+        return newAllocatedBlock;
     }
 
     private static BlocksAllocator instance = new BlocksAllocatorImpl(20_000, 17_000);

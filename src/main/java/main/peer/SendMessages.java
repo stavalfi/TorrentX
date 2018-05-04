@@ -53,7 +53,7 @@ public class SendMessages {
                 buffer.putInt(pieceMessage.getBegin());
                 this.dataOutputStream.write(buffer.array());
                 this.dataOutputStream.write(pieceMessage.getAllocatedBlock().getBlock(),
-                        pieceMessage.getAllocatedBlock().getOffset(), pieceMessage.getAllocatedBlock().getLength());
+                        pieceMessage.getAllocatedBlock().getOffset(), pieceMessage.getAllocatedBlock().getActualLength());
                 monoSink.success(this);
             } catch (IOException e) {
                 this.closeConnectionMethod.run();

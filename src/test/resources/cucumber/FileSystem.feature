@@ -71,6 +71,24 @@ Feature: create get and delete active torrents
       | torrent-file-example3.torrent             | torrents-test    |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
+  Scenario Outline: we save a block which is too large than the corresponding actual piece.
+    # we expect that it will be as saving a piece when we don't specify "length".
+    # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
+    When application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
+      | pieceIndex | from | length     |
+      | -3         | 0    | 1000000000 |
+      | 1          | 30   | 1000000000 |
+      | 3          | 0    |            |
+    Then the only completed pieces are - for torrent: "<torrent>":
+      | 3 |
+
+    Examples:
+      | torrent                       | downloadLocation |
+      | torrent-file-example1.torrent | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | torrent-file-example3.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+
   Scenario Outline: we save piece of active torrent
     # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
     When application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved

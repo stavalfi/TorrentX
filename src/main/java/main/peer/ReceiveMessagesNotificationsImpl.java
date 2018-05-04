@@ -1,6 +1,7 @@
 package main.peer;
 
 import main.App;
+import main.TorrentInfo;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
@@ -26,11 +27,11 @@ class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
 
     private PeerCurrentStatus peerCurrentStatus;
 
-    public ReceiveMessagesNotificationsImpl(Peer me, Peer peer,
+    public ReceiveMessagesNotificationsImpl(TorrentInfo torrentInfo, Peer me, Peer peer,
                                             PeerCurrentStatus peerCurrentStatus, DataInputStream dataInputStream) {
         this.peerCurrentStatus = peerCurrentStatus;
 
-        this.peerMessageResponseFlux = Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, me, peer, dataInputStream))
+        this.peerMessageResponseFlux = Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(torrentInfo, sink, me, peer, dataInputStream))
                 // it is important to publish from source on different thread then the
                 // subscription to this source's thread every time because:
                 // if not and we subscribe to this specific source multiple times then only the
@@ -117,10 +118,10 @@ class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
                 .cast(UnchokeMessage.class);
     }
 
-    private void listenForPeerMessages(FluxSink<PeerMessage> sink, Peer me, Peer peer, DataInputStream dataInputStream) {
+    private void listenForPeerMessages(TorrentInfo torrentInfo, FluxSink<PeerMessage> sink, Peer me, Peer peer, DataInputStream dataInputStream) {
         while (!sink.isCancelled()) {
             try {
-                PeerMessage peerMessage = PeerMessageFactory.create(peer, me, dataInputStream);
+                PeerMessage peerMessage = PeerMessageFactory.create(torrentInfo, peer, me, dataInputStream);
                 sink.next(peerMessage);
             } catch (IOException e) {
                 try {

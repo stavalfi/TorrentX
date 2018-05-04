@@ -294,7 +294,7 @@ public class Utils {
                         .allocate(0, 10)
                         .block();
                 return link.sendMessages()
-                        .sendPieceMessage(0, 0, allocatedBlock.getLength(), allocatedBlock)
+                        .sendPieceMessage(0, 0, allocatedBlock.getActualLength(), allocatedBlock)
                         .doOnEach(signal -> {
                             // TODO: assert that we didn't miss any signal type or we will have a damn bug or a memory leak!
                             if (signal.isOnError() || signal.isOnNext())
@@ -388,7 +388,7 @@ public class Utils {
         long to = from + requestMessage.getBlockLength();
 
         AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                .allocate(0,requestMessage.getBlockLength())
+                .allocate(0, requestMessage.getBlockLength())
                 .block();
 
         int resultFreeIndex = 0;
@@ -461,13 +461,16 @@ public class Utils {
         });
     }
 
-    public static Flux<PieceMessage> createRandomPieceMessages(TorrentInfo torrentInfo, BlockOfPiece blockOfPiece, int maxRequestBlockSize) {
+    public static Flux<PieceMessage> createRandomPieceMessages(TorrentInfo torrentInfo,
+                                                               BlockOfPiece blockOfPiece,
+                                                               int maxRequestBlockSize) {
         int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
                 blockOfPiece.getPieceIndex() :
                 torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
 
         long requestBlockSize = blockOfPiece.getLength() != null ?
-                blockOfPiece.getLength() :
+                blockOfPiece.getLength() > BlocksAllocatorImpl.getInstance().getBlockLength() ?
+                        BlocksAllocatorImpl.getInstance().getBlockLength() : blockOfPiece.getLength() :
                 torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getFrom();
 
         return Flux.create(sink -> {
@@ -475,14 +478,14 @@ public class Utils {
                 // I can cast safely to integer because REQUEST_BLOCK_SIZE is integer and we find the min.
                 int blockLength = (int) Math.min(maxRequestBlockSize, requestBlockSize - blockStartPosition);
                 AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                        .allocate(0,blockLength)
+                        .allocate(0, blockLength)
                         .block();
 
                 for (int i = 0; i < blockLength; i++)
                     allocatedBlock.getBlock()[i] = (byte) i;
                 PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex,
                         blockStartPosition, blockLength, allocatedBlock);
-                sink.next(pieceMessage);
+                sink.next(PieceMessage.fixPieceMessage(pieceMessage, torrentInfo.getPieceLength(pieceIndex)));
                 blockStartPosition += blockLength;
             }
             sink.complete();

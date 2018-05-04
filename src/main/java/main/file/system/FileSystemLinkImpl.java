@@ -196,28 +196,11 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     public Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage, AllocatedBlock allocatedBlock) {
         if (!havePiece(requestMessage.getIndex()))
             return Mono.error(new PieceNotDownloadedYetException(requestMessage.getIndex()));
-        // TODO: we can't return as an answer more bytes than the size
-        // of an allocatedBlock!!!!
-        // TODO: make test for it.
 
-        // TODO: assert that the begin+length is legal because it may
-        // overlap with the next piece (if there is a next piece).
-//        return BlocksAllocatorImpl.getInstance()
-//                .allocate()
-//                .doOnNext(allocatedBlock -> allocatedBlock.setOffset(0))
-//                // TODO: assert that the begin+length is legal because it may
-//                // overlap with the next piece (if there is a next piece).
-//                // TODO: make test for it.
-//                .doOnNext(allocatedBlock -> allocatedBlock.setLength(requestMessage.getBlockLength()))
         return Mono.create(sink -> {
-            int freeIndexInResultArray = 0;
-
-            long from = super.getPieceStartPosition(requestMessage.getIndex());
-            // TODO: assert that the begin+length is legal because it may
-            // overlap with the next piece (if there is a next piece).
-            // TODO: make test for it.
+            long from = super.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
             long to = from + requestMessage.getBlockLength();
-            int actualBlockLength = (int) (to - from); // to-from <= requestMessage.getBlockLength() which is integer.
+            int freeIndexInResultArray = 0;
 
             for (ActualFile actualFile : this.actualFileImplList) {
                 if (from != to)
@@ -239,7 +222,8 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     }
             }
             PieceMessage pieceMessage = new PieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
-                    requestMessage.getIndex(), requestMessage.getBegin(), actualBlockLength, allocatedBlock);
+                    requestMessage.getIndex(), requestMessage.getBegin(),
+                    requestMessage.getBlockLength(), allocatedBlock);
             sink.success(pieceMessage);
         });
     }
@@ -247,13 +231,13 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private Mono<PieceEvent> writeBlock(PieceMessage pieceMessage) {
         if (havePiece(pieceMessage.getIndex()) ||
                 this.downloadedBytesInPieces[pieceMessage.getIndex()] > pieceMessage.getBegin() +
-                        pieceMessage.getAllocatedBlock().getLength())
+                        pieceMessage.getAllocatedBlock().getActualLength())
             // I already have the received block. I don't need it.
             return Mono.empty();
 
         return Mono.<PieceEvent>create(sink -> {
             long from = super.getPieceStartPosition(pieceMessage.getIndex()) + pieceMessage.getBegin();
-            long to = from + pieceMessage.getAllocatedBlock().getLength();
+            long to = from + pieceMessage.getAllocatedBlock().getActualLength();
 
             // from which position the ActualFileImpl object needs to write to filesystem from the given block array.
             int arrayIndexFrom = pieceMessage.getAllocatedBlock().getOffset();
@@ -261,7 +245,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
             for (ActualFile actualFile : this.actualFileImplList)
                 if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
                     // (to-from)<=piece.length <= file.size , request.length<= Integer.MAX_VALUE
-                    // so: (Math.min(to, actualFileImpl.getLength()) - from) <= Integer.MAX_VALUE
+                    // so: (Math.min(to, actualFileImpl.getActualLength()) - from) <= Integer.MAX_VALUE
                     int howMuchToWriteFromArray = (int) Math.min(actualFile.getTo() - from, to - from);
                     try {
                         actualFile.writeBlock(from, pieceMessage.getAllocatedBlock().getBlock(), arrayIndexFrom,
@@ -281,7 +265,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
             // there maybe multiple writes of the same pieceRequest during one execution...
             long pieceLength = getPieceLength(pieceMessage.getIndex());
-            this.downloadedBytesInPieces[pieceMessage.getIndex()] += pieceMessage.getAllocatedBlock().getLength();
+            this.downloadedBytesInPieces[pieceMessage.getIndex()] += pieceMessage.getAllocatedBlock().getActualLength();
             if (pieceLength < this.downloadedBytesInPieces[pieceMessage.getIndex()])
                 this.downloadedBytesInPieces[pieceMessage.getIndex()] = getPieceLength(pieceMessage.getIndex());
 

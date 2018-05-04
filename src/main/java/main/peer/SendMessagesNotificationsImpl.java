@@ -1,5 +1,6 @@
 package main.peer;
 
+import main.TorrentInfo;
 import main.file.system.AllocatedBlock;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
@@ -10,6 +11,7 @@ import java.io.DataOutputStream;
 import java.util.BitSet;
 
 class SendMessagesNotificationsImpl implements SendMessagesNotifications {
+    private TorrentInfo torrentInfo;
     private Peer me;
     private Peer peer;
     private Flux<PeerMessage> sentPeerMessagesFlux;
@@ -17,10 +19,12 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     private PeerCurrentStatus peerCurrentStatus;
     private SendMessages sendMessages;
 
-    SendMessagesNotificationsImpl(Peer me, Peer peer,
+    SendMessagesNotificationsImpl(TorrentInfo torrentInfo,
+                                  Peer me, Peer peer,
                                   PeerCurrentStatus peerCurrentStatus,
                                   Runnable closeConnectionMethod,
                                   DataOutputStream peerDataOutputStream) {
+        this.torrentInfo = torrentInfo;
         this.me = me;
         this.peer = peer;
         this.peerCurrentStatus = peerCurrentStatus;
@@ -42,7 +46,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
                                                             int blockLength, AllocatedBlock allocatedBlock) {
         PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(),
                 index, begin, blockLength, allocatedBlock);
-        return send(pieceMessage)
+        return send(PieceMessage.fixPieceMessage(pieceMessage, this.torrentInfo.getPieceLength(index)))
                 .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(index));
     }
 
@@ -93,7 +97,8 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
 
     @Override
     public Mono<SendMessagesNotifications> sendRequestMessage(int index, int begin, int length) {
-        return send(new RequestMessage(this.getMe(), this.getPeer(), index, begin, length));
+        RequestMessage requestMessage = new RequestMessage(this.getMe(), this.getPeer(), index, begin, length);
+        return send(RequestMessage.fixRequestMessage(requestMessage, this.torrentInfo.getPieceLength(requestMessage.getIndex())));
     }
 
     @Override

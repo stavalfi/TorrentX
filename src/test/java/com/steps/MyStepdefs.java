@@ -152,13 +152,14 @@ public class MyStepdefs {
                     .verify();
     }
 
-    @Then("^application send to \\[peer ip: \"([^\"]*)\", peer port: \"([^\"]*)\"] and receive the following messages:$")
-    public void applicationSendToPeerIpPeerPortAndReceiveTheFollowingMessages(String peerIp, int peerPort,
-                                                                              List<PeerFakeRequestResponse> peerFakeRequestResponses) {
-        RemoteFakePeerCopyCat remoteFakePeerCopyCat = new RemoteFakePeerCopyCat(new Peer(peerIp, peerPort));
+    @Then("^application send to \\[peer ip: \"([^\"]*)\", peer port: \"([^\"]*)\"] and receive the following messages for torrent: \"([^\"]*)\":$")
+    public void applicationSendToPeerIpPeerPortAndReceiveTheFollowingMessagesForTorrent(String peerIp, int peerPort, String torrentFileName,
+                                                                                        List<PeerFakeRequestResponse> peerFakeRequestResponses) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        RemoteFakePeerCopyCat remoteFakePeerCopyCat = new RemoteFakePeerCopyCat(torrentInfo, new Peer(peerIp, peerPort));
         remoteFakePeerCopyCat.listen();
 
-        PeersProvider peersProvider = new PeersProvider(this.torrentInfo);
+        PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
         List<PeerMessageType> messageToSendList = peerFakeRequestResponses.stream()
                 .map(PeerFakeRequestResponse::getSendMessageType)
@@ -428,13 +429,15 @@ public class MyStepdefs {
                 .map(PieceEvent::getReceivedPiece)
                 .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(),
                         pieceMessage.getBegin(), pieceMessage.getBlockLength()))
+                .map(requestMessage -> RequestMessage.fixRequestMessage(requestMessage, torrentInfo.getPieceLength(requestMessage.getIndex())))
                 // I must change the thread because I'm going to block it in readFromFile
                 // and reactor doesn't allow to block single or parallel threads.
                 .publishOn(Schedulers.elastic())
                 .map(requestMessage -> {
                     AllocatedBlock actualWrittenBytes = Utils.readFromFile(torrentInfo, fullDownloadPath, requestMessage);
-                    return new PieceMessage(null, null, requestMessage.getIndex(),
-                            requestMessage.getBegin(), actualWrittenBytes.getLength(), actualWrittenBytes);
+                    PieceMessage pieceMessage = new PieceMessage(null, null, requestMessage.getIndex(),
+                            requestMessage.getBegin(), actualWrittenBytes.getActualLength(), actualWrittenBytes);
+                    return PieceMessage.fixPieceMessage(pieceMessage, fileSystemLink.getTorrentInfo().getPieceLength(pieceMessage.getIndex()));
                 })
                 .collect(Collectors.toSet())
                 .block();
@@ -464,7 +467,8 @@ public class MyStepdefs {
 
         Set<PieceMessage> actualCompletedSavedPiecesReadByFileSystem = Flux.fromIterable(expectedCompletedSavedPieces)
                 .map(pieceMessage -> new RequestMessage(null, null, pieceMessage.getIndex(),
-                        pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength()))
+                        pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getActualLength()))
+                .map(requestMessage -> RequestMessage.fixRequestMessage(requestMessage, torrentInfo.getPieceLength(requestMessage.getIndex())))
                 .flatMap((RequestMessage requestMessage) -> BlocksAllocatorImpl.getInstance()
                         .allocate(0, requestMessage.getBlockLength())
                         .flatMap(allocatedBlock -> fileSystemLink.buildPieceMessage(requestMessage, allocatedBlock)))
@@ -1211,7 +1215,7 @@ public class MyStepdefs {
                 .autoConnect(0);
 
         this.actualAllocations = Flux.range(0, expectedAllocationsList.size())
-                .flatMap(blockIndex -> this.blocksAllocator.allocate(0,0), threadsAmount)
+                .flatMap(blockIndex -> this.blocksAllocator.allocate(0, 0), threadsAmount)
                 .doOnNext(allocatedBlock -> Assert.assertFalse(this.blocksAllocator.getFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
                 .collect(Collectors.toSet())
                 .block();

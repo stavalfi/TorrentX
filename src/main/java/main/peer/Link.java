@@ -38,11 +38,12 @@ public class Link {
         this.me = new Peer("localhost", peerSocket.getLocalPort());
 
         this.peerCurrentStatus = new PeerCurrentStatus(torrentInfo.getPieces().size());
-        this.sendMessages = new SendMessagesNotificationsImpl(this.me, this.peer,
+        this.sendMessages = new SendMessagesNotificationsImpl(this.torrentInfo,
+                this.me, this.peer,
                 this.peerCurrentStatus,
                 this::closeConnection,
                 dataOutputStream);
-        this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(this.me, this.peer, this.peerCurrentStatus, dataInputStream);
+        this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(torrentInfo, this.me, this.peer, this.peerCurrentStatus, dataInputStream);
 
         this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
                 this.receiveMessagesNotifications.getPeerMessageResponseFlux(),

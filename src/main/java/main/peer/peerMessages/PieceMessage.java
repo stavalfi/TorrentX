@@ -1,6 +1,7 @@
 package main.peer.peerMessages;
 
 import main.file.system.AllocatedBlock;
+import main.file.system.BlocksAllocatorImpl;
 import main.peer.Peer;
 import main.peer.SendMessages;
 import reactor.core.publisher.Mono;
@@ -11,7 +12,7 @@ public class PieceMessage extends PeerMessage {
     private static final byte messageId = 7;
     private int index;
     private int begin;
-    // we may use this property after a the allocatedBlock object freed.
+    // TODO: remove this property because we can't update this property in an object of AllocatedBlock.
     private int blockLength;
     private AllocatedBlock allocatedBlock;
 
@@ -31,6 +32,38 @@ public class PieceMessage extends PeerMessage {
         this.allocatedBlock = allocatedBlock;
     }
 
+
+    // TODO: call this method from the constructor of PieceMessage class.
+    public static PieceMessage fixPieceMessage(PieceMessage pieceMessage, long pieceLength) {
+        // TODO: piece length is integer and not long.
+        // Notes:
+        // (1) piece size can't be more than Integer.MAX_VALUE because the protocol allow me to request
+        // even the last byte of a piece and if the piece size is more than Integer.MAX_VALUE,
+        // than I can't spacify the "begin" of that request using 4 bytes.
+        // (2) in the tests, a block size is bounded to the allocatedBlock size and it's integer so
+        // we can't create a request for a block larger than Integer.MAX_VALUE. so for both reasons,
+        // a request of a block can't be more than Integer.MAX_VALUE.
+        // TODO: uncomment the following line and fix this compilation error because the above TODO.
+//        int newBegin = Math.min(pieceMessage.getBegin(), pieceLength);
+        int maxAllocatedBlockSize = BlocksAllocatorImpl.getInstance().getBlockLength();
+        int newBlockLength = Math.min(maxAllocatedBlockSize, pieceMessage.getBlockLength());
+
+        // is pieceMessage.getBegin() + newBlockLength overlaps with the range of this piece?
+        if (pieceLength < pieceMessage.getBegin() + newBlockLength) {
+            // (1) newBlockLength <= maxAllocatedBlockSize
+            // (1) -> (2) pieceLength - pieceMessage.getBegin() < newBlockLength <= maxAllocatedBlockSize <= Integer.MAX_VALUE
+            // (2) -> (3) pieceLength - pieceMessage.getBegin() < Integer.MAX_VALUE
+            newBlockLength = (int) (pieceLength - pieceMessage.getBegin());
+            // (4) ->  newBlockLength = (pieceLength - pieceMessage.getBegin()) <= pieceLength
+            // (4) -> (5) -> newBlockLength <= pieceLength
+        }
+
+        AllocatedBlock newAllocatedBlock = BlocksAllocatorImpl.getInstance()
+                .updateLength(pieceMessage.getAllocatedBlock(), newBlockLength);
+        return new PieceMessage(pieceMessage.getFrom(), pieceMessage.getTo(),
+                pieceMessage.getIndex(), pieceMessage.getBegin(), newBlockLength, newAllocatedBlock);
+    }
+
     @Override
     public Mono<SendMessages> sendMessage(SendMessages sendMessages) {
         return sendMessages.send(this);
@@ -46,7 +79,7 @@ public class PieceMessage extends PeerMessage {
         int messageIdLength = 1,
                 indexLength = 4,
                 beginLength = 4;
-        return messageIdLength + indexLength + beginLength + allocatedBlock.getLength() - allocatedBlock.getOffset();
+        return messageIdLength + indexLength + beginLength + allocatedBlock.getActualLength() - allocatedBlock.getOffset();
     }
 
     @Override

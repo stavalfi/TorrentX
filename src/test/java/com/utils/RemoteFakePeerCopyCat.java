@@ -1,5 +1,6 @@
 package com.utils;
 
+import main.TorrentInfo;
 import main.peer.Peer;
 import main.peer.PeerMessageFactory;
 import main.peer.SendMessages;
@@ -25,9 +26,11 @@ public class RemoteFakePeerCopyCat extends Peer {
     private boolean closeEverything = false;
     private ServerSocket listenToPeerConnection;
     private final List<Socket> peerConnections = new ArrayList<>();
+    private TorrentInfo torrentInfo;
 
-    public RemoteFakePeerCopyCat(Peer Me) {
+    public RemoteFakePeerCopyCat(TorrentInfo torrentInfo, Peer Me) {
         super(Me.getPeerIp(), Me.getPeerPort());
+        this.torrentInfo = torrentInfo;
         try {
             this.listenToPeerConnection = new ServerSocket(this.getPeerPort());
         } catch (IOException e) {
@@ -73,7 +76,7 @@ public class RemoteFakePeerCopyCat extends Peer {
             return;
         Peer fromPeer = new Peer("localhost", peerConnection.getPort());
         while (!this.closeEverything) {
-            PeerMessage peerMessage = PeerMessageFactory.create(fromPeer, this, dataInputStream);
+            PeerMessage peerMessage = PeerMessageFactory.create(this.torrentInfo, fromPeer, this, dataInputStream);
             if (receivedMessagesAmount == 2)
                 Thread.sleep(2000);
             else if (receivedMessagesAmount == 3) {
