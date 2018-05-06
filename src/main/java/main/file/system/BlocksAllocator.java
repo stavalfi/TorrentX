@@ -9,7 +9,7 @@ public interface BlocksAllocator {
 
 	Mono<AllocatedBlock> allocate(int offset, int length);
 
-	boolean free(AllocatedBlock allocatedBlock);
+	AllocatedBlock free(AllocatedBlock allocatedBlock);
 
 	void freeAll();
 

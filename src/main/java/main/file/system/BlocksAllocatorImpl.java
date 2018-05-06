@@ -7,7 +7,9 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.Objects;
 import java.util.OptionalInt;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.IntStream;
 
 public class BlocksAllocatorImpl implements BlocksAllocator {
@@ -27,7 +29,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
         this.blockLength = blockLength;
         this.amountOfBlocks = amountOfBlocks;
         this.allocations = IntStream.range(0, amountOfBlocks)
-                .mapToObj(allocationIndex -> new AllocatedBlock(allocationIndex, blockLength))
+                .mapToObj(allocationIndex -> new AllocatedBlockImpl(allocationIndex, blockLength))
                 .toArray(AllocatedBlock[]::new);
         this.freeBlocksStatus = new BitSet(amountOfBlocks);
         this.freeBlocksStatus.set(0, amountOfBlocks);
@@ -50,9 +52,9 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
                     if (freeBlock.isPresent()) {
                         this.freeBlocksStatus.set(freeBlock.getAsInt(), false);
                         AllocatedBlock oldAllocatedBlock = this.allocations[freeBlock.getAsInt()];
-                        AllocatedBlock newAllocatedBlock = new AllocatedBlock(oldAllocatedBlock.getBlockIndex(),
+                        AllocatedBlock newAllocatedBlock = new AllocatedBlockImpl(oldAllocatedBlock.getBlockIndex(),
                                 this.allocations[freeBlock.getAsInt()].getBlock(),
-                                offset, length);
+                                false, offset, length);
                         this.allocations[freeBlock.getAsInt()] = newAllocatedBlock;
                         sink.success(newAllocatedBlock);
                         return;
@@ -70,23 +72,28 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
     }
 
     @Override
-    public boolean free(AllocatedBlock allocatedBlock) {
+    public AllocatedBlock free(AllocatedBlock allocatedBlock) {
         synchronized (this.notifyOnFreeIndex) {
-            if (!this.freeBlocksStatus.get(allocatedBlock.getBlockIndex()) &&
+            if (!allocatedBlock.isFreed() &&
+                    !this.freeBlocksStatus.get(allocatedBlock.getBlockIndex()) &&
                     this.allocations[allocatedBlock.getBlockIndex()].getAllocationId().equals(allocatedBlock.getAllocationId())) {
                 this.freeBlocksStatus.set(allocatedBlock.getBlockIndex());
                 this.notifyOnFreeIndex.notify();
                 this.freesSink.next(allocatedBlock.getBlockIndex());
-                return true;
+                return new AllocatedBlockImpl(allocatedBlock.getBlockIndex(),
+                        allocatedBlock.getBlock(),
+                        true,
+                        allocatedBlock.getOffset(),
+                        allocatedBlock.getLength());
             }
-            return false;
+            return allocatedBlock;
         }
     }
 
     @Override
     public void freeAll() {
         Arrays.stream(this.allocations)
-                .forEach(allocatedBlock -> free(allocatedBlock));
+                .forEach(this::free);
     }
 
     @Override
@@ -119,9 +126,12 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
         assert !this.freeBlocksStatus.get(oldAllocatedBlock.getBlockIndex());
         assert length <= this.blockLength;
         assert this.allocations[oldAllocatedBlock.getBlockIndex()].getOffset() + length <= this.blockLength;
+        // check if someone try to update a freed block.
+        assert this.allocations[oldAllocatedBlock.getBlockIndex()].getAllocationId().equals(oldAllocatedBlock.getAllocationId());
+        assert !oldAllocatedBlock.isFreed();
 
-        AllocatedBlock newAllocatedBlock = new AllocatedBlock(oldAllocatedBlock.getBlockIndex(),
-                oldAllocatedBlock.getBlock(), oldAllocatedBlock.getOffset(), length);
+        AllocatedBlock newAllocatedBlock = new AllocatedBlockImpl(oldAllocatedBlock.getBlockIndex(),
+                oldAllocatedBlock.getBlock(), oldAllocatedBlock.isFreed(), oldAllocatedBlock.getOffset(), length);
         this.allocations[oldAllocatedBlock.getBlockIndex()] = newAllocatedBlock;
         return newAllocatedBlock;
     }
@@ -130,5 +140,91 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
 
     public static BlocksAllocator getInstance() {
         return instance;
+    }
+
+    static class AllocatedBlockImpl implements AllocatedBlock {
+        private static AtomicLong idCounter = new AtomicLong();
+        private int blockIndex;
+        private String allocationId;
+        private byte[] block;
+        private boolean isFreed;
+        private int offset, length;
+
+        AllocatedBlockImpl(int blockIndex, int blockSize) {
+            this.blockIndex = blockIndex;
+            this.block = new byte[blockSize];
+            this.allocationId = String.valueOf(AllocatedBlockImpl.idCounter.getAndIncrement());
+            this.isFreed = false;
+        }
+
+        AllocatedBlockImpl(int blockIndex, byte[] block, boolean isFreed, int offset, int length) {
+            assert 0 <= offset && offset < block.length;
+            assert length <= block.length - offset;
+            this.allocationId = String.valueOf(idCounter.getAndIncrement());
+            this.blockIndex = blockIndex;
+            this.block = block;
+            this.isFreed = isFreed;
+            this.offset = offset;
+            this.length = length;
+        }
+
+        @Override
+        public byte[] getBlock() {
+            return block;
+        }
+
+        @Override
+        public int getBlockIndex() {
+            return blockIndex;
+        }
+
+        @Override
+        public int getOffset() {
+            return offset;
+        }
+
+        @Override
+        public int getLength() {
+            return length;
+        }
+
+        @Override
+        public String getAllocationId() {
+            return allocationId;
+        }
+
+        @Override
+        public boolean isFreed() {
+            return isFreed;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof AllocatedBlock)) return false;
+            AllocatedBlock that = (AllocatedBlock) o;
+            if (getLength() == that.getLength()) {
+                for (int i = this.offset; i < this.length; i++)
+                    if (this.block[i] != that.getBlock()[i])
+                        return false;
+            }
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(getLength());
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return "AllocatedBlock{" +
+                    "blockIndex=" + blockIndex +
+                    ", blockLength=" + block.length +
+                    ", offset=" + offset +
+                    ", length=" + length +
+                    '}';
+        }
     }
 }

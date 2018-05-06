@@ -4,12 +4,16 @@ import main.TorrentInfo;
 import main.algorithms.UploadAlgorithm;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentPieceStatus;
+import main.file.system.AllocatedBlock;
 import main.file.system.BlocksAllocatorImpl;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
+import main.peer.peerMessages.PieceMessage;
 import main.torrent.status.Status;
 import main.torrent.status.StatusChanger;
 import reactor.core.publisher.Flux;
+
+import java.util.function.BiFunction;
 
 public class UploadAlgorithmImpl implements UploadAlgorithm {
     private TorrentInfo torrentInfo;
@@ -27,6 +31,15 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
         this.statusChanger = statusChanger;
         this.fileSystemLink = fileSystemLink;
         this.peersCommunicatorFlux = peersCommunicatorFlux;
+
+        BiFunction<PieceEvent, AllocatedBlock, PieceEvent> updateAllocatedBlock = (pieceEvent, allocatedBlock) ->
+                new PieceEvent(pieceEvent.getTorrentPieceStatus(),
+                        new PieceMessage(pieceEvent.getReceivedPiece().getFrom(),
+                                pieceEvent.getReceivedPiece().getTo(),
+                                pieceEvent.getReceivedPiece().getIndex(),
+                                pieceEvent.getReceivedPiece().getBegin(),
+                                allocatedBlock,
+                                torrentInfo.getPieceLength(pieceEvent.getReceivedPiece().getIndex())));
 
         this.uploadedBlocksFlux = this.statusChanger
                 .getStatus$()
@@ -48,7 +61,9 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                                                                 peersCommunicator.sendMessages().sendPieceMessage(pieceMessage.getIndex(),
                                                                         pieceMessage.getBegin(), pieceMessage.getAllocatedBlock())
                                                                         .map(___ -> new PieceEvent(TorrentPieceStatus.UPLOADING, pieceMessage)))
-                                                        .doOnTerminate(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock)))))
+                                                        .map(pieceEvent -> updateAllocatedBlock.apply(pieceEvent, BlocksAllocatorImpl.getInstance().free(allocatedBlock)))
+                                                        .doOnError(throwable -> BlocksAllocatorImpl.getInstance().free(allocatedBlock))
+                                                        .doOnCancel(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock)))))
                 .publish()
                 .autoConnect(0);
     }
