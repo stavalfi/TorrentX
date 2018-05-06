@@ -31,463 +31,464 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
+import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 
 public class Utils {
-	public static PeersListener peersListener;
+    public static PeersListener peersListener;
 
-	public static TorrentInfo createTorrentInfo(String torrentFilePath) throws IOException {
-		String torrentFilesPath = "src" + File.separator +
-				"test" + File.separator +
-				"resources" + File.separator +
-				"torrents" + File.separator +
-				torrentFilePath;
-		return new TorrentInfo(torrentFilesPath, TorrentParser.parseTorrent(torrentFilesPath));
-	}
+    public static TorrentInfo createTorrentInfo(String torrentFilePath) throws IOException {
+        String torrentFilesPath = "src" + File.separator +
+                "test" + File.separator +
+                "resources" + File.separator +
+                "torrents" + File.separator +
+                torrentFilePath;
+        return new TorrentInfo(torrentFilesPath, TorrentParser.parseTorrent(torrentFilesPath));
+    }
 
-	public static void removeEverythingRelatedToLastTest() {
+    public static void removeEverythingRelatedToLastTest() {
 
-		BlocksAllocatorImpl.getInstance().freeAll();
+        BlocksAllocatorImpl.getInstance().freeAll();
 
-		Mono<List<FileSystemLink>> activeTorrentsListMono = ActiveTorrents.getInstance()
-				.getActiveTorrentsFlux()
-				.flatMap(activeTorrent -> activeTorrent.deleteFileOnlyMono()
-						// if the test deleted the files then I will get NoSuchFileException and we will not delete the FileSystemLinkImpl object.
-						.onErrorResume(Throwable.class, throwable -> Mono.just(activeTorrent)))
-				.flatMap(activeTorrent -> activeTorrent.deleteActiveTorrentOnlyMono()
-						// if the test deleted the FileSystemLinkImpl object then I may get an exception which I clearly don't want.
-						.onErrorResume(Throwable.class, throwable -> Mono.just(activeTorrent)))
+        Mono<List<FileSystemLink>> activeTorrentsListMono = ActiveTorrents.getInstance()
+                .getActiveTorrentsFlux()
+                .flatMap(activeTorrent -> activeTorrent.deleteFileOnlyMono()
+                        // if the test deleted the files then I will get NoSuchFileException and we will not delete the FileSystemLinkImpl object.
+                        .onErrorResume(Throwable.class, throwable -> Mono.just(activeTorrent)))
+                .flatMap(activeTorrent -> activeTorrent.deleteActiveTorrentOnlyMono()
+                        // if the test deleted the FileSystemLinkImpl object then I may get an exception which I clearly don't want.
+                        .onErrorResume(Throwable.class, throwable -> Mono.just(activeTorrent)))
 
-				.collectList();
-		try {
-			activeTorrentsListMono.block();
-		} catch (Exception e) {
-			//e.printStackTrace();
-		}
+                .collectList();
+        try {
+            activeTorrentsListMono.block();
+        } catch (Exception e) {
+            //e.printStackTrace();
+        }
 
 
-		Mono<List<StatusChanger>> torrentDownloadersListMono = TorrentDownloaders.getInstance()
-				.getTorrentDownloadersFlux()
-				.doOnNext(torrentDownloader -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash()))
-				.map(TorrentDownloader::getStatusChanger)
-				.doOnNext(statusChanger -> {
-					statusChanger.changeStatus(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
-					statusChanger.changeStatus(StatusType.PAUSE_SEARCHING_PEERS).block();
-					statusChanger.changeStatus(StatusType.PAUSE_DOWNLOAD).block();
-					statusChanger.changeStatus(StatusType.PAUSE_UPLOAD).block();
-				})
-				.collectList();
-		try {
-			torrentDownloadersListMono.block();
-		} catch (Exception e) {
-			//e.printStackTrace();
-		}
+        Mono<List<StatusChanger>> torrentDownloadersListMono = TorrentDownloaders.getInstance()
+                .getTorrentDownloadersFlux()
+                .doOnNext(torrentDownloader -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash()))
+                .map(TorrentDownloader::getStatusChanger)
+                .doOnNext(statusChanger -> {
+                    statusChanger.changeStatus(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
+                    statusChanger.changeStatus(StatusType.PAUSE_SEARCHING_PEERS).block();
+                    statusChanger.changeStatus(StatusType.PAUSE_DOWNLOAD).block();
+                    statusChanger.changeStatus(StatusType.PAUSE_UPLOAD).block();
+                })
+                .collectList();
+        try {
+            torrentDownloadersListMono.block();
+        } catch (Exception e) {
+            //e.printStackTrace();
+        }
 
-		if (peersListener != null) {
-			try {
-				peersListener.stopListenForNewPeers();
-			} catch (IOException e) {
+        if (peersListener != null) {
+            try {
+                peersListener.stopListenForNewPeers();
+            } catch (IOException e) {
 
-			}
-			peersListener = null;
-		}
+            }
+            peersListener = null;
+        }
 
-		// delete download folder from last test
-		Utils.deleteDownloadFolder();
-	}
+        // delete download folder from last test
+        Utils.deleteDownloadFolder();
+    }
 
-	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
-		return createDefaultTorrentDownloader(torrentInfo, downloadPath,
-				new StatusChanger(new Status(
-						false,
-						false,
-						false,
-						false,
-						false, false,
-						false,
-						false,
-						false,
-						false,
-						false)));
-	}
+    public static Status createDefaultFalseStatus() {
+        return new Status(
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false);
+    }
 
-	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
-																   Flux<TrackerConnection> trackerConnectionConnectableFlux) {
-		TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
-		PeersProvider peersProvider = new PeersProvider(torrentInfo);
+    public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
+        return createDefaultTorrentDownloader(torrentInfo, downloadPath,
+                new StatusChanger(createDefaultFalseStatus()));
+    }
 
-		StatusChanger statusChanger = new StatusChanger(new Status(
-				false,
-				false,
-				false,
-				false,
-				false, false,
-				false,
-				false,
-				false,
-				false,
-				false));
+    public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
+                                                                   Flux<TrackerConnection> trackerConnectionConnectableFlux) {
+        TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
+        PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
-		peersListener = new PeersListener(statusChanger);
+        StatusChanger statusChanger = new StatusChanger(createDefaultFalseStatus());
 
-		Flux<Link> searchingPeers$ = statusChanger.getStatus$()
-				.filter(Status::isStartedSearchingPeers)
-				.take(1)
-				.flatMap(__ ->
-						peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-								.autoConnect(0));
+        peersListener = new PeersListener(statusChanger);
 
-		Flux<Link> peersCommunicatorFlux =
-				Flux.merge(peersListener.getPeersConnectedToMeFlux()
-						// SocketException == When I shutdown the SocketServer after/before
-						// the tests inside Utils::removeEverythingRelatedToTorrent.
-						.onErrorResume(SocketException.class, throwable -> Flux.empty()), searchingPeers$)
-						// multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-						// multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
-						// every time and then I will connect to all the peers again and again...
-						.publish()
-						.autoConnect(0);
+        Flux<Link> searchingPeers$ = statusChanger.getStatus$()
+                .filter(Status::isStartedSearchingPeers)
+                .take(1)
+                .flatMap(__ ->
+                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                                .autoConnect(0));
 
-		FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-				.createActiveTorrentMono(torrentInfo, downloadPath, statusChanger,
-						peersCommunicatorFlux.map(Link::receivePeerMessages)
-								.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
-				.block();
+        Flux<Link> peersCommunicatorFlux =
+                Flux.merge(peersListener.getPeersConnectedToMeFlux()
+                        // SocketException == When I shutdown the SocketServer after/before
+                        // the tests inside Utils::removeEverythingRelatedToTorrent.
+                        .onErrorResume(SocketException.class, throwable -> Flux.empty()), searchingPeers$)
+                        // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
+                        // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
+                        // every time and then I will connect to all the peers again and again...
+                        .publish()
+                        .autoConnect(0);
 
-		BittorrentAlgorithm bittorrentAlgorithm =
-				BittorrentAlgorithmInitializer.v1(torrentInfo,
-						statusChanger,
-						fileSystemLink,
-						peersCommunicatorFlux);
+        FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
+                .createActiveTorrentMono(torrentInfo, downloadPath, statusChanger,
+                        peersCommunicatorFlux.map(Link::receivePeerMessages)
+                                .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
+                .block();
 
-		SpeedStatistics torrentSpeedStatistics =
-				new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
+        BittorrentAlgorithm bittorrentAlgorithm =
+                BittorrentAlgorithmInitializer.v1(torrentInfo,
+                        statusChanger,
+                        fileSystemLink,
+                        peersCommunicatorFlux);
 
-		return TorrentDownloaders.getInstance()
-				.createTorrentDownloader(torrentInfo,
-						fileSystemLink,
-						bittorrentAlgorithm,
-						statusChanger,
-						torrentSpeedStatistics,
-						trackerProvider,
-						peersProvider,
-						trackerConnectionConnectableFlux,
-						peersCommunicatorFlux);
-	}
+        SpeedStatistics torrentSpeedStatistics =
+                new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
+                        peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 
-	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
-																   StatusChanger statusChanger) {
-		TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
-		PeersProvider peersProvider = new PeersProvider(torrentInfo);
+        return TorrentDownloaders.getInstance()
+                .createTorrentDownloader(torrentInfo,
+                        fileSystemLink,
+                        bittorrentAlgorithm,
+                        statusChanger,
+                        torrentSpeedStatistics,
+                        trackerProvider,
+                        peersProvider,
+                        trackerConnectionConnectableFlux,
+                        peersCommunicatorFlux);
+    }
 
-		Flux<TrackerConnection> trackerConnectionConnectableFlux =
-				trackerProvider.connectToTrackersFlux()
-						.autoConnect();
+    public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
+                                                                   StatusChanger statusChanger) {
+        TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
+        PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
-		peersListener = new PeersListener(statusChanger);
+        Flux<TrackerConnection> trackerConnectionConnectableFlux =
+                trackerProvider.connectToTrackersFlux()
+                        .autoConnect();
 
-		Flux<Link> searchingPeers$ = statusChanger.getStatus$()
-				.filter(Status::isStartedSearchingPeers)
-				.take(1)
-				.flatMap(__ ->
-						peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-								.autoConnect(0));
+        peersListener = new PeersListener(statusChanger);
 
-		Flux<Link> peersCommunicatorFlux =
-				Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchingPeers$)
-						// multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-						// multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
-						// every time and then I will connect to all the peers again and again...
-						.publish()
-						.autoConnect(0);
+        Flux<Link> searchingPeers$ = statusChanger.getStatus$()
+                .filter(Status::isStartedSearchingPeers)
+                .take(1)
+                .flatMap(__ ->
+                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                                .autoConnect(0));
 
-		FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-				.createActiveTorrentMono(torrentInfo, downloadPath, statusChanger,
-						peersCommunicatorFlux.map(Link::receivePeerMessages)
-								.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
-				.block();
+        Flux<Link> peersCommunicatorFlux =
+                Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchingPeers$)
+                        // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
+                        // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
+                        // every time and then I will connect to all the peers again and again...
+                        .publish()
+                        .autoConnect(0);
 
-		BittorrentAlgorithm bittorrentAlgorithm =
-				BittorrentAlgorithmInitializer.v1(torrentInfo,
-						statusChanger,
-						fileSystemLink,
-						peersCommunicatorFlux);
+        FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
+                .createActiveTorrentMono(torrentInfo, downloadPath, statusChanger,
+                        peersCommunicatorFlux.map(Link::receivePeerMessages)
+                                .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
+                .block();
 
-		SpeedStatistics torrentSpeedStatistics =
-				new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
+        BittorrentAlgorithm bittorrentAlgorithm =
+                BittorrentAlgorithmInitializer.v1(torrentInfo,
+                        statusChanger,
+                        fileSystemLink,
+                        peersCommunicatorFlux);
 
-		return TorrentDownloaders.getInstance()
-				.createTorrentDownloader(torrentInfo,
-						fileSystemLink,
-						bittorrentAlgorithm,
-						statusChanger,
-						torrentSpeedStatistics,
-						trackerProvider,
-						peersProvider,
-						trackerConnectionConnectableFlux,
-						peersCommunicatorFlux);
-	}
+        SpeedStatistics torrentSpeedStatistics =
+                new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
+                        peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 
-	public static TorrentDownloader createCustomTorrentDownloader(TorrentInfo torrentInfo,
-																  StatusChanger statusChanger,
-																  FileSystemLink fileSystemLink,
-																  Flux<TrackerConnection> trackerConnectionConnectableFlux) {
-		TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
-		PeersProvider peersProvider = new PeersProvider(torrentInfo);
+        return TorrentDownloaders.getInstance()
+                .createTorrentDownloader(torrentInfo,
+                        fileSystemLink,
+                        bittorrentAlgorithm,
+                        statusChanger,
+                        torrentSpeedStatistics,
+                        trackerProvider,
+                        peersProvider,
+                        trackerConnectionConnectableFlux,
+                        peersCommunicatorFlux);
+    }
 
-		peersListener = new PeersListener(statusChanger);
+    public static TorrentDownloader createCustomTorrentDownloader(TorrentInfo torrentInfo,
+                                                                  StatusChanger statusChanger,
+                                                                  FileSystemLink fileSystemLink,
+                                                                  Flux<TrackerConnection> trackerConnectionConnectableFlux) {
+        TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
+        PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
-		Flux<Link> searchingPeers$ = statusChanger.getStatus$()
-				.filter(Status::isStartedSearchingPeers)
-				.take(1)
-				.flatMap(__ ->
-						peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-								.autoConnect(0));
+        peersListener = new PeersListener(statusChanger);
 
-		Flux<Link> incomingPeers$ = peersListener.getPeersConnectedToMeFlux()
-				// SocketException == When I shutdown the SocketServer after/before
-				// the tests inside Utils::removeEverythingRelatedToTorrent.
-				.onErrorResume(SocketException.class, throwable -> Flux.empty());
+        Flux<Link> searchingPeers$ = statusChanger.getStatus$()
+                .filter(Status::isStartedSearchingPeers)
+                .take(1)
+                .flatMap(__ ->
+                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                                .autoConnect(0));
 
-		Flux<Link> peersCommunicatorFlux =
-				Flux.merge(incomingPeers$, searchingPeers$)
-						// multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-						// multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
-						// every time and then I will connect to all the peers again and again...
-						.publish()
-						.autoConnect(0);
+        Flux<Link> incomingPeers$ = peersListener.getPeersConnectedToMeFlux()
+                // SocketException == When I shutdown the SocketServer after/before
+                // the tests inside Utils::removeEverythingRelatedToTorrent.
+                .onErrorResume(SocketException.class, throwable -> Flux.empty());
 
-		BittorrentAlgorithm bittorrentAlgorithm =
-				BittorrentAlgorithmInitializer.v1(torrentInfo,
-						statusChanger,
-						fileSystemLink,
-						peersCommunicatorFlux);
+        Flux<Link> peersCommunicatorFlux =
+                Flux.merge(incomingPeers$, searchingPeers$)
+                        // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
+                        // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
+                        // every time and then I will connect to all the peers again and again...
+                        .publish()
+                        .autoConnect(0);
 
-		SpeedStatistics torrentSpeedStatistics =
-				new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
+        BittorrentAlgorithm bittorrentAlgorithm =
+                BittorrentAlgorithmInitializer.v1(torrentInfo,
+                        statusChanger,
+                        fileSystemLink,
+                        peersCommunicatorFlux);
 
-		return TorrentDownloaders.getInstance()
-				.createTorrentDownloader(torrentInfo,
-						fileSystemLink,
-						bittorrentAlgorithm,
-						statusChanger,
-						torrentSpeedStatistics,
-						trackerProvider,
-						peersProvider,
-						trackerConnectionConnectableFlux,
-						peersCommunicatorFlux);
-	}
+        SpeedStatistics torrentSpeedStatistics =
+                new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
+                        peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 
-	public static Mono<SendMessagesNotifications> sendFakeMessage(Link link, PeerMessageType peerMessageType) {
-		switch (peerMessageType) {
-			case HaveMessage:
-				return link.sendMessages().sendHaveMessage(0);
-			case PortMessage:
-				return link.sendMessages().sendPortMessage((short) link.getMe().getPeerPort());
-			case ChokeMessage:
-				return link.sendMessages().sendChokeMessage();
-			case PieceMessage:
-				AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-						.allocate(0, 10)
-						.block();
-				return link.sendMessages()
-						.sendPieceMessage(0, 0, allocatedBlock)
-						.doOnTerminate(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock));
-			case CancelMessage:
-				return link.sendMessages().sendCancelMessage(0, 0, 10);
-			case KeepAliveMessage:
-				return link.sendMessages().sendKeepAliveMessage();
-			case RequestMessage:
-				return link.sendMessages().sendRequestMessage(0, 0, 10);
-			case UnchokeMessage:
-				return link.sendMessages().sendUnchokeMessage();
-			case BitFieldMessage:
-				return link.sendMessages().sendBitFieldMessage(BitSet.valueOf(new byte[10]));
-			case InterestedMessage:
-				return link.sendMessages().sendInterestedMessage();
-			case NotInterestedMessage:
-				return link.sendMessages().sendNotInterestedMessage();
-			default:
-				throw new IllegalArgumentException(peerMessageType.toString());
-		}
-	}
+        return TorrentDownloaders.getInstance()
+                .createTorrentDownloader(torrentInfo,
+                        fileSystemLink,
+                        bittorrentAlgorithm,
+                        statusChanger,
+                        torrentSpeedStatistics,
+                        trackerProvider,
+                        peersProvider,
+                        trackerConnectionConnectableFlux,
+                        peersCommunicatorFlux);
+    }
 
-	public static Flux<? extends PeerMessage> getSpecificMessageResponseFluxByMessageType(Link link, PeerMessageType peerMessageType) {
-		switch (peerMessageType) {
-			case HaveMessage:
-				return link.receivePeerMessages().getHaveMessageResponseFlux();
-			case PortMessage:
-				return link.receivePeerMessages().getPortMessageResponseFlux();
-			case ChokeMessage:
-				return link.receivePeerMessages().getChokeMessageResponseFlux();
-			case PieceMessage:
-				return link.receivePeerMessages().getPieceMessageResponseFlux();
-			case CancelMessage:
-				return link.receivePeerMessages().getCancelMessageResponseFlux();
-			case KeepAliveMessage:
-				return link.receivePeerMessages().getKeepMessageResponseFlux();
-			case RequestMessage:
-				return link.receivePeerMessages().getRequestMessageResponseFlux();
-			case UnchokeMessage:
-				return link.receivePeerMessages().getUnchokeMessageResponseFlux();
-			case BitFieldMessage:
-				return link.receivePeerMessages().getBitFieldMessageResponseFlux();
-			case InterestedMessage:
-				return link.receivePeerMessages().getInterestedMessageResponseFlux();
-			case NotInterestedMessage:
-				return link.receivePeerMessages().getNotInterestedMessageResponseFlux();
-			case ExtendedMessage:
-				return link.receivePeerMessages().getExtendedMessageResponseFlux();
-			default:
-				throw new IllegalArgumentException(peerMessageType.toString());
-		}
-	}
+    public static Mono<SendMessagesNotifications> sendFakeMessage(Link link, PeerMessageType peerMessageType) {
+        switch (peerMessageType) {
+            case HaveMessage:
+                return link.sendMessages().sendHaveMessage(0);
+            case PortMessage:
+                return link.sendMessages().sendPortMessage((short) link.getMe().getPeerPort());
+            case ChokeMessage:
+                return link.sendMessages().sendChokeMessage();
+            case PieceMessage:
+                AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
+                        .allocate(0, 10)
+                        .block();
+                return link.sendMessages()
+                        .sendPieceMessage(0, 0, allocatedBlock)
+                        .doOnTerminate(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock));
+            case CancelMessage:
+                return link.sendMessages().sendCancelMessage(0, 0, 10);
+            case KeepAliveMessage:
+                return link.sendMessages().sendKeepAliveMessage();
+            case RequestMessage:
+                return link.sendMessages().sendRequestMessage(0, 0, 10);
+            case UnchokeMessage:
+                return link.sendMessages().sendUnchokeMessage();
+            case BitFieldMessage:
+                return link.sendMessages().sendBitFieldMessage(BitSet.valueOf(new byte[10]));
+            case InterestedMessage:
+                return link.sendMessages().sendInterestedMessage();
+            case NotInterestedMessage:
+                return link.sendMessages().sendNotInterestedMessage();
+            default:
+                throw new IllegalArgumentException(peerMessageType.toString());
+        }
+    }
 
-	public static long folderSize(File directory) {
-		long length = 0;
-		for (File file : Objects.requireNonNull(directory.listFiles())) {
-			if (file.isFile())
-				length += file.length();
-			else
-				length += folderSize(file);
-		}
-		return length;
-	}
+    public static Flux<? extends PeerMessage> getSpecificMessageResponseFluxByMessageType(Link link, PeerMessageType peerMessageType) {
+        switch (peerMessageType) {
+            case HaveMessage:
+                return link.receivePeerMessages().getHaveMessageResponseFlux();
+            case PortMessage:
+                return link.receivePeerMessages().getPortMessageResponseFlux();
+            case ChokeMessage:
+                return link.receivePeerMessages().getChokeMessageResponseFlux();
+            case PieceMessage:
+                return link.receivePeerMessages().getPieceMessageResponseFlux();
+            case CancelMessage:
+                return link.receivePeerMessages().getCancelMessageResponseFlux();
+            case KeepAliveMessage:
+                return link.receivePeerMessages().getKeepMessageResponseFlux();
+            case RequestMessage:
+                return link.receivePeerMessages().getRequestMessageResponseFlux();
+            case UnchokeMessage:
+                return link.receivePeerMessages().getUnchokeMessageResponseFlux();
+            case BitFieldMessage:
+                return link.receivePeerMessages().getBitFieldMessageResponseFlux();
+            case InterestedMessage:
+                return link.receivePeerMessages().getInterestedMessageResponseFlux();
+            case NotInterestedMessage:
+                return link.receivePeerMessages().getNotInterestedMessageResponseFlux();
+            case ExtendedMessage:
+                return link.receivePeerMessages().getExtendedMessageResponseFlux();
+            default:
+                throw new IllegalArgumentException(peerMessageType.toString());
+        }
+    }
 
-	@SneakyThrows
-	public static AllocatedBlock readFromFile(TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
-		List<TorrentFile> fileList = torrentInfo.getFileList();
+    public static long folderSize(File directory) {
+        long length = 0;
+        for (File file : Objects.requireNonNull(directory.listFiles())) {
+            if (file.isFile())
+                length += file.length();
+            else
+                length += folderSize(file);
+        }
+        return length;
+    }
 
-		List<ActualFileImpl> actualFileImplList = new ArrayList<>();
-		String fullFilePath = downloadPath;
-		if (!torrentInfo.isSingleFileTorrent())
-			fullFilePath += torrentInfo.getName() + File.separator;
-		long position = 0;
-		for (TorrentFile torrentFile : fileList) {
-			String completeFilePath = torrentFile.getFileDirs()
-					.stream()
-					.collect(Collectors.joining(File.separator, fullFilePath, ""));
-			long from = position;
-			long to = position + torrentFile.getFileLength();
-			position = to;
+    @SneakyThrows
+    public static AllocatedBlock readFromFile(TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
+        List<TorrentFile> fileList = torrentInfo.getFileList();
 
-			ActualFileImpl actualFileImpl = new ActualFileImpl(completeFilePath, from, to, null);
-			actualFileImplList.add(actualFileImpl);
-		}
+        List<ActualFileImpl> actualFileImplList = new ArrayList<>();
+        String fullFilePath = downloadPath;
+        if (!torrentInfo.isSingleFileTorrent())
+            fullFilePath += torrentInfo.getName() + File.separator;
+        long position = 0;
+        for (TorrentFile torrentFile : fileList) {
+            String completeFilePath = torrentFile.getFileDirs()
+                    .stream()
+                    .collect(Collectors.joining(File.separator, fullFilePath, ""));
+            long from = position;
+            long to = position + torrentFile.getFileLength();
+            position = to;
 
-		// read from the file:
+            ActualFileImpl actualFileImpl = new ActualFileImpl(completeFilePath, from, to, null);
+            actualFileImplList.add(actualFileImpl);
+        }
 
-		long from = torrentInfo.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
-		long to = from + requestMessage.getBlockLength();
+        // read from the file:
 
-		AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-				.allocate(0, requestMessage.getBlockLength())
-				.block();
+        long from = torrentInfo.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
+        long to = from + requestMessage.getBlockLength();
 
-		int resultFreeIndex = 0;
-		long amountOfBytesOfFileWeCovered = 0;
-		for (ActualFileImpl actualFileImpl : actualFileImplList) {
-			if (actualFileImpl.getFrom() <= from && from <= actualFileImpl.getTo()) {
+        AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
+                .allocate(0, requestMessage.getBlockLength())
+                .block();
 
-				OpenOption[] options = {StandardOpenOption.READ};
-				SeekableByteChannel seekableByteChannel = Files.newByteChannel(Paths.get(actualFileImpl.getFilePath()), options);
+        int resultFreeIndex = 0;
+        long amountOfBytesOfFileWeCovered = 0;
+        for (ActualFileImpl actualFileImpl : actualFileImplList) {
+            if (actualFileImpl.getFrom() <= from && from <= actualFileImpl.getTo()) {
 
-				long fromWhereToReadInThisFile = from - amountOfBytesOfFileWeCovered;
-				seekableByteChannel.position(fromWhereToReadInThisFile);
+                OpenOption[] options = {StandardOpenOption.READ};
+                SeekableByteChannel seekableByteChannel = Files.newByteChannel(Paths.get(actualFileImpl.getFilePath()), options);
 
-				// to,from are taken from the requestMessage message object so "to-from" must be valid integer.
-				int howMuchToReadFromThisFile = (int) Math.min(actualFileImpl.getTo() - from, to - from);
-				ByteBuffer block = ByteBuffer.allocate(howMuchToReadFromThisFile);
-				seekableByteChannel.read(block);
+                long fromWhereToReadInThisFile = from - amountOfBytesOfFileWeCovered;
+                seekableByteChannel.position(fromWhereToReadInThisFile);
 
-				for (byte aTempResult : block.array())
-					allocatedBlock.getBlock()[resultFreeIndex++] = aTempResult;
-				from += howMuchToReadFromThisFile;
+                // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
+                int howMuchToReadFromThisFile = (int) Math.min(actualFileImpl.getTo() - from, to - from);
+                ByteBuffer block = ByteBuffer.allocate(howMuchToReadFromThisFile);
+                seekableByteChannel.read(block);
 
-				seekableByteChannel.close();
-			}
-			if (from == to)
-				return allocatedBlock;
-			amountOfBytesOfFileWeCovered = actualFileImpl.getTo();
-		}
-		throw new Exception("we shouldn't be here - never!");
-	}
+                for (byte aTempResult : block.array())
+                    allocatedBlock.getBlock()[resultFreeIndex++] = aTempResult;
+                from += howMuchToReadFromThisFile;
 
-	public static void deleteDownloadFolder() {
-		try {
-			File file = new File(System.getProperty("user.dir") + File.separator + "torrents-test");
-			if (file.exists()) {
-				deleteDirectory(file);
-			}
-		} catch (Exception e) {
-			//e.printStackTrace();
-		}
-	}
+                seekableByteChannel.close();
+            }
+            if (from == to)
+                return allocatedBlock;
+            amountOfBytesOfFileWeCovered = actualFileImpl.getTo();
+        }
+        throw new Exception("we shouldn't be here - never!");
+    }
 
-	private static void deleteDirectory(File directoryToBeDeleted) throws IOException {
-		Files.walkFileTree(directoryToBeDeleted.toPath(), new HashSet<>(), Integer.MAX_VALUE, new FileVisitor<Path>() {
-			@Override
-			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-					throws IOException {
-				return FileVisitResult.CONTINUE;
-			}
+    public static void deleteDownloadFolder() {
+        try {
+            File file = new File(System.getProperty("user.dir") + File.separator + "torrents-test");
+            if (file.exists()) {
+                deleteDirectory(file);
+            }
+        } catch (Exception e) {
+            //e.printStackTrace();
+        }
+    }
 
-			@Override
-			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-					throws IOException {
-				Files.delete(file);
-				return FileVisitResult.CONTINUE;
-			}
+    private static void deleteDirectory(File directoryToBeDeleted) throws IOException {
+        Files.walkFileTree(directoryToBeDeleted.toPath(), new HashSet<>(), Integer.MAX_VALUE, new FileVisitor<Path>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+                    throws IOException {
+                return FileVisitResult.CONTINUE;
+            }
 
-			@Override
-			public FileVisitResult visitFileFailed(Path file, IOException exc)
-					throws IOException {
-				return FileVisitResult.CONTINUE;
-			}
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                    throws IOException {
+                Files.delete(file);
+                return FileVisitResult.CONTINUE;
+            }
 
-			@Override
-			public FileVisitResult postVisitDirectory(Path dir, IOException exc)
-					throws IOException {
-				Files.delete(dir);
-				return FileVisitResult.CONTINUE;
-			}
-		});
-	}
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException exc)
+                    throws IOException {
+                return FileVisitResult.CONTINUE;
+            }
 
-	public static Flux<PieceMessage> createRandomPieceMessages(TorrentInfo torrentInfo,
-															   BlockOfPiece blockOfPiece,
-															   int maxRequestBlockSize) {
-		int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
-				blockOfPiece.getPieceIndex() :
-				torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc)
+                    throws IOException {
+                Files.delete(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+    }
 
-		int requestBlockSize = blockOfPiece.getLength() != null ?
-				blockOfPiece.getLength() > BlocksAllocatorImpl.getInstance().getBlockLength() ?
-						BlocksAllocatorImpl.getInstance().getBlockLength() : blockOfPiece.getLength() :
-				torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getFrom();
+    public static Flux<PieceMessage> createRandomPieceMessages(TorrentInfo torrentInfo,
+                                                               Semaphore semaphore,
+                                                               BlockOfPiece blockOfPiece,
+                                                               int maxRequestBlockSize) {
+        int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
+                blockOfPiece.getPieceIndex() :
+                torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
 
-		return Flux.create(sink -> {
-			for (int blockStartPosition = 0; blockStartPosition < requestBlockSize; ) {
-				// I can cast safely to integer because REQUEST_BLOCK_SIZE is integer and we find the min.
-				int blockLength = PieceMessage.fixBlockLength(torrentInfo.getPieceLength(pieceIndex), blockStartPosition,
-						requestBlockSize - blockStartPosition);
-				AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-						.allocate(0, blockLength)
-						.block();
+        int pieceLength = torrentInfo.getPieceLength(pieceIndex);
+        int totalRequestBlockSize = (blockOfPiece.getLength() == null || blockOfPiece.getLength() > pieceLength) ?
+                pieceLength :
+                blockOfPiece.getLength();
 
-				for (int i = 0; i < blockLength; i++)
-					allocatedBlock.getBlock()[i] = (byte) i;
-				PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex,
-						blockStartPosition, allocatedBlock, torrentInfo.getPieceLength(pieceIndex));
-				sink.next(pieceMessage);
-				blockStartPosition += blockLength;
-			}
-			sink.complete();
-		});
-	}
+        return Flux.generate(() -> blockOfPiece.getFrom(), (blockStartPosition, sink) -> {
+            if (blockStartPosition >= totalRequestBlockSize) {
+                sink.complete();
+                return blockStartPosition;
+            }
 
-	;
+            try {
+                semaphore.acquire();// wait until downstream finish working on the last signal.
+            } catch (InterruptedException e) {
+                sink.error(e);
+            }
+
+            int blockLength = PieceMessage.fixBlockLength(pieceLength, blockStartPosition, totalRequestBlockSize);
+            AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
+                    .allocate(0, blockLength)
+                    .block();
+
+            for (int i = 0; i < blockLength; i++)
+                allocatedBlock.getBlock()[i] = (byte) 3;
+            PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex,
+                    blockStartPosition, allocatedBlock, torrentInfo.getPieceLength(pieceIndex));
+            sink.next(pieceMessage);
+            return blockStartPosition + blockLength;
+        });
+    }
 }

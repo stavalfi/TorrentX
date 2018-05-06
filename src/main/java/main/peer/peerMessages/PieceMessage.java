@@ -27,8 +27,9 @@ public class PieceMessage extends PeerMessage {
         this.index = index;
         this.begin = fixBlockBegin(pieceLength, begin);
         int newBlockLength = fixBlockLength(pieceLength, begin, allocatedBlock.getLength());
-        this.allocatedBlock = BlocksAllocatorImpl.getInstance()
-                .updateLength(allocatedBlock, newBlockLength);
+        this.allocatedBlock = allocatedBlock.getLength() != newBlockLength ?
+                BlocksAllocatorImpl.getInstance().updateLength(allocatedBlock, newBlockLength) :
+                allocatedBlock;
     }
 
     public static int fixBlockBegin(int pieceLength, int oldBegin) {
@@ -94,12 +95,14 @@ public class PieceMessage extends PeerMessage {
         if (!(o instanceof PieceMessage)) return false;
         PieceMessage that = (PieceMessage) o;
         return getIndex() == that.getIndex() &&
-                getBegin() == that.getBegin();
+                getBegin() == that.getBegin() &&
+                getAllocatedBlock().getLength() == that.getAllocatedBlock().getLength();
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getIndex(), getBegin());
+
+        return Objects.hash(getIndex(), getBegin(), getAllocatedBlock().getLength());
     }
 
     @Override

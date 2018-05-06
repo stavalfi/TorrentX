@@ -52,20 +52,23 @@ Feature: create get and delete active torrents
       | torrent-file-example3.torrent             | torrents-test    |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
-  Scenario Outline: we save piece of active torrent
+  Scenario Outline: we save pieces of active torrent and read it
     # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
     When application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
+      | 1          | 100  |        |
       | 3          | 0    |        |
       | 4          | 100  | 100    |
       | -1         | 100  | 100    |
       | -2         | 0    |        |
+      | -7         | 100  | 100    |
+      | -6         | 100  |        |
     Then the only completed pieces are - for torrent: "<torrent>":
       | 3  |
       | -2 |
 
     Examples:
-      | torrent                                   | downloadLocation |
+      | torrent                       | downloadLocation |
       | torrent-file-example1.torrent             | torrents-test    |
       | torrent-file-example2.torrent             | torrents-test    |
       | torrent-file-example3.torrent             | torrents-test    |
@@ -80,25 +83,8 @@ Feature: create get and delete active torrents
       | 1          | 30   | 1000000000 |
       | 3          | 0    |            |
     Then the only completed pieces are - for torrent: "<torrent>":
-      | 3 |
-
-    Examples:
-      | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test    |
-      | torrent-file-example2.torrent             | torrents-test    |
-      | torrent-file-example3.torrent             | torrents-test    |
-      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-
-  Scenario Outline: we save piece of active torrent
-    # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
-    When application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
-      | pieceIndex | from | length |
-      | 0          | 0    |        |
-      | 1          | 100  | 100    |
-      | -7         | 100  | 100    |
-      | -6         | 100  |        |
-    Then the only completed pieces are - for torrent: "<torrent>":
-      | 0 |
+      | -3 |
+      | 3  |
 
     Examples:
       | torrent                                   | downloadLocation |
