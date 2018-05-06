@@ -20,6 +20,7 @@ import main.torrent.status.StatusChanger;
 import main.torrent.status.StatusType;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
+import org.junit.Assert;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -32,6 +33,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.Semaphore;
+import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
 public class Utils {
@@ -455,8 +457,7 @@ public class Utils {
 
     public static Flux<PieceMessage> createRandomPieceMessages(TorrentInfo torrentInfo,
                                                                Semaphore semaphore,
-                                                               BlockOfPiece blockOfPiece,
-                                                               int maxRequestBlockSize) {
+                                                               BlockOfPiece blockOfPiece) {
         int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
                 blockOfPiece.getPieceIndex() :
                 torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
@@ -490,5 +491,10 @@ public class Utils {
             sink.next(pieceMessage);
             return blockStartPosition + blockLength;
         });
+    }
+
+    public static <T, U> void assertListEqualNotByOrder(List<T> list1, List<U> list2, BiPredicate<T, U> areElementsEqual) {
+        Assert.assertTrue(list1.stream().allMatch(t1 -> list2.stream().anyMatch(t2 -> areElementsEqual.test(t1, t2))));
+        Assert.assertTrue(list2.stream().allMatch(t2 -> list1.stream().anyMatch(t1 -> areElementsEqual.test(t1, t2))));
     }
 }

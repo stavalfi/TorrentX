@@ -386,7 +386,6 @@ public class MyStepdefs {
         this.actualCompletedSavedPiecesReadByFS$ = null;
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-        int blockLength = BlocksAllocatorImpl.getInstance().getBlockLength();
 
         StatusChanger statusChanger = new StatusChanger(Utils.createDefaultFalseStatus());
 
@@ -396,7 +395,7 @@ public class MyStepdefs {
         Flux<PieceMessage> generatedWrittenPieceMessages$ = Flux.fromIterable(blockList)
                 .doOnNext(blockOfPiece -> System.out.println("start saving: " + blockOfPiece))
                 .flatMap((BlockOfPiece blockOfPiece) ->
-                        Utils.createRandomPieceMessages(torrentInfo, semaphore, blockOfPiece, blockLength))
+                        Utils.createRandomPieceMessages(torrentInfo, semaphore, blockOfPiece))
                 .publishOn(App.MyScheduler)
                 .publish()
                 .autoConnect(2);
@@ -602,7 +601,6 @@ public class MyStepdefs {
                         null,
                         null,
                         null);
-        System.out.println(torrentFileName);
     }
 
     private Status actualLastStatus = null;
@@ -1168,7 +1166,7 @@ public class MyStepdefs {
         this.blocksAllocator = new BlocksAllocatorImpl(amountOfBlocksToAllocate, blockLength);
     }
 
-    private Set<AllocatedBlock> actualAllocations;
+    private List<AllocatedBlock> actualAllocations;
 
     @When("^the application allocate \"([^\"]*)\" blocks from \"([^\"]*)\" threads:$")
     public void theApplicationAllocateBlocksFromThreads(int amountOfAllocations, int threadsAmount) throws Throwable {
@@ -1180,7 +1178,7 @@ public class MyStepdefs {
                 .flatMap(blockIndex -> this.blocksAllocator.allocate(0, 0), threadsAmount)
                 .doOnNext(allocatedBlock ->
                         Assert.assertFalse(this.blocksAllocator.getFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
-                .collect(Collectors.toSet())
+                .collect(Collectors.toList())
                 .block();
 
         int actualFreesAmount = this.blocksAllocator.getAmountOfBlocks() - amountOfAllocations;
@@ -1199,19 +1197,18 @@ public class MyStepdefs {
         this.actualAllocations = Flux.range(0, expectedAllocationsList.size())
                 .flatMap(blockIndex -> this.blocksAllocator.allocate(0, 0), threadsAmount)
                 .doOnNext(allocatedBlock -> Assert.assertFalse(this.blocksAllocator.getFreeBlocksStatus().get(allocatedBlock.getBlockIndex())))
-                .collect(Collectors.toSet())
+                .collect(Collectors.toList())
                 .block();
 
-        Set<Integer> actualAllocationsFromNotifier = allocations$.take(expectedAllocationsList.size())
-                .collect(Collectors.toSet())
+        List<Integer> actualAllocationsFromNotifier = allocations$.take(expectedAllocationsList.size())
+                .collect(Collectors.toList())
                 .block();
 
-        Assert.assertEquals(expectedAllocationsList.stream()
-                        .collect(Collectors.toSet()),
-                actualAllocations.stream()
-                        .map(AllocatedBlock::getBlockIndex)
-                        .collect(Collectors.toSet()));
-        Assert.assertEquals(expectedAllocationsList.stream().collect(Collectors.toSet()), actualAllocationsFromNotifier);
+        Utils.assertListEqualNotByOrder(expectedAllocationsList, actualAllocations,
+                (expectedBlockIndex, actualAllocatedBlock) -> expectedBlockIndex == actualAllocatedBlock.getBlockIndex());
+
+        Utils.assertListEqualNotByOrder(expectedAllocationsList, actualAllocationsFromNotifier,
+                (expectedBlockIndex, actualBlockIndex) -> expectedBlockIndex == actualBlockIndex);
     }
 
     @Then("^the allocator have the following free blocks:$")

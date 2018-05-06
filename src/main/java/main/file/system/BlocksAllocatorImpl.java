@@ -126,7 +126,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
         return newAllocatedBlock;
     }
 
-    private static BlocksAllocator instance = new BlocksAllocatorImpl(2, 100_000_000);
+    private static BlocksAllocator instance = new BlocksAllocatorImpl(2, 17_000);
 
     public static BlocksAllocator getInstance() {
         return instance;
