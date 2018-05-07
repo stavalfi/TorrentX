@@ -3,30 +3,21 @@ package main.file.system;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.BitSet;
-
 public interface BlocksAllocator {
 
-	Mono<AllocatedBlock> allocate(int offset, int length);
+    Mono<AllocatorState> updateAllocations(int amountOfBlocks, int blockLength);
 
-	AllocatedBlock free(AllocatedBlock allocatedBlock);
+    Mono<AllocatedBlock> updateAllocatedBlock(AllocatedBlock old, int offset, int length);
 
-	void freeAll();
+    Mono<AllocatedBlock> allocate(int offset, int length);
 
-	// I can't send the actual AllocatedBlock
-	// here because someone will maybe save
-	// it but it's not safe because it's content
-	// will be changed in the future.
-	Flux<Integer> allocated$();
+    Mono<AllocatorState> free(AllocatedBlock allocatedBlock);
 
-	Flux<Integer> frees$();
+    Mono<AllocatorState> freeAll();
 
-	BitSet getFreeBlocksStatus();
+    Mono<AllocatorState> getLatestState$();
 
-	int getBlockLength();
+    Flux<AllocatorState> getState$();
 
-	int getAmountOfBlocks();
-
-	AllocatedBlock updateLength(AllocatedBlock old, int length);
-
+    Flux<AllocatorState> getStateHistory$();
 }

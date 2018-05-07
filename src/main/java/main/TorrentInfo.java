@@ -97,15 +97,16 @@ public class TorrentInfo {
         // tracker pattern example: udp://tracker.coppersurfer.tk:6969/scrapeMono
         String trackerPattern = "^(.*)://(\\d*\\.)?(.*):(\\d*)(.*)?$";
 
-        return this.torrent.getAnnounceList()
-                .stream()
-                .filter((String tracker) -> !tracker.equals("udp://9.rarbg.com:2710/scrapeMono")) // problematic tracker !!!!
-                .map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
-                .filter(Matcher::matches)
-                .map((Matcher matcher) -> new Tracker(matcher.group(1), matcher.group(3), Integer.parseInt(matcher.group(4))))
-                .filter(tracker -> !tracker.getConnectionType().equals("http"))
-                .filter(tracker -> !tracker.getConnectionType().equals("https"))
-                .collect(Collectors.toList());
+        return this.torrent.getAnnounceList() == null ?
+                Collections.emptyList() :
+                this.torrent.getAnnounceList().stream()
+                        .filter((String tracker) -> !tracker.equals("udp://9.rarbg.com:2710/scrapeMono")) // problematic tracker !!!!
+                        .map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
+                        .filter(Matcher::matches)
+                        .map((Matcher matcher) -> new Tracker(matcher.group(1), matcher.group(3), Integer.parseInt(matcher.group(4))))
+                        .filter(tracker -> !tracker.getConnectionType().equals("http"))
+                        .filter(tracker -> !tracker.getConnectionType().equals("https"))
+                        .collect(Collectors.toList());
     }
 
     public String getTorrentInfoHash() {

@@ -80,3 +80,29 @@ Feature: allocate and deallocate blocks from multiple threads
       | 3 |
       | 4 |
     Then the allocator have the following used blocks - none
+
+  Scenario: we allocate and free blocks from multiple threads successfully
+    Given allocator for "5" blocks with "17_000" bytes each
+    When the application allocate the following blocks from "3" threads:
+      | 0 |
+      | 1 |
+    Then the allocator have the following free blocks:
+      | 2 |
+      | 3 |
+      | 4 |
+    Then the allocator have the following used blocks:
+      | 0 |
+      | 1 |
+    When the application free the following blocks:
+      | 0 |
+      | 1 |
+    Then the allocator have the following free blocks:
+      | 0 |
+      | 1 |
+      | 2 |
+      | 3 |
+      | 4 |
+    Then the allocator have the following used blocks - none
+
+
+

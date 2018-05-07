@@ -9,8 +9,8 @@ Feature: create get and delete active torrents
       | torrent                                   | downloadLocation |
       | torrent-file-example1.torrent             | torrents-test    |
       | torrent-file-example2.torrent             | torrents-test    |
-      | torrent-file-example3.torrent             | torrents-test    |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
 
   Scenario Outline: we delete torrent files only
     When application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -22,8 +22,8 @@ Feature: create get and delete active torrents
       | torrent                                   | downloadLocation |
       | torrent-file-example1.torrent             | torrents-test    |
       | torrent-file-example2.torrent             | torrents-test    |
-      | torrent-file-example3.torrent             | torrents-test    |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
 
   Scenario Outline: we delete active torrent only
     When application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -35,8 +35,8 @@ Feature: create get and delete active torrents
       | torrent                                   | downloadLocation |
       | torrent-file-example1.torrent             | torrents-test    |
       | torrent-file-example2.torrent             | torrents-test    |
-      | torrent-file-example3.torrent             | torrents-test    |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
 
   Scenario Outline: we delete active torrent and file
     When application create active-torrent for: "<torrent>","<downloadLocation>"
@@ -49,8 +49,8 @@ Feature: create get and delete active torrents
       | torrent                                   | downloadLocation |
       | torrent-file-example1.torrent             | torrents-test    |
       | torrent-file-example2.torrent             | torrents-test    |
-      | torrent-file-example3.torrent             | torrents-test    |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
 
   Scenario Outline: we save pieces of active torrent and read it
     # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
@@ -68,11 +68,11 @@ Feature: create get and delete active torrents
       | -2 |
 
     Examples:
-      | torrent                       | downloadLocation |
+      | torrent                                   | downloadLocation |
       | torrent-file-example1.torrent             | torrents-test    |
       | torrent-file-example2.torrent             | torrents-test    |
-      | torrent-file-example3.torrent             | torrents-test    |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
 
   Scenario Outline: we save a block which is too large than the corresponding actual piece.
     # we expect that it will be as saving a piece when we don't specify "length".
@@ -90,18 +90,20 @@ Feature: create get and delete active torrents
       | torrent                                   | downloadLocation |
       | torrent-file-example1.torrent             | torrents-test    |
       | torrent-file-example2.torrent             | torrents-test    |
-      | torrent-file-example3.torrent             | torrents-test    |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
 
-#  Scenario Outline: we save all the pieces and expect to see that the fluxes are completed
-#    # this step is extremely slow because we manually send to the app every piece one by one.
-#    When application save the all the pieces of torrent: "<torrent>","<downloadLocation>"
-#    Then torrent-status for torrent "<torrent>" will be:
-#      | START_DOWNLOAD        |
-#      | COMPLETED_DOWNLOADING |
-#    And the saved-pieces-flux send complete signal - for torrent: "<torrent>","<downloadLocation>"
-#    And the saved-blocks-flux send  complete signal - for torrent: "<torrent>","<downloadLocation>"
-#
-#    Examples:
-#      | torrent                       | downloadLocation |
-#      | torrent-file-example1.torrent | torrents-test    |
+  Scenario Outline: we save all the pieces and expect to see that the fluxes are completed
+    # this step is extremely slow because we manually send to the app every piece one by one.
+    When application save the all the pieces of torrent: "<torrent>","<downloadLocation>"
+    Then torrent-status for torrent "<torrent>" will be:
+      | START_DOWNLOAD        |
+      | PAUSE_DOWNLOAD        |
+      | COMPLETED_DOWNLOADING |
+    And the saved-pieces-flux send complete signal - for torrent: "<torrent>","<downloadLocation>"
+    And the saved-blocks-flux send  complete signal - for torrent: "<torrent>","<downloadLocation>"
+
+    Examples:
+      | torrent                                   | downloadLocation |
+      | ComplexFolderStructure.torrent            | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |

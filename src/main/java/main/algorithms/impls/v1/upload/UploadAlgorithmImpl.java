@@ -61,7 +61,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                                                                 peersCommunicator.sendMessages().sendPieceMessage(pieceMessage.getIndex(),
                                                                         pieceMessage.getBegin(), pieceMessage.getAllocatedBlock())
                                                                         .map(___ -> new PieceEvent(TorrentPieceStatus.UPLOADING, pieceMessage)))
-                                                        .map(pieceEvent -> updateAllocatedBlock.apply(pieceEvent, BlocksAllocatorImpl.getInstance().free(allocatedBlock)))
+                                                        .doOnNext(pieceEvent -> BlocksAllocatorImpl.getInstance().free(allocatedBlock))
                                                         .doOnError(throwable -> BlocksAllocatorImpl.getInstance().free(allocatedBlock))
                                                         .doOnCancel(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock)))))
                 .publish()

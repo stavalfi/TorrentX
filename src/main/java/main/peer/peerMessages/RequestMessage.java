@@ -1,5 +1,7 @@
 package main.peer.peerMessages;
 
+import main.file.system.AllocatorState;
+import main.file.system.BlocksAllocatorImpl;
 import main.peer.Peer;
 
 import java.nio.ByteBuffer;
@@ -28,7 +30,11 @@ public class RequestMessage extends PeerMessage {
 
         this.index = index;
         this.begin = PieceMessage.fixBlockBegin(pieceLength, begin);
-        this.blockLength = PieceMessage.fixBlockLength(pieceLength, begin, blockLength);
+        Integer maxAllocatedBlockSize = BlocksAllocatorImpl.getInstance()
+                .getLatestState$()
+                .map(AllocatorState::getBlockLength)
+                .block();
+        this.blockLength = PieceMessage.fixBlockLength(pieceLength, begin, blockLength, maxAllocatedBlockSize);
     }
 
     @Override

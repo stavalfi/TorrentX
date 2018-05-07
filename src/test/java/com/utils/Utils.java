@@ -97,6 +97,10 @@ public class Utils {
 
         // delete download folder from last test
         Utils.deleteDownloadFolder();
+
+        BlocksAllocatorImpl.getInstance()
+                .updateAllocations(100, 17_000)
+                .block();
     }
 
     public static Status createDefaultFalseStatus() {
@@ -467,7 +471,7 @@ public class Utils {
                 pieceLength :
                 blockOfPiece.getLength();
 
-        return Flux.generate(() -> blockOfPiece.getFrom(), (blockStartPosition, sink) -> {
+        return Flux.<PieceMessage, Integer>generate(blockOfPiece::getFrom, (blockStartPosition, sink) -> {
             if (blockStartPosition >= totalRequestBlockSize) {
                 sink.complete();
                 return blockStartPosition;
@@ -479,22 +483,35 @@ public class Utils {
                 sink.error(e);
             }
 
-            int blockLength = PieceMessage.fixBlockLength(pieceLength, blockStartPosition, totalRequestBlockSize);
             AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                    .allocate(0, blockLength)
+                    .getLatestState$()
+                    .map(AllocatorState::getBlockLength)
+                    .map(allocatedBlockLength -> PieceMessage.fixBlockLength(pieceLength, blockStartPosition, totalRequestBlockSize, allocatedBlockLength))
+                    .flatMap(fixedBlockLength -> BlocksAllocatorImpl.getInstance()
+                            .allocate(0, fixedBlockLength))
                     .block();
 
-            for (int i = 0; i < blockLength; i++)
+            for (int i = 0; i < allocatedBlock.getLength(); i++)
                 allocatedBlock.getBlock()[i] = (byte) 3;
             PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex,
                     blockStartPosition, allocatedBlock, torrentInfo.getPieceLength(pieceIndex));
             sink.next(pieceMessage);
-            return blockStartPosition + blockLength;
+            return blockStartPosition + allocatedBlock.getLength();
         });
     }
 
-    public static <T, U> void assertListEqualNotByOrder(List<T> list1, List<U> list2, BiPredicate<T, U> areElementsEqual) {
-        Assert.assertTrue(list1.stream().allMatch(t1 -> list2.stream().anyMatch(t2 -> areElementsEqual.test(t1, t2))));
-        Assert.assertTrue(list2.stream().allMatch(t2 -> list1.stream().anyMatch(t1 -> areElementsEqual.test(t1, t2))));
+    public static <T, U> void assertListEqualNotByOrder(List<T> expected, List<U> actual, BiPredicate<T, U> areElementsEqual) {
+        Assert.assertTrue(expected.stream().allMatch(t1 -> {
+            boolean b = actual.stream().anyMatch(t2 -> areElementsEqual.test(t1, t2));
+            if (!b)
+                System.out.println(t1 + " -  expected is not inside actual.");
+            return b;
+        }));
+        Assert.assertTrue(actual.stream().allMatch(t2 -> {
+            boolean b = expected.stream().anyMatch(t1 -> areElementsEqual.test(t1, t2));
+            if (!b)
+                System.out.println(t2 + " -  actual is not inside expected.");
+            return b;
+        }));
     }
 }

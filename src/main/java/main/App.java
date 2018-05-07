@@ -26,7 +26,7 @@ public class App {
 
 
     public static void f5() throws IOException {
-        System.out.println(Integer.MAX_VALUE);
+        System.out.println(getTorrentInfo());
     }
 
     private static SeekableByteChannel createFile(String filePathToCreate) throws IOException {
@@ -80,7 +80,7 @@ public class App {
                 "main" + File.separator +
                 "resources" + File.separator +
                 "torrents" + File.separator +
-                "torrent-file-example3.torrent";
+                "MyTorrent.torrent";
         return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
     }
 }

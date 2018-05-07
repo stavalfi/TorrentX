@@ -41,7 +41,7 @@ public class StatusChanger {
         return this.latestStatus$
                 .take(1)
                 .single()
-                .flatMap(lastStatus -> {
+                .flatMapMany(lastStatus -> {
                     Status newStatus = changeStatus(lastStatus, change);
                     if (lastStatus.equals(newStatus))
                         return Mono.empty();
@@ -50,10 +50,10 @@ public class StatusChanger {
                             // we need to assert that the new state is available.
                             .flatMapMany(status -> this.latestStatus$)
                             // status == "lastStatus" or "newStatus". there is no other option.
-                            .filter(status -> status.equals(newStatus))
-                            .take(1)
-                            .single();
-                });
+                            .filter(status -> status.equals(newStatus));
+                })
+                .take(1)
+                .single();
     }
 
     /**

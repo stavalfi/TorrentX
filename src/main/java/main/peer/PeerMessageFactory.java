@@ -2,6 +2,7 @@ package main.peer;
 
 import main.TorrentInfo;
 import main.file.system.AllocatedBlock;
+import main.file.system.AllocatorState;
 import main.file.system.BlocksAllocatorImpl;
 import main.peer.peerMessages.*;
 
@@ -42,10 +43,12 @@ public class PeerMessageFactory {
         int index = dataInputStream.readInt();
         int pieceLength = torrentInfo.getPieceLength(index);
         int begin = PieceMessage.fixBlockBegin(pieceLength, dataInputStream.readInt());
-        int blockLength = PieceMessage.fixBlockLength(pieceLength, begin, messagePayloadLength - 8);
-        // we will come here when he receive piece message. We need to assert that in all the places we finally free this allocated block even if we got error or complete signal.
         AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                .allocate(0, blockLength)
+                .getLatestState$()
+                .map(AllocatorState::getBlockLength)
+                .map(allocatedBlockLength -> PieceMessage.fixBlockLength(pieceLength, begin, messagePayloadLength - 8, allocatedBlockLength))
+                .flatMap(fixedBlockLength -> BlocksAllocatorImpl.getInstance()
+                        .allocate(0, fixedBlockLength))
                 .block();
 
         dataInputStream.readFully(allocatedBlock.getBlock(), allocatedBlock.getOffset(), allocatedBlock.getLength());
@@ -86,7 +89,7 @@ public class PeerMessageFactory {
                 int index = wrap.getInt();
                 int begin = wrap.getInt();
                 int blockLength = wrap.getInt();
-                RequestMessage requestMessage = new RequestMessage(from, to, index, begin, blockLength,torrentInfo.getPieceLength(index));
+                RequestMessage requestMessage = new RequestMessage(from, to, index, begin, blockLength, torrentInfo.getPieceLength(index));
                 return requestMessage;
             }
             case unchokeMessage:

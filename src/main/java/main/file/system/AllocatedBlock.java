@@ -10,6 +10,4 @@ public interface AllocatedBlock {
     int getLength();
 
     String getAllocationId();
-
-    boolean isFreed();
 }

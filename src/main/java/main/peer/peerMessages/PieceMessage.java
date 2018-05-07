@@ -1,6 +1,7 @@
 package main.peer.peerMessages;
 
 import main.file.system.AllocatedBlock;
+import main.file.system.AllocatorState;
 import main.file.system.BlocksAllocatorImpl;
 import main.peer.Peer;
 import main.peer.SendMessages;
@@ -26,19 +27,22 @@ public class PieceMessage extends PeerMessage {
         super(to, from);
         this.index = index;
         this.begin = fixBlockBegin(pieceLength, begin);
-        int newBlockLength = fixBlockLength(pieceLength, begin, allocatedBlock.getLength());
-        this.allocatedBlock = allocatedBlock.getLength() != newBlockLength ?
-                BlocksAllocatorImpl.getInstance().updateLength(allocatedBlock, newBlockLength) :
-                allocatedBlock;
+        this.allocatedBlock = BlocksAllocatorImpl.getInstance()
+                .getLatestState$()
+                .map(AllocatorState::getBlockLength)
+                .map(allocatedBlockLength -> fixBlockLength(pieceLength, begin, allocatedBlock.getLength(), allocatedBlockLength))
+                .flatMap(fixedBlockLength -> BlocksAllocatorImpl.getInstance()
+                        .updateAllocatedBlock(allocatedBlock, allocatedBlock.getOffset(), fixedBlockLength))
+                .block();
     }
 
     public static int fixBlockBegin(int pieceLength, int oldBegin) {
         return Math.min(oldBegin, pieceLength - 1);
     }
 
-    public static int fixBlockLength(int pieceLength, int begin, int oldBlockLength) {
+    // TODO: we didn't take in account the offset of the AllocatedBlock!
+    public static int fixBlockLength(int pieceLength, int begin, int oldBlockLength, int maxAllocatedBlockSize) {
         assert fixBlockBegin(pieceLength, begin) == begin;
-        int maxAllocatedBlockSize = BlocksAllocatorImpl.getInstance().getBlockLength();
         int newBlockLength = Math.min(maxAllocatedBlockSize, oldBlockLength);
 
         // is pieceMessage.getBegin() + newBlockLength overlaps with the range of this piece?

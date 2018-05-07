@@ -66,7 +66,7 @@ public class RemoteFakePeerCopyCat extends Peer {
             try {
                 peerConnection.close();
             } catch (IOException e) {
-
+//                e.printStackTrace();
             }
         });
         if (!this.closeEverything) {
@@ -84,6 +84,8 @@ public class RemoteFakePeerCopyCat extends Peer {
                 return;
             }
             peerMessage.sendMessage(sendMessages).block();
+//            if (peerMessage instanceof PieceMessage)
+//                BlocksAllocatorImpl.getInstance().free(((PieceMessage) peerMessage).getAllocatedBlock());
             receivedMessagesAmount++;
         }
     }
