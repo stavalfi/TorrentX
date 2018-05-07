@@ -321,10 +321,11 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         torrentInfo.getFileList()
                 .stream()
                 .map(christophedetroyer.torrent.TorrentFile::getFileDirs)
-                .filter(folders -> folders.size() > 1)
-                .map(folders -> folders.subList(0, folders.size() - 2))
-                .map(List::stream)
+                .filter(fileAndFolders -> fileAndFolders.size() > 1)
+                .map(fileAndFolders -> fileAndFolders.subList(0, fileAndFolders.size() - 1))
+                .map(strings -> strings.stream())
                 .map(stringStream -> stringStream.collect(Collectors.joining(File.separator, mainFolder, "")))
+                .distinct()
                 .forEach(this::createFolder);
     }
 
