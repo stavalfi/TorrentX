@@ -16,6 +16,8 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
 
     public BlocksAllocatorImpl(int amountOfBlocks, int blockLength) {
         this.latestState$ = Flux.<AllocatorState>create(sink -> this.latestStateSink = sink)
+                // this must be it or nothing will work. because after every update we wait until
+                // we consume the state we created so if someone try to add new state in between, we fucked.
                 .publishOn(Schedulers.single())
                 .replay(1)
                 .autoConnect(0);
@@ -32,12 +34,12 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
         assert offset > 0;
         assert length > 0;
 
-        return getState$().filter(allocatorState -> offset + length < allocatorState.getBlockLength())
+        return getState$().filter(allocatorState -> offset + length <= allocatorState.getBlockLength())
                 .filter(allocatorState -> isNotFull(allocatorState.getFreeBlocksStatus()))
                 .take(1)
                 .flatMap(oldState -> {
                     int freeIndex = oldState.getFreeBlocksStatus().nextSetBit(0);
-                    return createNewStateToAllocation(oldState, freeIndex, offset, length)
+                    return createNewStateForAllocation(oldState, freeIndex, offset, length)
                             .doOnNext(allocatorState -> this.latestStateSink.next(allocatorState))
                             // wait until the new status is updated.
                             .flatMapMany(allocatorState -> getState$().filter(allocatorState::equals))
@@ -50,6 +52,8 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
     @Override
     public Mono<AllocatorState> free(AllocatedBlock allocatedBlock) {
         return getLatestState$()
+                // check if the allocator didn't shrink the blocks length and if yes, this block is free automatically.
+                .filter(allocatorState -> allocatedBlock.getBlockIndex() < allocatorState.getAmountOfBlocks())
                 // check if the index is specified as not free.
                 .filter(allocatorState -> !allocatorState.getFreeBlocksStatus().get(allocatedBlock.getBlockIndex()))
                 // check if the given allocatedBlock is present.
@@ -60,6 +64,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
                 .doOnNext(allocatorState -> this.latestStateSink.next(allocatorState))
                 // wait until the new status is updated.
                 .flatMapMany(allocatorState -> getState$().filter(allocatorState::equals))
+                .switchIfEmpty(getLatestState$())
                 .take(1)
                 .single();
     }
@@ -101,15 +106,16 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
 
     @Override
     public Mono<AllocatorState> freeAll() {
-        return getLatestState$().map(AllocatorState::getAllocatedBlocks)
-                .flatMapMany(Flux::fromArray)
-                .flatMap(this::free)
+        return getLatestState$().map(allocatorState -> allocatorState.getAllocatedBlocks())
+                .flatMapMany(array -> Flux.fromArray(array))
+                .flatMap(allocatedBlock -> free(allocatedBlock))
                 .last();
     }
 
     @Override
     public Mono<AllocatorState> getLatestState$() {
-        return this.latestState$.take(1).single();
+        return this.latestState$.take(1)
+                .single();
     }
 
     @Override
@@ -124,7 +130,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
 
     private AllocatorState createInitialState(int amountOfBlocks, int blockLength) {
         BitSet freeBlocksStatus = new BitSet(amountOfBlocks);
-        freeBlocksStatus.set(0, amountOfBlocks - 1, true);
+        freeBlocksStatus.set(0, amountOfBlocks, true);
         AllocatedBlock[] allocatedBlocks = IntStream.range(0, amountOfBlocks)
                 .mapToObj(index -> new AllocatedBlockImpl(index, blockLength))
                 .toArray(AllocatedBlock[]::new);
@@ -150,7 +156,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
         AllocatorState newState = new AllocatorState(oldState.getBlockLength(),
                 oldState.getAmountOfBlocks(),
                 oldState.getFreeBlocksStatus(),
-                oldState.getAllocatedBlocks());
+                allocatedBlocks);
         return oldState.equals(newState) ?
                 Mono.empty() :
                 Mono.just(newState);
@@ -166,15 +172,18 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
         AllocatedBlock[] allocatedBlocks = new AllocatedBlock[amountOfBlocks];
         int min = Math.min(oldState.getAmountOfBlocks(), amountOfBlocks);
         int max = Math.max(oldState.getAmountOfBlocks(), amountOfBlocks);
+
         IntStream.range(0, min)
                 .peek(index -> freeBlocksStatus.set(index, oldState.getFreeBlocksStatus().get(index)))
                 .forEach(index -> allocatedBlocks[index] = new AllocatedBlockImpl(
                         oldState.getAllocatedBlocks()[index].getAllocationId(),
                         index,
                         blockLength));
-        freeBlocksStatus.set(min, max, true);
-        IntStream.rangeClosed(min, max)
-                .forEach(index -> allocatedBlocks[index] = new AllocatedBlockImpl(index, blockLength));
+        if (oldState.getAmountOfBlocks() < amountOfBlocks) {
+            freeBlocksStatus.set(min, max, true);
+            IntStream.range(min, max)
+                    .forEach(index -> allocatedBlocks[index] = new AllocatedBlockImpl(index, blockLength));
+        }
         AllocatorState newState = new AllocatorState(blockLength,
                 amountOfBlocks,
                 freeBlocksStatus,
@@ -186,7 +195,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
 
     private Mono<AllocatorState> createNewStateToFreeAllocation(AllocatorState oldState, AllocatedBlock allocatedBlock) {
         BitSet freeBlocksStatus = new BitSet(oldState.getAmountOfBlocks());
-        freeBlocksStatus.set(allocatedBlock.getBlockIndex(), false);
+        freeBlocksStatus.set(allocatedBlock.getBlockIndex(), true);
         AllocatedBlock[] allocatedBlocks = new AllocatedBlock[oldState.getAmountOfBlocks()];
         allocatedBlocks[allocatedBlock.getBlockIndex()] = new AllocatedBlockImpl(allocatedBlock.getBlockIndex(),
                 oldState.getAllocatedBlocks()[allocatedBlock.getBlockIndex()].getBlock(),
@@ -199,14 +208,14 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
             }
         AllocatorState newState = new AllocatorState(oldState.getBlockLength(),
                 oldState.getAmountOfBlocks(),
-                oldState.getFreeBlocksStatus(),
-                oldState.getAllocatedBlocks());
+                freeBlocksStatus,
+                allocatedBlocks);
         return oldState.equals(newState) ?
                 Mono.empty() :
                 Mono.just(newState);
     }
 
-    private Mono<AllocatorState> createNewStateToAllocation(AllocatorState oldState, int freeIndex, int offset, int length) {
+    private Mono<AllocatorState> createNewStateForAllocation(AllocatorState oldState, int freeIndex, int offset, int length) {
         BitSet freeBlocksStatus = new BitSet(oldState.getAmountOfBlocks());
         freeBlocksStatus.set(freeIndex, false);
         AllocatedBlock[] allocatedBlocks = new AllocatedBlock[oldState.getAmountOfBlocks()];
@@ -221,8 +230,8 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
             }
         AllocatorState newState = new AllocatorState(oldState.getBlockLength(),
                 oldState.getAmountOfBlocks(),
-                oldState.getFreeBlocksStatus(),
-                oldState.getAllocatedBlocks());
+                freeBlocksStatus,
+                allocatedBlocks);
         return oldState.equals(newState) ?
                 Mono.empty() :
                 Mono.just(newState);

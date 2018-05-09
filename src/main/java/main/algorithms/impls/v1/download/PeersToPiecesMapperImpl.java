@@ -34,7 +34,7 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
                         .map(bitFieldMessage -> bitFieldMessage.getPiecesStatus())
                         .flatMap(peerPieceStatus -> {
                             List<Integer> pieceList = new ArrayList<>();
-                            for (int i = 0; i < peerPieceStatus.size(); i++)
+                            for (int i = 0; i < peerPieceStatus.length(); i++)
                                 if (peerPieceStatus.get(i))
                                     pieceList.add(i);
                             return Flux.fromIterable(pieceList);

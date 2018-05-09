@@ -74,7 +74,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .map(Status::isCompletedDownloading)
                 .flatMapMany(isCompletedDownloading -> {
                     if (isCompletedDownloading) {
-                        this.piecesStatus.set(0, this.piecesStatus.size());
+                        this.piecesStatus.set(0, this.piecesStatus.length());
                         return Mono.empty();
                     }
                     return peerResponsesFlux;

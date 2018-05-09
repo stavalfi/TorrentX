@@ -99,7 +99,8 @@ public class Utils {
         Utils.deleteDownloadFolder();
 
         BlocksAllocatorImpl.getInstance()
-                .updateAllocations(100, 17_000)
+                .freeAll()
+                .flatMap(__ -> BlocksAllocatorImpl.getInstance().updateAllocations(100, 17_000))
                 .block();
     }
 

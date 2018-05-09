@@ -254,7 +254,7 @@ public class MyStepdefs {
 
         Function<BitFieldMessage, List<Integer>> getCompletedPieces = bitFieldMessage -> {
             List<Integer> completedPieces = new ArrayList<>();
-            for (int i = 0; i < bitFieldMessage.getPiecesStatus().size(); i++)
+            for (int i = 0; i < bitFieldMessage.getPiecesStatus().length(); i++)
                 if (bitFieldMessage.getPiecesStatus().get(i))
                     completedPieces.add(i);
             return completedPieces;
@@ -1185,9 +1185,21 @@ public class MyStepdefs {
     public void allocatorForBlocksWithBytesEach(int amountOfBlocksToAllocate, int blockLength) throws Throwable {
         Utils.removeEverythingRelatedToLastTest();
 
-        BlocksAllocatorImpl.getInstance()
-                .updateAllocations(amountOfBlocksToAllocate, blockLength)
-                .block();
+        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
+
+        blocksAllocator.updateAllocations(amountOfBlocksToAllocate, blockLength)
+                .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getAmountOfBlocks()))
+                .doOnNext(allocatorState -> Assert.assertEquals(blockLength, allocatorState.getBlockLength()))
+                .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getAllocatedBlocks().length))
+                .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getFreeBlocksStatus().length()))
+                .doOnNext(allocatorState -> {
+                    BitSet allBlocksAreFreeStatus = new BitSet(amountOfBlocksToAllocate);
+                    allBlocksAreFreeStatus.set(0, amountOfBlocksToAllocate, true);
+                    Assert.assertEquals(allBlocksAreFreeStatus, allocatorState.getFreeBlocksStatus());
+                })
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
     }
 
     @When("^the application allocate \"([^\"]*)\" blocks from \"([^\"]*)\" threads:$")
@@ -1214,14 +1226,13 @@ public class MyStepdefs {
         BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
 
         Flux.fromIterable(expectedAllocationsList)
-                .flatMap(index -> blocksAllocator.allocate(index, index * index)
-                        .flatMap(allocatedBlock -> blocksAllocator.getLatestState$())
-                        .doOnNext(allocatorState -> {
-                            IntStream.rangeClosed(0, index)
-                                    .peek(i -> Assert.assertEquals(i, allocatorState.getAllocatedBlocks()[i].getOffset()))
-                                    .peek(i -> Assert.assertEquals(i * i, allocatorState.getAllocatedBlocks()[i].getLength()))
-                                    .forEach(i -> Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(i)));
-                        }), threadsAmount)
+                .flatMap(index ->
+                        blocksAllocator.allocate(index + 1, (index + 1) * (index + 1))
+                                .flatMap(allocatedBlock -> blocksAllocator.getLatestState$())
+                                .doOnNext(allocatorState -> IntStream.rangeClosed(0, index)
+                                        .peek(i -> Assert.assertEquals(i + 1, allocatorState.getAllocatedBlocks()[i].getOffset()))
+                                        .peek(i -> Assert.assertEquals((i + 1) * (i + 1), allocatorState.getAllocatedBlocks()[i].getLength()))
+                                        .forEach(i -> Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(i)))), threadsAmount)
                 .as(StepVerifier::create)
                 .expectNextCount(expectedAllocationsList.size())
                 .verifyComplete();
@@ -1281,7 +1292,7 @@ public class MyStepdefs {
                 .getLatestState$()
                 .flatMapMany(allocatorState -> Flux.range(0, allocatorState.getAmountOfBlocks())
                         .doOnNext(index -> Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(index)))
-                        .filter(index -> !allocatorState.getFreeBlocksStatus().get(index)))
+                        .filter(index -> allocatorState.getFreeBlocksStatus().get(index)))
                 .as(StepVerifier::create)
                 .verifyComplete();
     }
@@ -1292,7 +1303,7 @@ public class MyStepdefs {
                 .getLatestState$()
                 .flatMapMany(allocatorState -> Flux.range(0, allocatorState.getAmountOfBlocks())
                         .doOnNext(index -> Assert.assertTrue(allocatorState.getFreeBlocksStatus().get(index)))
-                        .filter(index -> allocatorState.getFreeBlocksStatus().get(index)))
+                        .filter(index -> !allocatorState.getFreeBlocksStatus().get(index)))
                 .as(StepVerifier::create)
                 .verifyComplete();
     }
