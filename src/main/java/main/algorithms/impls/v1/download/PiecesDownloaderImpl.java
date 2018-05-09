@@ -37,7 +37,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
         this.blockDownloader = blockDownloader;
 
         // TODO: note: if we ask for notification AFTER the download started, we will lose the notification.
-        downloadedPiecesFlux = statusChanger.getStatus$()
+        downloadedPiecesFlux = statusChanger.getState$()
                 .filter(Status::isStartedDownload)
                 .take(1)
                 .flatMap(__ -> this.peersToPiecesMapper.getAvailablePiecesFlux())

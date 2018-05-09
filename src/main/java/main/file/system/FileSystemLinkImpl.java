@@ -52,7 +52,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         this.actualFileImplList = createActiveTorrentFileList(torrentInfo, downloadPath);
 
         this.notifyWhenActiveTorrentDeleted = this.statusChanger
-                .getStatus$()
+                .getState$()
                 .filter(Status::isTorrentRemoved)
                 .take(1)
                 .flatMap(__ -> deleteFileOnlyMono())
@@ -61,7 +61,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .single();
 
         this.notifyWhenFilesDeleted = this.statusChanger
-                .getStatus$()
+                .getState$()
                 .filter(Status::isFilesRemoved)
                 .take(1)
                 .flatMap(__ -> deleteActiveTorrentOnlyMono())
@@ -70,7 +70,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .single();
 
         this.savedBlocksFlux = this.statusChanger
-                .getLatestStatus$()
+                .getLatestState$()
                 .map(Status::isCompletedDownloading)
                 .flatMapMany(isCompletedDownloading -> {
                     if (isCompletedDownloading) {
@@ -83,7 +83,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .flatMap(this::writeBlock)
                 .doOnNext(pieceEvent -> {
                     if (minMissingPieceIndex() == -1)
-                        this.statusChanger.changeStatus(StatusType.COMPLETED_DOWNLOADING).block();
+                        this.statusChanger.changeState(StatusType.COMPLETED_DOWNLOADING).block();
                 })
                 // takeUntil will signal the last next signal he received and then he will send complete signal.
                 .takeUntil(pieceEvent -> minMissingPieceIndex() == -1)

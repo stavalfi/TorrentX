@@ -79,6 +79,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
                 .doOnNext(allocatorState -> this.latestStateSink.next(allocatorState))
                 // wait until the new status is updated.
                 .flatMapMany(allocatorState -> getState$().filter(allocatorState::equals))
+                .switchIfEmpty(getLatestState$())
                 .take(1)
                 .single();
     }
@@ -100,6 +101,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
                 // wait until the new status is updated.
                 .flatMapMany(allocatorState -> getState$().filter(allocatorState::equals))
                 .map(allocatorState -> allocatorState.getAllocatedBlocks()[old.getBlockIndex()])
+                .defaultIfEmpty(old)
                 .take(1)
                 .single();
     }
@@ -109,6 +111,7 @@ public class BlocksAllocatorImpl implements BlocksAllocator {
         return getLatestState$().map(allocatorState -> allocatorState.getAllocatedBlocks())
                 .flatMapMany(array -> Flux.fromArray(array))
                 .flatMap(allocatedBlock -> free(allocatedBlock))
+                .switchIfEmpty(getLatestState$())
                 .last();
     }
 

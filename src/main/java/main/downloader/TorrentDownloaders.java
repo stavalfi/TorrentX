@@ -106,7 +106,7 @@ public class TorrentDownloaders {
 
         PeersListener peersListener = new PeersListener(statusChanger);
 
-        Flux<Link> searchingPeers$ = statusChanger.getStatus$()
+        Flux<Link> searchingPeers$ = statusChanger.getState$()
                 .filter(Status::isStartedSearchingPeers)
                 .take(1)
                 .flatMap(__ ->

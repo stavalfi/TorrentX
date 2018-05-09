@@ -28,13 +28,17 @@ public class RequestMessage extends PeerMessage {
         assert 0 <= begin;
         assert 0 <= blockLength;
 
-        this.index = index;
-        this.begin = PieceMessage.fixBlockBegin(pieceLength, begin);
-        Integer maxAllocatedBlockSize = BlocksAllocatorImpl.getInstance()
+        assert begin == PieceMessage.fixBlockBegin(pieceLength, begin);
+        int maxAllocatedBlockSize = BlocksAllocatorImpl.getInstance()
                 .getLatestState$()
                 .map(AllocatorState::getBlockLength)
                 .block();
-        this.blockLength = PieceMessage.fixBlockLength(pieceLength, begin, blockLength, maxAllocatedBlockSize);
+        assert blockLength ==
+                PieceMessage.fixBlockLength(pieceLength, begin, blockLength, maxAllocatedBlockSize);
+
+        this.index = index;
+        this.begin = begin;
+        this.blockLength = blockLength;
     }
 
     @Override

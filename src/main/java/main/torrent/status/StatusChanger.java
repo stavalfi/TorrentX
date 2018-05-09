@@ -7,51 +7,48 @@ import reactor.core.publisher.Mono;
 
 public class StatusChanger {
 
-    private FluxSink<Status> latestStatusSink;
-    private Flux<Status> latestStatus$;
+    private FluxSink<Status> latestStateSink;
+    private Flux<Status> latestState$;
     private Flux<Status> history$;
 
     public StatusChanger(Status initialStatus) {
-        this.latestStatus$ = Flux.<Status>create(sink -> this.latestStatusSink = sink)
+        this.latestState$ = Flux.<Status>create(sink -> this.latestStateSink = sink)
                 .publishOn(App.MyScheduler)
                 .replay(1)
                 .autoConnect(0);
 
-        this.latestStatusSink.next(initialStatus);
+        this.latestStateSink.next(initialStatus);
 
-        this.history$ = this.latestStatus$.replay(10) // how much statuses to save.
+        this.history$ = this.latestState$.replay(10) // how much statuses to save.
                 .autoConnect(0);
     }
 
-    public Mono<Status> getLatestStatus$() {
-        return latestStatus$.take(1)
+    public Mono<Status> getLatestState$() {
+        return latestState$.take(1)
                 .single();
     }
 
-    public Flux<Status> getStatus$() {
-        return latestStatus$;
+    public Flux<Status> getState$() {
+        return latestState$;
     }
 
     public Flux<Status> getHistory$() {
         return history$;
     }
 
-    public Mono<Status> changeStatus(StatusType change) {
+    public Mono<Status> changeState(StatusType change) {
         // TODO: replace this shit with something better.
-        return this.latestStatus$
-                .take(1)
-                .single()
-                .flatMapMany(lastStatus -> {
-                    Status newStatus = changeStatus(lastStatus, change);
-                    if (lastStatus.equals(newStatus))
-                        return Mono.empty();
-                    this.latestStatusSink.next(newStatus);
-                    return Mono.just(newStatus)
-                            // we need to assert that the new state is available.
-                            .flatMapMany(status -> this.latestStatus$)
-                            // status == "lastStatus" or "newStatus". there is no other option.
-                            .filter(status -> status.equals(newStatus));
-                })
+        return getLatestState$().flatMapMany(lastStatus -> {
+            Status newStatus = changeState(lastStatus, change);
+            if (lastStatus.equals(newStatus))
+                return Mono.empty();
+            this.latestStateSink.next(newStatus);
+            return Mono.just(newStatus)
+                    // we need to assert that the new state is available.
+                    .flatMapMany(status -> this.latestState$)
+                    // status == "lastStatus" or "newStatus". there is no other option.
+                    .filter(status -> status.equals(newStatus));
+        }).switchIfEmpty(getLatestState$())
                 .take(1)
                 .single();
     }
@@ -64,7 +61,7 @@ public class StatusChanger {
      * @param change     what to change in the status.
      * @return the new status.
      */
-    private Status changeStatus(Status lastStatus, StatusType change) {
+    private Status changeState(Status lastStatus, StatusType change) {
         switch (change) {
             case START_DOWNLOAD:
                 if (!lastStatus.isStartedDownload() &&

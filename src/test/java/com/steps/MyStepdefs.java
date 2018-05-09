@@ -283,7 +283,7 @@ public class MyStepdefs {
                         .take(1)
                         .single();
 
-        torrentDownloader.getStatusChanger().changeStatus(StatusType.START_UPLOAD).block();
+        torrentDownloader.getStatusChanger().changeState(StatusType.START_UPLOAD).block();
 
         StepVerifier.create(receiveSinglePieceMono)
                 .expectNextCount(1)
@@ -639,8 +639,8 @@ public class MyStepdefs {
         // for recording all the peers without blocking the main thread.
         peersFromResponsesMono.subscribe();
 
-        torrentDownloader.getStatusChanger().changeStatus(StatusType.START_DOWNLOAD).block();
-        torrentDownloader.getStatusChanger().changeStatus(StatusType.START_UPLOAD).block();
+        torrentDownloader.getStatusChanger().changeState(StatusType.START_DOWNLOAD).block();
+        torrentDownloader.getStatusChanger().changeState(StatusType.START_UPLOAD).block();
 
         List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
         List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
@@ -705,49 +705,49 @@ public class MyStepdefs {
         changeStatusTypeList.forEach(torrentStatusType -> {
             switch (torrentStatusType) {
                 case START_DOWNLOAD:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.START_DOWNLOAD).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.START_DOWNLOAD).block();
                     break;
                 case START_UPLOAD:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.START_UPLOAD).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.START_UPLOAD).block();
                     break;
                 case PAUSE_DOWNLOAD:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.PAUSE_DOWNLOAD).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.PAUSE_DOWNLOAD).block();
                     break;
                 case RESUME_DOWNLOAD:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.RESUME_DOWNLOAD).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.RESUME_DOWNLOAD).block();
                     break;
                 case PAUSE_UPLOAD:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.PAUSE_UPLOAD).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.PAUSE_UPLOAD).block();
                     break;
                 case RESUME_UPLOAD:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.RESUME_UPLOAD).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.RESUME_UPLOAD).block();
                     break;
                 case COMPLETED_DOWNLOADING:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.COMPLETED_DOWNLOADING).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.COMPLETED_DOWNLOADING).block();
                     break;
                 case REMOVE_TORRENT:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.REMOVE_TORRENT).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.REMOVE_TORRENT).block();
                     break;
                 case REMOVE_FILES:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.REMOVE_FILES).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.REMOVE_FILES).block();
                     break;
                 case START_LISTENING_TO_INCOMING_PEERS:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.START_LISTENING_TO_INCOMING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.START_LISTENING_TO_INCOMING_PEERS).block();
                     break;
                 case RESUME_LISTENING_TO_INCOMING_PEERS:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.RESUME_LISTENING_TO_INCOMING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.RESUME_LISTENING_TO_INCOMING_PEERS).block();
                     break;
                 case PAUSE_LISTENING_TO_INCOMING_PEERS:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
                     break;
                 case START_SEARCHING_PEERS:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.START_SEARCHING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.START_SEARCHING_PEERS).block();
                     break;
                 case RESUME_SEARCHING_PEERS:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.RESUME_SEARCHING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.RESUME_SEARCHING_PEERS).block();
                     break;
                 case PAUSE_SEARCHING_PEERS:
-                    this.actualLastStatus = statusChanger.changeStatus(StatusType.PAUSE_SEARCHING_PEERS).block();
+                    this.actualLastStatus = statusChanger.changeState(StatusType.PAUSE_SEARCHING_PEERS).block();
                     break;
             }
         });
@@ -776,7 +776,7 @@ public class MyStepdefs {
                 expectedStatusTypeList.contains(StatusType.RESUME_SEARCHING_PEERS));
 
         // test with the status we received from the "last-status-mono"
-        Assert.assertEquals(expectedFinalStatus, statusChanger.getLatestStatus$().block());
+        Assert.assertEquals(expectedFinalStatus, statusChanger.getLatestState$().block());
         // test with the actual last status we received in the last time we tried to change the status
         if (this.actualLastStatus != null)
             Assert.assertEquals(expectedFinalStatus, this.actualLastStatus);
@@ -825,10 +825,10 @@ public class MyStepdefs {
                 .single();
 
         // my application start listening for new peers.
-        statusChanger.changeStatus(StatusType.START_LISTENING_TO_INCOMING_PEERS).block();
+        statusChanger.changeState(StatusType.START_LISTENING_TO_INCOMING_PEERS).block();
 
         // listen for incoming request messages and response to them.
-        statusChanger.changeStatus(StatusType.START_UPLOAD).block();
+        statusChanger.changeState(StatusType.START_UPLOAD).block();
 
         // wait until the app will start listen for new incoming peers
         // and wait until torrent-status signal "RESUME_LISTENING_TO_INCOMING_PEERS".

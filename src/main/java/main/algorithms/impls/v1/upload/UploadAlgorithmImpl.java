@@ -42,7 +42,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                                 torrentInfo.getPieceLength(pieceEvent.getReceivedPiece().getIndex())));
 
         this.uploadedBlocksFlux = this.statusChanger
-                .getStatus$()
+                .getState$()
                 .filter(Status::isStartedUpload)
                 .take(1)
                 .flatMap(__ -> this.peersCommunicatorFlux)
@@ -51,7 +51,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                         // notifyWhenStartUploading() thread. Watch out.
                         peersCommunicator.receivePeerMessages().getRequestMessageResponseFlux()
                                 .filter(requestMessage -> this.fileSystemLink.havePiece(requestMessage.getIndex()))
-                                .flatMap(requestMessage -> this.statusChanger.getStatus$()
+                                .flatMap(requestMessage -> this.statusChanger.getState$()
                                         .filter(Status::isUploading)
                                         .take(1)
                                         .flatMap(__ -> BlocksAllocatorImpl.getInstance().allocate(0, requestMessage.getBlockLength()))

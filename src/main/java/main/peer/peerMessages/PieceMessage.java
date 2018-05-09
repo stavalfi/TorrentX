@@ -1,8 +1,6 @@
 package main.peer.peerMessages;
 
 import main.file.system.AllocatedBlock;
-import main.file.system.AllocatorState;
-import main.file.system.BlocksAllocatorImpl;
 import main.peer.Peer;
 import main.peer.SendMessages;
 import reactor.core.publisher.Mono;
@@ -25,15 +23,14 @@ public class PieceMessage extends PeerMessage {
     public PieceMessage(Peer from, Peer to, int index, int begin,
                         AllocatedBlock allocatedBlock, int pieceLength) {
         super(to, from);
+
+        assert begin == fixBlockBegin(pieceLength, begin);
+        assert allocatedBlock.getLength() ==
+                fixBlockLength(pieceLength, begin, allocatedBlock.getLength(), allocatedBlock.getBlock().length);
+
         this.index = index;
-        this.begin = fixBlockBegin(pieceLength, begin);
-        this.allocatedBlock = BlocksAllocatorImpl.getInstance()
-                .getLatestState$()
-                .map(AllocatorState::getBlockLength)
-                .map(allocatedBlockLength -> fixBlockLength(pieceLength, begin, allocatedBlock.getLength(), allocatedBlockLength))
-                .flatMap(fixedBlockLength -> BlocksAllocatorImpl.getInstance()
-                        .updateAllocatedBlock(allocatedBlock, allocatedBlock.getOffset(), fixedBlockLength))
-                .block();
+        this.begin = begin;
+        this.allocatedBlock = allocatedBlock;
     }
 
     public static int fixBlockBegin(int pieceLength, int oldBegin) {

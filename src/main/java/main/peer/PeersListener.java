@@ -35,7 +35,7 @@ public class PeersListener {
     public PeersListener(StatusChanger statusChanger, Integer tcpPort) {
         this.tcpPort = tcpPort;
         this.peersConnectedToMeFlux =
-                statusChanger.getStatus$()
+                statusChanger.getState$()
                         .filter(Status::isStartedListeningToIncomingPeers)
                         .take(1)
                         // Important note: While we are waiting for new connections,
@@ -51,7 +51,7 @@ public class PeersListener {
                                         // TODO: do something with this shit
                                         //e.printStackTrace();
                                         sink.error(e);
-                                        statusChanger.changeStatus(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
+                                        statusChanger.changeState(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
                                         return;
                                     }
                                     while (!this.listenToPeerConnection.isClosed() && !sink.isCancelled())
@@ -71,7 +71,7 @@ public class PeersListener {
                                             return;
                                         }
                                 }))
-                        .flatMap(link -> statusChanger.getLatestStatus$()
+                        .flatMap(link -> statusChanger.getLatestState$()
                                 .doOnNext(status -> {
                                     if (!status.isListeningToIncomingPeers())
                                         link.closeConnection();
