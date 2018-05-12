@@ -141,9 +141,10 @@ public class TorrentInfo {
                 "Info_hash: " + this.torrent.getInfo_hash() + "\n" +
                 "Name: " + this.torrent.getName() + "\n" +
                 "Piece Length: " + this.torrent.getPieceLength() + "\n" +
+                "Last Piece Length: " + this.getPieceLength(this.torrent.getPieces().size() - 1) + "\n" +
                 "Pieces: " + this.torrent.getPieces().size() + "\n" +
                 "Total Size: " + this.getTotalSize() + "\n" +
-                "Is Single File Torrent: " + this.torrent.isSingleFileTorrent() + "\n" +
+                "Is Single File Torrent: " + this.isSingleFileTorrent() + "\n" +
                 "File List:\n" + fileList + "\n" +
                 "Tracker List: \n" + trackers;
     }

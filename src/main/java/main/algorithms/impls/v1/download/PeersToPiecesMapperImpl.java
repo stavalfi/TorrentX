@@ -29,16 +29,17 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
                         .map(haveMessage -> haveMessage.getPieceIndex());
 
         Flux<Integer> piecesFromBitFieldMessageFlux =
-                this.linkFlux.map(link -> link.receivePeerMessages())
-                        .flatMap(receivePeerMessages -> receivePeerMessages.getBitFieldMessageResponseFlux())
-                        .map(bitFieldMessage -> bitFieldMessage.getPiecesStatus())
-                        .flatMap(peerPieceStatus -> {
-                            List<Integer> pieceList = new ArrayList<>();
-                            for (int i = 0; i < peerPieceStatus.length(); i++)
-                                if (peerPieceStatus.get(i))
-                                    pieceList.add(i);
-                            return Flux.fromIterable(pieceList);
-                        });
+                this.linkFlux.flatMap(link ->
+                        link.receivePeerMessages()
+                                .getBitFieldMessageResponseFlux()
+                                .map(bitFieldMessage -> bitFieldMessage.getPiecesStatus())
+                                .flatMap(peerPieceStatus -> {
+                                    List<Integer> pieceList = new ArrayList<>();
+                                    for (int i = 0; i < link.getTorrentInfo().getPieces().size(); i++)
+                                        if (peerPieceStatus.get(i))
+                                            pieceList.add(i);
+                                    return Flux.fromIterable(pieceList);
+                                }));
 
         this.availablePiecesFlux =
                 Flux.merge(piecesFromHaveMessageFlux, piecesFromBitFieldMessageFlux)

@@ -1,7 +1,5 @@
 package main.peer.peerMessages;
 
-import main.file.system.AllocatorState;
-import main.file.system.BlocksAllocatorImpl;
 import main.peer.Peer;
 
 import java.nio.ByteBuffer;
@@ -21,20 +19,12 @@ public class RequestMessage extends PeerMessage {
      * @param begin       integer (4 bytes) specifying the zero-based byte offset within the piece.
      * @param blockLength integer (4 bytes) specifying the requested length.
      */
-    public RequestMessage(Peer from, Peer to, int index, int begin, int blockLength, int pieceLength) {
+    public RequestMessage(Peer from, Peer to, int index, int begin, int blockLength) {
         super(to, from);
 
         assert 0 <= index;
         assert 0 <= begin;
         assert 0 <= blockLength;
-
-        assert begin == PieceMessage.fixBlockBegin(pieceLength, begin);
-        int maxAllocatedBlockSize = BlocksAllocatorImpl.getInstance()
-                .getLatestState$()
-                .map(AllocatorState::getBlockLength)
-                .block();
-        assert blockLength ==
-                PieceMessage.fixBlockLength(pieceLength, begin, blockLength, maxAllocatedBlockSize);
 
         this.index = index;
         this.begin = begin;

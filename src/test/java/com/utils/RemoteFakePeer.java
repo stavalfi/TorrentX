@@ -1,6 +1,5 @@
 package com.utils;
 
-import main.file.system.AllocatedBlock;
 import main.file.system.BlocksAllocatorImpl;
 import main.peer.Link;
 import reactor.core.publisher.Mono;
@@ -36,12 +35,13 @@ public class RemoteFakePeer extends Link {
                         case VALID:
                         case RESPOND_WITH_DELAY_100:
                         case RESPOND_WITH_DELAY_3000:
-                            AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                                    .allocate(0, requestMessage.getBlockLength())
-                                    .block();
-                            return this.sendMessages()
-                                    .sendPieceMessage(requestMessage.getIndex(), requestMessage.getBegin(), allocatedBlock)
-                                    .doOnTerminate(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock));
+                            int pieceLength = super.getTorrentInfo().getPieceLength(requestMessage.getIndex());
+                            return BlocksAllocatorImpl.getInstance()
+                                    // create a piece message with random bytes.
+                                    .createPieceMessage(super.getMe(), super.getPeer(),
+                                            requestMessage.getIndex(), requestMessage.getBegin(),
+                                            requestMessage.getBlockLength(), pieceLength)
+                                    .flatMap(pieceMessage -> this.sendMessages().sendPieceMessage(pieceMessage));
                     }
                     // we will never be here...
                     return Mono.empty();

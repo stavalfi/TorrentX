@@ -25,7 +25,7 @@ class TrackerCommunication {
 	Mono<Response> communicateMono(Request request, Function<ByteBuffer, Response> createResponse) {
 		return sendRequestMono(request)
 				// before we map to response bytes to response object, check if the response is ErrorResponse
-				// by actionNumber. If yes, create error-signal, else forward the signal.
+				// by actionNumber. If yes, waitForMessage error-signal, else forward the signal.
 				.flatMap((DatagramSocket trackerSocket) ->
 						receiveResponseMono(trackerSocket)
 								.handle((ByteBuffer response, SynchronousSink<ByteBuffer> sink) -> {

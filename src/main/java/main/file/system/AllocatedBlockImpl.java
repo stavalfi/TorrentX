@@ -79,8 +79,6 @@ public class AllocatedBlockImpl implements AllocatedBlock {
     public String toString() {
         return "AllocatedBlock{" +
                 "blockIndex=" + blockIndex +
-                ", blockLength=" + block.length +
-                ", offset=" + offset +
                 ", length=" + length +
                 '}';
     }

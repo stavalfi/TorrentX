@@ -74,16 +74,18 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .map(Status::isCompletedDownloading)
                 .flatMapMany(isCompletedDownloading -> {
                     if (isCompletedDownloading) {
-                        this.piecesStatus.set(0, this.piecesStatus.length());
+                        this.piecesStatus.set(0, torrentInfo.getPieces().size());
                         return Mono.empty();
                     }
                     return peerResponsesFlux;
                 })
                 .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
                 .flatMap(this::writeBlock)
-                .doOnNext(pieceEvent -> {
+                .flatMap(pieceEvent -> {
                     if (minMissingPieceIndex() == -1)
-                        this.statusChanger.changeState(StatusType.COMPLETED_DOWNLOADING).block();
+                        return this.statusChanger.changeState(StatusType.COMPLETED_DOWNLOADING)
+                                .map(__ -> pieceEvent);
+                    return Mono.just(pieceEvent);
                 })
                 // takeUntil will signal the last next signal he received and then he will send complete signal.
                 .takeUntil(pieceEvent -> minMissingPieceIndex() == -1)
@@ -192,37 +194,39 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     }
 
     @Override
-    public Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage, AllocatedBlock allocatedBlock) {
-        assert requestMessage.getBlockLength() == allocatedBlock.getLength();
-
+    public Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage) {
         if (!havePiece(requestMessage.getIndex()))
             return Mono.error(new PieceNotDownloadedYetException(requestMessage.getIndex()));
 
-        return Mono.create(sink -> {
-            long from = super.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
-            long to = from + requestMessage.getBlockLength();
-            int freeIndexInResultArray = allocatedBlock.getOffset();
+        int pieceLength = super.getPieceLength(requestMessage.getIndex());
 
-            for (ActualFile actualFile : this.actualFileImplList) {
-                if (from != to)
-                    if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
-                        // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
-                        int howMuchToReadFromThisFile = (int) Math.min(actualFile.getTo() - from, to - from);
-                        try {
-                            actualFile.readBlock(from, howMuchToReadFromThisFile, allocatedBlock.getBlock(), freeIndexInResultArray);
-                            freeIndexInResultArray += howMuchToReadFromThisFile;
-                        } catch (IOException e) {
-                            sink.error(e);
-                            return;
-                        }
-                        from += howMuchToReadFromThisFile;
+        return BlocksAllocatorImpl.getInstance()
+                .createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
+                        requestMessage.getIndex(), requestMessage.getBegin(),
+                        requestMessage.getBlockLength(), pieceLength)
+                .flatMap(pieceMessage -> {
+                    long from = super.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
+                    long to = from + requestMessage.getBlockLength();
+                    int freeIndexInResultArray = pieceMessage.getAllocatedBlock().getOffset();
+
+                    for (ActualFile actualFile : this.actualFileImplList) {
+                        if (from != to)
+                            if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
+                                // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
+                                int howMuchToReadFromThisFile = (int) Math.min(actualFile.getTo() - from, to - from);
+                                try {
+                                    actualFile.readBlock(from, howMuchToReadFromThisFile,
+                                            pieceMessage.getAllocatedBlock().getBlock(),
+                                            freeIndexInResultArray);
+                                    freeIndexInResultArray += howMuchToReadFromThisFile;
+                                } catch (IOException e) {
+                                    return Mono.error(e);
+                                }
+                                from += howMuchToReadFromThisFile;
+                            }
                     }
-            }
-            PieceMessage pieceMessage = new PieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
-                    requestMessage.getIndex(), requestMessage.getBegin(), allocatedBlock,
-                    super.getPieceLength(requestMessage.getIndex()));
-            sink.success(pieceMessage);
-        });
+                    return Mono.just(pieceMessage);
+                });
     }
 
     private Mono<PieceEvent> writeBlock(PieceMessage pieceMessage) {
@@ -283,7 +287,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 downloadPath + torrentInfo.getName() + File.separator :
                 downloadPath;
 
-        // create activeTorrentFile list
+        // waitForMessage activeTorrentFile list
         long position = 0;
         List<ActualFile> actualFileList = new ArrayList<>();
         for (TorrentFile torrentFile : torrentInfo.getFileList()) {
@@ -311,13 +315,13 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     }
 
     private void createFolders(TorrentInfo torrentInfo, String downloadPath) {
-        // create main folder for the download of the torrent.
+        // waitForMessage main folder for the download of the torrent.
         String mainFolder = !torrentInfo.isSingleFileTorrent() ?
                 downloadPath + torrentInfo.getName() + File.separator :
                 downloadPath;
         createFolder(mainFolder);
 
-        // create sub folders for the download of the torrent
+        // waitForMessage sub folders for the download of the torrent
         torrentInfo.getFileList()
                 .stream()
                 .map(christophedetroyer.torrent.TorrentFile::getFileDirs)

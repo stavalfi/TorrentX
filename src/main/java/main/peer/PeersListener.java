@@ -13,6 +13,7 @@ import main.torrent.status.StatusType;
 import main.tracker.BadResponseException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -32,7 +33,7 @@ public class PeersListener {
         this(statusChanger, AppConfig.getInstance().getMyListeningPort());
     }
 
-    public PeersListener(StatusChanger statusChanger, Integer tcpPort) {
+    PeersListener(StatusChanger statusChanger, Integer tcpPort) {
         this.tcpPort = tcpPort;
         this.peersConnectedToMeFlux =
                 statusChanger.getState$()
@@ -51,7 +52,6 @@ public class PeersListener {
                                         // TODO: do something with this shit
                                         //e.printStackTrace();
                                         sink.error(e);
-                                        statusChanger.changeState(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
                                         return;
                                     }
                                     while (!this.listenToPeerConnection.isClosed() && !sink.isCancelled())
@@ -71,6 +71,9 @@ public class PeersListener {
                                             return;
                                         }
                                 }))
+                        .doOnError(__ -> statusChanger.changeState(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS)
+                                .publishOn(Schedulers.elastic())
+                                .block())
                         .flatMap(link -> statusChanger.getLatestState$()
                                 .doOnNext(status -> {
                                     if (!status.isListeningToIncomingPeers())
@@ -81,6 +84,7 @@ public class PeersListener {
                         .subscribeOn(App.MyScheduler)
                         .publish()
                         .autoConnect(0);
+
     }
 
     private void acceptPeerConnection(Socket peerSocket, FluxSink<Link> sink) {

@@ -25,7 +25,7 @@ public class App {
     private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test" + File.separator;
 
 
-    public static void f5() throws IOException {
+    public static void f5() throws IOException, InterruptedException {
         System.out.println(getTorrentInfo());
     }
 
@@ -65,14 +65,20 @@ public class App {
                         ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
-        torrentDownloader.getStatusChanger().changeStatus(StatusType.START_DOWNLOAD).block();
-        torrentDownloader.getStatusChanger().changeStatus(StatusType.START_UPLOAD).block();
+        torrentDownloader.getStatusChanger()
+                .changeState(StatusType.START_DOWNLOAD)
+                .publishOn(Schedulers.elastic())
+                .block();
+        torrentDownloader.getStatusChanger()
+                .changeState(StatusType.START_UPLOAD)
+                .publishOn(Schedulers.elastic())
+                .block();
     }
 
     public static void main(String[] args) throws Exception {
         //Hooks.onOperatorDebug();
         f5();
-        //Thread.sleep(1000 * 1000);
+        Thread.sleep(1000 * 1000);
     }
 
     private static TorrentInfo getTorrentInfo() throws IOException {
@@ -80,7 +86,7 @@ public class App {
                 "main" + File.separator +
                 "resources" + File.separator +
                 "torrents" + File.separator +
-                "MyTorrent.torrent";
+                "torrent-file-example1.torrent";
         return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
     }
 }

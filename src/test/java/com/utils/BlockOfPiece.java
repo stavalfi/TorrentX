@@ -4,7 +4,7 @@ import java.util.Objects;
 
 public class BlockOfPiece {
     private int pieceIndex;
-    private int from;
+    private Integer from;
     private Integer length; // if null, then it's until the end of the piece
 
     public BlockOfPiece(int pieceIndex, int from, Integer length) {
@@ -17,7 +17,7 @@ public class BlockOfPiece {
         return pieceIndex;
     }
 
-    public int getFrom() {
+    public Integer getFrom() {
         return from;
     }
 
@@ -31,7 +31,7 @@ public class BlockOfPiece {
         if (!(o instanceof BlockOfPiece)) return false;
         BlockOfPiece that = (BlockOfPiece) o;
         return getPieceIndex() == that.getPieceIndex() &&
-                getFrom() == that.getFrom() &&
+                Objects.equals(getFrom(), that.getFrom()) &&
                 Objects.equals(getLength(), that.getLength());
     }
 

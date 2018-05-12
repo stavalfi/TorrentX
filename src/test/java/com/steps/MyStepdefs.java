@@ -201,8 +201,7 @@ public class MyStepdefs {
 
 
         Mono<List<SendMessagesNotifications>> sentMessagesMono = Flux.fromIterable(messageToSendList)
-                .flatMap(peerMessageType ->
-                        Utils.sendFakeMessage(fakePeer, peerMessageType))
+                .flatMap(peerMessageType -> Utils.sendFakeMessage(fakePeer, peerMessageType))
                 .collectList();
 
         if (expectResponseToEveryRequest)
@@ -254,9 +253,11 @@ public class MyStepdefs {
 
         Function<BitFieldMessage, List<Integer>> getCompletedPieces = bitFieldMessage -> {
             List<Integer> completedPieces = new ArrayList<>();
-            for (int i = 0; i < bitFieldMessage.getPiecesStatus().length(); i++)
-                if (bitFieldMessage.getPiecesStatus().get(i))
-                    completedPieces.add(i);
+            int completedPieceIndex = bitFieldMessage.getPiecesStatus().nextSetBit(0);
+            while (completedPieceIndex != -1) {
+                completedPieces.add(completedPieceIndex);
+                completedPieceIndex++;
+            }
             return completedPieces;
         };
 
@@ -273,9 +274,10 @@ public class MyStepdefs {
                                         .map(bitFieldMessage -> getCompletedPieces.apply(bitFieldMessage))
                                         .flatMap(Flux::fromIterable)
                                         .take(5)
-                                        .flatMap(completedPieceIndex -> peersCommunicator.sendMessages()
-                                                .sendRequestMessage(completedPieceIndex, 0, requestBlockSize)
-                                                .map(sendPeerMessages -> peersCommunicator)))
+                                        .flatMap(completedPieceIndex ->
+                                                peersCommunicator.sendMessages()
+                                                        .sendRequestMessage(completedPieceIndex, 0, requestBlockSize)
+                                                        .map(sendPeerMessages -> peersCommunicator)))
                         .flatMap(peersCommunicator ->
                                 peersCommunicator.receivePeerMessages()
                                         .getPieceMessageResponseFlux()
@@ -297,7 +299,7 @@ public class MyStepdefs {
         // delete everything from the last test.
         Utils.removeEverythingRelatedToLastTest();
 
-        // this will create an activeTorrent object.
+        // this will waitForMessage an activeTorrent object.
         String downloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
         Utils.createDefaultTorrentDownloader(torrentInfo, downloadPath);
     }
@@ -388,34 +390,32 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         BlocksAllocatorImpl.getInstance()
-                .updateAllocations(200, 10_000_000)
+                .updateAllocations(10, 1_000_000)
                 .block();
 
-        StatusChanger statusChanger = new StatusChanger(new Status(
-                true,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false));
+        StatusChanger statusChanger = new StatusChanger(Utils.createDefaultFalseStatus());
 
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
         int amountOfAllocatedBlocks = BlocksAllocatorImpl.getInstance()
                 .getLatestState$()
                 .map(AllocatorState::getAmountOfBlocks)
                 .block();
-        Semaphore semaphore = new Semaphore(amountOfAllocatedBlocks / 2, true);
 
-        ConnectableFlux<PieceMessage> allBlocksMessages$ = Flux.range(0, torrentInfo.getPieces().size())
-                .map(pieceIndex -> new BlockOfPiece(pieceIndex, 0, null))
-                .flatMap(blockOfPiece -> Utils.createRandomPieceMessages(torrentInfo, semaphore, blockOfPiece))
-                .publishOn(App.MyScheduler)
-                .publish();
+        // the permits must be 1 because if not, I may write to the same piece
+        // concurrently and piece counter will not be accurate.
+        Semaphore semaphore = new Semaphore(1, true);
+
+        ConnectableFlux<PieceMessage> allBlocksMessages$ =
+                BlocksAllocatorImpl.getInstance()
+                        .getLatestState$()
+                        .map(AllocatorState::getBlockLength)
+                        .flatMapMany(allocatedBlockLength -> Flux.range(0, torrentInfo.getPieces().size())
+                                .map(pieceIndex -> new BlockOfPiece(pieceIndex, 0, null))
+                                .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength))
+                                .flatMap(blockOfPiece -> Utils.createRandomPieceMessages(torrentInfo, semaphore, blockOfPiece, allocatedBlockLength)))
+                        .doOnNext(pieceMessage -> System.out.println("saving: " + pieceMessage.getIndex() + "," + pieceMessage.getBegin() + "," + pieceMessage.getAllocatedBlock().getLength()))
+                        .publishOn(App.MyScheduler)
+                        .publish();
 
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
@@ -424,11 +424,18 @@ public class MyStepdefs {
 
         Mono<List<Integer>> piecesCompleted1 = fileSystemLink.savedBlockFlux()
                 //.doOnNext(pieceEvent -> System.out.println("block complete:" + pieceEvent))
-                .doOnNext(pieceEvent -> BlocksAllocatorImpl.getInstance().free(pieceEvent.getReceivedPiece().getAllocatedBlock()))
+                .flatMap(pieceEvent ->
+                {
+                    AllocatedBlock allocatedBlock = pieceEvent.getReceivedPiece().getAllocatedBlock();
+                    return BlocksAllocatorImpl.getInstance()
+                            .free(allocatedBlock)
+                            .map(allocatorState -> pieceEvent);
+                })
                 .doOnNext(pieceEvent -> semaphore.release())
                 .filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
                 .map(PieceEvent::getReceivedPiece)
                 .map(PieceMessage::getIndex)
+                .doOnNext(pieceIndex -> System.out.println("saved piece index: " + pieceIndex))
                 .replay()
                 .autoConnect(0)
                 .collectList();
@@ -444,10 +451,10 @@ public class MyStepdefs {
         List<Integer> actual = piecesCompleted2.block();
         Utils.assertListEqualNotByOrder(expected, actual, Integer::equals);
 
-        Assert.assertEquals(fileSystemLink.minMissingPieceIndex(), -1);
+        Assert.assertEquals(-1, fileSystemLink.minMissingPieceIndex());
 
-        // I must create it here because later I need to get the torrentStatusController which was already created here.
-        // If I'm not creating TorrentDownloader object here, I will create 2 different torrentStatusController objects.
+        // I must waitForMessage it here because later I need to get the torrentStatusController which was already created here.
+        // If I'm not creating TorrentDownloader object here, I will waitForMessage 2 different torrentStatusController objects.
         TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
                         fileSystemLink,
@@ -477,14 +484,18 @@ public class MyStepdefs {
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
         Semaphore semaphore = new Semaphore(1, true);
 
-        Flux<PieceMessage> generatedWrittenPieceMessages$ = Flux.fromIterable(blockList)
-                .doOnNext(blockOfPiece -> System.out.println("start saving: " + blockOfPiece))
-                .flatMap((BlockOfPiece blockOfPiece) ->
-                        Utils.createRandomPieceMessages(torrentInfo, semaphore, blockOfPiece))
+        Flux<PieceMessage> generatedWrittenPieceMessages$ = BlocksAllocatorImpl.getInstance()
+                .getLatestState$()
+                .publishOn(Schedulers.elastic())
+                .map(AllocatorState::getBlockLength)
+                .flatMapMany(allocatedBlockLength -> Flux.fromIterable(blockList)
+                        .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength))
+                        .doOnNext(blockOfPiece -> System.out.println("start saving: " + blockOfPiece))
+                        .flatMap((BlockOfPiece blockOfPiece) ->
+                                Utils.createRandomPieceMessages(torrentInfo, semaphore, blockOfPiece, allocatedBlockLength)))
                 .publishOn(App.MyScheduler)
                 .publish()
                 .autoConnect(2);
-
 
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
@@ -505,42 +516,33 @@ public class MyStepdefs {
                 })
                 .doOnNext(pieceMessage -> System.out.println("saved from: " + pieceMessage.getBegin() +
                         ", length: " + pieceMessage.getAllocatedBlock().getLength()))
-                // I must change the thread because I'm going to block it in readFromFile
-                // and reactor doesn't allow to block single or parallel threads.
-                .publishOn(Schedulers.elastic())
-                .map(expectedPieceMessage -> {
-                    RequestMessage requestMessage = new RequestMessage(null, null, expectedPieceMessage.getIndex(),
-                            expectedPieceMessage.getBegin(), expectedPieceMessage.getAllocatedBlock().getLength(),
-                            torrentInfo.getPieceLength(expectedPieceMessage.getIndex()));
-                    AllocatedBlock actualWrittenBytes = Utils.readFromFile(torrentInfo, fullDownloadPath, requestMessage);
-                    PieceMessage writtenPieceMessage = new PieceMessage(null, null, requestMessage.getIndex(),
-                            requestMessage.getBegin(), actualWrittenBytes, torrentInfo.getPieceLength(requestMessage.getIndex()));
-                    System.out.println(
-                            "assert actualPieceFromFS: " +
-                                    "saved from: " + writtenPieceMessage.getBegin() +
-                                    ", length: " + writtenPieceMessage.getAllocatedBlock().getLength() +
-                                    " <----> generatedPieceMessage: " +
-                                    "saved from: " + expectedPieceMessage.getBegin() +
-                                    ", length: " + expectedPieceMessage.getAllocatedBlock().getLength());
-                    Assert.assertEquals("the pieces we read from filesystem are not equal to the pieces we tried to save to the filesystem.",
-                            expectedPieceMessage.getAllocatedBlock(), writtenPieceMessage.getAllocatedBlock());
-
-                    // free the write and read blocks.
-                    BlocksAllocatorImpl.getInstance().free(expectedPieceMessage.getAllocatedBlock());
-                    BlocksAllocatorImpl.getInstance().free(writtenPieceMessage.getAllocatedBlock());
-
-                    // tell upstream that we freed the buffer and he can give us one more signal (if he have any left)
-                    semaphore.release();
-
-                    return writtenPieceMessage;
-                })
-                .doOnNext(pieceMessage -> System.out.println("reading from: " + pieceMessage.getBegin() +
-                        ", length: " + pieceMessage.getAllocatedBlock().getLength()))
+                .flatMap(expectedPieceMessage -> BlocksAllocatorImpl.getInstance()
+                        .createRequestMessage(null, null, expectedPieceMessage.getIndex(),
+                                expectedPieceMessage.getBegin(),
+                                expectedPieceMessage.getAllocatedBlock().getLength(),
+                                torrentInfo.getPieceLength(expectedPieceMessage.getIndex()))
+                        .flatMap(requestMessage -> Utils.readFromFile(torrentInfo, fullDownloadPath, requestMessage)
+                                .doOnNext(actualPieceMessage -> {
+                                    System.out.println(
+                                            "assert actualPieceFromFS: " +
+                                                    "saved from: " + actualPieceMessage.getBegin() +
+                                                    ", length: " + actualPieceMessage.getAllocatedBlock().getLength() +
+                                                    " <----> generatedPieceMessage: " +
+                                                    "saved from: " + expectedPieceMessage.getBegin() +
+                                                    ", length: " + expectedPieceMessage.getAllocatedBlock().getLength());
+                                    Assert.assertEquals("the pieces we read from filesystem are not equal to the pieces we tried to save to the filesystem.",
+                                            expectedPieceMessage.getAllocatedBlock(), actualPieceMessage.getAllocatedBlock());
+                                })
+                                // free the write and read blocks.
+                                .flatMap(actualPieceMessage -> BlocksAllocatorImpl.getInstance().free(actualPieceMessage.getAllocatedBlock()))
+                                .flatMap(__ -> BlocksAllocatorImpl.getInstance().free(expectedPieceMessage.getAllocatedBlock()))))
+                // tell upstream that we freed the buffer and he can give us one more signal (if he have any left)
+                .doOnNext(__ -> semaphore.release())
                 .collectList()
                 .block();
 
-        // I must create it here because later I need to get the torrentStatusController which was already created here.
-        // If I'm not creating TorrentDownloader object here, I will create 2 different torrentStatusController objects.
+        // I must waitForMessage it here because later I need to get the torrentStatusController which was already created here.
+        // If I'm not creating TorrentDownloader object here, I will waitForMessage 2 different torrentStatusController objects.
         TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
                         fileSystemLink,
@@ -839,17 +841,18 @@ public class MyStepdefs {
                 .connectToPeerMono(me)
                 .block();
 
-        this.requestsFromFakePeerToMeListMono = fakePeerToMeLink.sendMessages().sendInterestedMessage()
-                // sendMessage all requests from fake peer to me.
-                .flatMapMany(__ -> Flux.fromIterable(peerRequestBlockList))
-                .flatMap(blockOfPiece -> {
-                    if (blockOfPiece.getLength() != null)
-                        return fakePeerToMeLink.sendMessages().sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(),
-                                blockOfPiece.getLength());
-                    long blockLength = torrentInfo.getPieceLength(blockOfPiece.getPieceIndex());
-                    return fakePeerToMeLink.sendMessages().sendRequestMessage(blockOfPiece.getPieceIndex(),
-                            blockOfPiece.getFrom(), (int) (blockLength - blockOfPiece.getFrom()));
-                })
+        this.requestsFromFakePeerToMeListMono = fakePeerToMeLink.sendMessages()
+                .sendInterestedMessage()
+                .flatMapMany(__ -> BlocksAllocatorImpl.getInstance()
+                        .getLatestState$()
+                        .map(AllocatorState::getBlockLength)
+                        .flatMapMany(allocatedBlockLength ->
+                                // sendMessage all requests from fake peer to me.
+                                Flux.fromIterable(peerRequestBlockList)
+                                        .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength))))
+                .flatMap(blockOfPiece -> fakePeerToMeLink.sendMessages()
+                        .sendRequestMessage(blockOfPiece.getPieceIndex(),
+                                blockOfPiece.getFrom(), blockOfPiece.getLength()))
                 .collectList()
                 .doOnNext(requestList -> {
                     Assert.assertEquals("We sent less requests then expected.",
@@ -886,8 +889,24 @@ public class MyStepdefs {
                 .collect(Collectors.toSet())
                 .block();
 
-        Set<BlockOfPiece> expectedBlockFromMeSet = expectedBlockFromMeList.stream()
-                .collect(Collectors.toSet());
+        Set<BlockOfPiece> expectedBlockFromMeSet = BlocksAllocatorImpl.getInstance()
+                .getLatestState$()
+                .map(AllocatorState::getBlockLength)
+                .flatMapMany(allocatedBlockLength ->
+                        Flux.fromIterable(expectedBlockFromMeList)
+                                .map(blockOfPiece -> {
+                                    int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
+                                            blockOfPiece.getPieceIndex() :
+                                            torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
+
+                                    int pieceLength = torrentInfo.getPieceLength(pieceIndex);
+                                    int blockLength = (blockOfPiece.getLength() == null || blockOfPiece.getLength() > pieceLength) ?
+                                            pieceLength - blockOfPiece.getFrom() :
+                                            blockOfPiece.getLength() == -1 ? allocatedBlockLength : blockOfPiece.getLength() - blockOfPiece.getFrom();
+                                    return new BlockOfPiece(pieceIndex, blockOfPiece.getFrom(), blockLength);
+                                }))
+                .collect(Collectors.toSet())
+                .block();
 
         // assert that both the list are equal.
         Assert.assertEquals(expectedBlockFromMeSet, actualBlockFromMeSet);
@@ -1191,7 +1210,7 @@ public class MyStepdefs {
                 .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getAmountOfBlocks()))
                 .doOnNext(allocatorState -> Assert.assertEquals(blockLength, allocatorState.getBlockLength()))
                 .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getAllocatedBlocks().length))
-                .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getFreeBlocksStatus().length()))
+                .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getFreeBlocksStatus().cardinality()))
                 .doOnNext(allocatorState -> {
                     BitSet allBlocksAreFreeStatus = new BitSet(amountOfBlocksToAllocate);
                     allBlocksAreFreeStatus.set(0, amountOfBlocksToAllocate, true);
@@ -1202,73 +1221,29 @@ public class MyStepdefs {
                 .verifyComplete();
     }
 
-    @When("^the application allocate \"([^\"]*)\" blocks from \"([^\"]*)\" threads:$")
-    public void theApplicationAllocateBlocksFromThreads(int amountOfAllocations, int threadsAmount) throws Throwable {
+    @Given("^allocator for \"([^\"]*)\" blocks with allocated-block-length which is bigger than piece: \"([^\"]*)\" for torrent: \"([^\"]*)\":$")
+    public void allocatorForBlocksWithAllocatedBlockLengthWhichIsBiggerThanPieceForTorrent(int amountOfBlocksToAllocate,
+                                                                                           int pieceIndex,
+                                                                                           String torrentFileName) throws Throwable {
+        Utils.removeEverythingRelatedToLastTest();
+
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        int pieceLength = torrentInfo.getPieceLength(pieceIndex);
+
         BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
 
-        Flux.range(0, amountOfAllocations)
-                .flatMap(index -> blocksAllocator.allocate(index, index * index)
-                        .flatMap(allocatedBlock -> blocksAllocator.getLatestState$())
-                        .doOnNext(allocatorState -> {
-                            IntStream.rangeClosed(0, index)
-                                    .peek(i -> Assert.assertEquals(i, allocatorState.getAllocatedBlocks()[i].getOffset()))
-                                    .peek(i -> Assert.assertEquals(i * i, allocatorState.getAllocatedBlocks()[i].getLength()))
-                                    .forEach(i -> Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(i)));
-                        }), threadsAmount)
+        blocksAllocator.updateAllocations(amountOfBlocksToAllocate, pieceLength)
+                .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getAmountOfBlocks()))
+                .doOnNext(allocatorState -> Assert.assertEquals(pieceLength, allocatorState.getBlockLength()))
+                .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getAllocatedBlocks().length))
+                .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getFreeBlocksStatus().cardinality()))
+                .doOnNext(allocatorState -> {
+                    BitSet allBlocksAreFreeStatus = new BitSet(amountOfBlocksToAllocate);
+                    allBlocksAreFreeStatus.set(0, amountOfBlocksToAllocate, true);
+                    Assert.assertEquals(allBlocksAreFreeStatus, allocatorState.getFreeBlocksStatus());
+                })
                 .as(StepVerifier::create)
-                .expectNextCount(amountOfAllocations)
-                .verifyComplete();
-    }
-
-    @When("^the application allocate the following blocks from \"([^\"]*)\" threads:$")
-    public void theApplicationAllocateTheFollowingBlocksFromThreads(int threadsAmount,
-                                                                    List<Integer> expectedAllocationsList) throws Throwable {
-        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
-
-        Flux.fromIterable(expectedAllocationsList)
-                .flatMap(index ->
-                        blocksAllocator.allocate(index + 1, (index + 1) * (index + 1))
-                                .flatMap(allocatedBlock -> blocksAllocator.getLatestState$())
-                                .doOnNext(allocatorState -> IntStream.rangeClosed(0, index)
-                                        .peek(i -> Assert.assertEquals(i + 1, allocatorState.getAllocatedBlocks()[i].getOffset()))
-                                        .peek(i -> Assert.assertEquals((i + 1) * (i + 1), allocatorState.getAllocatedBlocks()[i].getLength()))
-                                        .forEach(i -> Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(i)))), threadsAmount)
-                .as(StepVerifier::create)
-                .expectNextCount(expectedAllocationsList.size())
-                .verifyComplete();
-    }
-
-    @Then("^the allocator have the following free blocks:$")
-    public void theAllocatorHaveTheFollowingFreeBlocks(List<Integer> freeBlocksList) throws Throwable {
-        BlocksAllocatorImpl.getInstance()
-                .getLatestState$()
-                .flatMapMany(allocatorState -> Flux.range(0, allocatorState.getAmountOfBlocks())
-                        .doOnNext(index -> {
-                            if (freeBlocksList.contains(index))
-                                Assert.assertTrue(allocatorState.getFreeBlocksStatus().get(index));
-                            else
-                                Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(index));
-                        })
-                        .filter(index -> allocatorState.getFreeBlocksStatus().get(index)))
-                .as(StepVerifier::create)
-                .expectNextCount(freeBlocksList.size())
-                .verifyComplete();
-    }
-
-    @Then("^the allocator have the following used blocks:$")
-    public void theAllocatorHaveTheFollowingUsedBlocks(List<Integer> usedBlocksList) throws Throwable {
-        BlocksAllocatorImpl.getInstance()
-                .getLatestState$()
-                .flatMapMany(allocatorState -> Flux.range(0, allocatorState.getAmountOfBlocks())
-                        .doOnNext(index -> {
-                            if (usedBlocksList.contains(index))
-                                Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(index));
-                            else
-                                Assert.assertTrue(allocatorState.getFreeBlocksStatus().get(index));
-                        })
-                        .filter(index -> !allocatorState.getFreeBlocksStatus().get(index)))
-                .as(StepVerifier::create)
-                .expectNextCount(usedBlocksList.size())
+                .expectNextCount(1)
                 .verifyComplete();
     }
 
@@ -1286,25 +1261,200 @@ public class MyStepdefs {
                 .verifyComplete();
     }
 
-    @Then("^the allocator have the following free blocks - none$")
-    public void theAllocatorHaveTheFollowingFreeBlocksNone() throws Throwable {
-        BlocksAllocatorImpl.getInstance()
-                .getLatestState$()
-                .flatMapMany(allocatorState -> Flux.range(0, allocatorState.getAmountOfBlocks())
-                        .doOnNext(index -> Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(index)))
-                        .filter(index -> allocatorState.getFreeBlocksStatus().get(index)))
-                .as(StepVerifier::create)
+    private Flux<AllocatorState> allocatorStateFlux;
+    private List<PieceMessage> actualPieceMessageList;
+
+
+    @When("^we create the following piece-messages from \"([^\"]*)\" threads for torrent: \"([^\"]*)\":$")
+    public void weCreateTheFollowingPieceMessagesFromThreadsForTorrent(int threadsAmount, String torrentFileName,
+                                                                       List<BlockOfPiece> blockOfPieceList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
+
+        this.allocatorStateFlux = blocksAllocator.getState$()
+                .replay(blockOfPieceList.size())
+                .autoConnect(0);
+
+        this.actualPieceMessageList = blocksAllocator.getLatestState$()
+                .map(AllocatorState::getBlockLength)
+                .flatMapMany(allocatedBlockLength ->
+                        Flux.fromIterable(blockOfPieceList)
+                                .map(oldBlockOfPiece -> {
+                                    BlockOfPiece fixedBlockOfPiece = Utils.fixBlockOfPiece(oldBlockOfPiece, torrentInfo, allocatedBlockLength);
+                                    System.out.println("oldBlockOfPiece: " + oldBlockOfPiece);
+                                    System.out.println("fixedBlockOfPiece: " + fixedBlockOfPiece);
+                                    System.out.println("------------");
+                                    return fixedBlockOfPiece;
+                                }))
+                .flatMap(blockOfPiece ->
+                        {
+                            int pieceIndex = blockOfPiece.getPieceIndex();
+                            Integer from = blockOfPiece.getFrom();
+                            Integer length = blockOfPiece.getLength();
+                            int pieceLength = torrentInfo.getPieceLength(pieceIndex);
+                            return blocksAllocator.createPieceMessage(null, null, pieceIndex, from, length, pieceLength)
+                                    .subscribeOn(Schedulers.elastic());
+                        }
+                        , threadsAmount)
+                .doOnNext(pieceMessage -> System.out.println("created the following pieceMessage: " + pieceMessage))
+                .collectList()
+                .block();
+    }
+
+    @Then("^we created the following piece-messages for torrent: \"([^\"]*)\":$")
+    public void weCreatedTheFollowingPieceMessagesForTorrent(String torrentFileName,
+                                                             List<BlockOfPiece> blockOfPieceList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
+
+        List<BlockOfPiece> expectedPieceMessageList = blocksAllocator.getLatestState$()
+                .map(AllocatorState::getBlockLength)
+                .flatMapMany(allocatedBlockLength ->
+                        Flux.fromIterable(blockOfPieceList)
+                                .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength)))
+                .collectList()
+                .block();
+
+        List<BlockOfPiece> actualBlockOfPieceList = this.actualPieceMessageList.stream()
+                .map(pieceMessage -> new BlockOfPiece(pieceMessage.getIndex(), pieceMessage.getBegin(),
+                        pieceMessage.getAllocatedBlock().getLength()))
+                .collect(Collectors.toList());
+
+        Utils.assertListEqualNotByOrder(expectedPieceMessageList, actualBlockOfPieceList, BlockOfPiece::equals);
+
+        // check that the states during the allocations are valid:
+
+        Flux.zip(allocatorStateFlux, Flux.fromIterable(this.actualPieceMessageList),
+                (allocatorState, pieceMessage) -> {
+                    int blockIndex = pieceMessage.getAllocatedBlock().getBlockIndex();
+                    Assert.assertEquals(allocatorState.getAllocatedBlocks()[blockIndex], pieceMessage.getAllocatedBlock());
+                    Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(blockIndex));
+                    return pieceMessage;
+                }).as(StepVerifier::create)
+                .expectNextCount(blockOfPieceList.size())
                 .verifyComplete();
     }
 
-    @Then("^the allocator have the following used blocks - none$")
-    public void theAllocatorHaveTheFollowingUsedBlocksNone() throws Throwable {
+    private List<RequestMessage> actualRequestMessageList;
+
+    @When("^we create the following request-messages from \"([^\"]*)\" threads for torrent: \"([^\"]*)\":$")
+    public void weCreateTheFollowingRequestMessagesFromThreadsForTorrent(int threadsAmount, String torrentFileName,
+                                                                         List<BlockOfPiece> blockOfPieceList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
+
+        this.actualRequestMessageList = blocksAllocator.getLatestState$()
+                .map(AllocatorState::getBlockLength)
+                .flatMapMany(allocatedBlockLength ->
+                        Flux.fromIterable(blockOfPieceList)
+                                .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength)))
+                .flatMap(blockOfPiece -> {
+                    int pieceIndex = blockOfPiece.getPieceIndex();
+                    Integer from = blockOfPiece.getFrom();
+                    Integer length = blockOfPiece.getLength();
+                    int pieceLength = torrentInfo.getPieceLength(pieceIndex);
+                    return blocksAllocator.createRequestMessage(null, null, pieceIndex, from, length, pieceLength)
+                            .subscribeOn(Schedulers.elastic());
+                }, threadsAmount)
+                .collectList()
+                .block();
+    }
+
+    @Then("^we created the following request-messages for torrent: \"([^\"]*)\":$")
+    public void weCreatedTheFollowingRequestMessagesForTorrent(String torrentFileName,
+                                                               List<BlockOfPiece> blockOfPieceList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
+
+        List<BlockOfPiece> expectedPieceMessageList = blocksAllocator.getLatestState$()
+                .map(AllocatorState::getBlockLength)
+                .flatMapMany(allocatedBlockLength ->
+                        Flux.fromIterable(blockOfPieceList)
+                                .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength)))
+                .collectList()
+                .block();
+
+        List<BlockOfPiece> actualBlockOfPieceList = this.actualRequestMessageList.stream()
+                .map(requestMessage -> new BlockOfPiece(requestMessage.getIndex(), requestMessage.getBegin(),
+                        requestMessage.getBlockLength()))
+                .collect(Collectors.toList());
+
+        Utils.assertListEqualNotByOrder(expectedPieceMessageList, actualBlockOfPieceList, BlockOfPiece::equals);
+    }
+
+    @Then("^the allocator have \"([^\"]*)\" used blocks$")
+    public void theAllocatorHaveUsedBlocks(int expectedUsedBlocksAmount) throws Throwable {
         BlocksAllocatorImpl.getInstance()
                 .getLatestState$()
-                .flatMapMany(allocatorState -> Flux.range(0, allocatorState.getAmountOfBlocks())
-                        .doOnNext(index -> Assert.assertTrue(allocatorState.getFreeBlocksStatus().get(index)))
-                        .filter(index -> !allocatorState.getFreeBlocksStatus().get(index)))
+                .doOnNext(allocatorState -> {
+                    int actualUsedBlocksAmount = 0;
+                    for (int i = 0; i < allocatorState.getAmountOfBlocks(); i++)
+                        if (!allocatorState.getFreeBlocksStatus().get(i))
+                            actualUsedBlocksAmount++;
+                    Assert.assertEquals(expectedUsedBlocksAmount, actualUsedBlocksAmount);
+                }).as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @Then("^the allocator have \"([^\"]*)\" free blocks$")
+    public void theAllocatorHaveFreeBlocks(int expectedFreeBlocksAmount) throws Throwable {
+        BlocksAllocatorImpl.getInstance()
+                .getLatestState$()
+                .doOnNext(allocatorState -> {
+                    int actualUsedBlocksAmount = 0;
+                    for (int i = 0; i < allocatorState.getAmountOfBlocks(); i++)
+                        if (allocatorState.getFreeBlocksStatus().get(i))
+                            actualUsedBlocksAmount++;
+                    Assert.assertEquals(expectedFreeBlocksAmount, actualUsedBlocksAmount);
+                }).as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @When("^we free the following piece-messages for torrent: \"([^\"]*)\":$")
+    public void weFreeTheFollowingPieceMessagesForTorrent(String torrentFileName,
+                                                          List<BlockOfPiece> blockOfPieceList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
+
+        blocksAllocator.getLatestState$()
+                .map(AllocatorState::getBlockLength)
+                .flatMapMany(allocatedBlockLength ->
+                        Flux.fromIterable(blockOfPieceList)
+                                .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength)))
+                .flatMap(blockOfPiece -> Flux.fromIterable(this.actualPieceMessageList)
+                        .filter(pieceMessage -> pieceMessage.getIndex() == blockOfPiece.getPieceIndex())
+                        .filter(pieceMessage -> pieceMessage.getBegin() == blockOfPiece.getFrom())
+                        .filter(pieceMessage -> pieceMessage.getAllocatedBlock().getLength() == blockOfPiece.getLength())
+                        .single())
+                .flatMap(pieceMessage -> blocksAllocator.free(pieceMessage.getAllocatedBlock())
+                        .map(allocatorState -> allocatorState.getFreeBlocksStatus().get(pieceMessage.getAllocatedBlock().getBlockIndex()))
+                        .doOnNext(isAllocationFreed ->
+                                Assert.assertTrue("allocation wasn't freed: " + pieceMessage, isAllocationFreed)))
                 .as(StepVerifier::create)
+                .expectNextCount(blockOfPieceList.size())
+                .verifyComplete();
+    }
+
+    @When("^we free all piece-messages for torrent: \"([^\"]*)\"$")
+    public void weFreeAllPieceMessagesForTorrent(String torrentFileName) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
+
+        blocksAllocator.freeAll()
+                .doOnNext(allocatorState ->
+                        IntStream.range(0, allocatorState.getAmountOfBlocks())
+                                .forEach(index -> Assert.assertTrue("we freed all blocks but" +
+                                                " this index is not freed: " + index,
+                                        allocatorState.getFreeBlocksStatus().get(index))))
+                .as(StepVerifier::create)
+                .expectNextCount(1)
                 .verifyComplete();
     }
 }

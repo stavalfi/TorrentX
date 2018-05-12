@@ -37,10 +37,9 @@ public interface FileSystemLink {
      * it can't know when to free it.
      *
      * @param requestMessage what to read
-     * @param allocatedBlock where to fill what we read.
      * @return pieceMessage
      */
-    Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage, AllocatedBlock allocatedBlock);
+    Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
 
     Flux<PieceEvent> savedBlockFlux();
 

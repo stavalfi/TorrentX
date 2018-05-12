@@ -116,7 +116,7 @@ public class TorrentDownloaders {
         Flux<Link> peersCommunicatorFlux =
                 Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchingPeers$)
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-                        // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
+                        // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
                         .publish()
                         .autoConnect(0);

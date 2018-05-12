@@ -1,11 +1,12 @@
 package main.peer;
 
 import main.TorrentInfo;
-import main.file.system.AllocatedBlock;
+import main.file.system.BlocksAllocatorImpl;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.DataOutputStream;
 import java.util.BitSet;
@@ -42,12 +43,20 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     }
 
     @Override
-    public Mono<SendMessagesNotifications> sendPieceMessage(int index, int begin,
-                                                            AllocatedBlock allocatedBlock) {
-        PieceMessage pieceMessage = new PieceMessage(this.getMe(), this.getPeer(),
-                index, begin, allocatedBlock, this.torrentInfo.getPieceLength(index));
+    public Mono<SendMessagesNotifications> sendPieceMessage(PieceMessage pieceMessage) {
         return send(pieceMessage)
-                .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(index));
+                .flatMap(pieceEvent -> BlocksAllocatorImpl.getInstance()
+                        .free(pieceMessage.getAllocatedBlock())
+                        .map(__ -> pieceEvent))
+                .doOnError(throwable -> BlocksAllocatorImpl.getInstance()
+                        .free(pieceMessage.getAllocatedBlock())
+                        .publishOn(Schedulers.elastic())
+                        .block())
+                .doOnCancel(() -> BlocksAllocatorImpl.getInstance()
+                        .free(pieceMessage.getAllocatedBlock())
+                        .publishOn(Schedulers.elastic())
+                        .block())
+                .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(pieceMessage.getIndex()));
     }
 
     @Override
@@ -57,8 +66,8 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     }
 
     @Override
-    public Mono<SendMessagesNotifications> sendCancelMessage(int index, int begin, int length) {
-        return send(new CancelMessage(this.getMe(), this.getPeer(), index, begin, length));
+    public Mono<SendMessagesNotifications> sendCancelMessage(int index, int begin, int blockLength) {
+        return send(new CancelMessage(this.getMe(), this.getPeer(), index, begin, blockLength));
     }
 
     @Override
@@ -96,14 +105,11 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     }
 
     @Override
-    public Mono<SendMessagesNotifications> sendRequestMessage(int index, int begin, int length) {
-        RequestMessage requestMessage = new RequestMessage(this.getMe(), this.getPeer(), index, begin, length, this.torrentInfo.getPieceLength(index));
-        return send(requestMessage);
-    }
-
-    @Override
-    public Mono<SendMessagesNotifications> sendRequestMessage(RequestMessage requestMessage) {
-        return send(requestMessage);
+    public Mono<SendMessagesNotifications> sendRequestMessage(int index, int begin, int blockLength) {
+        int pieceLength = this.torrentInfo.getPieceLength(index);
+        return BlocksAllocatorImpl.getInstance()
+                .createRequestMessage(this.getMe(), this.getPeer(), index, begin, blockLength, pieceLength)
+                .flatMap(this::send);
     }
 
     @Override

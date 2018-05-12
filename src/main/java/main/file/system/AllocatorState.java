@@ -5,6 +5,8 @@ import java.util.BitSet;
 import java.util.Objects;
 
 public class AllocatorState {
+//    private static
+//    public long stateTime;
     private int blockLength;
     private int amountOfBlocks;
     private BitSet freeBlocksStatus;

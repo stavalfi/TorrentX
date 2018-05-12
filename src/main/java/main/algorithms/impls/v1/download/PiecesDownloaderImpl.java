@@ -4,9 +4,9 @@ import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
 import main.algorithms.PeersToPiecesMapper;
 import main.algorithms.PiecesDownloader;
+import main.file.system.BlocksAllocatorImpl;
 import main.file.system.FileSystemLink;
 import main.peer.PeerExceptions;
-import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.Status;
 import main.torrent.status.StatusChanger;
 import reactor.core.publisher.Flux;
@@ -74,18 +74,19 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
         return requestBlockFromPosition.flatMap(requestFromPosition ->
                         this.peersToPiecesMapper.peerSupplierFlux(pieceIndex)
                                 .index()
-                                //.doOnNext(link -> System.out.println("trying from: " + link.getT1() + ": " + link.getT2().getPeer()))
-                                .flatMap(link -> {
-                                    // System.out.println("trying to download piece: " + pieceIndex + ", begin: " + requestFromPosition + ", from: (" + link.getT1() + ") " + link.getT2().getPeer());
-                                    RequestMessage requestMessage = new RequestMessage(link.getT2().getMe(), link.getT2().getPeer(),
-                                            pieceIndex, requestFromPosition, requestBlockLength.apply(requestFromPosition),
-                                            torrentInfo.getPieceLength(pieceIndex));
-                                    return this.blockDownloader.downloadBlock(link.getT2(), requestMessage)
-                                            .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty());
-                                    // concurrency = 1 -> how many peers can I connect to the download the same block concurrently.
-                                    // when the download will end, the stream will be canceled using take(1) operator.
-                                    // prefetch = 1 -> the inner stream is a mono so any number is ok.
-                                }, 1, 1)
+                                .flatMap(link -> BlocksAllocatorImpl.getInstance()
+                                                .createRequestMessage(link.getT2().getMe(), link.getT2().getPeer(),
+                                                        pieceIndex, requestFromPosition, requestBlockLength.apply(requestFromPosition),
+                                                        torrentInfo.getPieceLength(pieceIndex))
+                                                .flatMap(requestMessage -> {
+                                                    // System.out.println("trying to download piece: " + pieceIndex + ", begin: " + requestFromPosition + ", from: (" + link.getT1() + ") " + link.getT2().getPeer());
+                                                    return this.blockDownloader.downloadBlock(link.getT2(), requestMessage)
+                                                            .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty());
+                                                }),
+                                        // concurrency = 1 -> how many peers can I connect to the download the same block concurrently.
+                                        // when the download will end, the stream will be canceled using take(1) operator.
+                                        // prefetch = 1 -> the inner stream is a mono so any number is ok.
+                                        1, 1)
                                 .doOnNext(torrentPieceChanged -> System.out.println("success: " + torrentPieceChanged))
                                 // if I can't download this block in this duration,
                                 // I will skip this piece and try to download the next piece.

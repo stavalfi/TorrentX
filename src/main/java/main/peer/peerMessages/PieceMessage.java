@@ -21,37 +21,12 @@ public class PieceMessage extends PeerMessage {
      * @param allocatedBlock allocatedBlock of data, which is a subset of the piece specified by index.
      */
     public PieceMessage(Peer from, Peer to, int index, int begin,
-                        AllocatedBlock allocatedBlock, int pieceLength) {
+                        AllocatedBlock allocatedBlock) {
         super(to, from);
-
-        assert begin == fixBlockBegin(pieceLength, begin);
-        assert allocatedBlock.getLength() ==
-                fixBlockLength(pieceLength, begin, allocatedBlock.getLength(), allocatedBlock.getBlock().length);
 
         this.index = index;
         this.begin = begin;
         this.allocatedBlock = allocatedBlock;
-    }
-
-    public static int fixBlockBegin(int pieceLength, int oldBegin) {
-        return Math.min(oldBegin, pieceLength - 1);
-    }
-
-    // TODO: we didn't take in account the offset of the AllocatedBlock!
-    public static int fixBlockLength(int pieceLength, int begin, int oldBlockLength, int maxAllocatedBlockSize) {
-        assert fixBlockBegin(pieceLength, begin) == begin;
-        int newBlockLength = Math.min(maxAllocatedBlockSize, oldBlockLength);
-
-        // is pieceMessage.getBegin() + newBlockLength overlaps with the range of this piece?
-        if (pieceLength < begin + newBlockLength) {
-            // (1) newBlockLength <= maxAllocatedBlockSize
-            // (1) -> (2) pieceLength - pieceMessage.getBegin() < newBlockLength <= maxAllocatedBlockSize <= Integer.MAX_VALUE
-            // (2) -> (3) pieceLength - pieceMessage.getBegin() < Integer.MAX_VALUE
-            newBlockLength = (int) (pieceLength - begin);
-            // (4) ->  newBlockLength = (pieceLength - pieceMessage.getBegin()) <= pieceLength
-            // (4) -> (5) -> newBlockLength <= pieceLength
-        }
-        return newBlockLength;
     }
 
     @Override

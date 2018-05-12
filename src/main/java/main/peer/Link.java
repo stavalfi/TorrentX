@@ -43,7 +43,8 @@ public class Link {
                 this.peerCurrentStatus,
                 this::closeConnection,
                 dataOutputStream);
-        this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(torrentInfo, this.me, this.peer, this.peerCurrentStatus, dataInputStream);
+        this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(torrentInfo, this.me,
+                this.peer, this.peerCurrentStatus, dataInputStream);
 
         this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
                 this.receiveMessagesNotifications.getPeerMessageResponseFlux(),

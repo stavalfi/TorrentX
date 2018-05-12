@@ -22,7 +22,7 @@ public class ActiveTorrents {
                                                                      Flux<PieceMessage> peerResponsesFlux) {
         // TODO: check if this torrent exist in db.
         // firstly, check if there is an active-torrent exist already.
-        // if yes, return it, else create one using the above Mono: "createActiveTorrentMono"
+        // if yes, return it, else waitForMessage one using the above Mono: "createActiveTorrentMono"
         return findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
                 .flatMap(activeTorrentOptional -> {
                     if (activeTorrentOptional.isPresent())

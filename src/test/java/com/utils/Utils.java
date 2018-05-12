@@ -2,7 +2,6 @@ package com.utils;
 
 import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
-import lombok.SneakyThrows;
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
@@ -100,7 +99,7 @@ public class Utils {
 
         BlocksAllocatorImpl.getInstance()
                 .freeAll()
-                .flatMap(__ -> BlocksAllocatorImpl.getInstance().updateAllocations(100, 17_000))
+                .flatMap(__ -> BlocksAllocatorImpl.getInstance().updateAllocations(2, 1_000_000))
                 .block();
     }
 
@@ -146,7 +145,7 @@ public class Utils {
                         // the tests inside Utils::removeEverythingRelatedToTorrent.
                         .onErrorResume(SocketException.class, throwable -> Flux.empty()), searchingPeers$)
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-                        // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
+                        // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
                         .publish()
                         .autoConnect(0);
@@ -200,7 +199,7 @@ public class Utils {
         Flux<Link> peersCommunicatorFlux =
                 Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchingPeers$)
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-                        // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
+                        // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
                         .publish()
                         .autoConnect(0);
@@ -257,7 +256,7 @@ public class Utils {
         Flux<Link> peersCommunicatorFlux =
                 Flux.merge(incomingPeers$, searchingPeers$)
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-                        // multiple calls to getPeersCommunicatorFromTrackerFlux which create new hot-flux
+                        // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
                         .publish()
                         .autoConnect(0);
@@ -293,18 +292,19 @@ public class Utils {
             case ChokeMessage:
                 return link.sendMessages().sendChokeMessage();
             case PieceMessage:
-                AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                        .allocate(0, 10)
-                        .block();
-                return link.sendMessages()
-                        .sendPieceMessage(0, 0, allocatedBlock)
-                        .doOnTerminate(() -> BlocksAllocatorImpl.getInstance().free(allocatedBlock));
+                // TODO: I must create an instance of ActiveTorrent, save a piece and then I can build a PieceMessage.
+                RequestMessage requestMessage = new RequestMessage(link.getMe(), link.getPeer(), 0, 0, 1);
+                return ActiveTorrents.getInstance()
+                        .findActiveTorrentByHashMono(link.getTorrentInfo().getTorrentInfoHash())
+                        .map(fileSystemLink1 -> fileSystemLink1.get())
+                        .flatMap(fileSystemLink -> fileSystemLink.buildPieceMessage(requestMessage))
+                        .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage));
             case CancelMessage:
-                return link.sendMessages().sendCancelMessage(0, 0, 10);
+                return link.sendMessages().sendCancelMessage(2, 0, 10);
             case KeepAliveMessage:
                 return link.sendMessages().sendKeepAliveMessage();
             case RequestMessage:
-                return link.sendMessages().sendRequestMessage(0, 0, 10);
+                return link.sendMessages().sendRequestMessage(1, 0, 3);
             case UnchokeMessage:
                 return link.sendMessages().sendUnchokeMessage();
             case BitFieldMessage:
@@ -360,8 +360,7 @@ public class Utils {
         return length;
     }
 
-    @SneakyThrows
-    public static AllocatedBlock readFromFile(TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
+    public static Mono<PieceMessage> readFromFile(TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
         List<TorrentFile> fileList = torrentInfo.getFileList();
 
         List<ActualFileImpl> actualFileImplList = new ArrayList<>();
@@ -383,40 +382,59 @@ public class Utils {
 
         // read from the file:
 
-        long from = torrentInfo.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
-        long to = from + requestMessage.getBlockLength();
+        return BlocksAllocatorImpl.getInstance()
+                .createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
+                        requestMessage.getIndex(), requestMessage.getBegin(),
+                        requestMessage.getBlockLength(), torrentInfo.getPieceLength(requestMessage.getIndex()))
+                .flatMap(pieceMessage -> {
+                    long from = torrentInfo.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
+                    long to = from + requestMessage.getBlockLength();
 
-        AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                .allocate(0, requestMessage.getBlockLength())
-                .block();
+                    int resultFreeIndex = 0;
+                    long amountOfBytesOfFileWeCovered = 0;
+                    for (ActualFileImpl actualFileImpl : actualFileImplList) {
+                        if (actualFileImpl.getFrom() <= from && from <= actualFileImpl.getTo()) {
 
-        int resultFreeIndex = 0;
-        long amountOfBytesOfFileWeCovered = 0;
-        for (ActualFileImpl actualFileImpl : actualFileImplList) {
-            if (actualFileImpl.getFrom() <= from && from <= actualFileImpl.getTo()) {
+                            OpenOption[] options = {StandardOpenOption.READ};
+                            SeekableByteChannel seekableByteChannel = null;
+                            try {
+                                seekableByteChannel = Files.newByteChannel(Paths.get(actualFileImpl.getFilePath()), options);
+                            } catch (IOException e) {
+                                return Mono.error(e);
+                            }
 
-                OpenOption[] options = {StandardOpenOption.READ};
-                SeekableByteChannel seekableByteChannel = Files.newByteChannel(Paths.get(actualFileImpl.getFilePath()), options);
+                            long fromWhereToReadInThisFile = from - amountOfBytesOfFileWeCovered;
+                            try {
+                                seekableByteChannel.position(fromWhereToReadInThisFile);
+                            } catch (IOException e) {
+                                return Mono.error(e);
+                            }
 
-                long fromWhereToReadInThisFile = from - amountOfBytesOfFileWeCovered;
-                seekableByteChannel.position(fromWhereToReadInThisFile);
+                            // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
+                            int howMuchToReadFromThisFile = (int) Math.min(actualFileImpl.getTo() - from, to - from);
+                            ByteBuffer block = ByteBuffer.allocate(howMuchToReadFromThisFile);
+                            try {
+                                seekableByteChannel.read(block);
+                            } catch (IOException e) {
+                                return Mono.error(e);
+                            }
 
-                // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
-                int howMuchToReadFromThisFile = (int) Math.min(actualFileImpl.getTo() - from, to - from);
-                ByteBuffer block = ByteBuffer.allocate(howMuchToReadFromThisFile);
-                seekableByteChannel.read(block);
+                            for (byte aTempResult : block.array())
+                                pieceMessage.getAllocatedBlock().getBlock()[resultFreeIndex++] = aTempResult;
+                            from += howMuchToReadFromThisFile;
 
-                for (byte aTempResult : block.array())
-                    allocatedBlock.getBlock()[resultFreeIndex++] = aTempResult;
-                from += howMuchToReadFromThisFile;
-
-                seekableByteChannel.close();
-            }
-            if (from == to)
-                return allocatedBlock;
-            amountOfBytesOfFileWeCovered = actualFileImpl.getTo();
-        }
-        throw new Exception("we shouldn't be here - never!");
+                            try {
+                                seekableByteChannel.close();
+                            } catch (IOException e) {
+                                return Mono.error(e);
+                            }
+                        }
+                        if (from == to)
+                            return Mono.just(pieceMessage);
+                        amountOfBytesOfFileWeCovered = actualFileImpl.getTo();
+                    }
+                    return Mono.error(new Exception("we shouldn't be here! never!"));
+                });
     }
 
     public static void deleteDownloadFolder() {
@@ -462,18 +480,20 @@ public class Utils {
 
     public static Flux<PieceMessage> createRandomPieceMessages(TorrentInfo torrentInfo,
                                                                Semaphore semaphore,
-                                                               BlockOfPiece blockOfPiece) {
-        int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
-                blockOfPiece.getPieceIndex() :
-                torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
-
+                                                               BlockOfPiece blockOfPiece,
+                                                               int allocatedBlockLength) {
+        int pieceIndex = blockOfPiece.getPieceIndex();
         int pieceLength = torrentInfo.getPieceLength(pieceIndex);
-        int totalRequestBlockSize = (blockOfPiece.getLength() == null || blockOfPiece.getLength() > pieceLength) ?
-                pieceLength :
-                blockOfPiece.getLength();
 
-        return Flux.<PieceMessage, Integer>generate(blockOfPiece::getFrom, (blockStartPosition, sink) -> {
-            if (blockStartPosition >= totalRequestBlockSize) {
+        int begin = Math.min(blockOfPiece.getFrom(), pieceLength - 1);
+        // calculate what is the over all size of all blocks I'm going to create.
+        int totalBlockLength = begin + blockOfPiece.getLength() > pieceLength ?
+                pieceLength - begin :
+                blockOfPiece.getLength() - begin;
+
+        // here I will use allocatedBlockLength to split totalBlockLength to small blocks:
+        return Flux.<BlockOfPiece, Integer>generate(() -> begin, (blockStartPosition, sink) -> {
+            if (blockStartPosition >= totalBlockLength) {
                 sink.complete();
                 return blockStartPosition;
             }
@@ -484,32 +504,53 @@ public class Utils {
                 sink.error(e);
             }
 
-            AllocatedBlock allocatedBlock = BlocksAllocatorImpl.getInstance()
-                    .getLatestState$()
-                    .map(AllocatorState::getBlockLength)
-                    .map(allocatedBlockLength -> PieceMessage.fixBlockLength(pieceLength, blockStartPosition, totalRequestBlockSize, allocatedBlockLength))
-                    .flatMap(fixedBlockLength -> BlocksAllocatorImpl.getInstance()
-                            .allocate(0, fixedBlockLength))
-                    .block();
+            int blockLength = Math.min(allocatedBlockLength, totalBlockLength - blockStartPosition);
+            sink.next(new BlockOfPiece(pieceIndex, blockStartPosition, blockLength));
 
-            for (int i = 0; i < allocatedBlock.getLength(); i++)
-                allocatedBlock.getBlock()[i] = (byte) 3;
-            PieceMessage pieceMessage = new PieceMessage(null, null, pieceIndex,
-                    blockStartPosition, allocatedBlock, torrentInfo.getPieceLength(pieceIndex));
-            sink.next(pieceMessage);
-            return blockStartPosition + allocatedBlock.getLength();
-        });
+            return blockStartPosition + blockLength;
+        })
+                .flatMap(smallBlock -> {
+                    BlocksAllocator instance = BlocksAllocatorImpl.getInstance();
+                    return instance.createPieceMessage(null, null, smallBlock.getPieceIndex(), smallBlock.getFrom(), smallBlock.getLength(), pieceLength)
+                            .doOnNext(pieceMessage -> Assert.assertEquals("I didn't proceed the length as good as I should have.",
+                                    smallBlock.getLength().longValue(),
+                                    pieceMessage.getAllocatedBlock().getLength()));
+                })
+                .doOnNext(pieceMessage -> {
+                    for (int i = 0; i < pieceMessage.getAllocatedBlock().getLength(); i++)
+                        pieceMessage.getAllocatedBlock().getBlock()[i] = (byte) i;
+                });
+    }
+
+    public static BlockOfPiece fixBlockOfPiece(BlockOfPiece blockOfPiece, TorrentInfo torrentInfo, int allocatedBlockLength) {
+        int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
+                blockOfPiece.getPieceIndex() :
+                torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
+
+        int pieceLength = torrentInfo.getPieceLength(pieceIndex);
+
+        // replace the nulls and the "-1"s:
+        int fixedFrom = blockOfPiece.getFrom() == null ?
+                pieceLength - 1 :
+                blockOfPiece.getFrom().equals(-1) ? allocatedBlockLength - 1 : blockOfPiece.getFrom();
+        int fixedBlockLength = blockOfPiece.getLength() == null ?
+                pieceLength :
+                blockOfPiece.getLength().equals(-1) ? allocatedBlockLength : blockOfPiece.getLength();
+
+        return new BlockOfPiece(pieceIndex, fixedFrom, fixedBlockLength);
     }
 
     public static <T, U> void assertListEqualNotByOrder(List<T> expected, List<U> actual, BiPredicate<T, U> areElementsEqual) {
         Assert.assertTrue(expected.stream().allMatch(t1 -> {
-            boolean b = actual.stream().anyMatch(t2 -> areElementsEqual.test(t1, t2));
+            boolean b = actual.stream()
+                    .anyMatch(t2 -> areElementsEqual.test(t1, t2));
             if (!b)
                 System.out.println(t1 + " -  expected is not inside actual.");
             return b;
         }));
         Assert.assertTrue(actual.stream().allMatch(t2 -> {
-            boolean b = expected.stream().anyMatch(t1 -> areElementsEqual.test(t1, t2));
+            boolean b = expected.stream()
+                    .anyMatch(t1 -> areElementsEqual.test(t1, t2));
             if (!b)
                 System.out.println(t2 + " -  actual is not inside expected.");
             return b;

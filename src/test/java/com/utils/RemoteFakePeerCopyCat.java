@@ -1,11 +1,15 @@
 package com.utils;
 
 import main.TorrentInfo;
+import main.file.system.BlocksAllocatorImpl;
 import main.peer.Peer;
 import main.peer.PeerMessageFactory;
 import main.peer.SendMessages;
 import main.peer.peerMessages.HandShake;
 import main.peer.peerMessages.PeerMessage;
+import main.peer.peerMessages.PieceMessage;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -76,16 +80,21 @@ public class RemoteFakePeerCopyCat extends Peer {
             return;
         Peer fromPeer = new Peer("localhost", peerConnection.getPort());
         while (!this.closeEverything) {
-            PeerMessage peerMessage = PeerMessageFactory.create(this.torrentInfo, fromPeer, this, dataInputStream);
+            PeerMessage peerMessage = PeerMessageFactory.waitForMessage(this.torrentInfo, fromPeer, this, dataInputStream)
+                    .publishOn(Schedulers.elastic())
+                    .block();
             if (receivedMessagesAmount == 2)
                 Thread.sleep(2000);
             else if (receivedMessagesAmount == 3) {
                 peerConnection.close();
                 return;
             }
-            peerMessage.sendMessage(sendMessages).block();
-//            if (peerMessage instanceof PieceMessage)
-//                BlocksAllocatorImpl.getInstance().free(((PieceMessage) peerMessage).getAllocatedBlock());
+            peerMessage.sendMessage(sendMessages)
+                    .flatMap(__ -> {
+                        if (peerMessage instanceof PieceMessage)
+                            return BlocksAllocatorImpl.getInstance().free(((PieceMessage) peerMessage).getAllocatedBlock());
+                        return Mono.empty();
+                    }).block();
             receivedMessagesAmount++;
         }
     }
