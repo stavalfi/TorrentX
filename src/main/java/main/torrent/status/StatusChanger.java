@@ -1,9 +1,9 @@
 package main.torrent.status;
 
-import main.App;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 public class StatusChanger {
 
@@ -12,45 +12,44 @@ public class StatusChanger {
     private Flux<Status> history$;
 
     public StatusChanger(Status initialStatus) {
-        this.latestState$ = Flux.<Status>create(sink -> this.latestStateSink = sink)
-                .publishOn(App.MyScheduler)
+        this.latestState$ = Flux.<Status>create(sink -> {
+            this.latestStateSink = sink;
+            this.latestStateSink.next(initialStatus);
+        })
                 .replay(1)
                 .autoConnect(0);
-
-        this.latestStateSink.next(initialStatus);
 
         this.history$ = this.latestState$.replay(10) // how much statuses to save.
                 .autoConnect(0);
     }
 
     public Mono<Status> getLatestState$() {
-        return latestState$.take(1)
+        return this.latestState$.take(1)
                 .single();
     }
 
     public Flux<Status> getState$() {
-        return latestState$;
+        return this.latestState$;
     }
 
     public Flux<Status> getHistory$() {
-        return history$;
+        return this.history$;
     }
 
     public Mono<Status> changeState(StatusType change) {
-        // TODO: replace this shit with something better.
-        return getLatestState$().flatMapMany(lastStatus -> {
-            Status newStatus = changeState(lastStatus, change);
-            if (lastStatus.equals(newStatus))
-                return Mono.empty();
-            this.latestStateSink.next(newStatus);
-            return Mono.just(newStatus)
-                    // we need to assert that the new state is available.
-                    .flatMapMany(status -> this.latestState$)
-                    // status == "lastStatus" or "newStatus". there is no other option.
-                    .filter(status -> status.equals(newStatus));
-        }).switchIfEmpty(getLatestState$())
+        return this.latestState$
+                .publishOn(Schedulers.single())
                 .take(1)
-                .single();
+                .single().flatMapMany(lastStatus -> {
+                    Status newStatus = changeState(lastStatus, change);
+                    if (lastStatus.equals(newStatus))
+                        return Mono.empty();
+                    this.latestStateSink.next(newStatus);
+                    return this.latestState$.filter(status -> status.equals(newStatus));
+                }).switchIfEmpty(getLatestState$())
+                .take(1)
+                .single()
+                .publishOn(Schedulers.parallel());
     }
 
     /**
