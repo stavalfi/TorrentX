@@ -1,11 +1,9 @@
 package main.peer;
 
 import main.TorrentInfo;
-import main.file.system.AllocatorState;
 import main.file.system.BlocksAllocatorImpl;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -16,79 +14,63 @@ import java.util.Objects;
 // TODO: implement visitor.
 public class PeerMessageFactory {
     public static Mono<? extends PeerMessage> waitForMessage(TorrentInfo torrentInfo, Peer from, Peer to, DataInputStream dataInputStream) {
-        final int messageLengthSize = 4;
-        byte[] messageLengthSizeByteArray = new byte[messageLengthSize];
+        // lengthOfTheRestOfData == messageLength == how much do we need to read more
+        int lengthOfTheRestOfData;
         try {
-            dataInputStream.readFully(messageLengthSizeByteArray);
+            lengthOfTheRestOfData = dataInputStream.readInt();
         } catch (IOException e) {
             return Mono.error(e);
         }
-
-        // I received something!
-        // I will get the latest allocatedBlockSize.
-        Integer allocatedBlockSize = BlocksAllocatorImpl.getInstance()
-                .getLatestState$()
-                .map(AllocatorState::getBlockLength)
-                .publishOn(Schedulers.elastic())
-                .block();
-
-        // lengthOfTheRestOfData == messageLength == how much do we need to read more
-        int lengthOfTheRestOfData = ByteBuffer.wrap(messageLengthSizeByteArray)
-                .getInt();
 
         if (lengthOfTheRestOfData == 0) {
             byte keepAliveMessageId = 10;
-            PeerMessage peerMessage = createMessage(torrentInfo, from, to, keepAliveMessageId, new byte[0], allocatedBlockSize);
+            PeerMessage peerMessage = createMessage(torrentInfo, from, to, keepAliveMessageId, new byte[0]);
             return Mono.just(peerMessage);
         }
-        int messageIdLength = 1;
-        byte[] messageIdByteArray = new byte[messageIdLength];
+        byte messageId;
         try {
-            dataInputStream.readFully(messageIdByteArray);
+            messageId = dataInputStream.readByte();
         } catch (IOException e) {
             return Mono.error(e);
         }
 
-        int messagePayloadLength = lengthOfTheRestOfData - messageIdLength;
-        if (messageIdByteArray[0] == PeerMessageId.pieceMessage.getMessageId())
+        int messagePayloadLength = lengthOfTheRestOfData - 1;
+
+        if (messageId == PeerMessageId.pieceMessage.getMessageId())
             return createPieceMessage(torrentInfo, from, to, messagePayloadLength, dataInputStream);
+
         byte[] messagePayloadByteArray = new byte[messagePayloadLength];
         try {
             dataInputStream.readFully(messagePayloadByteArray);
         } catch (IOException e) {
             return Mono.error(e);
         }
-        if (messageIdByteArray[0] == PeerMessageId.requestMessage.getMessageId())
-            return createRequestMessage(torrentInfo, from, to, messageIdByteArray[0],
-                    messagePayloadByteArray, allocatedBlockSize);
 
-        PeerMessage peerMessage = createMessage(torrentInfo, from, to, messageIdByteArray[0],
-                messagePayloadByteArray, allocatedBlockSize);
+        if (messageId == PeerMessageId.requestMessage.getMessageId())
+            return createRequestMessage(torrentInfo, from, to, messageId,
+                    messagePayloadByteArray);
+
+        PeerMessage peerMessage = createMessage(torrentInfo, from, to, messageId, messagePayloadByteArray);
         return Mono.just(peerMessage);
     }
 
     public static Mono<? extends PeerMessage> createPieceMessage(TorrentInfo torrentInfo, Peer from, Peer to,
                                                                  int messagePayloadLength, DataInputStream dataInputStream) {
-        int index = 0;
+        int index;
         try {
             index = dataInputStream.readInt();
         } catch (IOException e) {
             return Mono.error(e);
         }
         int pieceLength = torrentInfo.getPieceLength(index);
-        int begin = 0;
+        int begin;
         try {
             begin = dataInputStream.readInt();
         } catch (IOException e) {
             return Mono.error(e);
         }
-        int blockLength = 0;
-        try {
-            blockLength = dataInputStream.readInt();
-        } catch (IOException e) {
-            return Mono.error(e);
-        }
-        return BlocksAllocatorImpl.getInstance()
+        int blockLength = messagePayloadLength - 8;// 8 == 'index' length in bytes + 'begin' length in bytes
+        PieceMessage result = BlocksAllocatorImpl.getInstance()
                 .createPieceMessage(from, to, index, begin, blockLength, pieceLength)
                 .flatMap(pieceMessage -> {
                     try {
@@ -99,11 +81,16 @@ public class PeerMessageFactory {
                     } catch (IOException e) {
                         return Mono.error(e);
                     }
-                });
+                    // TODO: remove the block() operator. we have a bug because
+                    // if we remove the block(), than sometimes I can't
+                    // readFully anything. Its like someone is reading
+                    // while I read.
+                }).block();
+        return Mono.just(result);
     }
 
     public static Mono<? extends PeerMessage> createRequestMessage(TorrentInfo torrentInfo, Peer from, Peer to, byte messageId,
-                                                                   byte[] payload, int allocatedBlockSize) {
+                                                                   byte[] payload) {
         assert messageId == PeerMessageId.requestMessage.getMessageId();
 
         ByteBuffer wrap = ByteBuffer.wrap(payload);
@@ -117,7 +104,7 @@ public class PeerMessageFactory {
     }
 
     public static PeerMessage createMessage(TorrentInfo torrentInfo, Peer from, Peer to, byte messageId,
-                                            byte[] payload, int allocatedBlockSize) {
+                                            byte[] payload) {
         PeerMessageId peerMessageId = PeerMessageId.fromValue(messageId);
         switch (Objects.requireNonNull(peerMessageId)) {
             case bitFieldMessage:

@@ -47,11 +47,16 @@ public class SendMessages {
             try {
                 ByteBuffer buffer = ByteBuffer.allocate(13);
 
-                buffer.putInt(pieceMessage.getMessageLength());
-                buffer.put(pieceMessage.getMessageId());
-                buffer.putInt(pieceMessage.getIndex());
-                buffer.putInt(pieceMessage.getBegin());
-                this.dataOutputStream.write(buffer.array());
+                int messageLength = pieceMessage.getMessageLength();
+                buffer.putInt(messageLength);
+                byte messageId = pieceMessage.getMessageId();
+                buffer.put(messageId);
+                int index = pieceMessage.getIndex();
+                buffer.putInt(index);
+                int begin = pieceMessage.getBegin();
+                buffer.putInt(begin);
+                byte[] array = buffer.array();
+                this.dataOutputStream.write(array);
                 this.dataOutputStream.write(pieceMessage.getAllocatedBlock().getBlock(),
                         pieceMessage.getAllocatedBlock().getOffset(), pieceMessage.getAllocatedBlock().getLength());
                 monoSink.success(this);

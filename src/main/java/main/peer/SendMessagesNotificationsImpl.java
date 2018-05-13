@@ -1,5 +1,6 @@
 package main.peer;
 
+import main.App;
 import main.TorrentInfo;
 import main.file.system.BlocksAllocatorImpl;
 import main.peer.peerMessages.*;
@@ -29,7 +30,10 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
         this.me = me;
         this.peer = peer;
         this.peerCurrentStatus = peerCurrentStatus;
-        this.sentPeerMessagesFlux = Flux.create((FluxSink<PeerMessage> sink) -> this.sentMessagesFluxSink = sink);
+        this.sentPeerMessagesFlux = Flux.create((FluxSink<PeerMessage> sink) -> this.sentMessagesFluxSink = sink)
+                .subscribeOn(App.MyScheduler)
+                .publish()
+                .autoConnect(0);
         this.sendMessages = new SendMessages(peerDataOutputStream, closeConnectionMethod);
     }
 

@@ -8,7 +8,6 @@ import main.peer.SendMessages;
 import main.peer.peerMessages.HandShake;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
-import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
@@ -90,11 +89,10 @@ public class RemoteFakePeerCopyCat extends Peer {
                 return;
             }
             peerMessage.sendMessage(sendMessages)
-                    .flatMap(__ -> {
-                        if (peerMessage instanceof PieceMessage)
-                            return BlocksAllocatorImpl.getInstance().free(((PieceMessage) peerMessage).getAllocatedBlock());
-                        return Mono.empty();
-                    }).block();
+                    .filter(__ -> peerMessage instanceof PieceMessage)
+                    .map(__ -> (PieceMessage) peerMessage)
+                    .flatMap(pieceMessage -> BlocksAllocatorImpl.getInstance().free(pieceMessage.getAllocatedBlock()))
+                    .block();
             receivedMessagesAmount++;
         }
     }

@@ -44,7 +44,7 @@ public class PieceMessage extends PeerMessage {
         int messageIdLength = 1,
                 indexLength = 4,
                 beginLength = 4;
-        return messageIdLength + indexLength + beginLength + allocatedBlock.getLength() - allocatedBlock.getOffset();
+        return messageIdLength + indexLength + beginLength + allocatedBlock.getLength();
     }
 
     @Override
