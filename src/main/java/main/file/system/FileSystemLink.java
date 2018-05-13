@@ -48,8 +48,4 @@ public interface FileSystemLink {
     Mono<FileSystemLink> deleteActiveTorrentOnlyMono();
 
     Mono<FileSystemLink> deleteFileOnlyMono();
-
-    Mono<FileSystemLink> getNotifyWhenActiveTorrentDeleted();
-
-    Mono<FileSystemLink> getNotifyWhenFilesDeleted();
 }

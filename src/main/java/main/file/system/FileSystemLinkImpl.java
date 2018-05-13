@@ -35,8 +35,6 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private StatusChanger statusChanger;
     private Flux<Integer> savedPiecesFlux;
     private Flux<PieceEvent> savedBlocksFlux;
-    private Mono<FileSystemLink> notifyWhenActiveTorrentDeleted;
-    private Mono<FileSystemLink> notifyWhenFilesDeleted;
 
     public FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
                               StatusChanger statusChanger,
@@ -50,24 +48,6 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         createFolders(torrentInfo, downloadPath);
 
         this.actualFileImplList = createActiveTorrentFileList(torrentInfo, downloadPath);
-
-        this.notifyWhenActiveTorrentDeleted = this.statusChanger
-                .getState$()
-                .filter(Status::isTorrentRemoved)
-                .take(1)
-                .flatMap(__ -> deleteFileOnlyMono())
-                .replay(1)
-                .autoConnect(0)
-                .single();
-
-        this.notifyWhenFilesDeleted = this.statusChanger
-                .getState$()
-                .filter(Status::isFilesRemoved)
-                .take(1)
-                .flatMap(__ -> deleteActiveTorrentOnlyMono())
-                .replay(1)
-                .autoConnect(0)
-                .single();
 
         this.savedBlocksFlux = this.statusChanger
                 .getLatestState$()
@@ -154,7 +134,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     if (deletedActiveTorrent)
                         return Mono.just(this);
                     return Mono.error(new Exception("FileSystemLinkImpl object not exist."));
-                });
+                })
+                .flatMap(fileSystemLink -> this.statusChanger.changeState(StatusType.REMOVE_TORRENT)
+                        .map(status -> fileSystemLink));
     }
 
     public Mono<FileSystemLink> deleteFileOnlyMono() {
@@ -169,7 +151,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     // I will delete this file at the next operator.
                     String torrentDirectoryPath = this.downloadPath + this.getName();
                     return completelyDeleteFolder(torrentDirectoryPath);
-                });
+                })
+                .flatMap(fileSystemLink -> this.statusChanger.changeState(StatusType.REMOVE_FILES)
+                        .map(status -> fileSystemLink));
     }
 
     @Override
@@ -357,13 +341,5 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
             }
         }
         Files.delete(directoryToBeDeleted.toPath());
-    }
-
-    public Mono<FileSystemLink> getNotifyWhenActiveTorrentDeleted() {
-        return this.notifyWhenActiveTorrentDeleted;
-    }
-
-    public Mono<FileSystemLink> getNotifyWhenFilesDeleted() {
-        return this.notifyWhenFilesDeleted;
     }
 }
