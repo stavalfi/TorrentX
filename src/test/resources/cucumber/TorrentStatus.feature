@@ -17,10 +17,8 @@ Feature: start/stop downloading/uploading
       | START_DOWNLOAD |
       | START_UPLOAD   |
     Then torrent-status for torrent "<torrent>" will be:
-      | START_DOWNLOAD  |
-      | START_UPLOAD    |
-      | RESUME_DOWNLOAD |
-      | RESUME_UPLOAD   |
+      | START_DOWNLOAD |
+      | START_UPLOAD   |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -43,17 +41,13 @@ Feature: start/stop downloading/uploading
       | START_DOWNLOAD |
       | START_UPLOAD   |
     Then torrent-status for torrent "<torrent>" will be:
-      | START_DOWNLOAD  |
-      | START_UPLOAD    |
-      | RESUME_DOWNLOAD |
-      | RESUME_UPLOAD   |
+      | START_DOWNLOAD |
+      | START_UPLOAD   |
     When torrent-status for torrent "<torrent>" is trying to change to:
       | PAUSE_UPLOAD |
     Then torrent-status for torrent "<torrent>" will be:
-      | START_DOWNLOAD  |
-      | START_UPLOAD    |
-      | RESUME_DOWNLOAD |
-      | PAUSE_UPLOAD    |
+      | START_DOWNLOAD |
+      | START_UPLOAD   |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -126,13 +120,7 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | REMOVE_TORRENT |
     Then torrent-status for torrent "<torrent>" will be:
-      | START_DOWNLOAD                    |
-      | START_UPLOAD                      |
-      | PAUSE_DOWNLOAD                    |
-      | PAUSE_UPLOAD                      |
-      | REMOVE_TORRENT                    |
-      | START_LISTENING_TO_INCOMING_PEERS |
-      | PAUSE_LISTENING_TO_INCOMING_PEERS |
+      | REMOVE_TORRENT |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -155,10 +143,7 @@ Feature: start/stop downloading/uploading
       | START_DOWNLOAD |
     Then torrent-status for torrent "<torrent>" will be:
       | REMOVE_TORRENT                    |
-      | PAUSE_DOWNLOAD                    |
-      | PAUSE_UPLOAD                      |
       | START_LISTENING_TO_INCOMING_PEERS |
-      | PAUSE_LISTENING_TO_INCOMING_PEERS |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -180,9 +165,7 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | START_DOWNLOAD |
     Then torrent-status for torrent "<torrent>" will be:
-      | REMOVE_FILES   |
-      | PAUSE_DOWNLOAD |
-      | PAUSE_UPLOAD   |
+      | REMOVE_FILES |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -206,8 +189,6 @@ Feature: start/stop downloading/uploading
     Then torrent-status for torrent "<torrent>" will be:
       | REMOVE_TORRENT |
       | REMOVE_FILES   |
-      | PAUSE_DOWNLOAD |
-      | PAUSE_UPLOAD   |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -231,8 +212,6 @@ Feature: start/stop downloading/uploading
     Then torrent-status for torrent "<torrent>" will be:
       | REMOVE_TORRENT |
       | REMOVE_FILES   |
-      | PAUSE_DOWNLOAD |
-      | PAUSE_UPLOAD   |
 
     Examples:
       | torrent                       | downloadLocation |
@@ -283,8 +262,6 @@ Feature: start/stop downloading/uploading
     Then torrent-status for torrent "<torrent>" will be:
       | START_DOWNLOAD                     |
       | START_UPLOAD                       |
-      | RESUME_DOWNLOAD                    |
-      | RESUME_UPLOAD                      |
       | START_LISTENING_TO_INCOMING_PEERS  |
       | RESUME_LISTENING_TO_INCOMING_PEERS |
     When torrent-status for torrent "<torrent>" is trying to change to:
@@ -293,8 +270,6 @@ Feature: start/stop downloading/uploading
     Then torrent-status for torrent "<torrent>" will be:
       | START_DOWNLOAD                     |
       | START_UPLOAD                       |
-      | RESUME_DOWNLOAD                    |
-      | RESUME_UPLOAD                      |
       | START_LISTENING_TO_INCOMING_PEERS  |
       | RESUME_LISTENING_TO_INCOMING_PEERS |
 
@@ -311,16 +286,15 @@ Feature: start/stop downloading/uploading
       | COMPLETED_DOWNLOADING              | false |
       | REMOVE_TORRENT                     | true  |
       | REMOVE_FILES                       | false |
-      | START_LISTENING_TO_INCOMING_PEERS  | true  |
+      | START_LISTENING_TO_INCOMING_PEERS  | false |
       | RESUME_LISTENING_TO_INCOMING_PEERS | false |
       | START_SEARCHING_PEERS              | false |
       | RESUME_SEARCHING_PEERS             | false |
     When torrent-status for torrent "<torrent>" is trying to change to:
       | REMOVE_TORRENT |
     Then torrent-status for torrent "<torrent>" will be:
-      | REMOVE_TORRENT                    |
-      | START_LISTENING_TO_INCOMING_PEERS |
-      | PAUSE_LISTENING_TO_INCOMING_PEERS |
+      | REMOVE_TORRENT |
+
     Examples:
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test    |
@@ -384,8 +358,7 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | START_LISTENING_TO_INCOMING_PEERS |
     Then torrent-status for torrent "<torrent>" will be:
-      | START_LISTENING_TO_INCOMING_PEERS  |
-      | RESUME_LISTENING_TO_INCOMING_PEERS |
+      | START_LISTENING_TO_INCOMING_PEERS |
     Examples:
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test    |
@@ -407,7 +380,6 @@ Feature: start/stop downloading/uploading
       | PAUSE_LISTENING_TO_INCOMING_PEERS |
     Then torrent-status for torrent "<torrent>" will be:
       | START_LISTENING_TO_INCOMING_PEERS |
-      | PAUSE_LISTENING_TO_INCOMING_PEERS |
     Examples:
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test    |
@@ -429,7 +401,6 @@ Feature: start/stop downloading/uploading
       | PAUSE_LISTENING_TO_INCOMING_PEERS |
     Then torrent-status for torrent "<torrent>" will be:
       | START_LISTENING_TO_INCOMING_PEERS |
-      | PAUSE_LISTENING_TO_INCOMING_PEERS |
       | START_SEARCHING_PEERS             |
       | RESUME_SEARCHING_PEERS            |
     Examples:
@@ -452,9 +423,7 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | REMOVE_TORRENT |
     Then torrent-status for torrent "<torrent>" will be:
-      | REMOVE_TORRENT        |
-      | START_SEARCHING_PEERS |
-      | PAUSE_SEARCHING_PEERS |
+      | REMOVE_TORRENT |
     Examples:
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test    |
@@ -475,9 +444,7 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | REMOVE_FILES |
     Then torrent-status for torrent "<torrent>" will be:
-      | REMOVE_FILES          |
-      | START_SEARCHING_PEERS |
-      | PAUSE_SEARCHING_PEERS |
+      | REMOVE_FILES |
     Examples:
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test    |
@@ -520,10 +487,9 @@ Feature: start/stop downloading/uploading
     When torrent-status for torrent "<torrent>" is trying to change to:
       | START_SEARCHING_PEERS |
     Then torrent-status for torrent "<torrent>" will be:
-      | START_DOWNLOAD         |
-      | RESUME_DOWNLOAD        |
-      | START_SEARCHING_PEERS  |
-      | RESUME_SEARCHING_PEERS |
+      | START_DOWNLOAD        |
+      | RESUME_DOWNLOAD       |
+      | START_SEARCHING_PEERS |
     Examples:
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test    |
