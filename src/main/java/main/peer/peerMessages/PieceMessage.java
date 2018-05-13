@@ -1,42 +1,56 @@
 package main.peer.peerMessages;
 
+import main.file.system.AllocatedBlock;
 import main.peer.Peer;
+import main.peer.SendMessages;
+import reactor.core.publisher.Mono;
 
-import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Objects;
 
 public class PieceMessage extends PeerMessage {
     private static final byte messageId = 7;
     private int index;
     private int begin;
-    private byte[] block;
+    private AllocatedBlock allocatedBlock;
 
     /**
      * The payload contains the following information: (by this order)
      *
-     * @param index integer specifying the zero-based piece index
-     * @param begin integer specifying the zero-based byte offset within the piece
-     * @param block block of data, which is a subset of the piece specified by index.
+     * @param index          integer specifying the zero-based piece index
+     * @param begin          integer specifying the zero-based byte offset within the piece
+     * @param allocatedBlock allocatedBlock of data, which is a subset of the piece specified by index.
      */
-    public PieceMessage(Peer from, Peer to, int index, int begin, byte[] block) {
-        super(to, from, 9 + block.length, messageId, ByteBuffer.allocate(4 + 4 + block.length)
-                .putInt(index)
-                .putInt(begin)
-                .put(block).array());
+    public PieceMessage(Peer from, Peer to, int index, int begin,
+                        AllocatedBlock allocatedBlock) {
+        super(to, from);
+
         this.index = index;
         this.begin = begin;
-        this.block = block;
+        this.allocatedBlock = allocatedBlock;
     }
 
-    public PieceMessage(Peer from, Peer to, byte[] peerMessage) {
-        super(to, peerMessage, from);
-        ByteBuffer byteBuffer = ByteBuffer.wrap(super.getPayload());
-        this.index = byteBuffer.getInt();
-        this.begin = byteBuffer.getInt();
-        // 8 == `index` in bytes + `begin` in bytes.
-        this.block = new byte[super.getPayload().length - 8];
-        byteBuffer.get(this.block);
+    @Override
+    public Mono<SendMessages> sendMessage(SendMessages sendMessages) {
+        return sendMessages.send(this);
+    }
+
+    @Override
+    public byte getMessageId() {
+        return messageId;
+    }
+
+    @Override
+    public int getMessageLength() {
+        int messageIdLength = 1,
+                indexLength = 4,
+                beginLength = 4;
+        return messageIdLength + indexLength + beginLength + allocatedBlock.getLength();
+    }
+
+    @Override
+    public byte[] getMessagePayload() {
+        throw new UnsupportedOperationException("this class use AllocatedBlock class to represent " +
+                "a allocatedBlock instead of representing it by byte[].");
     }
 
     public int getIndex() {
@@ -47,26 +61,24 @@ public class PieceMessage extends PeerMessage {
         return begin;
     }
 
-    public byte[] getBlock() {
-        return block;
+    public AllocatedBlock getAllocatedBlock() {
+        return this.allocatedBlock;
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (!(o instanceof PieceMessage)) return false;
         PieceMessage that = (PieceMessage) o;
-        return index == that.index &&
-                begin == that.begin &&
-                Arrays.equals(block, that.block);
+        return getIndex() == that.getIndex() &&
+                getBegin() == that.getBegin() &&
+                getAllocatedBlock().getLength() == that.getAllocatedBlock().getLength();
     }
 
     @Override
     public int hashCode() {
 
-        int result = Objects.hash(index, begin);
-        result = 31 * result + Arrays.hashCode(block);
-        return result;
+        return Objects.hash(getIndex(), getBegin(), getAllocatedBlock().getLength());
     }
 
     @Override
@@ -74,7 +86,7 @@ public class PieceMessage extends PeerMessage {
         return "PieceMessage{" +
                 "index=" + index +
                 ", begin=" + begin +
-                ", block-length=" + Arrays.toString(block) +
+                ", allocatedBlock=" + allocatedBlock +
                 "} " + super.toString();
     }
 }

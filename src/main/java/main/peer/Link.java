@@ -17,8 +17,8 @@ public class Link {
     private DataOutputStream dataOutputStream;
     private TorrentInfo torrentInfo;
     private PeerCurrentStatus peerCurrentStatus;
-    private SendPeerMessages sendMessages;
-    private ReceivePeerMessages receivePeerMessages;
+    private SendMessagesNotifications sendMessages;
+    private ReceiveMessagesNotifications receiveMessagesNotifications;
     private SpeedStatistics peerSpeedStatistics;
 
     public Link(Link link) {
@@ -38,16 +38,16 @@ public class Link {
         this.me = new Peer("localhost", peerSocket.getLocalPort());
 
         this.peerCurrentStatus = new PeerCurrentStatus(torrentInfo.getPieces().size());
-        this.sendMessages = new SendPeerMessagesImpl(this.me, this.peer,
+        this.sendMessages = new SendMessagesNotificationsImpl(this.torrentInfo,
+                this.me, this.peer,
                 this.peerCurrentStatus,
                 this::closeConnection,
                 dataOutputStream);
-        this.receivePeerMessages = new ReceivePeerMessagesImpl(this.me, this.peer,
-                this.peerCurrentStatus,
-                dataInputStream);
+        this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(torrentInfo, this.me,
+                this.peer, this.peerCurrentStatus, dataInputStream);
 
         this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-                this.receivePeerMessages.getPeerMessageResponseFlux(),
+                this.receiveMessagesNotifications.getPeerMessageResponseFlux(),
                 this.sendMessages.sentPeerMessagesFlux());
     }
 
@@ -84,11 +84,11 @@ public class Link {
                 '}';
     }
 
-    public ReceivePeerMessages receivePeerMessages() {
-        return receivePeerMessages;
+    public ReceiveMessagesNotifications receivePeerMessages() {
+        return receiveMessagesNotifications;
     }
 
-    public SendPeerMessages sendMessages() {
+    public SendMessagesNotifications sendMessages() {
         return sendMessages;
     }
 

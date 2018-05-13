@@ -6,7 +6,7 @@ import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.PeersProvider;
 import main.statistics.SpeedStatistics;
-import main.torrent.status.TorrentStatusController;
+import main.torrent.status.StatusChanger;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import reactor.core.publisher.Flux;
@@ -16,7 +16,7 @@ public class TorrentDownloader {
     private TorrentInfo torrentInfo;
     private FileSystemLink fileSystemLink;
     private BittorrentAlgorithm bittorrentAlgorithm;
-    private TorrentStatusController torrentStatusController;
+    private StatusChanger statusChanger;
     private SpeedStatistics torrentSpeedStatistics;
 
     private TrackerProvider trackerProvider;
@@ -27,7 +27,7 @@ public class TorrentDownloader {
     public TorrentDownloader(TorrentInfo torrentInfo,
                              FileSystemLink fileSystemLink,
                              BittorrentAlgorithm bittorrentAlgorithm,
-                             TorrentStatusController torrentStatusController,
+                             StatusChanger statusChanger,
                              SpeedStatistics torrentSpeedStatistics,
                              TrackerProvider trackerProvider,
                              PeersProvider peersProvider,
@@ -36,7 +36,7 @@ public class TorrentDownloader {
         this.torrentInfo = torrentInfo;
         this.fileSystemLink = fileSystemLink;
         this.bittorrentAlgorithm = bittorrentAlgorithm;
-        this.torrentStatusController = torrentStatusController;
+        this.statusChanger = statusChanger;
         this.torrentSpeedStatistics = torrentSpeedStatistics;
         this.trackerProvider = trackerProvider;
         this.peersProvider = peersProvider;
@@ -48,8 +48,8 @@ public class TorrentDownloader {
         return bittorrentAlgorithm;
     }
 
-    public TorrentStatusController getTorrentStatusController() {
-        return torrentStatusController;
+    public StatusChanger getStatusChanger() {
+        return statusChanger;
     }
 
     public FileSystemLink getFileSystemLink() {

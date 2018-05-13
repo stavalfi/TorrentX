@@ -20,15 +20,24 @@ public class BitFieldMessage extends PeerMessage {
      *               Spare bits at the end are set to zero.
      */
     public BitFieldMessage(Peer from, Peer to, BitSet pieces) {
-        super(to, from, 1 + pieces.toByteArray().length, messageId, pieces.toByteArray());
+        super(to, from);
         this.pieces = pieces;
     }
 
-    public BitFieldMessage(Peer from, Peer to, byte[] peerMessage) {
-        super(to, peerMessage, from);
-        this.pieces = BitSet.valueOf(super.getPayload());
+    @Override
+    public byte getMessageId() {
+        return messageId;
     }
 
+    @Override
+    public int getMessageLength() {
+        return 1 + pieces.toByteArray().length;
+    }
+
+    @Override
+    public byte[] getMessagePayload() {
+        return pieces.toByteArray();
+    }
 
     @Override
     public String toString() {

@@ -1,14 +1,13 @@
 package main.peer;
 
-import main.App;
+import main.TorrentInfo;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
-import java.io.IOException;
 
-class ReceivePeerMessagesImpl implements ReceivePeerMessages {
+class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
     private Flux<? extends PeerMessage> peerMessageResponseFlux;
 
     private Flux<BitFieldMessage> bitFieldMessageResponseFlux;
@@ -26,19 +25,13 @@ class ReceivePeerMessagesImpl implements ReceivePeerMessages {
 
     private PeerCurrentStatus peerCurrentStatus;
 
-    public ReceivePeerMessagesImpl(Peer me, Peer peer,
-                                   PeerCurrentStatus peerCurrentStatus, DataInputStream dataInputStream) {
+    public ReceiveMessagesNotificationsImpl(TorrentInfo torrentInfo, Peer me, Peer peer,
+                                            PeerCurrentStatus peerCurrentStatus, DataInputStream dataInputStream) {
         this.peerCurrentStatus = peerCurrentStatus;
 
-        this.peerMessageResponseFlux = Flux.create((FluxSink<PeerMessage> sink) -> listenForPeerMessages(sink, me, peer, dataInputStream))
-                // it is important to publish from source on different thread then the
-                // subscription to this source's thread every time because:
-                // if not and we subscribe to this specific source multiple times then only the
-                // first subscription will be activated and the source will never end.
-                // Also some methods are waiting for notification from torrent-status class and then listen to this.
-                // because this is a blocking stream, I will block the notificator thread which will cause
-                // that no one else will get notifications.
-                .subscribeOn(App.MyScheduler)
+        this.peerMessageResponseFlux = Flux.generate(synchronousSink -> synchronousSink.next(0))
+                .publishOn(Schedulers.elastic())
+                .flatMap(__ -> PeerMessageFactory.waitForMessage(torrentInfo, peer, me, dataInputStream))
                 //.onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                 // there are multiple subscribers to this source (every specific peer-message flux).
                 // all of them must get the same message and ***not activate this source more then once***.
@@ -115,25 +108,6 @@ class ReceivePeerMessagesImpl implements ReceivePeerMessages {
         this.unchokeMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof UnchokeMessage)
                 .cast(UnchokeMessage.class);
-    }
-
-    private void listenForPeerMessages(FluxSink<PeerMessage> sink, Peer me, Peer peer, DataInputStream dataInputStream) {
-        while (!sink.isCancelled()) {
-            try {
-                PeerMessage peerMessage = PeerMessageFactory.create(peer, me, dataInputStream);
-                sink.next(peerMessage);
-            } catch (IOException e) {
-                try {
-                    dataInputStream.close();
-                } catch (IOException e1) {
-                    // TODO: do something better... it's a fatal problem with my design!!!
-                    //e1.printStackTrace();
-                }
-                if (!sink.isCancelled())
-                    sink.error(e);
-                return;
-            }
-        }
     }
 
     @Override

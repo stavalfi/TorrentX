@@ -7,12 +7,12 @@ import main.algorithms.impls.v1.notification.NotifyAboutCompletedPieceAlgorithmI
 import main.algorithms.impls.v1.upload.UploadAlgorithmImpl;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
-import main.torrent.status.TorrentStatus;
+import main.torrent.status.StatusChanger;
 import reactor.core.publisher.Flux;
 
 public class BittorrentAlgorithmInitializer {
     public static BittorrentAlgorithm v1(TorrentInfo torrentInfo,
-                                         TorrentStatus torrentStatus,
+                                         StatusChanger statusChanger,
                                          FileSystemLink fileSystemLink,
                                          Flux<Link> peersCommunicatorFlux) {
         Flux<Link> recordedPeerFlux = peersCommunicatorFlux
@@ -24,12 +24,12 @@ public class BittorrentAlgorithmInitializer {
 
         NotifyAboutCompletedPieceAlgorithm notifyAboutCompletedPieceAlgorithm =
                 new NotifyAboutCompletedPieceAlgorithmImpl(torrentInfo,
-                        torrentStatus,
+                        statusChanger,
                         fileSystemLink,
                         recordedPeerFlux);
 
         UploadAlgorithm uploadAlgorithm = new UploadAlgorithmImpl(torrentInfo,
-                torrentStatus,
+                statusChanger,
                 fileSystemLink,
                 peersCommunicatorFlux);
 
@@ -39,7 +39,7 @@ public class BittorrentAlgorithmInitializer {
 
         BlockDownloader blockDownloader = new BlockDownloaderImpl(torrentInfo, fileSystemLink);
 
-        PiecesDownloader piecesDownloader = new PiecesDownloaderImpl(torrentInfo, torrentStatus,
+        PiecesDownloader piecesDownloader = new PiecesDownloaderImpl(torrentInfo, statusChanger,
                 fileSystemLink, peersToPiecesMapper, blockDownloader);
 
         DownloadAlgorithm downloadAlgorithm = new DownloadAlgorithm(piecesDownloader, blockDownloader, peersToPiecesMapper);

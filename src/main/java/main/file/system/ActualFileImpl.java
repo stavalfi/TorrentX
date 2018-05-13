@@ -40,24 +40,19 @@ public class ActualFileImpl implements ActualFile {
         long writeFrom = begin - this.from;
         this.seekableByteChannel.position(writeFrom);
 
-        // TODO: use the original block array and not creating new one for that.
-        byte[] myBlock = new byte[howMuchToWriteFromArray];
-        for (int i = 0; i < howMuchToWriteFromArray; i++)
-            myBlock[i] = block[arrayIndexFrom + i];
-
-        this.seekableByteChannel.write(ByteBuffer.wrap(myBlock));
+        ByteBuffer wrap = ByteBuffer.wrap(block, arrayIndexFrom, howMuchToWriteFromArray);
+        this.seekableByteChannel.write(wrap);
     }
 
     @Override
-    public synchronized byte[] readBlock(long begin, int blockLength) throws IOException {
+    public synchronized void readBlock(long begin, int blockLength, byte[] readTo, int offset) throws IOException {
         assert this.from <= begin && begin < this.to;
         assert blockLength <= this.to - this.from;
 
         long readFrom = begin - this.from;
         this.seekableByteChannel.position(readFrom);
-        ByteBuffer block = ByteBuffer.allocate(blockLength);
+        ByteBuffer block = ByteBuffer.wrap(readTo, offset, blockLength);
         this.seekableByteChannel.read(block);
-        return block.array();
     }
 
     @Override

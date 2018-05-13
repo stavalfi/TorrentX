@@ -1,5 +1,6 @@
 package com.utils;
 
+import main.file.system.BlocksAllocatorImpl;
 import main.peer.Link;
 import reactor.core.publisher.Mono;
 
@@ -18,9 +19,6 @@ public class RemoteFakePeer extends Link {
                             blockThread(100);
                             return;
                         case RESPOND_WITH_DELAY_3000:
-                            //TODO: in some operating systems, the IO operations are extremely slow.
-                            // for example the first use of randomAccessFile object. in linux all good.
-                            // we need to remmber to change back 20->3.
                             blockThread(3 * 1000);
                             return;
                     }
@@ -37,9 +35,13 @@ public class RemoteFakePeer extends Link {
                         case VALID:
                         case RESPOND_WITH_DELAY_100:
                         case RESPOND_WITH_DELAY_3000:
-                            return this.sendMessages()
-                                    .sendPieceMessage(requestMessage.getIndex(), requestMessage.getBegin(),
-                                            new byte[requestMessage.getBlockLength()]);
+                            int pieceLength = super.getTorrentInfo().getPieceLength(requestMessage.getIndex());
+                            return BlocksAllocatorImpl.getInstance()
+                                    // create a piece message with random bytes.
+                                    .createPieceMessage(super.getMe(), super.getPeer(),
+                                            requestMessage.getIndex(), requestMessage.getBegin(),
+                                            requestMessage.getBlockLength(), pieceLength)
+                                    .flatMap(pieceMessage -> this.sendMessages().sendPieceMessage(pieceMessage));
                     }
                     // we will never be here...
                     return Mono.empty();

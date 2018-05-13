@@ -1,11 +1,17 @@
 package com.utils;
 
+import main.TorrentInfo;
+import main.file.system.BlocksAllocatorImpl;
 import main.peer.Peer;
 import main.peer.PeerMessageFactory;
+import main.peer.SendMessages;
 import main.peer.peerMessages.HandShake;
 import main.peer.peerMessages.PeerMessage;
+import main.peer.peerMessages.PieceMessage;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
@@ -23,9 +29,11 @@ public class RemoteFakePeerCopyCat extends Peer {
     private boolean closeEverything = false;
     private ServerSocket listenToPeerConnection;
     private final List<Socket> peerConnections = new ArrayList<>();
+    private TorrentInfo torrentInfo;
 
-    public RemoteFakePeerCopyCat(Peer Me) {
+    public RemoteFakePeerCopyCat(TorrentInfo torrentInfo, Peer Me) {
         super(Me.getPeerIp(), Me.getPeerPort());
+        this.torrentInfo = torrentInfo;
         try {
             this.listenToPeerConnection = new ServerSocket(this.getPeerPort());
         } catch (IOException e) {
@@ -57,6 +65,13 @@ public class RemoteFakePeerCopyCat extends Peer {
         int receivedMessagesAmount = 0;
         DataInputStream dataInputStream = new DataInputStream(peerConnection.getInputStream());
         OutputStream outputStream = peerConnection.getOutputStream();
+        SendMessages sendMessages = new SendMessages(new DataOutputStream(outputStream), () -> {
+            try {
+                peerConnection.close();
+            } catch (IOException e) {
+//                e.printStackTrace();
+            }
+        });
         if (!this.closeEverything) {
             HandShake handShakeReceived = new HandShake(dataInputStream);
             outputStream.write(handShakeReceived.createPacketFromObject());
@@ -64,14 +79,20 @@ public class RemoteFakePeerCopyCat extends Peer {
             return;
         Peer fromPeer = new Peer("localhost", peerConnection.getPort());
         while (!this.closeEverything) {
-            PeerMessage peerMessage = PeerMessageFactory.create(fromPeer, this, dataInputStream);
+            PeerMessage peerMessage = PeerMessageFactory.waitForMessage(this.torrentInfo, fromPeer, this, dataInputStream)
+                    .publishOn(Schedulers.elastic())
+                    .block();
             if (receivedMessagesAmount == 2)
                 Thread.sleep(2000);
             else if (receivedMessagesAmount == 3) {
                 peerConnection.close();
                 return;
             }
-            outputStream.write(peerMessage.createPacketFromObject());
+            peerMessage.sendMessage(sendMessages)
+                    .filter(__ -> peerMessage instanceof PieceMessage)
+                    .map(__ -> (PieceMessage) peerMessage)
+                    .flatMap(pieceMessage -> BlocksAllocatorImpl.getInstance().free(pieceMessage.getAllocatedBlock()))
+                    .block();
             receivedMessagesAmount++;
         }
     }

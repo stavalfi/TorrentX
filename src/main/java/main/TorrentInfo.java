@@ -11,6 +11,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+// Claim: piece length is integer and not long.
+// Prof:
+// (1) piece size can't be more than Integer.MAX_VALUE because the protocol allow me to request
+// even the last byte of a piece and if the piece size is more than Integer.MAX_VALUE,
+// than I can't specify the "begin" of that request using 4 bytes.
+// (2) in the tests, a block size is bounded to the allocatedBlock size and it's integer so
+// we can't create a request for a block larger than Integer.MAX_VALUE. so for both reasons,
+// a request of a block can't be more than Integer.MAX_VALUE.
+
 public class TorrentInfo {
     private String torrentFilePath;
     private final Torrent torrent;
@@ -33,16 +42,14 @@ public class TorrentInfo {
         return this.torrent.isSingleFileTorrent();
     }
 
-    public long getPieceLength() {
-        return this.torrent.getPieceLength();
-    }
-
-    public long getPieceLength(int pieceIndex) {
+    public int getPieceLength(int pieceIndex) {
         long totalSize = getTotalSize();
-        long pieceLength = this.torrent.getPieceLength();
+        int pieceLength = this.torrent.getPieceLength().intValue();
         int piecesAmount = this.torrent.getPieces().size() - 1;
-        if (pieceIndex == this.torrent.getPieces().size() - 1)
-            return totalSize - (piecesAmount * pieceLength);
+        if (pieceIndex == this.torrent.getPieces().size() - 1) {
+            long lastPieceLength = totalSize - (piecesAmount * pieceLength);
+            return (int) lastPieceLength;
+        }
         return pieceLength;
     }
 
@@ -65,7 +72,7 @@ public class TorrentInfo {
         long totalSize = getTotalSize();
         long thisPieceLength = getPieceLength(pieceIndex);
         long position = pieceIndex < getPieces().size() - 1 ?
-                pieceIndex * getPieceLength() :
+                pieceIndex * this.torrent.getPieceLength() :
                 totalSize - thisPieceLength;
         return position;
     }
@@ -90,15 +97,16 @@ public class TorrentInfo {
         // tracker pattern example: udp://tracker.coppersurfer.tk:6969/scrapeMono
         String trackerPattern = "^(.*)://(\\d*\\.)?(.*):(\\d*)(.*)?$";
 
-        return this.torrent.getAnnounceList()
-                .stream()
-                .filter((String tracker) -> !tracker.equals("udp://9.rarbg.com:2710/scrapeMono")) // problematic tracker !!!!
-                .map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
-                .filter(Matcher::matches)
-                .map((Matcher matcher) -> new Tracker(matcher.group(1), matcher.group(3), Integer.parseInt(matcher.group(4))))
-                .filter(tracker -> !tracker.getConnectionType().equals("http"))
-                .filter(tracker -> !tracker.getConnectionType().equals("https"))
-                .collect(Collectors.toList());
+        return this.torrent.getAnnounceList() == null ?
+                Collections.emptyList() :
+                this.torrent.getAnnounceList().stream()
+                        .filter((String tracker) -> !tracker.equals("udp://9.rarbg.com:2710/scrapeMono")) // problematic tracker !!!!
+                        .map((String tracker) -> Pattern.compile(trackerPattern).matcher(tracker))
+                        .filter(Matcher::matches)
+                        .map((Matcher matcher) -> new Tracker(matcher.group(1), matcher.group(3), Integer.parseInt(matcher.group(4))))
+                        .filter(tracker -> !tracker.getConnectionType().equals("http"))
+                        .filter(tracker -> !tracker.getConnectionType().equals("https"))
+                        .collect(Collectors.toList());
     }
 
     public String getTorrentInfoHash() {
@@ -133,9 +141,10 @@ public class TorrentInfo {
                 "Info_hash: " + this.torrent.getInfo_hash() + "\n" +
                 "Name: " + this.torrent.getName() + "\n" +
                 "Piece Length: " + this.torrent.getPieceLength() + "\n" +
+                "Last Piece Length: " + this.getPieceLength(this.torrent.getPieces().size() - 1) + "\n" +
                 "Pieces: " + this.torrent.getPieces().size() + "\n" +
                 "Total Size: " + this.getTotalSize() + "\n" +
-                "Is Single File Torrent: " + this.torrent.isSingleFileTorrent() + "\n" +
+                "Is Single File Torrent: " + this.isSingleFileTorrent() + "\n" +
                 "File List:\n" + fileList + "\n" +
                 "Tracker List: \n" + trackers;
     }

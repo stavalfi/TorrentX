@@ -17,7 +17,7 @@ public class ErrorResponse extends TrackerResponse {
         assert getActionNumber() == 3;
         setTransactionId(receiveData.getInt());
         //TODO: need to check in torrent specification what is the size of the error message in bytes.
-        byte[] errorMessage = new byte[100];
+        byte[] errorMessage = new byte[1000];
         receiveData.get(errorMessage);
         this.errorMessage = new String(errorMessage);
     }

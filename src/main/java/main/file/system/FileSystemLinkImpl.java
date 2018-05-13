@@ -1,7 +1,6 @@
 package main.file.system;
 
 import christophedetroyer.torrent.TorrentFile;
-import main.App;
 import main.TorrentInfo;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentPieceStatus;
@@ -9,10 +8,11 @@ import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
-import main.torrent.status.TorrentStatusController;
+import main.torrent.status.Status;
+import main.torrent.status.StatusChanger;
+import main.torrent.status.StatusType;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,18 +32,18 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private final BitSet piecesStatus;
     private final long[] downloadedBytesInPieces;
     private final String downloadPath;
-    private TorrentStatusController torrentStatusController;
+    private StatusChanger statusChanger;
     private Flux<Integer> savedPiecesFlux;
     private Flux<PieceEvent> savedBlocksFlux;
-    private Mono<FileSystemLinkImpl> notifyWhenActiveTorrentDeleted;
-    private Mono<FileSystemLinkImpl> notifyWhenFilesDeleted;
+    private Mono<FileSystemLink> notifyWhenActiveTorrentDeleted;
+    private Mono<FileSystemLink> notifyWhenFilesDeleted;
 
     public FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
-                              TorrentStatusController torrentStatusController,
+                              StatusChanger statusChanger,
                               Flux<PieceMessage> peerResponsesFlux) throws IOException {
         super(torrentInfo);
         this.downloadPath = downloadPath;
-        this.torrentStatusController = torrentStatusController;
+        this.statusChanger = statusChanger;
         this.piecesStatus = new BitSet(getPieces().size());
         this.downloadedBytesInPieces = new long[getPieces().size()];
 
@@ -51,37 +51,41 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
         this.actualFileImplList = createActiveTorrentFileList(torrentInfo, downloadPath);
 
-        this.notifyWhenActiveTorrentDeleted = this.torrentStatusController
-                .notifyWhenFilesRemoved()
-                .flatMap(__ -> deleteFileOnlyMono())
-                .flux()
-                .replay(1)
-                .autoConnect(0)
-                .single();
-
-        this.notifyWhenFilesDeleted = this.torrentStatusController
-                .notifyWhenTorrentRemoved()
-                .flatMap(__ -> deleteActiveTorrentOnlyMono())
-                .flux()
-                .replay(1)
-                .autoConnect(0)
-                .single();
-
-        this.savedBlocksFlux = this.torrentStatusController
-                .isCompletedDownloadingFlux()
+        this.notifyWhenActiveTorrentDeleted = this.statusChanger
+                .getState$()
+                .filter(Status::isTorrentRemoved)
                 .take(1)
-                .flatMap(isCompletedDownloading -> {
+                .flatMap(__ -> deleteFileOnlyMono())
+                .replay(1)
+                .autoConnect(0)
+                .single();
+
+        this.notifyWhenFilesDeleted = this.statusChanger
+                .getState$()
+                .filter(Status::isFilesRemoved)
+                .take(1)
+                .flatMap(__ -> deleteActiveTorrentOnlyMono())
+                .replay(1)
+                .autoConnect(0)
+                .single();
+
+        this.savedBlocksFlux = this.statusChanger
+                .getLatestState$()
+                .map(Status::isCompletedDownloading)
+                .flatMapMany(isCompletedDownloading -> {
                     if (isCompletedDownloading) {
-                        this.piecesStatus.set(0, this.piecesStatus.size());
+                        this.piecesStatus.set(0, torrentInfo.getPieces().size());
                         return Mono.empty();
                     }
                     return peerResponsesFlux;
                 })
                 .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
                 .flatMap(this::writeBlock)
-                .doOnNext(pieceEvent -> {
+                .flatMap(pieceEvent -> {
                     if (minMissingPieceIndex() == -1)
-                        this.torrentStatusController.completedDownloading();
+                        return this.statusChanger.changeState(StatusType.COMPLETED_DOWNLOADING)
+                                .map(__ -> pieceEvent);
+                    return Mono.just(pieceEvent);
                 })
                 // takeUntil will signal the last next signal he received and then he will send complete signal.
                 .takeUntil(pieceEvent -> minMissingPieceIndex() == -1)
@@ -140,7 +144,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         return this.savedPiecesFlux;
     }
 
-    public Mono<FileSystemLinkImpl> deleteActiveTorrentOnlyMono() {
+    public Mono<FileSystemLink> deleteActiveTorrentOnlyMono() {
         return Flux.fromIterable(this.actualFileImplList)
                 .flatMap(ActualFile::closeFileChannel)
                 .collectList()
@@ -153,7 +157,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 });
     }
 
-    public Mono<FileSystemLinkImpl> deleteFileOnlyMono() {
+    public Mono<FileSystemLink> deleteFileOnlyMono() {
         return Flux.fromIterable(this.actualFileImplList)
                 .flatMap(ActualFile::closeFileChannel)
                 .collectList()
@@ -191,62 +195,62 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
     @Override
     public Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage) {
-//		if (!havePiece(requestMessage.getIndex()))
-//			return Mono.error(new PieceNotDownloadedYetException(requestMessage.getIndex()));
+        if (!havePiece(requestMessage.getIndex()))
+            return Mono.error(new PieceNotDownloadedYetException(requestMessage.getIndex()));
 
-        return Mono.<PieceMessage>create(sink -> {
-            byte[] result = new byte[requestMessage.getBlockLength()];
-            int freeIndexInResultArray = 0;
+        int pieceLength = super.getPieceLength(requestMessage.getIndex());
 
-            long from = super.getPieceStartPosition(requestMessage.getIndex());
-            long to = from + requestMessage.getBlockLength();
+        return BlocksAllocatorImpl.getInstance()
+                .createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
+                        requestMessage.getIndex(), requestMessage.getBegin(),
+                        requestMessage.getBlockLength(), pieceLength)
+                .flatMap(pieceMessage -> {
+                    long from = super.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
+                    long to = from + requestMessage.getBlockLength();
+                    int freeIndexInResultArray = pieceMessage.getAllocatedBlock().getOffset();
 
-            for (ActualFile actualFile : this.actualFileImplList) {
-                if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
-                    // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
-                    int howMuchToReadFromThisFile = (int) Math.min(actualFile.getTo() - from, to - from);
-                    byte[] tempResult;
-                    try {
-                        tempResult = actualFile.readBlock(from, howMuchToReadFromThisFile);
-                    } catch (IOException e) {
-                        sink.error(e);
-                        return;
+                    for (ActualFile actualFile : this.actualFileImplList) {
+                        if (from != to)
+                            if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
+                                // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
+                                int howMuchToReadFromThisFile = (int) Math.min(actualFile.getTo() - from, to - from);
+                                try {
+                                    actualFile.readBlock(from, howMuchToReadFromThisFile,
+                                            pieceMessage.getAllocatedBlock().getBlock(),
+                                            freeIndexInResultArray);
+                                    freeIndexInResultArray += howMuchToReadFromThisFile;
+                                } catch (IOException e) {
+                                    return Mono.error(e);
+                                }
+                                from += howMuchToReadFromThisFile;
+                            }
                     }
-                    for (byte aTempResult : tempResult)
-                        result[freeIndexInResultArray++] = aTempResult;
-
-                    from += howMuchToReadFromThisFile;
-                    if (from == to) {
-                        PieceMessage pieceMessage = new PieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
-                                requestMessage.getIndex(), requestMessage.getBegin(), result);
-                        sink.success(pieceMessage);
-                        return;
-                    }
-                }
-            }
-        }).subscribeOn(App.MyScheduler);
+                    return Mono.just(pieceMessage);
+                });
     }
 
     private Mono<PieceEvent> writeBlock(PieceMessage pieceMessage) {
         if (havePiece(pieceMessage.getIndex()) ||
-                this.downloadedBytesInPieces[pieceMessage.getIndex()] > pieceMessage.getBegin() + pieceMessage.getBlock().length)
+                this.downloadedBytesInPieces[pieceMessage.getIndex()] > pieceMessage.getBegin() +
+                        pieceMessage.getAllocatedBlock().getLength())
             // I already have the received block. I don't need it.
             return Mono.empty();
 
-        return Mono.<PieceEvent>create(sink -> {
+        return Mono.create(sink -> {
             long from = super.getPieceStartPosition(pieceMessage.getIndex()) + pieceMessage.getBegin();
-            long to = from + pieceMessage.getBlock().length;
+            long to = from + pieceMessage.getAllocatedBlock().getLength();
 
             // from which position the ActualFileImpl object needs to write to filesystem from the given block array.
-            int arrayIndexFrom = 0;
+            int arrayIndexFrom = pieceMessage.getAllocatedBlock().getOffset();
 
             for (ActualFile actualFile : this.actualFileImplList)
                 if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
                     // (to-from)<=piece.length <= file.size , request.length<= Integer.MAX_VALUE
-                    // so: (Math.min(to, actualFileImpl.getTo()) - from) <= Integer.MAX_VALUE
+                    // so: (Math.min(to, actualFileImpl.getLength()) - from) <= Integer.MAX_VALUE
                     int howMuchToWriteFromArray = (int) Math.min(actualFile.getTo() - from, to - from);
                     try {
-                        actualFile.writeBlock(from, pieceMessage.getBlock(), arrayIndexFrom, howMuchToWriteFromArray);
+                        actualFile.writeBlock(from, pieceMessage.getAllocatedBlock().getBlock(), arrayIndexFrom,
+                                howMuchToWriteFromArray);
                     } catch (IOException e) {
                         sink.error(e);
                         return;
@@ -259,27 +263,23 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 }
 
             // update pieces status:
-
-            // there maybe multiple writes of the same pieceRequest during one execution...
+            // Note: The download algorithm doesn't download multiple blocks of the same piece.
+            // so we won;t update the following cell concurrently.
+            this.downloadedBytesInPieces[pieceMessage.getIndex()] += pieceMessage.getAllocatedBlock().getLength();
             long pieceLength = getPieceLength(pieceMessage.getIndex());
-            this.downloadedBytesInPieces[pieceMessage.getIndex()] += pieceMessage.getBlock().length;
             if (pieceLength < this.downloadedBytesInPieces[pieceMessage.getIndex()])
                 this.downloadedBytesInPieces[pieceMessage.getIndex()] = getPieceLength(pieceMessage.getIndex());
 
             long howMuchWeWroteUntilNowInThisPiece = this.downloadedBytesInPieces[pieceMessage.getIndex()];
             if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
-                // update pieces partial status array:
-                // TODO: WARNING: this line *only* must be synchronized among multiple threads!
                 this.piecesStatus.set(pieceMessage.getIndex());
                 PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.COMPLETED, pieceMessage);
                 sink.success(pieceEvent);
             } else {
-                // update pieces partial status array:
-                // TODO: WARNING: this line *only* must be synchronized among multiple threads!
                 PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.DOWNLOADING, pieceMessage);
                 sink.success(pieceEvent);
             }
-        }).subscribeOn(Schedulers.single());
+        });
     }
 
     private List<ActualFile> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) throws IOException {
@@ -287,7 +287,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 downloadPath + torrentInfo.getName() + File.separator :
                 downloadPath;
 
-        // create activeTorrentFile list
+        // waitForMessage activeTorrentFile list
         long position = 0;
         List<ActualFile> actualFileList = new ArrayList<>();
         for (TorrentFile torrentFile : torrentInfo.getFileList()) {
@@ -296,7 +296,8 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     .stream()
                     .collect(Collectors.joining(File.separator, mainFolder, ""));
             SeekableByteChannel seekableByteChannel = createFile(filePath);
-            ActualFile actualFile = new ActualFileImpl(filePath, position, position + torrentFile.getFileLength(), seekableByteChannel);
+            ActualFile actualFile = new ActualFileImpl(filePath, position, position + torrentFile.getFileLength(),
+                    seekableByteChannel);
             actualFileList.add(actualFile);
             position += torrentFile.getFileLength();
         }
@@ -309,26 +310,26 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.SPARSE,
                 StandardOpenOption.READ
-                // TODO: think if we add CREATE if exist rule.
         };
         return Files.newByteChannel(Paths.get(filePathToCreate), options);
     }
 
     private void createFolders(TorrentInfo torrentInfo, String downloadPath) {
-        // create main folder for the download of the torrent.
+        // waitForMessage main folder for the download of the torrent.
         String mainFolder = !torrentInfo.isSingleFileTorrent() ?
                 downloadPath + torrentInfo.getName() + File.separator :
                 downloadPath;
         createFolder(mainFolder);
 
-        // create sub folders for the download of the torrent
+        // waitForMessage sub folders for the download of the torrent
         torrentInfo.getFileList()
                 .stream()
                 .map(christophedetroyer.torrent.TorrentFile::getFileDirs)
-                .filter(folders -> folders.size() > 1)
-                .map(folders -> folders.subList(0, folders.size() - 2))
-                .map(List::stream)
+                .filter(fileAndFolders -> fileAndFolders.size() > 1)
+                .map(fileAndFolders -> fileAndFolders.subList(0, fileAndFolders.size() - 1))
+                .map(strings -> strings.stream())
                 .map(stringStream -> stringStream.collect(Collectors.joining(File.separator, mainFolder, "")))
+                .distinct()
                 .forEach(this::createFolder);
     }
 
@@ -358,11 +359,11 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         Files.delete(directoryToBeDeleted.toPath());
     }
 
-    public Mono<FileSystemLinkImpl> getNotifyWhenActiveTorrentDeleted() {
+    public Mono<FileSystemLink> getNotifyWhenActiveTorrentDeleted() {
         return this.notifyWhenActiveTorrentDeleted;
     }
 
-    public Mono<FileSystemLinkImpl> getNotifyWhenFilesDeleted() {
+    public Mono<FileSystemLink> getNotifyWhenFilesDeleted() {
         return this.notifyWhenFilesDeleted;
     }
 }
