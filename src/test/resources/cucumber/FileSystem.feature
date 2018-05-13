@@ -38,6 +38,23 @@ Feature: create get and delete active torrents
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
       | ComplexFolderStructure.torrent            | torrents-test    |
 
+  Scenario Outline: we delete active torrent and files twice
+    When application create active-torrent for: "<torrent>","<downloadLocation>"
+    Then application delete active-torrent: "<torrent>": "true" and file: "true"
+    When application create active-torrent for: "<torrent>","<downloadLocation>"
+    Then application delete active-torrent: "<torrent>": "true" and file: "true"
+
+    Then active-torrent exist: "false" for torrent: "<torrent>"
+    Then files of torrent: "<torrent>" exist: "false" in "<downloadLocation>"
+    Then active-torrent exist: "false" for torrent: "<torrent>"
+
+    Examples:
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
+
   Scenario Outline: we delete active torrent and file
     When application create active-torrent for: "<torrent>","<downloadLocation>"
     Then application delete active-torrent: "<torrent>": "true" and file: "true"
@@ -97,5 +114,5 @@ Feature: create get and delete active torrents
     And the saved-blocks-flux send  complete signal - for torrent: "<torrent>","<downloadLocation>"
 
     Examples:
-      | torrent                                   | downloadLocation |
-      | ComplexFolderStructure.torrent            | torrents-test    |
+      | torrent                        | downloadLocation |
+      | ComplexFolderStructure.torrent | torrents-test    |
