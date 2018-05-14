@@ -15,9 +15,8 @@ import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
-import main.torrent.status.Status;
-import main.torrent.status.StatusChanger;
-import main.torrent.status.StatusType;
+import main.torrent.status.TorrentStatusStore;
+import main.torrent.status.reducers.Reducer;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import org.junit.Assert;
@@ -70,15 +69,16 @@ public class Utils {
         }
 
 
-        Mono<List<StatusChanger>> torrentDownloadersListMono = TorrentDownloaders.getInstance()
+        Mono<List<TorrentStatusStore>> torrentDownloadersListMono = TorrentDownloaders.getInstance()
                 .getTorrentDownloadersFlux()
                 .doOnNext(torrentDownloader -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash()))
-                .map(TorrentDownloader::getStatusChanger)
+                .map(TorrentDownloader::getTorrentStatusStore)
                 .doOnNext(statusChanger -> {
-                    statusChanger.changeState(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
-                    statusChanger.changeState(StatusType.PAUSE_SEARCHING_PEERS).block();
-                    statusChanger.changeState(StatusType.PAUSE_DOWNLOAD).block();
-                    statusChanger.changeState(StatusType.PAUSE_UPLOAD).block();
+                    // TODO: uncomment
+//                    statusChanger.changeState(Action.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
+//                    statusChanger.changeState(Action.PAUSE_SEARCHING_PEERS).block();
+//                    statusChanger.changeState(Action.PAUSE_DOWNLOAD).block();
+//                    statusChanger.changeState(Action.PAUSE_UPLOAD).block();
                 })
                 .collectList();
         try {
@@ -86,15 +86,15 @@ public class Utils {
         } catch (Exception e) {
             //e.printStackTrace();
         }
-
-        if (peersListener != null) {
-            try {
-                peersListener.stopListenForNewPeers();
-            } catch (IOException e) {
-
-            }
-            peersListener = null;
-        }
+        // TODO: uncomment
+//        if (peersListener != null) {
+//            try {
+////                peersListener.stopListenForNewPeers();
+//            } catch (IOException e) {
+//
+//            }
+//            peersListener = null;
+//        }
 
         // delete download folder from last test
         Utils.deleteDownloadFolder();
@@ -105,24 +105,9 @@ public class Utils {
                 .block();
     }
 
-    public static Status createDefaultFalseStatus() {
-        return new Status(
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false);
-    }
-
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
         return createDefaultTorrentDownloader(torrentInfo, downloadPath,
-                new StatusChanger(createDefaultFalseStatus()));
+                new TorrentStatusStore(Reducer.defaultTorrentStateSupplier.get()));
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
@@ -130,12 +115,13 @@ public class Utils {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
-        StatusChanger statusChanger = new StatusChanger(createDefaultFalseStatus());
+        TorrentStatusStore torrentStatusStore = new TorrentStatusStore(Reducer.defaultTorrentStateSupplier.get());
 
-        peersListener = new PeersListener(statusChanger);
+        peersListener = new PeersListener(torrentStatusStore);
 
-        Flux<Link> searchingPeers$ = statusChanger.getState$()
-                .filter(Status::isStartedSearchingPeers)
+        Flux<Link> searchingPeers$ = torrentStatusStore.getState$()
+                // TODO: uncomment this
+//                .filter(Status::isStartedSearchingPeers)
                 .take(1)
                 .flatMap(__ ->
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
@@ -153,14 +139,14 @@ public class Utils {
                         .autoConnect(0);
 
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, downloadPath, statusChanger,
+                .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusStore,
                         peersCommunicatorFlux.map(Link::receivePeerMessages)
                                 .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 BittorrentAlgorithmInitializer.v1(torrentInfo,
-                        statusChanger,
+                        torrentStatusStore,
                         fileSystemLink,
                         peersCommunicatorFlux);
 
@@ -172,7 +158,7 @@ public class Utils {
                 .createTorrentDownloader(torrentInfo,
                         fileSystemLink,
                         bittorrentAlgorithm,
-                        statusChanger,
+                        torrentStatusStore,
                         torrentSpeedStatistics,
                         trackerProvider,
                         peersProvider,
@@ -181,7 +167,7 @@ public class Utils {
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
-                                                                   StatusChanger statusChanger) {
+                                                                   TorrentStatusStore torrentStatusStore) {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
@@ -189,10 +175,11 @@ public class Utils {
                 trackerProvider.connectToTrackersFlux()
                         .autoConnect();
 
-        peersListener = new PeersListener(statusChanger);
+        peersListener = new PeersListener(torrentStatusStore);
 
-        Flux<Link> searchingPeers$ = statusChanger.getState$()
-                .filter(Status::isStartedSearchingPeers)
+        Flux<Link> searchingPeers$ = torrentStatusStore.getState$()
+                // TODO: uncomment this
+//                .filter(Status::isStartedSearchingPeers)
                 .take(1)
                 .flatMap(__ ->
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
@@ -207,14 +194,14 @@ public class Utils {
                         .autoConnect(0);
 
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, downloadPath, statusChanger,
+                .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusStore,
                         peersCommunicatorFlux.map(Link::receivePeerMessages)
                                 .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 BittorrentAlgorithmInitializer.v1(torrentInfo,
-                        statusChanger,
+                        torrentStatusStore,
                         fileSystemLink,
                         peersCommunicatorFlux);
 
@@ -226,7 +213,7 @@ public class Utils {
                 .createTorrentDownloader(torrentInfo,
                         fileSystemLink,
                         bittorrentAlgorithm,
-                        statusChanger,
+                        torrentStatusStore,
                         torrentSpeedStatistics,
                         trackerProvider,
                         peersProvider,
@@ -235,16 +222,17 @@ public class Utils {
     }
 
     public static TorrentDownloader createCustomTorrentDownloader(TorrentInfo torrentInfo,
-                                                                  StatusChanger statusChanger,
+                                                                  TorrentStatusStore torrentStatusStore,
                                                                   FileSystemLink fileSystemLink,
                                                                   Flux<TrackerConnection> trackerConnectionConnectableFlux) {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
-        peersListener = new PeersListener(statusChanger);
+        peersListener = new PeersListener(torrentStatusStore);
 
-        Flux<Link> searchingPeers$ = statusChanger.getState$()
-                .filter(Status::isStartedSearchingPeers)
+        Flux<Link> searchingPeers$ = torrentStatusStore.getState$()
+                // TODO: uncomment this:
+//                .filter(Status::isStartedSearchingPeers)
                 .take(1)
                 .flatMap(__ ->
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
@@ -265,7 +253,7 @@ public class Utils {
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 BittorrentAlgorithmInitializer.v1(torrentInfo,
-                        statusChanger,
+                        torrentStatusStore,
                         fileSystemLink,
                         peersCommunicatorFlux);
 
@@ -277,7 +265,7 @@ public class Utils {
                 .createTorrentDownloader(torrentInfo,
                         fileSystemLink,
                         bittorrentAlgorithm,
-                        statusChanger,
+                        torrentStatusStore,
                         torrentSpeedStatistics,
                         trackerProvider,
                         peersProvider,
@@ -330,8 +318,8 @@ public class Utils {
                 })
                 .flatMap(pieceMessageToSave -> {
                     ConnectableFlux<PieceMessage> pieceMessageFlux = Flux.just(pieceMessageToSave).publish();
-                    StatusChanger statusChanger = new StatusChanger(Utils.createDefaultFalseStatus());
-                    return activeTorrents.createActiveTorrentMono(link.getTorrentInfo(), downloadPath, statusChanger, pieceMessageFlux)
+                    TorrentStatusStore torrentStatusStore = new TorrentStatusStore(Reducer.defaultTorrentStateSupplier.get());
+                    return activeTorrents.createActiveTorrentMono(link.getTorrentInfo(), downloadPath, torrentStatusStore, pieceMessageFlux)
                             .flatMap(fileSystemLink -> {
                                 Flux<PieceEvent> savedPieces$ = fileSystemLink.savedBlockFlux()
                                         .replay()

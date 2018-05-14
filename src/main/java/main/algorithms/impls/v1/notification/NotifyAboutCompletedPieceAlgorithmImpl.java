@@ -7,7 +7,7 @@ import main.downloader.TorrentPieceStatus;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.peerMessages.PieceMessage;
-import main.torrent.status.StatusChanger;
+import main.torrent.status.TorrentStatusStore;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -16,18 +16,18 @@ import java.util.concurrent.TimeoutException;
 
 public class NotifyAboutCompletedPieceAlgorithmImpl implements NotifyAboutCompletedPieceAlgorithm {
     private TorrentInfo torrentInfo;
-    private StatusChanger statusChanger;
+    private TorrentStatusStore torrentStatusStore;
     private FileSystemLink fileSystemLink;
     private Flux<Link> recordedFreePeerFlux;
 
     private Flux<Integer> notifiedCompletedPiecesFlux;
 
     public NotifyAboutCompletedPieceAlgorithmImpl(TorrentInfo torrentInfo,
-                                                  StatusChanger statusChanger,
+                                                  TorrentStatusStore torrentStatusStore,
                                                   FileSystemLink fileSystemLink,
                                                   Flux<Link> recordedFreePeerFlux) {
         this.torrentInfo = torrentInfo;
-        this.statusChanger = statusChanger;
+        this.torrentStatusStore = torrentStatusStore;
         this.fileSystemLink = fileSystemLink;
         this.recordedFreePeerFlux = recordedFreePeerFlux;
 

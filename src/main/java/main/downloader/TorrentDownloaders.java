@@ -11,8 +11,8 @@ import main.peer.PeersProvider;
 import main.peer.ReceiveMessagesNotifications;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
-import main.torrent.status.Status;
-import main.torrent.status.StatusChanger;
+import main.torrent.status.reducers.Reducer;
+import main.torrent.status.TorrentStatusStore;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import reactor.core.publisher.Flux;
@@ -36,7 +36,7 @@ public class TorrentDownloaders {
     public synchronized TorrentDownloader createTorrentDownloader(TorrentInfo torrentInfo,
                                                                   FileSystemLink fileSystemLink,
                                                                   BittorrentAlgorithm bittorrentAlgorithm,
-                                                                  StatusChanger statusChanger,
+                                                                  TorrentStatusStore torrentStatusStore,
                                                                   SpeedStatistics torrentSpeedStatistics,
                                                                   TrackerProvider trackerProvider,
                                                                   PeersProvider peersProvider,
@@ -47,7 +47,7 @@ public class TorrentDownloaders {
                     TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
                             fileSystemLink,
                             bittorrentAlgorithm,
-                            statusChanger,
+                            torrentStatusStore,
                             torrentSpeedStatistics,
                             trackerProvider,
                             peersProvider,
@@ -92,22 +92,13 @@ public class TorrentDownloaders {
                         .autoConnect();
 
         // TODO: save the initial status in the mongodb.
-        StatusChanger statusChanger = new StatusChanger(new Status(
-                false,
-                false,
-                false,
-                false,
-                false, false,
-                false,
-                false,
-                false,
-                false,
-                false));
+        TorrentStatusStore torrentStatusStore = new TorrentStatusStore(Reducer.defaultTorrentStateSupplier.get());
 
-        PeersListener peersListener = new PeersListener(statusChanger);
+        PeersListener peersListener = new PeersListener(torrentStatusStore);
 
-        Flux<Link> searchingPeers$ = statusChanger.getState$()
-                .filter(Status::isStartedSearchingPeers)
+        Flux<Link> searchingPeers$ = torrentStatusStore.getState$()
+                // TODO: uncomment
+//                .filter(Status::isStartedSearchingPeers)
                 .take(1)
                 .flatMap(__ ->
                         peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
@@ -122,14 +113,14 @@ public class TorrentDownloaders {
                         .autoConnect(0);
 
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, downloadPath, statusChanger,
+                .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusStore,
                         peersCommunicatorFlux.map(Link::receivePeerMessages)
                                 .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 BittorrentAlgorithmInitializer.v1(torrentInfo,
-                        statusChanger,
+                        torrentStatusStore,
                         fileSystemLink,
                         peersCommunicatorFlux);
 
@@ -141,7 +132,7 @@ public class TorrentDownloaders {
                 .createTorrentDownloader(torrentInfo,
                         fileSystemLink,
                         bittorrentAlgorithm,
-                        statusChanger,
+                        torrentStatusStore,
                         torrentSpeedStatistics,
                         trackerProvider,
                         peersProvider,

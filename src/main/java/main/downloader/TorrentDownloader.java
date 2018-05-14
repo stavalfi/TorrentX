@@ -6,7 +6,7 @@ import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.PeersProvider;
 import main.statistics.SpeedStatistics;
-import main.torrent.status.StatusChanger;
+import main.torrent.status.TorrentStatusStore;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import reactor.core.publisher.Flux;
@@ -16,7 +16,7 @@ public class TorrentDownloader {
     private TorrentInfo torrentInfo;
     private FileSystemLink fileSystemLink;
     private BittorrentAlgorithm bittorrentAlgorithm;
-    private StatusChanger statusChanger;
+    private TorrentStatusStore torrentStatusStore;
     private SpeedStatistics torrentSpeedStatistics;
 
     private TrackerProvider trackerProvider;
@@ -27,7 +27,7 @@ public class TorrentDownloader {
     public TorrentDownloader(TorrentInfo torrentInfo,
                              FileSystemLink fileSystemLink,
                              BittorrentAlgorithm bittorrentAlgorithm,
-                             StatusChanger statusChanger,
+                             TorrentStatusStore torrentStatusStore,
                              SpeedStatistics torrentSpeedStatistics,
                              TrackerProvider trackerProvider,
                              PeersProvider peersProvider,
@@ -36,7 +36,7 @@ public class TorrentDownloader {
         this.torrentInfo = torrentInfo;
         this.fileSystemLink = fileSystemLink;
         this.bittorrentAlgorithm = bittorrentAlgorithm;
-        this.statusChanger = statusChanger;
+        this.torrentStatusStore = torrentStatusStore;
         this.torrentSpeedStatistics = torrentSpeedStatistics;
         this.trackerProvider = trackerProvider;
         this.peersProvider = peersProvider;
@@ -48,8 +48,8 @@ public class TorrentDownloader {
         return bittorrentAlgorithm;
     }
 
-    public StatusChanger getStatusChanger() {
-        return statusChanger;
+    public TorrentStatusStore getTorrentStatusStore() {
+        return torrentStatusStore;
     }
 
     public FileSystemLink getFileSystemLink() {

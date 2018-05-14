@@ -7,8 +7,7 @@ import main.algorithms.PiecesDownloader;
 import main.file.system.BlocksAllocatorImpl;
 import main.file.system.FileSystemLink;
 import main.peer.PeerExceptions;
-import main.torrent.status.Status;
-import main.torrent.status.StatusChanger;
+import main.torrent.status.TorrentStatusStore;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -18,7 +17,7 @@ import java.util.function.Function;
 
 public class PiecesDownloaderImpl implements PiecesDownloader {
     private TorrentInfo torrentInfo;
-    private StatusChanger statusChanger;
+    private TorrentStatusStore torrentStatusStore;
     private PeersToPiecesMapper peersToPiecesMapper;
     private FileSystemLink fileSystemLink;
     private BlockDownloader blockDownloader;
@@ -26,19 +25,20 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
     private Flux<Integer> downloadedPiecesFlux;
 
     public PiecesDownloaderImpl(TorrentInfo torrentInfo,
-                                StatusChanger statusChanger,
+                                TorrentStatusStore torrentStatusStore,
                                 FileSystemLink fileSystemLink,
                                 PeersToPiecesMapper peersToPiecesMapper,
                                 BlockDownloader blockDownloader) {
         this.torrentInfo = torrentInfo;
-        this.statusChanger = statusChanger;
+        this.torrentStatusStore = torrentStatusStore;
         this.peersToPiecesMapper = peersToPiecesMapper;
         this.fileSystemLink = fileSystemLink;
         this.blockDownloader = blockDownloader;
 
         // TODO: note: if we ask for notification AFTER the download started, we will lose the notification.
-        downloadedPiecesFlux = statusChanger.getState$()
-                .filter(Status::isStartedDownload)
+        downloadedPiecesFlux = torrentStatusStore.getState$()
+                // TODO: uncomment
+                //.filter(TorrentStatusState::isStartedDownload)
                 .take(1)
                 .flatMap(__ -> this.peersToPiecesMapper.getAvailablePiecesFlux())
                 .flatMap(pieceIndex -> downloadPieceMono(pieceIndex)

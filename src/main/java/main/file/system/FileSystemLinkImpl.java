@@ -8,9 +8,7 @@ import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
-import main.torrent.status.Status;
-import main.torrent.status.StatusChanger;
-import main.torrent.status.StatusType;
+import main.torrent.status.TorrentStatusStore;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -32,16 +30,16 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private final BitSet piecesStatus;
     private final long[] downloadedBytesInPieces;
     private final String downloadPath;
-    private StatusChanger statusChanger;
+    private TorrentStatusStore torrentStatusStore;
     private Flux<Integer> savedPiecesFlux;
     private Flux<PieceEvent> savedBlocksFlux;
 
     public FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
-                              StatusChanger statusChanger,
+                              TorrentStatusStore torrentStatusStore,
                               Flux<PieceMessage> peerResponsesFlux) throws IOException {
         super(torrentInfo);
         this.downloadPath = downloadPath;
-        this.statusChanger = statusChanger;
+        this.torrentStatusStore = torrentStatusStore;
         this.piecesStatus = new BitSet(getPieces().size());
         this.downloadedBytesInPieces = new long[getPieces().size()];
 
@@ -49,28 +47,31 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
         this.actualFileImplList = createActiveTorrentFileList(torrentInfo, downloadPath);
 
-        this.savedBlocksFlux = this.statusChanger
-                .getLatestState$()
-                .map(Status::isCompletedDownloading)
-                .flatMapMany(isCompletedDownloading -> {
-                    if (isCompletedDownloading) {
-                        this.piecesStatus.set(0, torrentInfo.getPieces().size());
-                        return Mono.empty();
-                    }
-                    return peerResponsesFlux;
-                })
-                .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
-                .flatMap(this::writeBlock)
-                .flatMap(pieceEvent -> {
-                    if (minMissingPieceIndex() == -1)
-                        return this.statusChanger.changeState(StatusType.COMPLETED_DOWNLOADING)
-                                .map(__ -> pieceEvent);
-                    return Mono.just(pieceEvent);
-                })
-                // takeUntil will signal the last next signal he received and then he will send complete signal.
-                .takeUntil(pieceEvent -> minMissingPieceIndex() == -1)
-                .publish()
-                .autoConnect(0);
+        // TODO: uncomment
+        this.savedBlocksFlux = Flux.never();
+//        this.torrentStatusStore
+//                .getLatestState$()
+//                .map(Status::isCompletedDownloading)
+//                .flatMapMany(isCompletedDownloading -> {
+//                    if (isCompletedDownloading) {
+//                        this.piecesStatus.set(0, torrentInfo.getPieces().size());
+//                        return Mono.empty();
+//                    }
+//                    return peerResponsesFlux;
+//                })
+//                .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
+//                .flatMap(this::writeBlock)
+//                .flatMap(pieceEvent -> {
+//                    // TODO: uncomment
+////                    if (minMissingPieceIndex() == -1)
+////                        return this.torrentStatusStore.changeState(Action.COMPLETED_DOWNLOADING)
+////                                .map(__ -> pieceEvent);
+//                    return Mono.just(pieceEvent);
+//                })
+//                // takeUntil will signal the last next signal he received and then he will send complete signal.
+//                .takeUntil(pieceEvent -> minMissingPieceIndex() == -1)
+//                .publish()
+//                .autoConnect(0);
 
         this.savedPiecesFlux = this.savedBlocksFlux
                 .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
@@ -134,9 +135,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     if (deletedActiveTorrent)
                         return Mono.just(this);
                     return Mono.error(new Exception("FileSystemLinkImpl object not exist."));
-                })
-                .flatMap(fileSystemLink -> this.statusChanger.changeState(StatusType.REMOVE_TORRENT)
-                        .map(status -> fileSystemLink));
+                });// TODO: uncomment
+//                .flatMap(fileSystemLink -> this.torrentStatusStore.changeState(Action.REMOVE_TORRENT)
+//                        .map(status -> fileSystemLink));
     }
 
     public Mono<FileSystemLink> deleteFileOnlyMono() {
@@ -151,9 +152,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     // I will delete this file at the next operator.
                     String torrentDirectoryPath = this.downloadPath + this.getName();
                     return completelyDeleteFolder(torrentDirectoryPath);
-                })
-                .flatMap(fileSystemLink -> this.statusChanger.changeState(StatusType.REMOVE_FILES)
-                        .map(status -> fileSystemLink));
+                });// TODO: uncomment
+//                .flatMap(fileSystemLink -> this.torrentStatusStore.changeState(Action.REMOVE_FILES)
+//                        .map(status -> fileSystemLink));
     }
 
     @Override
