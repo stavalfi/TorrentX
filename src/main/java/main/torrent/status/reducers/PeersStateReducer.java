@@ -76,7 +76,7 @@ public class PeersStateReducer {
                 if (isCompletedOrInProgress ||
                         isSomethingRemovedOrInRemoveOrInProgress ||
                         peersState.isPauseSearchingPeersInProgress() ||
-                        peersState.isStartedSearchingPeersWindUp() ||
+                        !peersState.isStartedSearchingPeersWindUp() ||
                         peersState.isResumeSearchingPeersInProgress() ||
                         peersState.isResumeSearchingPeersWindUp())
                     return peersState;
@@ -137,7 +137,7 @@ public class PeersStateReducer {
                 if (isCompletedOrInProgress ||
                         isSomethingRemovedOrInRemoveOrInProgress ||
                         peersState.isPauseListeningToIncomingPeersInProgress() ||
-                        peersState.isStartedListeningToIncomingPeersWindUp() ||
+                        !peersState.isStartedListeningToIncomingPeersWindUp() ||
                         peersState.isResumeListeningToIncomingPeersInProgress() ||
                         peersState.isResumeListeningToIncomingPeersWindUp())
                     return peersState;

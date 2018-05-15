@@ -130,7 +130,7 @@ public class Utils {
 
         PeersState peersState = PeersState.PeersStateBuilder.builder()
                 .setStartedListeningToIncomingPeersInProgress(actions.contains(Action.START_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
-                .setStartedListeningToIncomingPeersWindUp(actions.contains(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_WIND_UP))
+                .setStartedListeningToIncomingPeersWindUp(actions.contains(Action.START_LISTENING_TO_INCOMING_PEERS_WIND_UP))
                 .setPauseListeningToIncomingPeersInProgress(actions.contains(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
                 .setPauseListeningToIncomingPeersWindUp(actions.contains(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_WIND_UP))
                 .setResumeListeningToIncomingPeersInProgress(actions.contains(Action.RESUME_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
