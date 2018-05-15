@@ -28,7 +28,7 @@ public class DownloadStateReducer {
     public DownloadState reducer(TorrentStatusState lastState, Action action) {
         DownloadState downloadState = lastState.getDownloadState();
 
-        boolean isSomethingRemovedOrInRemove = lastState.getTorrentFileSystemState().isFilesRemovedInProgress() ||
+        boolean isSomethingRemovedOrInRemoveOrInProgress = lastState.getTorrentFileSystemState().isFilesRemovedInProgress() ||
                 lastState.getTorrentFileSystemState().isFilesRemovedWindUp() ||
                 lastState.getTorrentFileSystemState().isTorrentRemovedInProgress() ||
                 lastState.getTorrentFileSystemState().isTorrentRemovedWindUp();
@@ -39,7 +39,7 @@ public class DownloadStateReducer {
             default:
                 return lastState.getDownloadState();
             case START_DOWNLOAD_IN_PROGRESS:
-                if (isSomethingRemovedOrInRemove ||
+                if (isSomethingRemovedOrInRemoveOrInProgress ||
                         downloadState.isCompletedDownloadingInProgress() ||
                         downloadState.isCompletedDownloadingWindUp() ||
                         downloadState.isStartDownloadInProgress() ||
@@ -54,7 +54,7 @@ public class DownloadStateReducer {
                         .setCompletedDownloadingWindUp(false)
                         .build();
             case START_DOWNLOAD_WIND_UP:
-                if (isSomethingRemovedOrInRemove ||
+                if (isSomethingRemovedOrInRemoveOrInProgress ||
                         downloadState.isCompletedDownloadingInProgress() ||
                         downloadState.isCompletedDownloadingWindUp() ||
                         !downloadState.isStartDownloadInProgress() ||
@@ -69,8 +69,7 @@ public class DownloadStateReducer {
                         .setCompletedDownloadingWindUp(false)
                         .build();
             case PAUSE_DOWNLOAD_IN_PROGRESS:
-                if (isSomethingRemovedOrInRemove ||
-                        downloadState.isCompletedDownloadingInProgress() ||
+                if (downloadState.isCompletedDownloadingInProgress() ||
                         downloadState.isCompletedDownloadingWindUp() ||
                         downloadState.isStartDownloadInProgress() ||
                         !downloadState.isStartDownloadWindUp() ||
@@ -88,8 +87,7 @@ public class DownloadStateReducer {
                         .setCompletedDownloadingWindUp(false)
                         .build();
             case PAUSE_DOWNLOAD_WIND_UP:
-                if (isSomethingRemovedOrInRemove ||
-                        downloadState.isCompletedDownloadingInProgress() ||
+                if (downloadState.isCompletedDownloadingInProgress() ||
                         downloadState.isCompletedDownloadingWindUp() ||
                         downloadState.isStartDownloadInProgress() ||
                         !downloadState.isStartDownloadWindUp() ||
@@ -107,7 +105,7 @@ public class DownloadStateReducer {
                         .setCompletedDownloadingWindUp(false)
                         .build();
             case RESUME_DOWNLOAD_IN_PROGRESS:
-                if (isSomethingRemovedOrInRemove ||
+                if (isSomethingRemovedOrInRemoveOrInProgress ||
                         downloadState.isCompletedDownloadingInProgress() ||
                         downloadState.isCompletedDownloadingWindUp() ||
                         downloadState.isStartDownloadInProgress() ||
@@ -126,7 +124,7 @@ public class DownloadStateReducer {
                         .setCompletedDownloadingWindUp(false)
                         .build();
             case RESUME_DOWNLOAD_WIND_UP:
-                if (isSomethingRemovedOrInRemove ||
+                if (isSomethingRemovedOrInRemoveOrInProgress ||
                         downloadState.isCompletedDownloadingInProgress() ||
                         downloadState.isCompletedDownloadingWindUp() ||
                         downloadState.isStartDownloadInProgress() ||
@@ -147,7 +145,7 @@ public class DownloadStateReducer {
 
 
             case START_UPLOAD_IN_PROGRESS:
-                if (isSomethingRemovedOrInRemove ||
+                if (isSomethingRemovedOrInRemoveOrInProgress ||
                         downloadState.isStartUploadInProgress() ||
                         downloadState.isStartUploadWindUp())
                     return lastState.getDownloadState();
@@ -158,7 +156,7 @@ public class DownloadStateReducer {
                         .setPauseUploadInProgress(false)
                         .build();
             case START_UPLOAD_WIND_UP:
-                if (isSomethingRemovedOrInRemove ||
+                if (isSomethingRemovedOrInRemoveOrInProgress ||
                         !downloadState.isStartUploadInProgress() ||
                         downloadState.isStartUploadWindUp())
                     return lastState.getDownloadState();
@@ -169,8 +167,7 @@ public class DownloadStateReducer {
                         .setPauseUploadInProgress(false)
                         .build();
             case PAUSE_UPLOAD_IN_PROGRESS:
-                if (isSomethingRemovedOrInRemove ||
-                        downloadState.isStartUploadInProgress() ||
+                if (downloadState.isStartUploadInProgress() ||
                         !downloadState.isStartUploadWindUp() ||
                         downloadState.isPauseUploadInProgress() ||
                         downloadState.isPauseUploadWindUp())
@@ -184,8 +181,7 @@ public class DownloadStateReducer {
                         .setResumeUploadWindUp(false)
                         .build();
             case PAUSE_UPLOAD_WIND_UP:
-                if (isSomethingRemovedOrInRemove ||
-                        downloadState.isStartUploadInProgress() ||
+                if (downloadState.isStartUploadInProgress() ||
                         !downloadState.isStartUploadWindUp() ||
                         !downloadState.isPauseUploadInProgress() ||
                         downloadState.isPauseUploadWindUp())
@@ -199,7 +195,7 @@ public class DownloadStateReducer {
                         .setResumeUploadWindUp(false)
                         .build();
             case RESUME_UPLOAD_IN_PROGRESS:
-                if (isSomethingRemovedOrInRemove ||
+                if (isSomethingRemovedOrInRemoveOrInProgress ||
                         downloadState.isStartUploadInProgress() ||
                         !downloadState.isStartUploadWindUp() ||
                         downloadState.isResumeUploadInProgress() ||
@@ -214,7 +210,7 @@ public class DownloadStateReducer {
                         .setResumeUploadWindUp(false)
                         .build();
             case RESUME_UPLOAD_WIND_UP:
-                if (isSomethingRemovedOrInRemove ||
+                if (isSomethingRemovedOrInRemoveOrInProgress ||
                         downloadState.isStartUploadInProgress() ||
                         !downloadState.isStartUploadWindUp() ||
                         !downloadState.isResumeUploadInProgress() ||
@@ -231,15 +227,11 @@ public class DownloadStateReducer {
 
 
             case COMPLETED_DOWNLOADING_IN_PROGRESS:
-                if (isSomethingRemovedOrInRemove ||
+                if (isSomethingRemovedOrInRemoveOrInProgress ||
                         downloadState.isCompletedDownloadingInProgress() ||
                         downloadState.isCompletedDownloadingWindUp() ||
                         downloadState.isStartDownloadInProgress() ||
-                        !downloadState.isStartDownloadWindUp() ||
-                        downloadState.isResumeDownloadInProgress() ||
-                        !downloadState.isResumeDownloadWindUp() ||
-                        downloadState.isPauseDownloadInProgress() ||
-                        downloadState.isPauseDownloadWindUp())
+                        !downloadState.isStartDownloadWindUp())
                     return lastState.getDownloadState();
                 return DownloadState.DownloadStateBuilder.builder(lastState.getDownloadState())
                         .setStartDownloadInProgress(false)
@@ -252,15 +244,11 @@ public class DownloadStateReducer {
                         .setCompletedDownloadingWindUp(false)
                         .build();
             case COMPLETED_DOWNLOADING_WIND_UP:
-                if (isSomethingRemovedOrInRemove ||
+                if (isSomethingRemovedOrInRemoveOrInProgress ||
                         !downloadState.isCompletedDownloadingInProgress() ||
                         downloadState.isCompletedDownloadingWindUp() ||
                         downloadState.isStartDownloadInProgress() ||
-                        !downloadState.isStartDownloadWindUp() ||
-                        downloadState.isResumeDownloadInProgress() ||
-                        !downloadState.isResumeDownloadWindUp() ||
-                        downloadState.isPauseDownloadInProgress() ||
-                        downloadState.isPauseDownloadWindUp())
+                        !downloadState.isStartDownloadWindUp())
                     return lastState.getDownloadState();
                 return DownloadState.DownloadStateBuilder.builder(lastState.getDownloadState())
                         .setStartDownloadInProgress(false)
