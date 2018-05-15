@@ -15,8 +15,13 @@ import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
+import main.torrent.status.Action;
 import main.torrent.status.TorrentStatusStore;
 import main.torrent.status.reducers.Reducer;
+import main.torrent.status.state.tree.DownloadState;
+import main.torrent.status.state.tree.PeersState;
+import main.torrent.status.state.tree.TorrentFileSystemState;
+import main.torrent.status.state.tree.TorrentStatusState;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import org.junit.Assert;
@@ -103,6 +108,49 @@ public class Utils {
                 .freeAll()
                 .flatMap(__ -> BlocksAllocatorImpl.getInstance().updateAllocations(2, 1_000_000))
                 .block();
+    }
+
+    public static TorrentStatusState getTorrentStatusState(Action lastAction, List<Action> actions) {
+        DownloadState downloadState = DownloadState.DownloadStateBuilder.builder()
+                .setStartDownloadInProgress(actions.contains(Action.START_DOWNLOAD_IN_PROGRESS))
+                .setStartDownloadWindUp(actions.contains(Action.START_DOWNLOAD_WIND_UP))
+                .setResumeDownloadInProgress(actions.contains(Action.RESUME_DOWNLOAD_IN_PROGRESS))
+                .setResumeDownloadWindUp(actions.contains(Action.RESUME_DOWNLOAD_WIND_UP))
+                .setPauseDownloadInProgress(actions.contains(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
+                .setPauseDownloadWindUp(actions.contains(Action.PAUSE_DOWNLOAD_WIND_UP))
+                .setCompletedDownloadingInProgress(actions.contains(Action.COMPLETED_DOWNLOADING_IN_PROGRESS))
+                .setCompletedDownloadingWindUp(actions.contains(Action.COMPLETED_DOWNLOADING_WIND_UP))
+                .setStartUploadInProgress(actions.contains(Action.START_UPLOAD_IN_PROGRESS))
+                .setStartUploadWindUp(actions.contains(Action.START_UPLOAD_WIND_UP))
+                .setResumeUploadInProgress(actions.contains(Action.RESUME_UPLOAD_IN_PROGRESS))
+                .setResumeUploadWindUp(actions.contains(Action.RESUME_UPLOAD_WIND_UP))
+                .setPauseUploadInProgress(actions.contains(Action.PAUSE_UPLOAD_IN_PROGRESS))
+                .setPauseUploadWindUp(actions.contains(Action.PAUSE_UPLOAD_WIND_UP))
+                .build();
+
+        PeersState peersState = PeersState.PeersStateBuilder.builder()
+                .setStartedListeningToIncomingPeersInProgress(actions.contains(Action.START_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
+                .setStartedListeningToIncomingPeersWindUp(actions.contains(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_WIND_UP))
+                .setPauseListeningToIncomingPeersInProgress(actions.contains(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
+                .setPauseListeningToIncomingPeersWindUp(actions.contains(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_WIND_UP))
+                .setResumeListeningToIncomingPeersInProgress(actions.contains(Action.RESUME_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
+                .setResumeListeningToIncomingPeersWindUp(actions.contains(Action.RESUME_LISTENING_TO_INCOMING_PEERS_WIND_UP))
+                .setStartedSearchingPeersInProgress(actions.contains(Action.START_SEARCHING_PEERS_IN_PROGRESS))
+                .setStartedSearchingPeersWindUp(actions.contains(Action.START_SEARCHING_PEERS_WIND_UP))
+                .setPauseSearchingPeersInProgress(actions.contains(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+                .setPauseSearchingPeersWindUp(actions.contains(Action.PAUSE_SEARCHING_PEERS_WIND_UP))
+                .setResumeSearchingPeersInProgress(actions.contains(Action.RESUME_SEARCHING_PEERS_IN_PROGRESS))
+                .setResumeSearchingPeersWindUp(actions.contains(Action.RESUME_SEARCHING_PEERS_WIND_UP))
+                .build();
+
+        TorrentFileSystemState torrentFileSystemState = TorrentFileSystemState.TorrentFileSystemStateBuilder.builder()
+                .setFilesRemovedInProgress(actions.contains(Action.REMOVE_FILES_IN_PROGRESS))
+                .setFilesRemovedWindUp(actions.contains(Action.REMOVE_FILES_WIND_UP))
+                .setTorrentRemovedInProgress(actions.contains(Action.REMOVE_TORRENT_IN_PROGRESS))
+                .setTorrentRemovedWindUp(actions.contains(Action.REMOVE_TORRENT_WIND_UP))
+                .build();
+
+        return new TorrentStatusState(lastAction, downloadState, peersState, torrentFileSystemState);
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {

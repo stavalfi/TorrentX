@@ -26,109 +26,134 @@ public class PeersStateReducer {
     public PeersState reducer(TorrentStatusState lastState, Action action) {
         PeersState peersState = lastState.getPeersState();
 
+        boolean isCompletedOrInProgress = lastState.getDownloadState().isCompletedDownloadingInProgress() ||
+                lastState.getDownloadState().isCompletedDownloadingWindUp();
+
         boolean isSomethingRemovedOrInRemoveOrInProgress = lastState.getTorrentFileSystemState().isFilesRemovedInProgress() ||
                 lastState.getTorrentFileSystemState().isFilesRemovedWindUp() ||
                 lastState.getTorrentFileSystemState().isTorrentRemovedInProgress() ||
                 lastState.getTorrentFileSystemState().isTorrentRemovedWindUp();
 
         switch (action) {
-            case START_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
-                if (peersState.isStartedListeningToIncomingPeersInProgress() ||
-                        peersState.isStartedListeningToIncomingPeersWindUp())
-                    return peersState;
-                return PeersState.PeersStateBuilder.builder()
-                        .setStartedListeningToIncomingPeersInProgress(true)
-                        .build();
-            case START_LISTENING_TO_INCOMING_PEERS_WIND_UP:
-                if (isSomethingRemovedOrInRemoveOrInProgress ||
-                        !peersState.isStartedListeningToIncomingPeersInProgress() ||
-                        peersState.isStartedListeningToIncomingPeersWindUp())
-                    return peersState;
-                return PeersState.PeersStateBuilder.builder()
-                        .setStartedListeningToIncomingPeersInProgress(false)
-                        .setStartedListeningToIncomingPeersWindUp(true)
-                        .build();
-            case PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
-                if (peersState.isPauseListeningToIncomingPeersInProgress() ||
-                        peersState.isPauseListeningToIncomingPeersWindUp())
-                    return peersState;
-                return PeersState.PeersStateBuilder.builder()
-                        .setPauseListeningToIncomingPeersInProgress(true)
-                        .build();
-            case PAUSE_LISTENING_TO_INCOMING_PEERS_WIND_UP:
-                if (isSomethingRemovedOrInRemoveOrInProgress ||
-                        !peersState.isPauseListeningToIncomingPeersInProgress() ||
-                        peersState.isPauseListeningToIncomingPeersWindUp())
-                    return peersState;
-                return PeersState.PeersStateBuilder.builder()
-                        .setPauseListeningToIncomingPeersInProgress(false)
-                        .setPauseListeningToIncomingPeersWindUp(true)
-                        .build();
-            case RESUME_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
-                if (peersState.isResumeListeningToIncomingPeersInProgress() ||
-                        peersState.isResumeListeningToIncomingPeersWindUp())
-                    return peersState;
-                return PeersState.PeersStateBuilder.builder()
-                        .setResumeListeningToIncomingPeersInProgress(true)
-                        .build();
-            case RESUME_LISTENING_TO_INCOMING_PEERS_WIND_UP:
-                if (isSomethingRemovedOrInRemoveOrInProgress ||
-                        !peersState.isResumeListeningToIncomingPeersInProgress() ||
-                        peersState.isResumeListeningToIncomingPeersWindUp())
-                    return peersState;
-                return PeersState.PeersStateBuilder.builder()
-                        .setResumeListeningToIncomingPeersInProgress(false)
-                        .setResumeListeningToIncomingPeersWindUp(true)
-                        .build();
-            //....
-
             case START_SEARCHING_PEERS_IN_PROGRESS:
-                if (peersState.isStartedSearchingPeersInProgress() ||
+                if (isCompletedOrInProgress ||
+                        isSomethingRemovedOrInRemoveOrInProgress ||
+                        peersState.isStartedSearchingPeersInProgress() ||
                         peersState.isStartedSearchingPeersWindUp())
                     return peersState;
-                return PeersState.PeersStateBuilder.builder()
+                return PeersState.PeersStateBuilder.builder(peersState)
                         .setStartedSearchingPeersInProgress(true)
                         .build();
             case START_SEARCHING_PEERS_WIND_UP:
-                if (isSomethingRemovedOrInRemoveOrInProgress ||
+                if (isCompletedOrInProgress ||
+                        isSomethingRemovedOrInRemoveOrInProgress ||
                         !peersState.isStartedSearchingPeersInProgress() ||
                         peersState.isStartedSearchingPeersWindUp())
                     return peersState;
-                return PeersState.PeersStateBuilder.builder()
+                return PeersState.PeersStateBuilder.builder(peersState)
                         .setStartedSearchingPeersInProgress(false)
                         .setStartedSearchingPeersWindUp(true)
                         .build();
             case PAUSE_SEARCHING_PEERS_IN_PROGRESS:
-                if (peersState.isPauseSearchingPeersInProgress() ||
+                if (peersState.isStartedListeningToIncomingPeersWindUp() ||
+                        peersState.isPauseSearchingPeersInProgress() ||
                         peersState.isPauseSearchingPeersWindUp())
                     return peersState;
-                return PeersState.PeersStateBuilder.builder()
+                return PeersState.PeersStateBuilder.builder(peersState)
                         .setPauseSearchingPeersInProgress(true)
+                        .setResumeSearchingPeersInProgress(false)
                         .build();
             case PAUSE_SEARCHING_PEERS_WIND_UP:
-                if (isSomethingRemovedOrInRemoveOrInProgress ||
-                        !peersState.isPauseSearchingPeersInProgress() ||
+                if (!peersState.isPauseSearchingPeersInProgress() ||
                         peersState.isPauseSearchingPeersWindUp())
                     return peersState;
-                return PeersState.PeersStateBuilder.builder()
+                return PeersState.PeersStateBuilder.builder(peersState)
                         .setPauseSearchingPeersInProgress(false)
                         .setPauseSearchingPeersWindUp(true)
+                        .setResumeSearchingPeersWindUp(false)
                         .build();
             case RESUME_SEARCHING_PEERS_IN_PROGRESS:
-                if (peersState.isResumeSearchingPeersInProgress() ||
+                if (isCompletedOrInProgress ||
+                        isSomethingRemovedOrInRemoveOrInProgress ||
+                        peersState.isPauseSearchingPeersInProgress() ||
+                        peersState.isStartedSearchingPeersWindUp() ||
+                        peersState.isResumeSearchingPeersInProgress() ||
                         peersState.isResumeSearchingPeersWindUp())
                     return peersState;
-                return PeersState.PeersStateBuilder.builder()
+                return PeersState.PeersStateBuilder.builder(peersState)
                         .setResumeSearchingPeersInProgress(true)
                         .build();
             case RESUME_SEARCHING_PEERS_WIND_UP:
-                if (isSomethingRemovedOrInRemoveOrInProgress ||
+                if (isCompletedOrInProgress ||
+                        isSomethingRemovedOrInRemoveOrInProgress ||
                         !peersState.isResumeSearchingPeersInProgress() ||
                         peersState.isResumeSearchingPeersWindUp())
                     return peersState;
-                return PeersState.PeersStateBuilder.builder()
+                return PeersState.PeersStateBuilder.builder(peersState)
                         .setResumeSearchingPeersInProgress(false)
                         .setResumeSearchingPeersWindUp(true)
+                        .setPauseSearchingPeersWindUp(false)
+                        .build();
+
+
+            case START_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
+                if (isCompletedOrInProgress ||
+                        isSomethingRemovedOrInRemoveOrInProgress ||
+                        peersState.isStartedListeningToIncomingPeersInProgress() ||
+                        peersState.isStartedListeningToIncomingPeersWindUp())
+                    return peersState;
+                return PeersState.PeersStateBuilder.builder(peersState)
+                        .setStartedListeningToIncomingPeersInProgress(true)
+                        .build();
+            case START_LISTENING_TO_INCOMING_PEERS_WIND_UP:
+                if (isCompletedOrInProgress ||
+                        isSomethingRemovedOrInRemoveOrInProgress ||
+                        !peersState.isStartedListeningToIncomingPeersInProgress() ||
+                        peersState.isStartedListeningToIncomingPeersWindUp())
+                    return peersState;
+                return PeersState.PeersStateBuilder.builder(peersState)
+                        .setStartedListeningToIncomingPeersInProgress(false)
+                        .setStartedListeningToIncomingPeersWindUp(true)
+                        .build();
+            case PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
+                if (peersState.isStartedListeningToIncomingPeersWindUp() ||
+                        peersState.isPauseListeningToIncomingPeersInProgress() ||
+                        peersState.isPauseListeningToIncomingPeersWindUp())
+                    return peersState;
+                return PeersState.PeersStateBuilder.builder(peersState)
+                        .setPauseListeningToIncomingPeersInProgress(true)
+                        .setResumeListeningToIncomingPeersInProgress(false)
+                        .build();
+            case PAUSE_LISTENING_TO_INCOMING_PEERS_WIND_UP:
+                if (!peersState.isPauseListeningToIncomingPeersInProgress() ||
+                        peersState.isPauseListeningToIncomingPeersWindUp())
+                    return peersState;
+                return PeersState.PeersStateBuilder.builder(peersState)
+                        .setPauseListeningToIncomingPeersInProgress(false)
+                        .setPauseListeningToIncomingPeersWindUp(true)
+                        .setResumeListeningToIncomingPeersWindUp(false)
+                        .build();
+            case RESUME_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
+                if (isCompletedOrInProgress ||
+                        isSomethingRemovedOrInRemoveOrInProgress ||
+                        peersState.isPauseListeningToIncomingPeersInProgress() ||
+                        peersState.isStartedListeningToIncomingPeersWindUp() ||
+                        peersState.isResumeListeningToIncomingPeersInProgress() ||
+                        peersState.isResumeListeningToIncomingPeersWindUp())
+                    return peersState;
+                return PeersState.PeersStateBuilder.builder(peersState)
+                        .setResumeListeningToIncomingPeersInProgress(true)
+                        .build();
+            case RESUME_LISTENING_TO_INCOMING_PEERS_WIND_UP:
+                if (isCompletedOrInProgress ||
+                        isSomethingRemovedOrInRemoveOrInProgress ||
+                        !peersState.isResumeListeningToIncomingPeersInProgress() ||
+                        peersState.isResumeListeningToIncomingPeersWindUp())
+                    return peersState;
+                return PeersState.PeersStateBuilder.builder(peersState)
+                        .setResumeListeningToIncomingPeersInProgress(false)
+                        .setResumeListeningToIncomingPeersWindUp(true)
+                        .setPauseListeningToIncomingPeersWindUp(false)
                         .build();
         }
 
