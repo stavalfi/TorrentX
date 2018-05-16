@@ -10,8 +10,10 @@ public class TorrentFileSystemStateReducer {
     public static Supplier<TorrentFileSystemState> defaultTorrentFileSystemStateSupplier = () ->
             TorrentFileSystemState.TorrentFileSystemStateBuilder.builder()
                     .setFilesRemovedInProgress(false)
+                    .setFilesRemovedSelfResolved(false)
                     .setFilesRemovedWindUp(false)
                     .setTorrentRemovedInProgress(false)
+                    .setTorrentRemovedSelfResolved(false)
                     .setTorrentRemovedWindUp(false)
                     .build();
 
@@ -31,8 +33,7 @@ public class TorrentFileSystemStateReducer {
                         torrentFileSystemState.isFilesRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
-                        !lastState.getPeersState().isPauseSearchingPeersWindUp() ||
-                        !lastState.getPeersState().isPauseListeningToIncomingPeersWindUp())
+                        !lastState.getPeersState().isPauseSearchingPeersWindUp())
                     return torrentFileSystemState;
                 return TorrentFileSystemState.TorrentFileSystemStateBuilder.builder(torrentFileSystemState)
                         .setFilesRemovedInProgress(false)
@@ -50,8 +51,7 @@ public class TorrentFileSystemStateReducer {
                         torrentFileSystemState.isTorrentRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
-                        !lastState.getPeersState().isPauseSearchingPeersWindUp() ||
-                        !lastState.getPeersState().isPauseListeningToIncomingPeersWindUp())
+                        !lastState.getPeersState().isPauseSearchingPeersWindUp())
                     return torrentFileSystemState;
                 return TorrentFileSystemState.TorrentFileSystemStateBuilder.builder(torrentFileSystemState)
                         .setTorrentRemovedInProgress(false)

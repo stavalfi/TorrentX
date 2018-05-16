@@ -1,20 +1,24 @@
 package main.torrent.status.state.tree;
 
+import main.TorrentInfo;
 import main.torrent.status.Action;
 
 import java.util.Objects;
 
 public class TorrentStatusState {
+    private TorrentInfo torrentInfo;
     private Action action;
 
     private DownloadState downloadState;
     private PeersState peersState;
     private TorrentFileSystemState torrentFileSystemState;
 
-    public TorrentStatusState(Action action,
+    public TorrentStatusState(TorrentInfo torrentInfo,
+                              Action action,
                               DownloadState downloadState,
                               PeersState peersState,
                               TorrentFileSystemState torrentFileSystemState) {
+        this.torrentInfo = torrentInfo;
         this.action = action;
         this.downloadState = downloadState;
         this.peersState = peersState;
@@ -68,5 +72,9 @@ public class TorrentStatusState {
                 ", peersState=" + peersState +
                 ", torrentFileSystemState=" + torrentFileSystemState +
                 '}';
+    }
+
+    public TorrentInfo getTorrentInfo() {
+        return torrentInfo;
     }
 }

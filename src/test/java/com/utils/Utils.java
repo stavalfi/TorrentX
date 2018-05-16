@@ -110,7 +110,7 @@ public class Utils {
                 .block();
     }
 
-    public static TorrentStatusState getTorrentStatusState(Action lastAction, List<Action> actions) {
+    public static TorrentStatusState getTorrentStatusState(TorrentInfo torrentInfo, Action lastAction, List<Action> actions) {
         DownloadState downloadState = DownloadState.DownloadStateBuilder.builder()
                 .setStartDownloadInProgress(actions.contains(Action.START_DOWNLOAD_IN_PROGRESS))
                 .setStartDownloadWindUp(actions.contains(Action.START_DOWNLOAD_WIND_UP))
@@ -129,17 +129,14 @@ public class Utils {
                 .build();
 
         PeersState peersState = PeersState.PeersStateBuilder.builder()
-                .setStartedListeningToIncomingPeersInProgress(actions.contains(Action.START_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
-                .setStartedListeningToIncomingPeersWindUp(actions.contains(Action.START_LISTENING_TO_INCOMING_PEERS_WIND_UP))
-                .setPauseListeningToIncomingPeersInProgress(actions.contains(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
-                .setPauseListeningToIncomingPeersWindUp(actions.contains(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_WIND_UP))
-                .setResumeListeningToIncomingPeersInProgress(actions.contains(Action.RESUME_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
-                .setResumeListeningToIncomingPeersWindUp(actions.contains(Action.RESUME_LISTENING_TO_INCOMING_PEERS_WIND_UP))
                 .setStartedSearchingPeersInProgress(actions.contains(Action.START_SEARCHING_PEERS_IN_PROGRESS))
+                .setStartedSearchingPeersSelfResolved(actions.contains(Action.START_SEARCHING_PEERS_SELF_RESOLVED))
                 .setStartedSearchingPeersWindUp(actions.contains(Action.START_SEARCHING_PEERS_WIND_UP))
                 .setPauseSearchingPeersInProgress(actions.contains(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+                .setPauseSearchingPeersSelfResolved(actions.contains(Action.PAUSE_SEARCHING_PEERS_SELF_RESOLVED))
                 .setPauseSearchingPeersWindUp(actions.contains(Action.PAUSE_SEARCHING_PEERS_WIND_UP))
                 .setResumeSearchingPeersInProgress(actions.contains(Action.RESUME_SEARCHING_PEERS_IN_PROGRESS))
+                .setResumeSearchingPeersSelfResolved(actions.contains(Action.RESUME_SEARCHING_PEERS_SELF_RESOLVED))
                 .setResumeSearchingPeersWindUp(actions.contains(Action.RESUME_SEARCHING_PEERS_WIND_UP))
                 .build();
 
@@ -150,12 +147,14 @@ public class Utils {
                 .setTorrentRemovedWindUp(actions.contains(Action.REMOVE_TORRENT_WIND_UP))
                 .build();
 
-        return new TorrentStatusState(lastAction, downloadState, peersState, torrentFileSystemState);
+        return new TorrentStatusState(torrentInfo, lastAction, downloadState, peersState, torrentFileSystemState);
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
+        TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo));
         return createDefaultTorrentDownloader(torrentInfo, downloadPath,
-                new TorrentStatusStore(Reducer.defaultTorrentStateSupplier.get()));
+                torrentStatusStore);
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
@@ -163,7 +162,8 @@ public class Utils {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
-        TorrentStatusStore torrentStatusStore = new TorrentStatusStore(Reducer.defaultTorrentStateSupplier.get());
+        TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo));
 
         peersListener = new PeersListener(torrentStatusStore);
 
@@ -345,7 +345,8 @@ public class Utils {
                 })
                 .flatMap(pieceMessageToSave -> {
                     ConnectableFlux<PieceMessage> pieceMessageFlux = Flux.just(pieceMessageToSave).publish();
-                    TorrentStatusStore torrentStatusStore = new TorrentStatusStore(Reducer.defaultTorrentStateSupplier.get());
+                    TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+                    torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo));
                     return activeTorrents.createActiveTorrentMono(link.getTorrentInfo(), downloadPath, torrentStatusStore, pieceMessageFlux)
                             .flatMap(fileSystemLink -> {
                                 Flux<PieceEvent> savedPieces$ = fileSystemLink.savedBlockFlux()

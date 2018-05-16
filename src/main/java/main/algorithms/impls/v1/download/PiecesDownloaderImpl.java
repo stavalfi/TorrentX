@@ -36,7 +36,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
         this.blockDownloader = blockDownloader;
 
         // TODO: note: if we ask for notification AFTER the download started, we will lose the notification.
-        downloadedPiecesFlux = torrentStatusStore.getState$()
+        downloadedPiecesFlux = torrentStatusStore.getState$(torrentInfo)
                 // TODO: uncomment
                 //.filter(TorrentStatusState::isStartedDownload)
                 .take(1)

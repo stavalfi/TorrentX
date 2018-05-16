@@ -5,43 +5,34 @@ import main.torrent.status.Action;
 import java.util.Objects;
 
 public class PeersState {
-    private boolean isStartedListeningToIncomingPeersInProgress;
-    private boolean isStartedListeningToIncomingPeersWindUp;
-    private boolean isPauseListeningToIncomingPeersInProgress;
-    private boolean isPauseListeningToIncomingPeersWindUp;
-    private boolean isResumeListeningToIncomingPeersInProgress;
-    private boolean isResumeListeningToIncomingPeersWindUp;
 
     private boolean isStartedSearchingPeersInProgress;
+    private boolean isStartedSearchingPeersSelfResolved;
     private boolean isStartedSearchingPeersWindUp;
     private boolean isPauseSearchingPeersInProgress;
+    private boolean isPauseSearchingPeersSelfResolved;
     private boolean isPauseSearchingPeersWindUp;
     private boolean isResumeSearchingPeersInProgress;
+    private boolean isResumeSearchingPeersSelfResolved;
     private boolean isResumeSearchingPeersWindUp;
 
-    public PeersState(boolean isStartedListeningToIncomingPeersInProgress,
-                      boolean isStartedListeningToIncomingPeersWindUp,
-                      boolean isPauseListeningToIncomingPeersInProgress,
-                      boolean isPauseListeningToIncomingPeersWindUp,
-                      boolean isResumeListeningToIncomingPeersInProgress,
-                      boolean isResumeListeningToIncomingPeersWindUp,
-                      boolean isStartedSearchingPeersInProgress,
+    public PeersState(boolean isStartedSearchingPeersInProgress,
+                      boolean isStartedSearchingPeersSelfResolved,
                       boolean isStartedSearchingPeersWindUp,
                       boolean isPauseSearchingPeersInProgress,
+                      boolean isPauseSearchingPeersSelfResolved,
                       boolean isPauseSearchingPeersWindUp,
                       boolean isResumeSearchingPeersInProgress,
+                      boolean isResumeSearchingPeersSelfResolved,
                       boolean isResumeSearchingPeersWindUp) {
-        this.isStartedListeningToIncomingPeersInProgress = isStartedListeningToIncomingPeersInProgress;
-        this.isStartedListeningToIncomingPeersWindUp = isStartedListeningToIncomingPeersWindUp;
-        this.isPauseListeningToIncomingPeersInProgress = isPauseListeningToIncomingPeersInProgress;
-        this.isPauseListeningToIncomingPeersWindUp = isPauseListeningToIncomingPeersWindUp;
-        this.isResumeListeningToIncomingPeersInProgress = isResumeListeningToIncomingPeersInProgress;
-        this.isResumeListeningToIncomingPeersWindUp = isResumeListeningToIncomingPeersWindUp;
         this.isStartedSearchingPeersInProgress = isStartedSearchingPeersInProgress;
+        this.isStartedSearchingPeersSelfResolved = isStartedSearchingPeersSelfResolved;
         this.isStartedSearchingPeersWindUp = isStartedSearchingPeersWindUp;
         this.isPauseSearchingPeersInProgress = isPauseSearchingPeersInProgress;
+        this.isPauseSearchingPeersSelfResolved = isPauseSearchingPeersSelfResolved;
         this.isPauseSearchingPeersWindUp = isPauseSearchingPeersWindUp;
         this.isResumeSearchingPeersInProgress = isResumeSearchingPeersInProgress;
+        this.isResumeSearchingPeersSelfResolved = isResumeSearchingPeersSelfResolved;
         this.isResumeSearchingPeersWindUp = isResumeSearchingPeersWindUp;
     }
 
@@ -49,59 +40,33 @@ public class PeersState {
         switch (action) {
             case START_SEARCHING_PEERS_IN_PROGRESS:
                 return this.isStartedSearchingPeersInProgress;
+            case START_SEARCHING_PEERS_SELF_RESOLVED:
+                return this.isStartedSearchingPeersSelfResolved;
             case START_SEARCHING_PEERS_WIND_UP:
                 return this.isStartedSearchingPeersWindUp;
             case PAUSE_SEARCHING_PEERS_IN_PROGRESS:
                 return this.isPauseSearchingPeersInProgress;
+            case PAUSE_SEARCHING_PEERS_SELF_RESOLVED:
+                return this.isPauseSearchingPeersSelfResolved;
             case PAUSE_SEARCHING_PEERS_WIND_UP:
                 return this.isPauseSearchingPeersWindUp;
             case RESUME_SEARCHING_PEERS_IN_PROGRESS:
                 return this.isResumeSearchingPeersInProgress;
+            case RESUME_SEARCHING_PEERS_SELF_RESOLVED:
+                return this.isResumeSearchingPeersSelfResolved;
             case RESUME_SEARCHING_PEERS_WIND_UP:
                 return this.isResumeSearchingPeersWindUp;
-            case START_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
-                return this.isStartedListeningToIncomingPeersInProgress;
-            case START_LISTENING_TO_INCOMING_PEERS_WIND_UP:
-                return this.isStartedListeningToIncomingPeersWindUp;
-            case PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
-                return this.isPauseListeningToIncomingPeersInProgress;
-            case PAUSE_LISTENING_TO_INCOMING_PEERS_WIND_UP:
-                return this.isPauseListeningToIncomingPeersWindUp;
-            case RESUME_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
-                return this.isResumeListeningToIncomingPeersInProgress;
-            case RESUME_LISTENING_TO_INCOMING_PEERS_WIND_UP:
-                return this.isResumeListeningToIncomingPeersWindUp;
             default:
                 return false;
         }
     }
 
-    public boolean isStartedListeningToIncomingPeersInProgress() {
-        return isStartedListeningToIncomingPeersInProgress;
-    }
-
-    public boolean isStartedListeningToIncomingPeersWindUp() {
-        return isStartedListeningToIncomingPeersWindUp;
-    }
-
-    public boolean isPauseListeningToIncomingPeersInProgress() {
-        return isPauseListeningToIncomingPeersInProgress;
-    }
-
-    public boolean isPauseListeningToIncomingPeersWindUp() {
-        return isPauseListeningToIncomingPeersWindUp;
-    }
-
-    public boolean isResumeListeningToIncomingPeersInProgress() {
-        return isResumeListeningToIncomingPeersInProgress;
-    }
-
-    public boolean isResumeListeningToIncomingPeersWindUp() {
-        return isResumeListeningToIncomingPeersWindUp;
-    }
-
     public boolean isStartedSearchingPeersInProgress() {
         return isStartedSearchingPeersInProgress;
+    }
+
+    public boolean isStartedSearchingPeersSelfResolved() {
+        return isStartedSearchingPeersSelfResolved;
     }
 
     public boolean isStartedSearchingPeersWindUp() {
@@ -112,12 +77,20 @@ public class PeersState {
         return isPauseSearchingPeersInProgress;
     }
 
+    public boolean isPauseSearchingPeersSelfResolved() {
+        return isPauseSearchingPeersSelfResolved;
+    }
+
     public boolean isPauseSearchingPeersWindUp() {
         return isPauseSearchingPeersWindUp;
     }
 
     public boolean isResumeSearchingPeersInProgress() {
         return isResumeSearchingPeersInProgress;
+    }
+
+    public boolean isResumeSearchingPeersSelfResolved() {
+        return isResumeSearchingPeersSelfResolved;
     }
 
     public boolean isResumeSearchingPeersWindUp() {
@@ -129,57 +102,47 @@ public class PeersState {
         if (this == o) return true;
         if (!(o instanceof PeersState)) return false;
         PeersState that = (PeersState) o;
-        return isStartedListeningToIncomingPeersInProgress() == that.isStartedListeningToIncomingPeersInProgress() &&
-                isStartedListeningToIncomingPeersWindUp() == that.isStartedListeningToIncomingPeersWindUp() &&
-                isPauseListeningToIncomingPeersInProgress() == that.isPauseListeningToIncomingPeersInProgress() &&
-                isPauseListeningToIncomingPeersWindUp() == that.isPauseListeningToIncomingPeersWindUp() &&
-                isResumeListeningToIncomingPeersInProgress() == that.isResumeListeningToIncomingPeersInProgress() &&
-                isResumeListeningToIncomingPeersWindUp() == that.isResumeListeningToIncomingPeersWindUp() &&
-                isStartedSearchingPeersInProgress() == that.isStartedSearchingPeersInProgress() &&
+        return isStartedSearchingPeersInProgress() == that.isStartedSearchingPeersInProgress() &&
+                isStartedSearchingPeersSelfResolved() == that.isStartedSearchingPeersSelfResolved() &&
                 isStartedSearchingPeersWindUp() == that.isStartedSearchingPeersWindUp() &&
                 isPauseSearchingPeersInProgress() == that.isPauseSearchingPeersInProgress() &&
+                isPauseSearchingPeersSelfResolved() == that.isPauseSearchingPeersSelfResolved() &&
                 isPauseSearchingPeersWindUp() == that.isPauseSearchingPeersWindUp() &&
                 isResumeSearchingPeersInProgress() == that.isResumeSearchingPeersInProgress() &&
+                isResumeSearchingPeersSelfResolved() == that.isResumeSearchingPeersSelfResolved() &&
                 isResumeSearchingPeersWindUp() == that.isResumeSearchingPeersWindUp();
     }
 
     @Override
     public int hashCode() {
 
-        return Objects.hash(isStartedListeningToIncomingPeersInProgress(), isStartedListeningToIncomingPeersWindUp(), isPauseListeningToIncomingPeersInProgress(), isPauseListeningToIncomingPeersWindUp(), isResumeListeningToIncomingPeersInProgress(), isResumeListeningToIncomingPeersWindUp(), isStartedSearchingPeersInProgress(), isStartedSearchingPeersWindUp(), isPauseSearchingPeersInProgress(), isPauseSearchingPeersWindUp(), isResumeSearchingPeersInProgress(), isResumeSearchingPeersWindUp());
+        return Objects.hash(isStartedSearchingPeersInProgress(), isStartedSearchingPeersSelfResolved(), isStartedSearchingPeersWindUp(), isPauseSearchingPeersInProgress(), isPauseSearchingPeersSelfResolved(), isPauseSearchingPeersWindUp(), isResumeSearchingPeersInProgress(), isResumeSearchingPeersSelfResolved(), isResumeSearchingPeersWindUp());
     }
 
     @Override
     public String toString() {
         return "PeersState{" +
-                "isStartedListeningToIncomingPeersInProgress=" + isStartedListeningToIncomingPeersInProgress +
-                ", isStartedListeningToIncomingPeersWindUp=" + isStartedListeningToIncomingPeersWindUp +
-                ", isPauseListeningToIncomingPeersInProgress=" + isPauseListeningToIncomingPeersInProgress +
-                ", isPauseListeningToIncomingPeersWindUp=" + isPauseListeningToIncomingPeersWindUp +
-                ", isResumeListeningToIncomingPeersInProgress=" + isResumeListeningToIncomingPeersInProgress +
-                ", isResumeListeningToIncomingPeersWindUp=" + isResumeListeningToIncomingPeersWindUp +
-                ", isStartedSearchingPeersInProgress=" + isStartedSearchingPeersInProgress +
+                "isStartedSearchingPeersInProgress=" + isStartedSearchingPeersInProgress +
+                ", isStartedSearchingPeersSelfResolved=" + isStartedSearchingPeersSelfResolved +
                 ", isStartedSearchingPeersWindUp=" + isStartedSearchingPeersWindUp +
                 ", isPauseSearchingPeersInProgress=" + isPauseSearchingPeersInProgress +
+                ", isPauseSearchingPeersSelfResolved=" + isPauseSearchingPeersSelfResolved +
                 ", isPauseSearchingPeersWindUp=" + isPauseSearchingPeersWindUp +
                 ", isResumeSearchingPeersInProgress=" + isResumeSearchingPeersInProgress +
+                ", isResumeSearchingPeersSelfResolved=" + isResumeSearchingPeersSelfResolved +
                 ", isResumeSearchingPeersWindUp=" + isResumeSearchingPeersWindUp +
                 '}';
     }
 
     public static class PeersStateBuilder {
-        private boolean isStartedListeningToIncomingPeersInProgress;
-        private boolean isStartedListeningToIncomingPeersWindUp;
-        private boolean isPauseListeningToIncomingPeersInProgress;
-        private boolean isPauseListeningToIncomingPeersWindUp;
-        private boolean isResumeListeningToIncomingPeersInProgress;
-        private boolean isResumeListeningToIncomingPeersWindUp;
-
         private boolean isStartedSearchingPeersInProgress;
+        private boolean isStartedSearchingPeersSelfResolved;
         private boolean isStartedSearchingPeersWindUp;
         private boolean isPauseSearchingPeersInProgress;
+        private boolean isPauseSearchingPeersSelfResolved;
         private boolean isPauseSearchingPeersWindUp;
         private boolean isResumeSearchingPeersInProgress;
+        private boolean isResumeSearchingPeersSelfResolved;
         private boolean isResumeSearchingPeersWindUp;
 
         public static PeersStateBuilder builder(PeersState peersState) {
@@ -191,17 +154,15 @@ public class PeersState {
         }
 
         public PeersState build() {
-            return new PeersState(this.isStartedListeningToIncomingPeersInProgress,
-                    this.isStartedListeningToIncomingPeersWindUp,
-                    this.isPauseListeningToIncomingPeersInProgress,
-                    this.isPauseListeningToIncomingPeersWindUp,
-                    this.isResumeListeningToIncomingPeersInProgress,
-                    this.isResumeListeningToIncomingPeersWindUp,
+            return new PeersState(
                     this.isStartedSearchingPeersInProgress,
+                    this.isStartedSearchingPeersSelfResolved,
                     this.isStartedSearchingPeersWindUp,
                     this.isPauseSearchingPeersInProgress,
+                    this.isPauseSearchingPeersSelfResolved,
                     this.isPauseSearchingPeersWindUp,
                     this.isResumeSearchingPeersInProgress,
+                    this.isResumeSearchingPeersSelfResolved,
                     this.isResumeSearchingPeersWindUp);
         }
 
@@ -209,47 +170,29 @@ public class PeersState {
         }
 
         public PeersStateBuilder(PeersState peersState) {
-            this.isStartedListeningToIncomingPeersInProgress = peersState.isStartedListeningToIncomingPeersInProgress;
-            this.isStartedListeningToIncomingPeersWindUp = peersState.isStartedListeningToIncomingPeersWindUp;
-            this.isPauseListeningToIncomingPeersInProgress = peersState.isPauseListeningToIncomingPeersInProgress;
-            this.isPauseListeningToIncomingPeersWindUp = peersState.isPauseListeningToIncomingPeersWindUp;
-            this.isResumeListeningToIncomingPeersInProgress = peersState.isResumeListeningToIncomingPeersInProgress;
-            this.isResumeListeningToIncomingPeersWindUp = peersState.isResumeListeningToIncomingPeersWindUp;
             this.isStartedSearchingPeersInProgress = peersState.isStartedSearchingPeersInProgress;
+            this.isStartedSearchingPeersSelfResolved = peersState.isStartedSearchingPeersSelfResolved;
             this.isStartedSearchingPeersWindUp = peersState.isStartedSearchingPeersWindUp;
             this.isPauseSearchingPeersInProgress = peersState.isPauseSearchingPeersInProgress;
+            this.isPauseSearchingPeersSelfResolved = peersState.isPauseSearchingPeersSelfResolved;
             this.isPauseSearchingPeersWindUp = peersState.isPauseSearchingPeersWindUp;
             this.isResumeSearchingPeersInProgress = peersState.isResumeSearchingPeersInProgress;
+            this.isResumeSearchingPeersSelfResolved = peersState.isResumeSearchingPeersSelfResolved;
             this.isResumeSearchingPeersWindUp = peersState.isResumeSearchingPeersWindUp;
         }
 
-        public PeersStateBuilder setStartedListeningToIncomingPeersInProgress(boolean startedListeningToIncomingPeersInProgress) {
-            isStartedListeningToIncomingPeersInProgress = startedListeningToIncomingPeersInProgress;
+        public PeersStateBuilder setStartedSearchingPeersSelfResolved(boolean startedSearchingPeersSelfResolved) {
+            isStartedSearchingPeersSelfResolved = startedSearchingPeersSelfResolved;
             return this;
         }
 
-        public PeersStateBuilder setStartedListeningToIncomingPeersWindUp(boolean startedListeningToIncomingPeersWindUp) {
-            isStartedListeningToIncomingPeersWindUp = startedListeningToIncomingPeersWindUp;
+        public PeersStateBuilder setPauseSearchingPeersSelfResolved(boolean pauseSearchingPeersSelfResolved) {
+            isPauseSearchingPeersSelfResolved = pauseSearchingPeersSelfResolved;
             return this;
         }
 
-        public PeersStateBuilder setPauseListeningToIncomingPeersInProgress(boolean pauseListeningToIncomingPeersInProgress) {
-            isPauseListeningToIncomingPeersInProgress = pauseListeningToIncomingPeersInProgress;
-            return this;
-        }
-
-        public PeersStateBuilder setPauseListeningToIncomingPeersWindUp(boolean pauseListeningToIncomingPeersWindUp) {
-            isPauseListeningToIncomingPeersWindUp = pauseListeningToIncomingPeersWindUp;
-            return this;
-        }
-
-        public PeersStateBuilder setResumeListeningToIncomingPeersInProgress(boolean resumeListeningToIncomingPeersInProgress) {
-            isResumeListeningToIncomingPeersInProgress = resumeListeningToIncomingPeersInProgress;
-            return this;
-        }
-
-        public PeersStateBuilder setResumeListeningToIncomingPeersWindUp(boolean resumeListeningToIncomingPeersWindUp) {
-            isResumeListeningToIncomingPeersWindUp = resumeListeningToIncomingPeersWindUp;
+        public PeersStateBuilder setResumeSearchingPeersSelfResolved(boolean resumeSearchingPeersSelfResolved) {
+            isResumeSearchingPeersSelfResolved = resumeSearchingPeersSelfResolved;
             return this;
         }
 

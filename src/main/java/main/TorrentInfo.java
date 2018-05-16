@@ -7,6 +7,7 @@ import main.tracker.Tracker;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -121,6 +122,10 @@ public class TorrentInfo {
         return this.torrent.getFileList();
     }
 
+    public String getTorrentFilePath() {
+        return torrentFilePath;
+    }
+
     @Override
     public String toString() {
 
@@ -149,7 +154,17 @@ public class TorrentInfo {
                 "Tracker List: \n" + trackers;
     }
 
-    public String getTorrentFilePath() {
-        return torrentFilePath;
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof TorrentInfo)) return false;
+        TorrentInfo that = (TorrentInfo) o;
+        return Objects.equals(getTorrentInfoHash(), that.getTorrentInfoHash());
+    }
+
+    @Override
+    public int hashCode() {
+
+        return Objects.hash(getTorrentInfoHash());
     }
 }

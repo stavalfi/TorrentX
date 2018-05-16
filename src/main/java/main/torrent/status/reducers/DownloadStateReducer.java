@@ -10,18 +10,25 @@ public class DownloadStateReducer {
     public static Supplier<DownloadState> defaultDownloadStateSupplier = () ->
             DownloadState.DownloadStateBuilder.builder()
                     .setStartDownloadInProgress(false)
+                    .setStartDownloadSelfResolved(false)
                     .setStartDownloadWindUp(false)
                     .setResumeDownloadInProgress(false)
+                    .setResumeDownloadSelfResolved(false)
                     .setResumeDownloadWindUp(false)
                     .setPauseDownloadInProgress(false)
+                    .setPauseDownloadSelfResolved(false)
                     .setPauseDownloadWindUp(true)
                     .setCompletedDownloadingInProgress(false)
+                    .setCompletedDownloadingSelfResolved(false)
                     .setCompletedDownloadingWindUp(false)
                     .setStartUploadInProgress(false)
+                    .setStartUploadSelfResolved(false)
                     .setStartUploadWindUp(false)
                     .setResumeUploadInProgress(false)
+                    .setResumeUploadSelfResolved(false)
                     .setResumeUploadWindUp(false)
                     .setPauseUploadInProgress(false)
+                    .setPauseUploadSelfResolved(false)
                     .setPauseUploadWindUp(true)
                     .build();
 
@@ -143,7 +150,6 @@ public class DownloadStateReducer {
                         .build();
             case RESUME_UPLOAD_IN_PROGRESS:
                 if (isSomethingRemovedOrInRemoveOrInProgress ||
-                        !lastState.getPeersState().isResumeListeningToIncomingPeersWindUp() ||
                         !downloadState.isStartUploadWindUp() ||
                         downloadState.isPauseUploadInProgress() ||
                         downloadState.isResumeUploadInProgress() ||
@@ -154,7 +160,6 @@ public class DownloadStateReducer {
                         .build();
             case RESUME_UPLOAD_WIND_UP:
                 if (isSomethingRemovedOrInRemoveOrInProgress ||
-                        !lastState.getPeersState().isResumeListeningToIncomingPeersWindUp() ||
                         !downloadState.isStartUploadWindUp() ||
                         downloadState.isPauseUploadInProgress() ||
                         !downloadState.isResumeUploadInProgress() ||
@@ -193,8 +198,7 @@ public class DownloadStateReducer {
                         lastState.getTorrentFileSystemState().isFilesRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
-                        !lastState.getPeersState().isPauseSearchingPeersWindUp() ||
-                        !lastState.getPeersState().isPauseListeningToIncomingPeersWindUp())
+                        !lastState.getPeersState().isPauseSearchingPeersWindUp())
                     return lastState.getDownloadState();
                 return DownloadState.DownloadStateBuilder.builder(lastState.getDownloadState())
                         .setCompletedDownloadingInProgress(false)
@@ -206,8 +210,7 @@ public class DownloadStateReducer {
                         lastState.getTorrentFileSystemState().isTorrentRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
-                        !lastState.getPeersState().isPauseSearchingPeersWindUp() ||
-                        !lastState.getPeersState().isPauseListeningToIncomingPeersWindUp())
+                        !lastState.getPeersState().isPauseSearchingPeersWindUp())
                     return lastState.getDownloadState();
                 return DownloadState.DownloadStateBuilder.builder(lastState.getDownloadState())
                         .setCompletedDownloadingInProgress(false)

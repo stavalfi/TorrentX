@@ -406,8 +406,8 @@ public class MyStepdefs {
                 .updateAllocations(10, 1_000_000)
                 .block();
 
-        TorrentStatusStore torrentStatusStore = new TorrentStatusStore(Reducer.defaultTorrentStateSupplier.get());
-
+        TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo));
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
         int amountOfAllocatedBlocks = BlocksAllocatorImpl.getInstance()
                 .getLatestState$()
@@ -491,7 +491,8 @@ public class MyStepdefs {
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        TorrentStatusStore torrentStatusStore = new TorrentStatusStore(Reducer.defaultTorrentStateSupplier.get());
+        TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo));
 
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
         Semaphore semaphore = new Semaphore(1, true);
@@ -676,15 +677,15 @@ public class MyStepdefs {
         // delete everything from the last test.
         Utils.removeEverythingRelatedToLastTest();
 
-        TorrentStatusState torrentStatusState = Utils.getTorrentStatusState(Action.INITIALIZE, actions);
-
+        TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        torrentStatusStore.initializeState(Utils.getTorrentStatusState(torrentInfo, Action.INITIALIZE, actions));
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
                         null,
                         null,
                         null,
                         null,
-                        new TorrentStatusStore(torrentStatusState),
+                        torrentStatusStore,
                         null,
                         null);
     }
@@ -704,7 +705,7 @@ public class MyStepdefs {
                 .getTorrentStatusStore();
 
         this.actualLastStatus = Flux.fromIterable(changeActionList)
-                .flatMap(action -> torrentStatusStore.changeState(action), 1, 1)
+                .flatMap(action -> torrentStatusStore.changeState(torrentInfo, action), 1, 1)
                 .blockLast();
         System.out.println();
     }
@@ -718,10 +719,10 @@ public class MyStepdefs {
                 .get()
                 .getTorrentStatusStore();
 
-        TorrentStatusState expectedState = Utils.getTorrentStatusState(lastAction, expectedActionList);
+        TorrentStatusState expectedState = Utils.getTorrentStatusState(torrentInfo, lastAction, expectedActionList);
 
         // test with the status we received from the "last-status-mono"
-        Assert.assertEquals(expectedState, torrentStatusStore.getLatestState$().block());
+        Assert.assertEquals(expectedState, torrentStatusStore.getLatestState$(torrentInfo).block());
         // test with the actual last status we received in the last time we tried to change the status
         if (this.actualLastStatus != null)
             Assert.assertEquals(expectedState, this.actualLastStatus);

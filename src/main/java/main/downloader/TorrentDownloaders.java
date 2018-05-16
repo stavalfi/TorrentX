@@ -79,7 +79,8 @@ public class TorrentDownloaders {
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
         // TODO: save the initial status in the mongodb.
-        TorrentStatusStore torrentStatusStore = new TorrentStatusStore(Reducer.defaultTorrentStateSupplier.get());
+        TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo));
         SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore);
         PeersListener peersListener = new PeersListener(torrentStatusStore);
 
