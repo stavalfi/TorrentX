@@ -86,7 +86,6 @@ public class DownloadStateReducer {
                     return lastState.getDownloadState();
                 return DownloadState.DownloadStateBuilder.builder(lastState.getDownloadState())
                         .setPauseDownloadInProgress(true)
-                        .setResumeDownloadInProgress(false)
                         .build();
             case PAUSE_DOWNLOAD_SELF_RESOLVED:
                 if (!downloadState.isResumeDownloadWindUp() ||
@@ -184,7 +183,6 @@ public class DownloadStateReducer {
                     return lastState.getDownloadState();
                 return DownloadState.DownloadStateBuilder.builder(lastState.getDownloadState())
                         .setPauseUploadInProgress(true)
-                        .setResumeUploadInProgress(false)
                         .build();
             case PAUSE_UPLOAD_SELF_RESOLVED:
                 if (!downloadState.isResumeUploadWindUp() ||
