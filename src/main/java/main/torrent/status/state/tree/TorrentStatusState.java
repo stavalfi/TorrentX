@@ -21,6 +21,12 @@ public class TorrentStatusState {
         this.torrentFileSystemState = torrentFileSystemState;
     }
 
+    public boolean fromAction(Action action) {
+        return this.downloadState.fromAction(action) ||
+                this.peersState.fromAction(action) ||
+                this.torrentFileSystemState.fromAction(action);
+    }
+
     public Action getAction() {
         return action;
     }

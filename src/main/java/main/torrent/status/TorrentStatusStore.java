@@ -40,6 +40,17 @@ public class TorrentStatusStore implements StatusNotifier {
         return this.history$;
     }
 
+    public Flux<Action> getAction$() {
+        return this.latestState$.map(TorrentStatusState::getAction);
+    }
+
+    public Mono<TorrentStatusState> notifyUntilChange(Action change, Action resumeIf) {
+        return this.latestState$.takeUntil(torrentStatusState -> torrentStatusState.fromAction(resumeIf))
+                .flatMap(torrentStatusState -> changeState(change))
+                .take(1)
+                .single();
+    }
+
     public Mono<TorrentStatusState> changeState(Action action) {
         return this.latestState$
                 .publishOn(Schedulers.single())

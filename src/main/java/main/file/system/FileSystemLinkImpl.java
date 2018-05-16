@@ -8,7 +8,10 @@ import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
+import main.torrent.status.Action;
 import main.torrent.status.TorrentStatusStore;
+import main.torrent.status.state.tree.DownloadState;
+import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -25,7 +28,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
-
     private final List<ActualFile> actualFileImplList;
     private final BitSet piecesStatus;
     private final long[] downloadedBytesInPieces;
@@ -47,31 +49,56 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
         this.actualFileImplList = createActiveTorrentFileList(torrentInfo, downloadPath);
 
-        // TODO: uncomment
-        this.savedBlocksFlux = Flux.never();
-//        this.torrentStatusStore
-//                .getLatestState$()
-//                .map(Status::isCompletedDownloading)
-//                .flatMapMany(isCompletedDownloading -> {
-//                    if (isCompletedDownloading) {
-//                        this.piecesStatus.set(0, torrentInfo.getPieces().size());
-//                        return Mono.empty();
-//                    }
-//                    return peerResponsesFlux;
-//                })
-//                .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
-//                .flatMap(this::writeBlock)
-//                .flatMap(pieceEvent -> {
-//                    // TODO: uncomment
-////                    if (minMissingPieceIndex() == -1)
-////                        return this.torrentStatusStore.changeState(Action.COMPLETED_DOWNLOADING)
-////                                .map(__ -> pieceEvent);
-//                    return Mono.just(pieceEvent);
-//                })
-//                // takeUntil will signal the last next signal he received and then he will send complete signal.
-//                .takeUntil(pieceEvent -> minMissingPieceIndex() == -1)
-//                .publish()
-//                .autoConnect(0);
+        this.torrentStatusStore.getAction$()
+                .filter(Action.COMPLETED_DOWNLOADING_IN_PROGRESS::equals)
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+                .flatMap(__ -> this.torrentStatusStore.notifyUntilChange(Action.COMPLETED_DOWNLOADING_WIND_UP, Action.COMPLETED_DOWNLOADING_IN_PROGRESS))
+                .publish()
+                .autoConnect(0);
+
+        this.torrentStatusStore.getAction$()
+                .filter(Action.REMOVE_TORRENT_IN_PROGRESS::equals)
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_UPLOAD_IN_PROGRESS))
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
+                .flatMap(__ -> deleteActiveTorrentOnlyMono())
+                .flatMap(__ -> this.torrentStatusStore.notifyUntilChange(Action.REMOVE_TORRENT_WIND_UP, Action.REMOVE_TORRENT_IN_PROGRESS))
+                .publish()
+                .autoConnect(0);
+
+        this.torrentStatusStore.getAction$()
+                .filter(Action.REMOVE_TORRENT_IN_PROGRESS::equals)
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_UPLOAD_IN_PROGRESS))
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
+                .flatMap(__ -> deleteFileOnlyMono())
+                .flatMap(__ -> this.torrentStatusStore.notifyUntilChange(Action.REMOVE_TORRENT_WIND_UP, Action.REMOVE_TORRENT_IN_PROGRESS))
+                .publish()
+                .autoConnect(0);
+
+        this.savedBlocksFlux =
+                this.torrentStatusStore.getLatestState$()
+                        .map(TorrentStatusState::getDownloadState)
+                        .map(DownloadState::isCompletedDownloadingWindUp)
+                        .filter(isCompletedDownloading -> isCompletedDownloading)
+                        .flatMapMany(isCompletedDownloading -> {
+                            if (isCompletedDownloading) {
+                                this.piecesStatus.set(0, torrentInfo.getPieces().size());
+                                return Flux.empty();
+                            }
+                            return peerResponsesFlux;
+                        })
+                        .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
+                        .flatMap(this::writeBlock)
+                        // takeUntil will signal the last next signal he received and then he will send complete signal.
+                        .takeUntil(pieceEvent -> minMissingPieceIndex() == -1)
+                        .publish()
+                        .autoConnect(0);
 
         this.savedPiecesFlux = this.savedBlocksFlux
                 .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
@@ -221,7 +248,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
             // I already have the received block. I don't need it.
             return Mono.empty();
 
-        return Mono.create(sink -> {
+        return Mono.<PieceEvent>create(sink -> {
             long from = super.getPieceStartPosition(pieceMessage.getIndex()) + pieceMessage.getBegin();
             long to = from + pieceMessage.getAllocatedBlock().getLength();
 
@@ -264,6 +291,11 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.DOWNLOADING, pieceMessage);
                 sink.success(pieceEvent);
             }
+        }).flatMap(pieceEvent -> {
+            if (pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
+                return this.torrentStatusStore.changeState(Action.COMPLETED_DOWNLOADING_IN_PROGRESS)
+                        .map(torrentStatusState -> pieceEvent);
+            return Mono.just(pieceEvent);
         });
     }
 

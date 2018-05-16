@@ -1,5 +1,7 @@
 package main.torrent.status.state.tree;
 
+import main.torrent.status.Action;
+
 import java.util.Objects;
 
 public class TorrentFileSystemState {
@@ -17,6 +19,21 @@ public class TorrentFileSystemState {
         this.isTorrentRemovedWindUp = isTorrentRemovedWindUp;
         this.isFilesRemovedInProgress = isFilesRemovedInProgress;
         this.isFilesRemovedWindUp = isFilesRemovedWindUp;
+    }
+
+    public boolean fromAction(Action action) {
+        switch (action) {
+            case REMOVE_FILES_IN_PROGRESS:
+                return this.isFilesRemovedInProgress;
+            case REMOVE_FILES_WIND_UP:
+                return this.isTorrentRemovedWindUp;
+            case REMOVE_TORRENT_IN_PROGRESS:
+                return this.isTorrentRemovedInProgress;
+            case REMOVE_TORRENT_WIND_UP:
+                return this.isTorrentRemovedWindUp;
+            default:
+                return false;
+        }
     }
 
     public boolean isTorrentRemovedInProgress() {

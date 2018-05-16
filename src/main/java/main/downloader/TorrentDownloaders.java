@@ -7,14 +7,12 @@ import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.PeersListener;
-import main.peer.PeersProvider;
 import main.peer.ReceiveMessagesNotifications;
+import main.peer.SearchPeers;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
-import main.torrent.status.reducers.Reducer;
 import main.torrent.status.TorrentStatusStore;
-import main.tracker.TrackerConnection;
-import main.tracker.TrackerProvider;
+import main.torrent.status.reducers.Reducer;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
@@ -34,24 +32,20 @@ public class TorrentDownloaders {
     }
 
     public synchronized TorrentDownloader createTorrentDownloader(TorrentInfo torrentInfo,
+                                                                  PeersListener peersListener,
+                                                                  SearchPeers searchPeers,
                                                                   FileSystemLink fileSystemLink,
                                                                   BittorrentAlgorithm bittorrentAlgorithm,
                                                                   TorrentStatusStore torrentStatusStore,
                                                                   SpeedStatistics torrentSpeedStatistics,
-                                                                  TrackerProvider trackerProvider,
-                                                                  PeersProvider peersProvider,
-                                                                  Flux<TrackerConnection> trackerConnectionFlux,
                                                                   Flux<Link> peersCommunicatorFlux) {
         return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .orElseGet(() -> {
                     TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
-                            fileSystemLink,
+                            peersListener, searchPeers, fileSystemLink,
                             bittorrentAlgorithm,
                             torrentStatusStore,
                             torrentSpeedStatistics,
-                            trackerProvider,
-                            peersProvider,
-                            trackerConnectionFlux,
                             peersCommunicatorFlux);
 
                     this.torrentDownloaderList.add(torrentDownloader);
@@ -84,28 +78,13 @@ public class TorrentDownloaders {
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
-        TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
-        PeersProvider peersProvider = new PeersProvider(torrentInfo);
-
-        Flux<TrackerConnection> trackerConnectionConnectableFlux =
-                trackerProvider.connectToTrackersFlux()
-                        .autoConnect();
-
         // TODO: save the initial status in the mongodb.
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore(Reducer.defaultTorrentStateSupplier.get());
-
+        SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore);
         PeersListener peersListener = new PeersListener(torrentStatusStore);
 
-        Flux<Link> searchingPeers$ = torrentStatusStore.getState$()
-                // TODO: uncomment
-//                .filter(Status::isStartedSearchingPeers)
-                .take(1)
-                .flatMap(__ ->
-                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                                .autoConnect(0));
-
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchingPeers$)
+                Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchPeers.getPeers$())
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
@@ -130,13 +109,12 @@ public class TorrentDownloaders {
 
         return TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
+                        peersListener,
+                        searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,
                         torrentStatusStore,
                         torrentSpeedStatistics,
-                        trackerProvider,
-                        peersProvider,
-                        trackerConnectionConnectableFlux,
                         peersCommunicatorFlux);
     }
 

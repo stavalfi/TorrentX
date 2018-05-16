@@ -1,5 +1,7 @@
 package main.torrent.status.state.tree;
 
+import main.torrent.status.Action;
+
 import java.util.Objects;
 
 public class PeersState {
@@ -41,6 +43,37 @@ public class PeersState {
         this.isPauseSearchingPeersWindUp = isPauseSearchingPeersWindUp;
         this.isResumeSearchingPeersInProgress = isResumeSearchingPeersInProgress;
         this.isResumeSearchingPeersWindUp = isResumeSearchingPeersWindUp;
+    }
+
+    public boolean fromAction(Action action) {
+        switch (action) {
+            case START_SEARCHING_PEERS_IN_PROGRESS:
+                return this.isStartedSearchingPeersInProgress;
+            case START_SEARCHING_PEERS_WIND_UP:
+                return this.isStartedSearchingPeersWindUp;
+            case PAUSE_SEARCHING_PEERS_IN_PROGRESS:
+                return this.isPauseSearchingPeersInProgress;
+            case PAUSE_SEARCHING_PEERS_WIND_UP:
+                return this.isPauseSearchingPeersWindUp;
+            case RESUME_SEARCHING_PEERS_IN_PROGRESS:
+                return this.isResumeSearchingPeersInProgress;
+            case RESUME_SEARCHING_PEERS_WIND_UP:
+                return this.isResumeSearchingPeersWindUp;
+            case START_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
+                return this.isStartedListeningToIncomingPeersInProgress;
+            case START_LISTENING_TO_INCOMING_PEERS_WIND_UP:
+                return this.isStartedListeningToIncomingPeersWindUp;
+            case PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
+                return this.isPauseListeningToIncomingPeersInProgress;
+            case PAUSE_LISTENING_TO_INCOMING_PEERS_WIND_UP:
+                return this.isPauseListeningToIncomingPeersWindUp;
+            case RESUME_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS:
+                return this.isResumeListeningToIncomingPeersInProgress;
+            case RESUME_LISTENING_TO_INCOMING_PEERS_WIND_UP:
+                return this.isResumeListeningToIncomingPeersWindUp;
+            default:
+                return false;
+        }
     }
 
     public boolean isStartedListeningToIncomingPeersInProgress() {

@@ -1,5 +1,7 @@
 package main.torrent.status.state.tree;
 
+import main.torrent.status.Action;
+
 import java.util.Objects;
 
 public class DownloadState {
@@ -52,6 +54,41 @@ public class DownloadState {
         this.isResumeUploadWindUp = isResumeUploadWindUp;
         this.isCompletedDownloadingInProgress = isCompletedDownloadingInProgress;
         this.isCompletedDownloadingWindUp = isCompletedDownloadingWindUp;
+    }
+
+    public boolean fromAction(Action action) {
+        switch (action) {
+            case START_DOWNLOAD_IN_PROGRESS:
+                return this.isStartDownloadInProgress;
+            case START_DOWNLOAD_WIND_UP:
+                return this.isStartDownloadWindUp;
+            case PAUSE_DOWNLOAD_IN_PROGRESS:
+                return this.isPauseDownloadInProgress;
+            case PAUSE_DOWNLOAD_WIND_UP:
+                return this.isPauseDownloadWindUp;
+            case RESUME_DOWNLOAD_IN_PROGRESS:
+                return this.isResumeDownloadInProgress;
+            case RESUME_DOWNLOAD_WIND_UP:
+                return this.isResumeDownloadWindUp;
+            case START_UPLOAD_IN_PROGRESS:
+                return this.isStartUploadInProgress;
+            case START_UPLOAD_WIND_UP:
+                return this.isStartUploadWindUp;
+            case PAUSE_UPLOAD_IN_PROGRESS:
+                return this.isPauseUploadInProgress;
+            case PAUSE_UPLOAD_WIND_UP:
+                return this.isPauseUploadWindUp;
+            case RESUME_UPLOAD_IN_PROGRESS:
+                return this.isResumeUploadInProgress;
+            case RESUME_UPLOAD_WIND_UP:
+                return this.isResumeUploadWindUp;
+            case COMPLETED_DOWNLOADING_IN_PROGRESS:
+                return this.isCompletedDownloadingInProgress;
+            case COMPLETED_DOWNLOADING_WIND_UP:
+                return this.isCompletedDownloadingWindUp;
+            default:
+                return false;
+        }
     }
 
     public boolean isStartDownloadInProgress() {

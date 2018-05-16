@@ -4,44 +4,43 @@ import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
-import main.peer.PeersProvider;
+import main.peer.PeersListener;
+import main.peer.SearchPeers;
 import main.statistics.SpeedStatistics;
 import main.torrent.status.TorrentStatusStore;
-import main.tracker.TrackerConnection;
-import main.tracker.TrackerProvider;
 import reactor.core.publisher.Flux;
 
 public class TorrentDownloader {
 
     private TorrentInfo torrentInfo;
+    private PeersListener peersListener;
+    private SearchPeers searchPeers;
     private FileSystemLink fileSystemLink;
     private BittorrentAlgorithm bittorrentAlgorithm;
     private TorrentStatusStore torrentStatusStore;
     private SpeedStatistics torrentSpeedStatistics;
 
-    private TrackerProvider trackerProvider;
-    private PeersProvider peersProvider;
-    private Flux<TrackerConnection> trackerConnectionFlux;
     private Flux<Link> peersCommunicatorFlux;
 
     public TorrentDownloader(TorrentInfo torrentInfo,
+                             PeersListener peersListener, SearchPeers searchPeers,
                              FileSystemLink fileSystemLink,
                              BittorrentAlgorithm bittorrentAlgorithm,
                              TorrentStatusStore torrentStatusStore,
                              SpeedStatistics torrentSpeedStatistics,
-                             TrackerProvider trackerProvider,
-                             PeersProvider peersProvider,
-                             Flux<TrackerConnection> trackerConnectionFlux,
                              Flux<Link> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
+        this.peersListener = peersListener;
+        this.searchPeers = searchPeers;
         this.fileSystemLink = fileSystemLink;
         this.bittorrentAlgorithm = bittorrentAlgorithm;
         this.torrentStatusStore = torrentStatusStore;
         this.torrentSpeedStatistics = torrentSpeedStatistics;
-        this.trackerProvider = trackerProvider;
-        this.peersProvider = peersProvider;
-        this.trackerConnectionFlux = trackerConnectionFlux;
         this.peersCommunicatorFlux = peersCommunicatorFlux;
+    }
+
+    public SearchPeers getSearchPeers() {
+        return searchPeers;
     }
 
     public BittorrentAlgorithm getBittorrentAlgorithm() {
@@ -60,23 +59,15 @@ public class TorrentDownloader {
         return torrentSpeedStatistics;
     }
 
-    public TrackerProvider getTrackerProvider() {
-        return trackerProvider;
-    }
-
-    public PeersProvider getPeersProvider() {
-        return peersProvider;
-    }
-
-    public Flux<TrackerConnection> getTrackerConnectionFlux() {
-        return trackerConnectionFlux;
-    }
-
     public Flux<Link> getPeersCommunicatorFlux() {
         return peersCommunicatorFlux;
     }
 
     public TorrentInfo getTorrentInfo() {
         return torrentInfo;
+    }
+
+    public PeersListener getPeersListener() {
+        return peersListener;
     }
 }

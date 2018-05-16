@@ -1,5 +1,7 @@
 package main;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class AppConfig {
 
     private static AppConfig instance = new AppConfig();
@@ -16,7 +18,9 @@ public class AppConfig {
         return "-AZ5750-TpkXttZLfpSH";
     }
 
-    public int getMyListeningPort() {
-        return 9191;
+    private AtomicInteger freePort = new AtomicInteger(9191);
+
+    public int findFreePort() {
+        return this.freePort.getAndIncrement();
     }
 }

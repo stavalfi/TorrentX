@@ -128,7 +128,7 @@ public class MyStepdefs {
                                     switch (messageWeNeedToSend.getTrackerRequestType()) {
                                         case Announce:
                                             return trackerConnection.announceMono(this.torrentInfo.getTorrentInfoHash(),
-                                                    AppConfig.getInstance().getMyListeningPort());
+                                                    AppConfig.getInstance().findFreePort());
                                         case Scrape:
                                             return trackerConnection.scrapeMono(Collections.singletonList(this.torrentInfo.getTorrentInfoHash()));
                                         default:
@@ -470,12 +470,11 @@ public class MyStepdefs {
         // If I'm not creating TorrentDownloader object here, I will waitForMessage 2 different torrentStatusController objects.
         TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
+                        null,
+                        null,
                         fileSystemLink,
                         null,
                         torrentStatusStore,
-                        null,
-                        null,
-                        null,
                         null,
                         null);
     }
@@ -558,12 +557,11 @@ public class MyStepdefs {
         // If I'm not creating TorrentDownloader object here, I will waitForMessage 2 different torrentStatusController objects.
         TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
+                        null,
+                        null,
                         fileSystemLink,
                         null,
                         torrentStatusStore,
-                        null,
-                        null,
-                        null,
                         null,
                         null);
     }
@@ -684,10 +682,9 @@ public class MyStepdefs {
                 .createTorrentDownloader(torrentInfo,
                         null,
                         null,
+                        null,
+                        null,
                         new TorrentStatusStore(torrentStatusState),
-                        null,
-                        null,
-                        null,
                         null,
                         null);
     }
@@ -764,7 +761,7 @@ public class MyStepdefs {
                         fileSystemLink, trackerConnectionFlux);
 
         // the fake-peer will connect to me.
-        Peer me = new Peer("localhost", AppConfig.getInstance().getMyListeningPort());
+        Peer me = new Peer("localhost", AppConfig.getInstance().findFreePort());
 
         this.meToFakePeerLink = torrentDownloaderNew.getPeersCommunicatorFlux()
                 .replay()
@@ -897,7 +894,7 @@ public class MyStepdefs {
                 .replay()
                 .autoConnect(0);
 
-        Peer me = new Peer("localhost", AppConfig.getInstance().getMyListeningPort());
+        Peer me = new Peer("localhost", AppConfig.getInstance().findFreePort());
         Peer fakePeer = new Peer("localhost", fakePeerPort);
 
         // build a bitfield message so I can send it to my app and also

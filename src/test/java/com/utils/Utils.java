@@ -167,19 +167,16 @@ public class Utils {
 
         peersListener = new PeersListener(torrentStatusStore);
 
-        Flux<Link> searchingPeers$ = torrentStatusStore.getState$()
-                // TODO: uncomment this
-//                .filter(Status::isStartedSearchingPeers)
-                .take(1)
-                .flatMap(__ ->
-                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                                .autoConnect(0));
+        // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
+        SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider,
+                peersProvider, peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                .autoConnect(0));
 
         Flux<Link> peersCommunicatorFlux =
                 Flux.merge(peersListener.getPeersConnectedToMeFlux()
                         // SocketException == When I shutdown the SocketServer after/before
                         // the tests inside Utils::removeEverythingRelatedToTorrent.
-                        .onErrorResume(SocketException.class, throwable -> Flux.empty()), searchingPeers$)
+                        .onErrorResume(SocketException.class, throwable -> Flux.empty()), searchPeers.getPeers$())
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
@@ -204,37 +201,24 @@ public class Utils {
 
         return TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
+                        peersListener,
+                        searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,
                         torrentStatusStore,
                         torrentSpeedStatistics,
-                        trackerProvider,
-                        peersProvider,
-                        trackerConnectionConnectableFlux,
                         peersCommunicatorFlux);
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
                                                                    TorrentStatusStore torrentStatusStore) {
-        TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
-        PeersProvider peersProvider = new PeersProvider(torrentInfo);
-
-        Flux<TrackerConnection> trackerConnectionConnectableFlux =
-                trackerProvider.connectToTrackersFlux()
-                        .autoConnect();
-
         peersListener = new PeersListener(torrentStatusStore);
 
-        Flux<Link> searchingPeers$ = torrentStatusStore.getState$()
-                // TODO: uncomment this
-//                .filter(Status::isStartedSearchingPeers)
-                .take(1)
-                .flatMap(__ ->
-                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                                .autoConnect(0));
+        // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
+        SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore);
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchingPeers$)
+                Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchPeers.getPeers$())
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
@@ -259,13 +243,12 @@ public class Utils {
 
         return TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
+                        peersListener,
+                        searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,
                         torrentStatusStore,
                         torrentSpeedStatistics,
-                        trackerProvider,
-                        peersProvider,
-                        trackerConnectionConnectableFlux,
                         peersCommunicatorFlux);
     }
 
@@ -278,13 +261,10 @@ public class Utils {
 
         peersListener = new PeersListener(torrentStatusStore);
 
-        Flux<Link> searchingPeers$ = torrentStatusStore.getState$()
-                // TODO: uncomment this:
-//                .filter(Status::isStartedSearchingPeers)
-                .take(1)
-                .flatMap(__ ->
-                        peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-                                .autoConnect(0));
+        // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
+        SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider,
+                peersProvider, peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
+                .autoConnect(0));
 
         Flux<Link> incomingPeers$ = peersListener.getPeersConnectedToMeFlux()
                 // SocketException == When I shutdown the SocketServer after/before
@@ -292,7 +272,7 @@ public class Utils {
                 .onErrorResume(SocketException.class, throwable -> Flux.empty());
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(incomingPeers$, searchingPeers$)
+                Flux.merge(incomingPeers$, searchPeers.getPeers$())
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
@@ -311,13 +291,12 @@ public class Utils {
 
         return TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
+                        peersListener,
+                        searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,
                         torrentStatusStore,
                         torrentSpeedStatistics,
-                        trackerProvider,
-                        peersProvider,
-                        trackerConnectionConnectableFlux,
                         peersCommunicatorFlux);
     }
 

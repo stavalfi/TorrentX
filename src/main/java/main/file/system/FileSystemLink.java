@@ -45,6 +45,7 @@ public interface FileSystemLink {
 
     Flux<Integer> savedPieceFlux();
 
+    // TODO: remove these 2 methods from this interface:
     Mono<FileSystemLink> deleteActiveTorrentOnlyMono();
 
     Mono<FileSystemLink> deleteFileOnlyMono();
