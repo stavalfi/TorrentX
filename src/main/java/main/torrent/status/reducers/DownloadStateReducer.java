@@ -187,6 +187,32 @@ public class DownloadStateReducer {
                         .setCompletedDownloadingInProgress(false)
                         .setCompletedDownloadingWindUp(true)
                         .build();
+
+            case REMOVE_FILES_WIND_UP:
+                if (!lastState.getTorrentFileSystemState().isFilesRemovedInProgress() ||
+                        lastState.getTorrentFileSystemState().isFilesRemovedWindUp() ||
+                        !lastState.getDownloadState().isPauseDownloadWindUp() ||
+                        !lastState.getDownloadState().isPauseUploadWindUp() ||
+                        !lastState.getPeersState().isPauseSearchingPeersWindUp() ||
+                        !lastState.getPeersState().isPauseListeningToIncomingPeersWindUp())
+                    return lastState.getDownloadState();
+                return DownloadState.DownloadStateBuilder.builder(lastState.getDownloadState())
+                        .setCompletedDownloadingInProgress(false)
+                        .setCompletedDownloadingWindUp(false)
+                        .build();
+
+            case REMOVE_TORRENT_WIND_UP:
+                if (!lastState.getTorrentFileSystemState().isTorrentRemovedInProgress() ||
+                        lastState.getTorrentFileSystemState().isTorrentRemovedWindUp() ||
+                        !lastState.getDownloadState().isPauseDownloadWindUp() ||
+                        !lastState.getDownloadState().isPauseUploadWindUp() ||
+                        !lastState.getPeersState().isPauseSearchingPeersWindUp() ||
+                        !lastState.getPeersState().isPauseListeningToIncomingPeersWindUp())
+                    return lastState.getDownloadState();
+                return DownloadState.DownloadStateBuilder.builder(lastState.getDownloadState())
+                        .setCompletedDownloadingInProgress(false)
+                        .setCompletedDownloadingWindUp(false)
+                        .build();
         }
     }
 }

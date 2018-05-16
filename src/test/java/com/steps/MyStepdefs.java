@@ -708,7 +708,6 @@ public class MyStepdefs {
 
         this.actualLastStatus = Flux.fromIterable(changeActionList)
                 .flatMap(action -> torrentStatusStore.changeState(action), 1, 1)
-                .doOnNext(torrentStatusState -> System.out.println("1"))
                 .blockLast();
         System.out.println();
     }
