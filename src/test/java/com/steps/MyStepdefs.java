@@ -407,7 +407,7 @@ public class MyStepdefs {
                 .block();
 
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo));
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
         int amountOfAllocatedBlocks = BlocksAllocatorImpl.getInstance()
                 .getLatestState$()
@@ -492,7 +492,7 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo));
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
 
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
         Semaphore semaphore = new Semaphore(1, true);
@@ -678,7 +678,7 @@ public class MyStepdefs {
         Utils.removeEverythingRelatedToLastTest();
 
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-        torrentStatusStore.initializeState(Utils.getTorrentStatusState(torrentInfo, Action.INITIALIZE, actions));
+        torrentStatusStore.initializeState(Utils.getTorrentStatusState(torrentInfo, Action.INITIALIZE, actions)).block();
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
                         null,

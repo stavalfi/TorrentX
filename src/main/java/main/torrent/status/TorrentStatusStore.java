@@ -61,7 +61,7 @@ public class TorrentStatusStore implements StatusNotifier {
                 .doOnNext(__ -> this.latestStateSink.next(initialTorrentStatusState))
                 .flatMapMany(__ -> this.latestState$)
                 .filter(torrentStatusState -> torrentStatusState.getTorrentInfo().equals(initialTorrentStatusState.getTorrentInfo()))
-                .filter(status -> status.equals(initialTorrentStatusState))
+                .filter(torrentStatusState -> torrentStatusState.equals(initialTorrentStatusState))
                 .take(1)
                 .single()
                 .publishOn(Schedulers.parallel());

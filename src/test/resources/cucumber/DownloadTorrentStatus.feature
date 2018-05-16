@@ -81,7 +81,8 @@ Feature: start/stop downloading/uploading
       | START_SEARCHING_PEERS_WIND_UP              |
       | RESUME_SEARCHING_PEERS_WIND_UP             |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | START_DOWNLOAD_WIND_UP |
+      | START_DOWNLOAD_SELF_RESOLVED |
+      | START_DOWNLOAD_WIND_UP       |
     Then torrent-status for torrent "<torrent>" will be with action: "START_DOWNLOAD_WIND_UP":
       | PAUSE_DOWNLOAD_WIND_UP                     |
       | PAUSE_UPLOAD_WIND_UP                       |
@@ -203,10 +204,12 @@ Feature: start/stop downloading/uploading
       | START_SEARCHING_PEERS_WIND_UP              |
       | RESUME_SEARCHING_PEERS_WIND_UP             |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | START_DOWNLOAD_IN_PROGRESS  |
-      | START_DOWNLOAD_WIND_UP      |
-      | RESUME_DOWNLOAD_IN_PROGRESS |
-      | RESUME_DOWNLOAD_WIND_UP     |
+      | START_DOWNLOAD_IN_PROGRESS    |
+      | START_DOWNLOAD_SELF_RESOLVED  |
+      | START_DOWNLOAD_WIND_UP        |
+      | RESUME_DOWNLOAD_IN_PROGRESS   |
+      | RESUME_DOWNLOAD_SELF_RESOLVED |
+      | RESUME_DOWNLOAD_WIND_UP       |
     Then torrent-status for torrent "<torrent>" will be with action: "RESUME_DOWNLOAD_WIND_UP":
       | RESUME_DOWNLOAD_WIND_UP                    |
       | PAUSE_UPLOAD_WIND_UP                       |
@@ -229,10 +232,12 @@ Feature: start/stop downloading/uploading
       | START_SEARCHING_PEERS_WIND_UP              |
       | RESUME_SEARCHING_PEERS_WIND_UP             |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | START_UPLOAD_IN_PROGRESS  |
-      | START_UPLOAD_WIND_UP      |
-      | RESUME_UPLOAD_IN_PROGRESS |
-      | RESUME_UPLOAD_WIND_UP     |
+      | START_UPLOAD_IN_PROGRESS    |
+      | START_UPLOAD_SELF_RESOLVED  |
+      | START_UPLOAD_WIND_UP        |
+      | RESUME_UPLOAD_IN_PROGRESS   |
+      | RESUME_UPLOAD_SELF_RESOLVED |
+      | RESUME_UPLOAD_WIND_UP       |
     Then torrent-status for torrent "<torrent>" will be with action: "RESUME_UPLOAD_WIND_UP":
       | RESUME_UPLOAD_WIND_UP                      |
       | PAUSE_DOWNLOAD_WIND_UP                     |
@@ -255,14 +260,18 @@ Feature: start/stop downloading/uploading
       | START_SEARCHING_PEERS_WIND_UP              |
       | RESUME_SEARCHING_PEERS_WIND_UP             |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | START_UPLOAD_IN_PROGRESS    |
-      | START_DOWNLOAD_IN_PROGRESS  |
-      | START_DOWNLOAD_WIND_UP      |
-      | START_UPLOAD_WIND_UP        |
-      | RESUME_UPLOAD_IN_PROGRESS   |
-      | RESUME_DOWNLOAD_IN_PROGRESS |
-      | RESUME_UPLOAD_WIND_UP       |
-      | RESUME_DOWNLOAD_WIND_UP     |
+      | START_UPLOAD_IN_PROGRESS      |
+      | START_UPLOAD_SELF_RESOLVED    |
+      | START_DOWNLOAD_IN_PROGRESS    |
+      | START_DOWNLOAD_SELF_RESOLVED  |
+      | START_DOWNLOAD_WIND_UP        |
+      | START_UPLOAD_WIND_UP          |
+      | RESUME_UPLOAD_IN_PROGRESS     |
+      | RESUME_UPLOAD_SELF_RESOLVED   |
+      | RESUME_DOWNLOAD_IN_PROGRESS   |
+      | RESUME_DOWNLOAD_SELF_RESOLVED |
+      | RESUME_UPLOAD_WIND_UP         |
+      | RESUME_DOWNLOAD_WIND_UP       |
     Then torrent-status for torrent "<torrent>" will be with action: "RESUME_DOWNLOAD_WIND_UP":
       | RESUME_UPLOAD_WIND_UP                      |
       | START_UPLOAD_WIND_UP                       |
@@ -284,16 +293,21 @@ Feature: start/stop downloading/uploading
       | START_SEARCHING_PEERS_WIND_UP  |
       | RESUME_SEARCHING_PEERS_WIND_UP |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | START_DOWNLOAD_IN_PROGRESS        |
-      | START_DOWNLOAD_WIND_UP            |
-      | RESUME_DOWNLOAD_IN_PROGRESS       |
-      | RESUME_DOWNLOAD_WIND_UP           |
-      | COMPLETED_DOWNLOADING_IN_PROGRESS |
-      | PAUSE_SEARCHING_PEERS_IN_PROGRESS |
-      | PAUSE_SEARCHING_PEERS_WIND_UP     |
-      | PAUSE_DOWNLOAD_IN_PROGRESS        |
-      | PAUSE_DOWNLOAD_WIND_UP            |
-      | COMPLETED_DOWNLOADING_WIND_UP     |
+      | START_DOWNLOAD_IN_PROGRESS          |
+      | START_DOWNLOAD_SELF_RESOLVED        |
+      | START_DOWNLOAD_WIND_UP              |
+      | RESUME_DOWNLOAD_IN_PROGRESS         |
+      | RESUME_DOWNLOAD_SELF_RESOLVED       |
+      | RESUME_DOWNLOAD_WIND_UP             |
+      | COMPLETED_DOWNLOADING_IN_PROGRESS   |
+      | COMPLETED_DOWNLOADING_SELF_RESOLVED |
+      | PAUSE_SEARCHING_PEERS_IN_PROGRESS   |
+      | PAUSE_SEARCHING_PEERS_SELF_RESOLVED |
+      | PAUSE_SEARCHING_PEERS_WIND_UP       |
+      | PAUSE_DOWNLOAD_IN_PROGRESS          |
+      | PAUSE_DOWNLOAD_SELF_RESOLVED        |
+      | PAUSE_DOWNLOAD_WIND_UP              |
+      | COMPLETED_DOWNLOADING_WIND_UP       |
     Then torrent-status for torrent "<torrent>" will be with action: "COMPLETED_DOWNLOADING_WIND_UP":
       | PAUSE_UPLOAD_WIND_UP          |
       | START_DOWNLOAD_WIND_UP        |
@@ -345,7 +359,8 @@ Feature: start/stop downloading/uploading
       | PAUSE_SEARCHING_PEERS_WIND_UP     |
       | COMPLETED_DOWNLOADING_IN_PROGRESS |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | COMPLETED_DOWNLOADING_WIND_UP |
+      | COMPLETED_DOWNLOADING_SELF_RESOLVED |
+      | COMPLETED_DOWNLOADING_WIND_UP       |
     Then torrent-status for torrent "<torrent>" will be with action: "COMPLETED_DOWNLOADING_WIND_UP":
       | PAUSE_UPLOAD_WIND_UP          |
       | START_DOWNLOAD_WIND_UP        |

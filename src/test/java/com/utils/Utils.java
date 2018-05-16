@@ -152,7 +152,7 @@ public class Utils {
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo));
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
         return createDefaultTorrentDownloader(torrentInfo, downloadPath,
                 torrentStatusStore);
     }
@@ -163,7 +163,7 @@ public class Utils {
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo));
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
 
         peersListener = new PeersListener(torrentStatusStore);
 
@@ -346,7 +346,7 @@ public class Utils {
                 .flatMap(pieceMessageToSave -> {
                     ConnectableFlux<PieceMessage> pieceMessageFlux = Flux.just(pieceMessageToSave).publish();
                     TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-                    torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo));
+                    torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
                     return activeTorrents.createActiveTorrentMono(link.getTorrentInfo(), downloadPath, torrentStatusStore, pieceMessageFlux)
                             .flatMap(fileSystemLink -> {
                                 Flux<PieceEvent> savedPieces$ = fileSystemLink.savedBlockFlux()
