@@ -28,8 +28,17 @@ public class TorrentFileSystemStateReducer {
                 return TorrentFileSystemState.TorrentFileSystemStateBuilder.builder(torrentFileSystemState)
                         .setFilesRemovedInProgress(true)
                         .build();
+            case REMOVE_FILES_SELF_RESOLVED:
+                if (!torrentFileSystemState.isFilesRemovedInProgress() ||
+                        torrentFileSystemState.isFilesRemovedSelfResolved() ||
+                        torrentFileSystemState.isFilesRemovedWindUp())
+                    return torrentFileSystemState;
+                return TorrentFileSystemState.TorrentFileSystemStateBuilder.builder(torrentFileSystemState)
+                        .setFilesRemovedSelfResolved(true)
+                        .build();
             case REMOVE_FILES_WIND_UP:
                 if (!torrentFileSystemState.isFilesRemovedInProgress() ||
+                        !torrentFileSystemState.isFilesRemovedSelfResolved() ||
                         torrentFileSystemState.isFilesRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
@@ -37,6 +46,7 @@ public class TorrentFileSystemStateReducer {
                     return torrentFileSystemState;
                 return TorrentFileSystemState.TorrentFileSystemStateBuilder.builder(torrentFileSystemState)
                         .setFilesRemovedInProgress(false)
+                        .setFilesRemovedSelfResolved(false)
                         .setFilesRemovedWindUp(true)
                         .build();
             case REMOVE_TORRENT_IN_PROGRESS:
@@ -46,8 +56,17 @@ public class TorrentFileSystemStateReducer {
                 return TorrentFileSystemState.TorrentFileSystemStateBuilder.builder(torrentFileSystemState)
                         .setTorrentRemovedInProgress(true)
                         .build();
+            case REMOVE_TORRENT_SELF_RESOLVED:
+                if (!torrentFileSystemState.isTorrentRemovedInProgress() ||
+                        torrentFileSystemState.isTorrentRemovedSelfResolved() ||
+                        torrentFileSystemState.isTorrentRemovedWindUp())
+                    return torrentFileSystemState;
+                return TorrentFileSystemState.TorrentFileSystemStateBuilder.builder(torrentFileSystemState)
+                        .setTorrentRemovedSelfResolved(true)
+                        .build();
             case REMOVE_TORRENT_WIND_UP:
                 if (!torrentFileSystemState.isTorrentRemovedInProgress() ||
+                        !torrentFileSystemState.isTorrentRemovedSelfResolved() ||
                         torrentFileSystemState.isTorrentRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
@@ -55,6 +74,7 @@ public class TorrentFileSystemStateReducer {
                     return torrentFileSystemState;
                 return TorrentFileSystemState.TorrentFileSystemStateBuilder.builder(torrentFileSystemState)
                         .setTorrentRemovedInProgress(false)
+                        .setTorrentRemovedSelfResolved(false)
                         .setTorrentRemovedWindUp(true)
                         .build();
         }
