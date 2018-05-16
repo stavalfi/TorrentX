@@ -80,10 +80,10 @@ public class Utils {
                 .map(TorrentDownloader::getTorrentStatusStore)
                 .doOnNext(statusChanger -> {
                     // TODO: uncomment
-//                    statusChanger.changeState(Action.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
-//                    statusChanger.changeState(Action.PAUSE_SEARCHING_PEERS).block();
-//                    statusChanger.changeState(Action.PAUSE_DOWNLOAD).block();
-//                    statusChanger.changeState(Action.PAUSE_UPLOAD).block();
+//                    statusChanger.dispatch(Action.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
+//                    statusChanger.dispatch(Action.PAUSE_SEARCHING_PEERS).block();
+//                    statusChanger.dispatch(Action.PAUSE_DOWNLOAD).block();
+//                    statusChanger.dispatch(Action.PAUSE_UPLOAD).block();
                 })
                 .collectList();
         try {

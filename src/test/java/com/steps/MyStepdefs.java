@@ -298,7 +298,7 @@ public class MyStepdefs {
                         .take(1)
                         .single();
 // TODO: uncomment
-//        torrentDownloader.getTorrentStatusStore().changeState(Action.START_UPLOAD).block();
+//        torrentDownloader.getTorrentStatusStore().dispatch(Action.START_UPLOAD).block();
 
         StepVerifier.create(receiveSinglePieceMono)
                 .expectNextCount(1)
@@ -653,8 +653,8 @@ public class MyStepdefs {
         // for recording all the peers without blocking the main thread.
         peersFromResponsesMono.subscribe();
 // TODO: uncomment
-//        torrentDownloader.getTorrentStatusStore().changeState(Action.START_DOWNLOAD).block();
-//        torrentDownloader.getTorrentStatusStore().changeState(Action.START_UPLOAD).block();
+//        torrentDownloader.getTorrentStatusStore().dispatch(Action.START_DOWNLOAD).block();
+//        torrentDownloader.getTorrentStatusStore().dispatch(Action.START_UPLOAD).block();
 
         List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
         List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
@@ -705,7 +705,7 @@ public class MyStepdefs {
                 .getTorrentStatusStore();
 
         this.actualLastStatus = Flux.fromIterable(changeActionList)
-                .flatMap(action -> torrentStatusStore.changeState(torrentInfo, action), 1, 1)
+                .flatMap(action -> torrentStatusStore.dispatch(torrentInfo, action), 1, 1)
                 .blockLast();
         System.out.println();
     }
@@ -772,10 +772,10 @@ public class MyStepdefs {
 
         // TODO: uncomment
 //        // my application start listening for new peers.
-//        torrentStatusStore.changeState(Action.START_LISTENING_TO_INCOMING_PEERS).block();
+//        torrentStatusStore.dispatch(Action.START_LISTENING_TO_INCOMING_PEERS).block();
 //
 //        // listen for incoming request messages and response to them.
-//        torrentStatusStore.changeState(Action.START_UPLOAD).block();
+//        torrentStatusStore.dispatch(Action.START_UPLOAD).block();
 
         // wait until the app will start listen for new incoming peers
         // and wait until torrent-status signal "RESUME_LISTENING_TO_INCOMING_PEERS".

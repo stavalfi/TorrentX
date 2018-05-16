@@ -45,13 +45,13 @@ public class SearchPeers {
 //        return torrentStatusStore.getAction$()
 //                .filter(Action.RESUME_SEARCHING_PEERS_IN_PROGRESS::equals)
 //                .take(1)
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.RESUME_SEARCHING_PEERS_WIND_UP))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.RESUME_SEARCHING_PEERS_WIND_UP))
 //                .flatMap(__ -> peers$)
 //                .flatMap(link -> torrentStatusStore.getLatestState$()
 //                        .map(TorrentStatusState::getPeersState)
 //                        .flatMap(peersState -> {
 //                            if (peersState.fromAction(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
-//                                return torrentStatusStore.changeState(Action.PAUSE_SEARCHING_PEERS_WIND_UP)
+//                                return torrentStatusStore.dispatch(Action.PAUSE_SEARCHING_PEERS_WIND_UP)
 //                                        .map(torrentStatusState -> link)
 //                                        .ignoreElement();
 //                            return Mono.just(link);

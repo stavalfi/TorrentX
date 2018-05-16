@@ -38,9 +38,9 @@ public class PeersListener {
 //        this.listenToIncomingPeers$ = this.torrentStatusStore.getAction$()
 //                .filter(Action.START_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS::equals)
 //                .take(1)
-//                .flatMap(__ -> this.torrentStatusStore.notifyUntilChange(Action.START_LISTENING_TO_INCOMING_PEERS_WIND_UP,
+//                .flatMap(__ -> this.torrentStatusStore.dispatchAsLongNoCancel(Action.START_LISTENING_TO_INCOMING_PEERS_WIND_UP,
 //                        Action.START_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
-//                .flatMap(__ -> this.torrentStatusStore.changeState(Action.RESUME_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
+//                .flatMap(__ -> this.torrentStatusStore.dispatch(Action.RESUME_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
 //                .flatMap(__ -> serverSocketMono)
 //                .doOnNext(serverSocket -> this.listenToPeerConnection = serverSocket)
 //                .flatMap(this::acceptPeersLinks)
@@ -51,7 +51,7 @@ public class PeersListener {
 //    private Flux<Link> acceptPeersLinks(ServerSocket serverSocket) {
 //        // update the status that we started listening to incoming peers.
 //        Mono.fromRunnable(() -> blockThreadUntilWeStartListening())
-//                .flatMap(__ -> this.torrentStatusStore.notifyUntilChange(Action.RESUME_LISTENING_TO_INCOMING_PEERS_WIND_UP,
+//                .flatMap(__ -> this.torrentStatusStore.dispatchAsLongNoCancel(Action.RESUME_LISTENING_TO_INCOMING_PEERS_WIND_UP,
 //                        Action.RESUME_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
 //                .toFuture();
 //
@@ -68,7 +68,7 @@ public class PeersListener {
 //        return peersSocket.flatMap(peerSocket -> acceptPeerConnection(peerSocket))
 //                .doOnError(throwable -> logger.error("could accept peer connection", throwable))
 //                // TODO: uncomment
-//                .doOnError(throwable -> this.torrentStatusStore.changeState(Action.PAUSE_LISTENING_TO_INCOMING_PEERS).block())
+//                .doOnError(throwable -> this.torrentStatusStore.dispatch(Action.PAUSE_LISTENING_TO_INCOMING_PEERS).block())
 //                .flatMap(link ->
 //                        this.torrentStatusStore.getLatestState$()
 //                                .map(Status::isListeningToIncomingPeers)
@@ -167,19 +167,19 @@ public class PeersListener {
 //    public Mono<Status> resumeListenToIncomingPeers() {
 //        return Mono.fromCallable(() -> this.isStoppedListenForNewPeers.get())
 //                .filter(isStoppedListenForNewPeers -> !isStoppedListenForNewPeers)
-//                .flatMap(__ -> this.torrentStatusStore.changeState(Action.RESUME_LISTENING_TO_INCOMING_PEERS));
+//                .flatMap(__ -> this.torrentStatusStore.dispatch(Action.RESUME_LISTENING_TO_INCOMING_PEERS));
 //    }
 //
 //    public Mono<Status> pauseListenToIncomingPeers() {
 //        return Mono.fromCallable(() -> this.isStoppedListenForNewPeers.get())
 //                .filter(isStoppedListenForNewPeers -> !isStoppedListenForNewPeers)
-//                .flatMap(__ -> this.torrentStatusStore.changeState(Action.PAUSE_LISTENING_TO_INCOMING_PEERS));
+//                .flatMap(__ -> this.torrentStatusStore.dispatch(Action.PAUSE_LISTENING_TO_INCOMING_PEERS));
 //    }
 //
 //    public Mono<Status> startListenToIncomingPeers() {
 //        return Mono.fromCallable(() -> this.isStoppedListenForNewPeers.get())
 //                .filter(isStoppedListenForNewPeers -> !isStoppedListenForNewPeers)
-//                .flatMap(__ -> this.torrentStatusStore.changeState(Action.START_LISTENING_TO_INCOMING_PEERS));
+//                .flatMap(__ -> this.torrentStatusStore.dispatch(Action.START_LISTENING_TO_INCOMING_PEERS));
 //    }
 
     public int getTcpPort() {

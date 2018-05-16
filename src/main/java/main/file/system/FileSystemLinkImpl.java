@@ -50,33 +50,33 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         // TODO: uncomment or move to side effect class
 //        this.torrentStatusStore.getAction$()
 //                .filter(Action.COMPLETED_DOWNLOADING_IN_PROGRESS::equals)
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
-//                .flatMap(__ -> this.torrentStatusStore.notifyUntilChange(Action.COMPLETED_DOWNLOADING_WIND_UP, Action.COMPLETED_DOWNLOADING_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+//                .flatMap(__ -> this.torrentStatusStore.dispatchAsLongNoCancel(Action.COMPLETED_DOWNLOADING_WIND_UP, Action.COMPLETED_DOWNLOADING_IN_PROGRESS))
 //                .publish()
 //                .autoConnect(0);
 //
 //        this.torrentStatusStore.getAction$()
 //                .filter(Action.REMOVE_TORRENT_IN_PROGRESS::equals)
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_UPLOAD_IN_PROGRESS))
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_UPLOAD_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
 //                .flatMap(__ -> deleteActiveTorrentOnlyMono())
-//                .flatMap(__ -> this.torrentStatusStore.notifyUntilChange(Action.REMOVE_TORRENT_WIND_UP, Action.REMOVE_TORRENT_IN_PROGRESS))
+//                .flatMap(__ -> this.torrentStatusStore.dispatchAsLongNoCancel(Action.REMOVE_TORRENT_WIND_UP, Action.REMOVE_TORRENT_IN_PROGRESS))
 //                .publish()
 //                .autoConnect(0);
 //
 //        this.torrentStatusStore.getAction$()
 //                .filter(Action.REMOVE_TORRENT_IN_PROGRESS::equals)
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_UPLOAD_IN_PROGRESS))
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
-//                .flatMap(__ -> torrentStatusStore.changeState(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_UPLOAD_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_LISTENING_TO_INCOMING_PEERS_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+//                .flatMap(__ -> torrentStatusStore.dispatch(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
 //                .flatMap(__ -> deleteFileOnlyMono())
-//                .flatMap(__ -> this.torrentStatusStore.notifyUntilChange(Action.REMOVE_TORRENT_WIND_UP, Action.REMOVE_TORRENT_IN_PROGRESS))
+//                .flatMap(__ -> this.torrentStatusStore.dispatchAsLongNoCancel(Action.REMOVE_TORRENT_WIND_UP, Action.REMOVE_TORRENT_IN_PROGRESS))
 //                .publish()
 //                .autoConnect(0);
 
@@ -163,7 +163,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                         return Mono.just(this);
                     return Mono.error(new Exception("FileSystemLinkImpl object not exist."));
                 });// TODO: uncomment
-//                .flatMap(fileSystemLink -> this.torrentStatusStore.changeState(Action.REMOVE_TORRENT)
+//                .flatMap(fileSystemLink -> this.torrentStatusStore.dispatch(Action.REMOVE_TORRENT)
 //                        .map(status -> fileSystemLink));
     }
 
@@ -180,7 +180,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     String torrentDirectoryPath = this.downloadPath + this.getName();
                     return completelyDeleteFolder(torrentDirectoryPath);
                 });// TODO: uncomment
-//                .flatMap(fileSystemLink -> this.torrentStatusStore.changeState(Action.REMOVE_FILES)
+//                .flatMap(fileSystemLink -> this.torrentStatusStore.dispatch(Action.REMOVE_FILES)
 //                        .map(status -> fileSystemLink));
     }
 
@@ -293,7 +293,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
             }
         }).flatMap(pieceEvent -> {
             if (pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
-                return this.torrentStatusStore.changeState(this,Action.COMPLETED_DOWNLOADING_IN_PROGRESS)
+                return this.torrentStatusStore.dispatch(this,Action.COMPLETED_DOWNLOADING_IN_PROGRESS)
                         .map(torrentStatusState -> pieceEvent);
             return Mono.just(pieceEvent);
         });

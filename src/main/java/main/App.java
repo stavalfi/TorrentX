@@ -65,11 +65,11 @@ public class App {
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
 //        torrentDownloader.getTorrentStatusStore()
-//                .changeState(Action.START_DOWNLOAD)
+//                .dispatch(Action.START_DOWNLOAD)
 //                .publishOn(Schedulers.elastic())
 //                .block();
 //        torrentDownloader.getTorrentStatusStore()
-//                .changeState(Action.START_UPLOAD)
+//                .dispatch(Action.START_UPLOAD)
 //                .publishOn(Schedulers.elastic())
 //                .block();
     }

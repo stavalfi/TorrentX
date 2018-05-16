@@ -45,10 +45,13 @@ public class TorrentStatusStore implements StatusNotifier {
                 .map(TorrentStatusState::getAction);
     }
 
-    public Mono<TorrentStatusState> notifyUntilChange(TorrentInfo torrentInfo, Action change, Action resumeIf) {
+    public Mono<TorrentStatusState> dispatchAsLongNoCancel(TorrentInfo torrentInfo, Action windUpActionToChange) {
+        Action correspondingIsProgressAction = Action.getCorrespondingIsProgressAction(windUpActionToChange);
+        assert correspondingIsProgressAction != null;
+
         return this.latestState$.filter(torrentStatusState -> torrentStatusState.getTorrentInfo().equals(torrentInfo))
-                .takeUntil(torrentStatusState -> torrentStatusState.fromAction(resumeIf))
-                .flatMap(torrentStatusState -> changeState(torrentInfo, change))
+                .takeUntil(torrentStatusState -> torrentStatusState.fromAction(correspondingIsProgressAction))
+                .flatMap(torrentStatusState -> dispatch(torrentInfo, windUpActionToChange))
                 .take(1)
                 .single();
     }
@@ -67,7 +70,7 @@ public class TorrentStatusStore implements StatusNotifier {
                 .publishOn(Schedulers.parallel());
     }
 
-    public Mono<TorrentStatusState> changeState(TorrentInfo torrentInfo, Action action) {
+    public Mono<TorrentStatusState> dispatch(TorrentInfo torrentInfo, Action action) {
         return this.latestState$
                 .publishOn(Schedulers.single())
                 .take(1)
