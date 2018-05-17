@@ -471,7 +471,6 @@ public class MyStepdefs {
         TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
                         null,
-                        null,
                         fileSystemLink,
                         null,
                         torrentStatusStore,
@@ -558,7 +557,6 @@ public class MyStepdefs {
         // If I'm not creating TorrentDownloader object here, I will waitForMessage 2 different torrentStatusController objects.
         TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
-                        null,
                         null,
                         fileSystemLink,
                         null,
@@ -681,7 +679,6 @@ public class MyStepdefs {
         torrentStatusStore.initializeState(Utils.getTorrentStatusState(torrentInfo, Action.INITIALIZE, actions)).block();
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
-                        null,
                         null,
                         null,
                         null,

@@ -18,21 +18,25 @@ import reactor.core.publisher.Flux;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 public class TorrentDownloaders {
 
+    private PeersListener peersListener = new PeersListener();
+
     private List<TorrentDownloader> torrentDownloaderList = new ArrayList<>();
+
+    public PeersListener getPeersListener() {
+        return peersListener;
+    }
 
     public synchronized Flux<TorrentDownloader> getTorrentDownloadersFlux() {
         // TODO: I can't go over this list and delete it in the same time. I will get concurrenctodificationException.
         // I should not save this list in the first place. for now I will copy it.
 
-        return Flux.fromIterable(this.torrentDownloaderList.stream().collect(Collectors.toList()));
+        return Flux.fromIterable(new ArrayList<>(this.torrentDownloaderList));
     }
 
     public synchronized TorrentDownloader createTorrentDownloader(TorrentInfo torrentInfo,
-                                                                  PeersListener peersListener,
                                                                   SearchPeers searchPeers,
                                                                   FileSystemLink fileSystemLink,
                                                                   BittorrentAlgorithm bittorrentAlgorithm,
@@ -42,7 +46,8 @@ public class TorrentDownloaders {
         return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .orElseGet(() -> {
                     TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
-                            peersListener, searchPeers, fileSystemLink,
+                            searchPeers,
+                            fileSystemLink,
                             bittorrentAlgorithm,
                             torrentStatusStore,
                             torrentSpeedStatistics,
@@ -83,10 +88,9 @@ public class TorrentDownloaders {
         // TODO: remove the block()
         torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
         SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore);
-        PeersListener peersListener = new PeersListener(torrentStatusStore);
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchPeers.getPeers$())
+                Flux.merge(getInstance().peersListener.getPeersConnectedToMeFlux(torrentInfo), searchPeers.getPeers$())
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
@@ -111,7 +115,6 @@ public class TorrentDownloaders {
 
         return TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
-                        peersListener,
                         searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,

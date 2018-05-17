@@ -4,7 +4,6 @@ import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
-import main.peer.PeersListener;
 import main.peer.SearchPeers;
 import main.statistics.SpeedStatistics;
 import main.torrent.status.TorrentStatusStore;
@@ -13,7 +12,6 @@ import reactor.core.publisher.Flux;
 public class TorrentDownloader {
 
     private TorrentInfo torrentInfo;
-    private PeersListener peersListener;
     private SearchPeers searchPeers;
     private FileSystemLink fileSystemLink;
     private BittorrentAlgorithm bittorrentAlgorithm;
@@ -23,14 +21,13 @@ public class TorrentDownloader {
     private Flux<Link> peersCommunicatorFlux;
 
     public TorrentDownloader(TorrentInfo torrentInfo,
-                             PeersListener peersListener, SearchPeers searchPeers,
+                             SearchPeers searchPeers,
                              FileSystemLink fileSystemLink,
                              BittorrentAlgorithm bittorrentAlgorithm,
                              TorrentStatusStore torrentStatusStore,
                              SpeedStatistics torrentSpeedStatistics,
                              Flux<Link> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
-        this.peersListener = peersListener;
         this.searchPeers = searchPeers;
         this.fileSystemLink = fileSystemLink;
         this.bittorrentAlgorithm = bittorrentAlgorithm;
@@ -65,9 +62,5 @@ public class TorrentDownloader {
 
     public TorrentInfo getTorrentInfo() {
         return torrentInfo;
-    }
-
-    public PeersListener getPeersListener() {
-        return peersListener;
     }
 }

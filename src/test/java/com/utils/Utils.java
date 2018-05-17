@@ -165,7 +165,7 @@ public class Utils {
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
         torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
 
-        peersListener = new PeersListener(torrentStatusStore);
+        peersListener = new PeersListener();
 
         // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
         SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider,
@@ -173,7 +173,7 @@ public class Utils {
                 .autoConnect(0));
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(peersListener.getPeersConnectedToMeFlux()
+                Flux.merge(peersListener.getPeersConnectedToMeFlux(torrentInfo)
                         // SocketException == When I shutdown the SocketServer after/before
                         // the tests inside Utils::removeEverythingRelatedToTorrent.
                         .onErrorResume(SocketException.class, throwable -> Flux.empty()), searchPeers.getPeers$())
@@ -201,7 +201,6 @@ public class Utils {
 
         return TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
-                        peersListener,
                         searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,
@@ -212,13 +211,13 @@ public class Utils {
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
                                                                    TorrentStatusStore torrentStatusStore) {
-        peersListener = new PeersListener(torrentStatusStore);
+        peersListener = new PeersListener();
 
         // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
         SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore);
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(peersListener.getPeersConnectedToMeFlux(), searchPeers.getPeers$())
+                Flux.merge(peersListener.getPeersConnectedToMeFlux(torrentInfo), searchPeers.getPeers$())
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
@@ -243,7 +242,6 @@ public class Utils {
 
         return TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
-                        peersListener,
                         searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,
@@ -259,14 +257,14 @@ public class Utils {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
-        peersListener = new PeersListener(torrentStatusStore);
+        peersListener = new PeersListener();
 
         // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
         SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider,
                 peersProvider, peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                 .autoConnect(0));
 
-        Flux<Link> incomingPeers$ = peersListener.getPeersConnectedToMeFlux()
+        Flux<Link> incomingPeers$ = peersListener.getPeersConnectedToMeFlux(torrentInfo)
                 // SocketException == When I shutdown the SocketServer after/before
                 // the tests inside Utils::removeEverythingRelatedToTorrent.
                 .onErrorResume(SocketException.class, throwable -> Flux.empty());
@@ -291,7 +289,6 @@ public class Utils {
 
         return TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
-                        peersListener,
                         searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,
