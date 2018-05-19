@@ -16,6 +16,7 @@ public class TorrentDownloader {
     private SearchPeers searchPeers;
     private FileSystemLink fileSystemLink;
     private BittorrentAlgorithm bittorrentAlgorithm;
+    // remove this from here
     private TorrentStatusStore torrentStatusStore;
     private SpeedStatistics torrentSpeedStatistics;
     private TorrentStatesSideEffects torrentStatesSideEffects;
