@@ -7,6 +7,7 @@ import main.peer.Link;
 import main.peer.SearchPeers;
 import main.statistics.SpeedStatistics;
 import main.torrent.status.TorrentStatusStore;
+import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import reactor.core.publisher.Flux;
 
 public class TorrentDownloader {
@@ -17,6 +18,7 @@ public class TorrentDownloader {
     private BittorrentAlgorithm bittorrentAlgorithm;
     private TorrentStatusStore torrentStatusStore;
     private SpeedStatistics torrentSpeedStatistics;
+    private TorrentStatesSideEffects torrentStatesSideEffects;
 
     private Flux<Link> peersCommunicatorFlux;
 
@@ -26,13 +28,14 @@ public class TorrentDownloader {
                              BittorrentAlgorithm bittorrentAlgorithm,
                              TorrentStatusStore torrentStatusStore,
                              SpeedStatistics torrentSpeedStatistics,
-                             Flux<Link> peersCommunicatorFlux) {
+                             TorrentStatesSideEffects torrentStatesSideEffects, Flux<Link> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
         this.searchPeers = searchPeers;
         this.fileSystemLink = fileSystemLink;
         this.bittorrentAlgorithm = bittorrentAlgorithm;
         this.torrentStatusStore = torrentStatusStore;
         this.torrentSpeedStatistics = torrentSpeedStatistics;
+        this.torrentStatesSideEffects = torrentStatesSideEffects;
         this.peersCommunicatorFlux = peersCommunicatorFlux;
     }
 

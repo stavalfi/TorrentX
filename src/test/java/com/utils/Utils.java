@@ -18,6 +18,7 @@ import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.Action;
 import main.torrent.status.TorrentStatusStore;
 import main.torrent.status.reducers.Reducer;
+import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.DownloadState;
 import main.torrent.status.state.tree.PeersState;
 import main.torrent.status.state.tree.TorrentFileSystemState;
@@ -91,15 +92,11 @@ public class Utils {
         } catch (Exception e) {
             //e.printStackTrace();
         }
-        // TODO: uncomment
-//        if (peersListener != null) {
-//            try {
-////                peersListener.stopListenForNewPeers();
-//            } catch (IOException e) {
-//
-//            }
-//            peersListener = null;
-//        }
+        if (peersListener != null) {
+            peersListener.stop();
+            //TODO: stop listen in the object which TorrentDownloaders have also and we need to restart him in the next test.
+            peersListener = null;
+        }
 
         // delete download folder from last test
         Utils.deleteDownloadFolder();
@@ -152,9 +149,10 @@ public class Utils {
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
         torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
         return createDefaultTorrentDownloader(torrentInfo, downloadPath,
-                torrentStatusStore);
+                torrentStatusStore, torrentStatesSideEffects);
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
@@ -163,6 +161,8 @@ public class Utils {
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
+        // TODO: Remove the block
         torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
 
         peersListener = new PeersListener();
@@ -206,11 +206,13 @@ public class Utils {
                         bittorrentAlgorithm,
                         torrentStatusStore,
                         torrentSpeedStatistics,
+                        torrentStatesSideEffects,
                         peersCommunicatorFlux);
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
-                                                                   TorrentStatusStore torrentStatusStore) {
+                                                                   TorrentStatusStore torrentStatusStore,
+                                                                   TorrentStatesSideEffects torrentStatesSideEffects) {
         peersListener = new PeersListener();
 
         // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
@@ -247,11 +249,13 @@ public class Utils {
                         bittorrentAlgorithm,
                         torrentStatusStore,
                         torrentSpeedStatistics,
+                        torrentStatesSideEffects,
                         peersCommunicatorFlux);
     }
 
     public static TorrentDownloader createCustomTorrentDownloader(TorrentInfo torrentInfo,
                                                                   TorrentStatusStore torrentStatusStore,
+                                                                  TorrentStatesSideEffects torrentStatesSideEffects,
                                                                   FileSystemLink fileSystemLink,
                                                                   Flux<TrackerConnection> trackerConnectionConnectableFlux) {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
@@ -294,6 +298,7 @@ public class Utils {
                         bittorrentAlgorithm,
                         torrentStatusStore,
                         torrentSpeedStatistics,
+                        torrentStatesSideEffects,
                         peersCommunicatorFlux);
     }
 

@@ -60,7 +60,7 @@ public class PeersListener {
         this.notifyIfCompletelyStoppedSink.next(false);
         this.didWeActuallyStartedListeningSink.next(false);
 
-        this.listenToIncomingPeers$ = this.notifyWhenStartListen$
+        Flux<ServerSocket> serverSocketFlux = this.notifyWhenStartListen$
                 .filter(isStarting -> isStarting)
                 .take(1)
                 .flatMap(__ -> Mono.<ServerSocket>create(sink -> {
@@ -72,26 +72,43 @@ public class PeersListener {
                         sink.error(e);
                     }
                 }))
+                .replay()
+                .autoConnect(0);
+
+        this.listenToIncomingPeers$ = serverSocketFlux
                 .flatMap(this::acceptPeersLinks)
                 .subscribeOn(App.MyScheduler)
-                .publish();
+                .publish()
+                .autoConnect(0);
+
+        this.notifyIfCompletelyStoppedListen$
+                .filter(Boolean::booleanValue)
+                .take(1)
+                .flatMap(__ -> serverSocketFlux)
+                .doOnNext(serverSocket -> closeServerSocket(serverSocket))
+                .publish()
+                .autoConnect(0);
     }
 
-    public synchronized void start() {
+    public synchronized PeersListener start() {
         this.notifyWhenStartListenSink.next(true);
+        return this;
     }
 
-    public synchronized void resume() {
+    public synchronized PeersListener resume() {
         this.doesUserWantToResumeSink.next(true);
+        return this;
     }
 
-    public synchronized void pause() {
+    public synchronized PeersListener pause() {
         this.doesUserWantToResumeSink.next(false);
-        this.didWeActuallyStartedListeningSink.next(false);
+        return this;
     }
 
-    public synchronized void stop() {
+    public synchronized PeersListener stop() {
         this.notifyIfCompletelyStoppedSink.next(true);
+        this.doesUserWantToResumeSink.next(false);
+        return this;
     }
 
     public Mono<Boolean> isListening() {

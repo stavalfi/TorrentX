@@ -30,15 +30,15 @@ Feature: connect to a fake peers and communicate with them
       | UnchokeMessage  | UnchokeMessage     |                 |
       | PortMessage     | PortMessage        |                 |
 
-    Then application send to [peer ip: "localhost", peer port: "8985"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
-      | sendMessageType | receiveMessageType | errorSignalType |
-      | PieceMessage    | PieceMessage       |                 |
-      | PieceMessage    | PieceMessage       |                 |
-
-    Then application send to [peer ip: "localhost", peer port: "8986"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
-      | sendMessageType | receiveMessageType | errorSignalType |
-      | RequestMessage  | RequestMessage     |                 |
-      | RequestMessage  | RequestMessage     |                 |
+#    Then application send to [peer ip: "localhost", peer port: "8985"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+#      | sendMessageType | receiveMessageType | errorSignalType |
+#      | PieceMessage    | PieceMessage       |                 |
+#      | PieceMessage    | PieceMessage       |                 |
+#
+#    Then application send to [peer ip: "localhost", peer port: "8986"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+#      | sendMessageType | receiveMessageType | errorSignalType |
+#      | RequestMessage  | RequestMessage     |                 |
+#      | RequestMessage  | RequestMessage     |                 |
 
     Examples:
       | torrent                                   | downloadLocation |

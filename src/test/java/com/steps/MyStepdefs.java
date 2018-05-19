@@ -22,6 +22,7 @@ import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.Action;
 import main.torrent.status.TorrentStatusStore;
 import main.torrent.status.reducers.Reducer;
+import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.TorrentStatusState;
 import main.tracker.Tracker;
 import main.tracker.TrackerConnection;
@@ -42,7 +43,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -249,62 +249,6 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
     }
 
-    @Then("^application request for a random block of a random piece from all peers in torrent: \"([^\"]*)\"$")
-    public void applicationRequestForARandomBlockOfARandomPieceFromAllPeersInTorrent(String torrentFileName) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-    }
-
-    @Then("^application receive at list one random block of a random piece in torrent: \"([^\"]*)\"$")
-    public void applicationReceiveAtListOneRandomBlockOfARandomPieceInTorrent(String torrentFileName) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
-                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get();
-
-        int requestBlockSize = 16_384;
-
-        Function<BitFieldMessage, List<Integer>> getCompletedPieces = bitFieldMessage -> {
-            List<Integer> completedPieces = new ArrayList<>();
-            int completedPieceIndex = bitFieldMessage.getPiecesStatus().nextSetBit(0);
-            while (completedPieceIndex != -1) {
-                completedPieces.add(completedPieceIndex);
-                completedPieceIndex++;
-            }
-            return completedPieces;
-        };
-
-        Mono<PieceMessage> receiveSinglePieceMono =
-                torrentDownloader.getPeersCommunicatorFlux()
-                        .replay()
-                        .autoConnect(0)
-                        .flatMap(peersCommunicator -> peersCommunicator.sendMessages()
-                                .sendInterestedMessage()
-                                .map(sendPeerMessages -> peersCommunicator))
-                        .flatMap(peersCommunicator ->
-                                peersCommunicator.receivePeerMessages()
-                                        .getBitFieldMessageResponseFlux()
-                                        .map(bitFieldMessage -> getCompletedPieces.apply(bitFieldMessage))
-                                        .flatMap(Flux::fromIterable)
-                                        .take(5)
-                                        .flatMap(completedPieceIndex ->
-                                                peersCommunicator.sendMessages()
-                                                        .sendRequestMessage(completedPieceIndex, 0, requestBlockSize)
-                                                        .map(sendPeerMessages -> peersCommunicator)))
-                        .flatMap(peersCommunicator ->
-                                peersCommunicator.receivePeerMessages()
-                                        .getPieceMessageResponseFlux()
-                                        .doOnNext(pieceMessage -> peersCommunicator.closeConnection()))
-                        .take(1)
-                        .single();
-// TODO: uncomment
-//        torrentDownloader.getTorrentStatusStore().dispatch(Action.START_UPLOAD).block();
-
-        StepVerifier.create(receiveSinglePieceMono)
-                .expectNextCount(1)
-                .verifyComplete();
-    }
-
     @When("^application create active-torrent for: \"([^\"]*)\",\"([^\"]*)\"$")
     public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
@@ -407,6 +351,7 @@ public class MyStepdefs {
                 .block();
 
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
         torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
         int amountOfAllocatedBlocks = BlocksAllocatorImpl.getInstance()
@@ -475,6 +420,7 @@ public class MyStepdefs {
                         null,
                         torrentStatusStore,
                         null,
+                        torrentStatesSideEffects,
                         null);
     }
 
@@ -491,6 +437,7 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
         torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
 
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
@@ -562,6 +509,7 @@ public class MyStepdefs {
                         null,
                         torrentStatusStore,
                         null,
+                        torrentStatesSideEffects,
                         null);
     }
 
@@ -650,9 +598,9 @@ public class MyStepdefs {
 
         // for recording all the peers without blocking the main thread.
         peersFromResponsesMono.subscribe();
-// TODO: uncomment
-//        torrentDownloader.getTorrentStatusStore().dispatch(Action.START_DOWNLOAD).block();
-//        torrentDownloader.getTorrentStatusStore().dispatch(Action.START_UPLOAD).block();
+
+
+        torrentDownloader.getTorrentStatusStore().dispatch(torrentInfo, Action.START_SEARCHING_PEERS_IN_PROGRESS).block();
 
         List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
         List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
@@ -676,7 +624,8 @@ public class MyStepdefs {
         Utils.removeEverythingRelatedToLastTest();
 
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-        torrentStatusStore.initializeState(Utils.getTorrentStatusState(torrentInfo, Action.INITIALIZE, actions)).block();
+        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .createTorrentDownloader(torrentInfo,
                         null,
@@ -684,6 +633,7 @@ public class MyStepdefs {
                         null,
                         torrentStatusStore,
                         null,
+                        torrentStatesSideEffects,
                         null);
     }
 
@@ -741,7 +691,9 @@ public class MyStepdefs {
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .get();
 
-        TorrentStatusStore torrentStatusStore = torrentDownloader.getTorrentStatusStore();
+        TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
 
         FileSystemLink fileSystemLink = torrentDownloader.getFileSystemLink();
 
@@ -756,6 +708,7 @@ public class MyStepdefs {
         // represent this application TorrentDownloader. (not the fake-peer TorrentDownloader).
         TorrentDownloader torrentDownloaderNew =
                 Utils.createCustomTorrentDownloader(torrentInfo, torrentStatusStore,
+                        torrentStatesSideEffects,
                         fileSystemLink, trackerConnectionFlux);
 
         // the fake-peer will connect to me.
@@ -767,16 +720,14 @@ public class MyStepdefs {
                 .take(1)
                 .single();
 
-        // TODO: uncomment
 //        // my application start listening for new peers.
-//        torrentStatusStore.dispatch(Action.START_LISTENING_TO_INCOMING_PEERS).block();
-//
-//        // listen for incoming request messages and response to them.
-//        torrentStatusStore.dispatch(Action.START_UPLOAD).block();
+        TorrentDownloaders.getInstance()
+                .getPeersListener()
+                .start()
+                .resume();
 
-        // wait until the app will start listen for new incoming peers
-        // and wait until torrent-status signal "RESUME_LISTENING_TO_INCOMING_PEERS".
-        Thread.sleep(500);
+//        // listen for incoming request messages and response to them.
+        torrentStatusStore.dispatch(torrentInfo, Action.START_UPLOAD_IN_PROGRESS).block();
 
         Link fakePeerToMeLink = new PeersProvider(torrentInfo)
                 // fake-peer connect to me.
@@ -1388,6 +1339,20 @@ public class MyStepdefs {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+    }
+
+    @Given("^initial torrent-status for torrent: \"([^\"]*)\" in \"([^\"]*)\" with default initial state$")
+    public void initialTorrentStatusForTorrentInWithDefaultInitialState(String torrentFileName,
+                                                                        String downloadLocation) throws Throwable {
+        // TODO: complete
+        Utils.removeEverythingRelatedToLastTest();
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
+        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
+
+
     }
 }
 

@@ -13,6 +13,7 @@ import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.TorrentStatusStore;
 import main.torrent.status.reducers.Reducer;
+import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ public class TorrentDownloaders {
                                                                   BittorrentAlgorithm bittorrentAlgorithm,
                                                                   TorrentStatusStore torrentStatusStore,
                                                                   SpeedStatistics torrentSpeedStatistics,
+                                                                  TorrentStatesSideEffects torrentStatesSideEffects,
                                                                   Flux<Link> peersCommunicatorFlux) {
         return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .orElseGet(() -> {
@@ -51,7 +53,7 @@ public class TorrentDownloaders {
                             bittorrentAlgorithm,
                             torrentStatusStore,
                             torrentSpeedStatistics,
-                            peersCommunicatorFlux);
+                            torrentStatesSideEffects, peersCommunicatorFlux);
 
                     this.torrentDownloaderList.add(torrentDownloader);
 
@@ -85,6 +87,7 @@ public class TorrentDownloaders {
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
         // TODO: save the initial status in the mongodb.
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
+        TorrentStatesSideEffects torrentStatesSideEffects=new TorrentStatesSideEffects(torrentInfo,torrentStatusStore);
         // TODO: remove the block()
         torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
         SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore);
@@ -120,6 +123,7 @@ public class TorrentDownloaders {
                         bittorrentAlgorithm,
                         torrentStatusStore,
                         torrentSpeedStatistics,
+                        torrentStatesSideEffects,
                         peersCommunicatorFlux);
     }
 
