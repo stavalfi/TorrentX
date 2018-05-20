@@ -14,10 +14,10 @@ import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.*;
-import main.listen.ListenAction;
-import main.listen.ListenStore;
-import main.listen.reducers.ListenReducer;
-import main.listen.state.tree.ListenState;
+import main.listen.ListenerAction;
+import main.listen.ListenerStore;
+import main.listen.reducers.ListenerReducer;
+import main.listen.state.tree.ListenerState;
 import main.peer.*;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
@@ -1365,71 +1365,71 @@ public class MyStepdefs {
     }
 
     @When("^listen-status is trying to change to:$")
-    public void listenStatusIsTryingToChangeTo(List<ListenAction> changesActionList) throws Throwable {
-        ListenStore listenStore = TorrentDownloaders.getInstance()
+    public void listenStatusIsTryingToChangeTo(List<ListenerAction> changesActionList) throws Throwable {
+        ListenerStore listenStore = TorrentDownloaders.getInstance()
                 .getListenStore();
 
         Flux.fromIterable(changesActionList)
-                .filter(action -> action.equals(ListenAction.START_LISTENING_IN_PROGRESS) ||
-                        action.equals(ListenAction.START_LISTENING_SELF_RESOLVED) ||
-                        action.equals(ListenAction.RESUME_LISTENING_IN_PROGRESS) ||
-                        action.equals(ListenAction.RESUME_LISTENING_SELF_RESOLVED) ||
-                        action.equals(ListenAction.PAUSE_LISTENING_IN_PROGRESS) ||
-                        action.equals(ListenAction.PAUSE_LISTENING_SELF_RESOLVED) ||
-                        action.equals(ListenAction.RESTART_LISTENING_IN_PROGRESS) ||
-                        action.equals(ListenAction.RESTART_LISTENING_SELF_RESOLVED))
+                .filter(action -> action.equals(ListenerAction.START_LISTENING_IN_PROGRESS) ||
+                        action.equals(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
+                        action.equals(ListenerAction.RESUME_LISTENING_IN_PROGRESS) ||
+                        action.equals(ListenerAction.RESUME_LISTENING_SELF_RESOLVED) ||
+                        action.equals(ListenerAction.PAUSE_LISTENING_IN_PROGRESS) ||
+                        action.equals(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED) ||
+                        action.equals(ListenerAction.RESTART_LISTENING_IN_PROGRESS) ||
+                        action.equals(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
                 .flatMap(action -> {
                     switch (action) {
                         case START_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action);
                         case START_LISTENING_SELF_RESOLVED:
                             return listenStore.getState$()
-                                    .filter(ListenState::isStartedListeningInProgress)
+                                    .filter(ListenerState::isStartedListeningInProgress)
                                     .take(1)
                                     .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.getState$())
-                                    .filter(ListenState::isStartedListeningWindUp)
+                                    .filter(ListenerState::isStartedListeningWindUp)
                                     .take(1)
                                     .single();
                         case RESUME_LISTENING_IN_PROGRESS:
                             return listenStore.getState$()
-                                    .filter(ListenState::isStartedListeningWindUp)
+                                    .filter(ListenerState::isStartedListeningWindUp)
                                     .take(1)
                                     .single()
                                     .flatMap(__ -> listenStore.dispatch(action));
                         case RESUME_LISTENING_SELF_RESOLVED:
                             return listenStore.getState$()
-                                    .filter(ListenState::isResumeListeningInProgress)
+                                    .filter(ListenerState::isResumeListeningInProgress)
                                     .take(1)
                                     .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.getState$())
-                                    .filter(ListenState::isResumeListeningWindUp)
+                                    .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
                                     .single();
                         case PAUSE_LISTENING_IN_PROGRESS:
                             return listenStore.getState$()
-                                    .filter(ListenState::isStartedListeningWindUp)
+                                    .filter(ListenerState::isStartedListeningWindUp)
                                     .take(1)
                                     .single()
                                     .flatMap(__ -> listenStore.dispatch(action));
                         case PAUSE_LISTENING_SELF_RESOLVED:
                             return listenStore.getState$()
-                                    .filter(ListenState::isPauseListeningInProgress)
+                                    .filter(ListenerState::isPauseListeningInProgress)
                                     .take(1)
                                     .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.getState$())
-                                    .filter(ListenState::isPauseListeningWindUp)
+                                    .filter(ListenerState::isPauseListeningWindUp)
                                     .take(1)
                                     .single();
                         case RESTART_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action);
                         case RESTART_LISTENING_SELF_RESOLVED:
                             return listenStore.getState$()
-                                    .filter(ListenState::isRestartListeningInProgress)
+                                    .filter(ListenerState::isRestartListeningInProgress)
                                     .take(1)
                                     .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.getState$())
-                                    .filter(ListenReducer.defaultListenState.get()::equals)
+                                    .filter(ListenerReducer.defaultListenState.get()::equals)
                                     .take(1)
                                     .single();
                         default:
@@ -1440,8 +1440,8 @@ public class MyStepdefs {
     }
 
     @Then("^listen-status will change to: \"([^\"]*)\":$")
-    public void listenStatusWillBeWithAction(ListenAction lastAction, List<ListenAction> expectedActionList) throws Throwable {
-        ListenState expectedState = Utils.getListenStatusState(lastAction, expectedActionList);
+    public void listenStatusWillBeWithAction(ListenerAction lastAction, List<ListenerAction> expectedActionList) throws Throwable {
+        ListenerState expectedState = Utils.getListenStatusState(lastAction, expectedActionList);
 
         TorrentDownloaders.getInstance()
                 .getListenStore()

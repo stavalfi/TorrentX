@@ -5,8 +5,8 @@ import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
-import main.listen.ListenSideEffects;
-import main.listen.ListenStore;
+import main.listen.ListenerSideEffects;
+import main.listen.ListenerStore;
 import main.peer.Link;
 import main.peer.PeersListener;
 import main.peer.ReceiveMessagesNotifications;
@@ -24,8 +24,8 @@ import java.util.Optional;
 
 public class TorrentDownloaders {
 
-    private ListenStore listenStore = new ListenStore();
-    private ListenSideEffects listenSideEffects = new ListenSideEffects(this.listenStore);
+    private ListenerStore listenStore = new ListenerStore();
+    private ListenerSideEffects listenerSideEffects = new ListenerSideEffects(this.listenStore);
     private PeersListener peersListener = new PeersListener();
 
     private List<TorrentDownloader> torrentDownloaderList = new ArrayList<>();
@@ -34,12 +34,12 @@ public class TorrentDownloaders {
         return peersListener;
     }
 
-    public ListenStore getListenStore() {
+    public ListenerStore getListenStore() {
         return listenStore;
     }
 
-    public ListenSideEffects getListenSideEffects() {
-        return listenSideEffects;
+    public ListenerSideEffects getListenerSideEffects() {
+        return listenerSideEffects;
     }
 
     public synchronized Flux<TorrentDownloader> getTorrentDownloadersFlux() {

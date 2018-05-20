@@ -9,9 +9,9 @@ import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.*;
-import main.listen.ListenAction;
-import main.listen.reducers.ListenReducer;
-import main.listen.state.tree.ListenState;
+import main.listen.ListenerAction;
+import main.listen.reducers.ListenerReducer;
+import main.listen.state.tree.ListenerState;
 import main.peer.*;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -111,9 +111,9 @@ public class Utils {
 
         TorrentDownloaders.getInstance()
                 .getListenStore()
-                .dispatch(ListenAction.RESTART_LISTENING_IN_PROGRESS)
+                .dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                 .flatMapMany(__ -> TorrentDownloaders.getInstance().getListenStore().getState$())
-                .takeUntil(listenState -> listenState.equals(ListenReducer.defaultListenState.get()))
+                .takeUntil(listenState -> listenState.equals(ListenerReducer.defaultListenState.get()))
                 .blockLast();
     }
 
@@ -157,20 +157,20 @@ public class Utils {
         return new TorrentStatusState(torrentInfo, lastAction, downloadState, peersState, torrentFileSystemState);
     }
 
-    public static ListenState getListenStatusState(ListenAction lastAction, List<ListenAction> actions) {
-        return ListenState.ListenStateBuilder.builder(lastAction)
-                .setStartedListeningInProgress(actions.contains(ListenAction.START_LISTENING_IN_PROGRESS))
-                .setStartedListeningSelfResolved(actions.contains(ListenAction.START_LISTENING_SELF_RESOLVED))
-                .setStartedListeningWindUp(actions.contains(ListenAction.START_LISTENING_WIND_UP))
-                .setResumeListeningInProgress(actions.contains(ListenAction.RESUME_LISTENING_IN_PROGRESS))
-                .setResumeListeningSelfResolved(actions.contains(ListenAction.RESUME_LISTENING_SELF_RESOLVED))
-                .setResumeListeningWindUp(actions.contains(ListenAction.RESUME_LISTENING_WIND_UP))
-                .setPauseListeningInProgress(actions.contains(ListenAction.PAUSE_LISTENING_IN_PROGRESS))
-                .setPauseListeningSelfResolved(actions.contains(ListenAction.PAUSE_LISTENING_SELF_RESOLVED))
-                .setResumeListeningWindUp(actions.contains(ListenAction.PAUSE_LISTENING_WIND_UP))
-                .setRestartListeningInProgress(actions.contains(ListenAction.RESTART_LISTENING_IN_PROGRESS))
-                .setRestartListeningSelfResolved(actions.contains(ListenAction.RESTART_LISTENING_SELF_RESOLVED))
-                .setRestartListeningWindUp(actions.contains(ListenAction.RESTART_LISTENING_WIND_UP))
+    public static ListenerState getListenStatusState(ListenerAction lastAction, List<ListenerAction> actions) {
+        return ListenerState.ListenStateBuilder.builder(lastAction)
+                .setStartedListeningInProgress(actions.contains(ListenerAction.START_LISTENING_IN_PROGRESS))
+                .setStartedListeningSelfResolved(actions.contains(ListenerAction.START_LISTENING_SELF_RESOLVED))
+                .setStartedListeningWindUp(actions.contains(ListenerAction.START_LISTENING_WIND_UP))
+                .setResumeListeningInProgress(actions.contains(ListenerAction.RESUME_LISTENING_IN_PROGRESS))
+                .setResumeListeningSelfResolved(actions.contains(ListenerAction.RESUME_LISTENING_SELF_RESOLVED))
+                .setResumeListeningWindUp(actions.contains(ListenerAction.RESUME_LISTENING_WIND_UP))
+                .setPauseListeningInProgress(actions.contains(ListenerAction.PAUSE_LISTENING_IN_PROGRESS))
+                .setPauseListeningSelfResolved(actions.contains(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
+                .setResumeListeningWindUp(actions.contains(ListenerAction.PAUSE_LISTENING_WIND_UP))
+                .setRestartListeningInProgress(actions.contains(ListenerAction.RESTART_LISTENING_IN_PROGRESS))
+                .setRestartListeningSelfResolved(actions.contains(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
+                .setRestartListeningWindUp(actions.contains(ListenerAction.RESTART_LISTENING_WIND_UP))
                 .build();
     }
 

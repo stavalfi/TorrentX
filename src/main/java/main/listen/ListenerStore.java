@@ -1,23 +1,23 @@
 package main.listen;
 
-import main.listen.reducers.ListenReducer;
-import main.listen.state.tree.ListenState;
+import main.listen.reducers.ListenerReducer;
+import main.listen.state.tree.ListenerState;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-public class ListenStore implements ListenNotifier {
+public class ListenerStore implements ListenerNotifier {
 
-    private FluxSink<ListenState> latestStateSink;
-    private Flux<ListenState> latestState$;
-    private Flux<ListenState> history$;
-    private ListenReducer reducer = new ListenReducer();
+    private FluxSink<ListenerState> latestStateSink;
+    private Flux<ListenerState> latestState$;
+    private Flux<ListenerState> history$;
+    private ListenerReducer reducer = new ListenerReducer();
 
-    public ListenStore() {
-        this.latestState$ = Flux.<ListenState>create(sink -> {
+    public ListenerStore() {
+        this.latestState$ = Flux.<ListenerState>create(sink -> {
             this.latestStateSink = sink;
-            this.latestStateSink.next(ListenReducer.defaultListenState.get());
+            this.latestStateSink.next(ListenerReducer.defaultListenState.get());
         }).replay(1).autoConnect(0);
 
         this.history$ = this.latestState$.replay(10) // how much statuses to save.
@@ -25,30 +25,30 @@ public class ListenStore implements ListenNotifier {
     }
 
     @Override
-    public Mono<ListenState> getLatestState$() {
+    public Mono<ListenerState> getLatestState$() {
         return this.latestState$
                 .take(1)
                 .single();
     }
 
     @Override
-    public Flux<ListenState> getState$() {
+    public Flux<ListenerState> getState$() {
         return this.latestState$;
     }
 
     @Override
-    public Flux<ListenState> getHistory$() {
+    public Flux<ListenerState> getHistory$() {
         return this.history$;
     }
 
     @Override
-    public Flux<ListenAction> getAction$() {
+    public Flux<ListenerAction> getAction$() {
         return this.latestState$
-                .map(ListenState::getAction);
+                .map(ListenerState::getAction);
     }
 
-    public Mono<ListenState> dispatchAsLongNoCancel(ListenAction windUpActionToChange) {
-        ListenAction correspondingIsProgressAction = ListenAction.getCorrespondingIsProgressAction(windUpActionToChange);
+    public Mono<ListenerState> dispatchAsLongNoCancel(ListenerAction windUpActionToChange) {
+        ListenerAction correspondingIsProgressAction = ListenerAction.getCorrespondingIsProgressAction(windUpActionToChange);
         assert correspondingIsProgressAction != null;
 
         return this.latestState$
@@ -59,13 +59,13 @@ public class ListenStore implements ListenNotifier {
                 .single();
     }
 
-    public Mono<ListenState> dispatch(ListenAction action) {
+    public Mono<ListenerState> dispatch(ListenerAction action) {
         return this.latestState$
                 .publishOn(Schedulers.single())
                 .take(1)
                 .single()
                 .flatMapMany(lastStatus -> {
-                    ListenState newStatus = this.reducer.reducer(lastStatus, action);
+                    ListenerState newStatus = this.reducer.reducer(lastStatus, action);
                     if (lastStatus.equals(newStatus))
                         return getLatestState$();
                     this.latestStateSink.next(newStatus);

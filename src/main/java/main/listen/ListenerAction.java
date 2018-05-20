@@ -1,6 +1,6 @@
 package main.listen;
 
-public enum ListenAction {
+public enum ListenerAction {
     // remove RESTART_LISTENING_WIND_UP flag and all other flags
     INITIALIZE,
 
@@ -21,7 +21,7 @@ public enum ListenAction {
     // remove all flags but this flag: RESTART_LISTENING_WIND_UP
     RESTART_LISTENING_WIND_UP,;
 
-    public static ListenAction getCorrespondingIsProgressAction(ListenAction action) {
+    public static ListenerAction getCorrespondingIsProgressAction(ListenerAction action) {
         switch (action) {
             case START_LISTENING_WIND_UP:
                 return START_LISTENING_IN_PROGRESS;

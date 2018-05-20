@@ -1,11 +1,11 @@
 package main.listen.state.tree;
 
-import main.listen.ListenAction;
+import main.listen.ListenerAction;
 
 import java.util.Objects;
 
-public class ListenState {
-    private ListenAction action;
+public class ListenerState {
+    private ListenerAction action;
     private boolean isStartedListeningInProgress;
     private boolean isStartedListeningSelfResolved;
     private boolean isStartedListeningWindUp;
@@ -19,19 +19,19 @@ public class ListenState {
     private boolean isRestartListeningSelfResolved;
     private boolean isRestartListeningWindUp;
 
-    public ListenState(ListenAction action,
-                       boolean isStartedListeningInProgress,
-                       boolean isStartedListeningSelfResolved,
-                       boolean isStartedListeningWindUp,
-                       boolean isPauseListeningInProgress,
-                       boolean isPauseListeningSelfResolved,
-                       boolean isPauseListeningWindUp,
-                       boolean isResumeListeningInProgress,
-                       boolean isResumeListeningSelfResolved,
-                       boolean isResumeListeningWindUp,
-                       boolean isRestartListeningInProgress,
-                       boolean isRestartListeningSelfResolved,
-                       boolean isRestartListeningWindUp) {
+    public ListenerState(ListenerAction action,
+                         boolean isStartedListeningInProgress,
+                         boolean isStartedListeningSelfResolved,
+                         boolean isStartedListeningWindUp,
+                         boolean isPauseListeningInProgress,
+                         boolean isPauseListeningSelfResolved,
+                         boolean isPauseListeningWindUp,
+                         boolean isResumeListeningInProgress,
+                         boolean isResumeListeningSelfResolved,
+                         boolean isResumeListeningWindUp,
+                         boolean isRestartListeningInProgress,
+                         boolean isRestartListeningSelfResolved,
+                         boolean isRestartListeningWindUp) {
         this.action = action;
         this.isStartedListeningInProgress = isStartedListeningInProgress;
         this.isStartedListeningSelfResolved = isStartedListeningSelfResolved;
@@ -47,7 +47,7 @@ public class ListenState {
         this.isRestartListeningWindUp = isRestartListeningWindUp;
     }
 
-    public ListenAction getAction() {
+    public ListenerAction getAction() {
         return action;
     }
 
@@ -102,8 +102,8 @@ public class ListenState {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ListenState)) return false;
-        ListenState that = (ListenState) o;
+        if (!(o instanceof ListenerState)) return false;
+        ListenerState that = (ListenerState) o;
         return isStartedListeningInProgress() == that.isStartedListeningInProgress() &&
                 isStartedListeningSelfResolved() == that.isStartedListeningSelfResolved() &&
                 isStartedListeningWindUp() == that.isStartedListeningWindUp() &&
@@ -126,7 +126,7 @@ public class ListenState {
 
     @Override
     public String toString() {
-        return "ListenStore{" +
+        return "ListenerStore{" +
                 "action=" + action +
                 ", isStartedListeningInProgress=" + isStartedListeningInProgress +
                 ", isStartedListeningSelfResolved=" + isStartedListeningSelfResolved +
@@ -143,7 +143,7 @@ public class ListenState {
                 '}';
     }
 
-    public boolean fromAction(ListenAction action) {
+    public boolean fromAction(ListenerAction action) {
         switch (action) {
             case START_LISTENING_IN_PROGRESS:
                 return isStartedListeningInProgress;
@@ -175,7 +175,7 @@ public class ListenState {
     }
 
     public static class ListenStateBuilder {
-        private ListenAction action;
+        private ListenerAction action;
         private boolean isStartedListeningInProgress;
         private boolean isStartedListeningSelfResolved;
         private boolean isStartedListeningWindUp;
@@ -193,20 +193,20 @@ public class ListenState {
 
         }
 
-        private ListenStateBuilder(ListenAction action) {
+        private ListenStateBuilder(ListenerAction action) {
             this.action = action;
         }
 
-        public static ListenState.ListenStateBuilder builder(ListenAction action, ListenState listenState) {
-            return new ListenState.ListenStateBuilder(action, listenState);
+        public static ListenerState.ListenStateBuilder builder(ListenerAction action, ListenerState listenerState) {
+            return new ListenerState.ListenStateBuilder(action, listenerState);
         }
 
-        public static ListenState.ListenStateBuilder builder(ListenAction action) {
-            return new ListenState.ListenStateBuilder(action);
+        public static ListenerState.ListenStateBuilder builder(ListenerAction action) {
+            return new ListenerState.ListenStateBuilder(action);
         }
 
-        public ListenState build() {
-            return new ListenState(
+        public ListenerState build() {
+            return new ListenerState(
                     this.action,
                     this.isStartedListeningInProgress,
                     this.isStartedListeningSelfResolved,
@@ -222,19 +222,19 @@ public class ListenState {
                     this.isRestartListeningWindUp);
         }
 
-        private ListenStateBuilder(ListenAction action, ListenState listenState) {
-            this.isStartedListeningInProgress = listenState.isStartedListeningInProgress;
-            this.isStartedListeningSelfResolved = listenState.isStartedListeningSelfResolved;
-            this.isStartedListeningWindUp = listenState.isStartedListeningWindUp;
-            this.isPauseListeningInProgress = listenState.isPauseListeningInProgress;
-            this.isPauseListeningSelfResolved = listenState.isPauseListeningSelfResolved;
-            this.isPauseListeningWindUp = listenState.isPauseListeningWindUp;
-            this.isResumeListeningInProgress = listenState.isResumeListeningInProgress;
-            this.isResumeListeningSelfResolved = listenState.isResumeListeningSelfResolved;
-            this.isResumeListeningWindUp = listenState.isResumeListeningWindUp;
-            this.isRestartListeningInProgress = listenState.isRestartListeningInProgress;
-            this.isRestartListeningSelfResolved = listenState.isRestartListeningSelfResolved;
-            this.isRestartListeningWindUp = listenState.isRestartListeningWindUp;
+        private ListenStateBuilder(ListenerAction action, ListenerState listenerState) {
+            this.isStartedListeningInProgress = listenerState.isStartedListeningInProgress;
+            this.isStartedListeningSelfResolved = listenerState.isStartedListeningSelfResolved;
+            this.isStartedListeningWindUp = listenerState.isStartedListeningWindUp;
+            this.isPauseListeningInProgress = listenerState.isPauseListeningInProgress;
+            this.isPauseListeningSelfResolved = listenerState.isPauseListeningSelfResolved;
+            this.isPauseListeningWindUp = listenerState.isPauseListeningWindUp;
+            this.isResumeListeningInProgress = listenerState.isResumeListeningInProgress;
+            this.isResumeListeningSelfResolved = listenerState.isResumeListeningSelfResolved;
+            this.isResumeListeningWindUp = listenerState.isResumeListeningWindUp;
+            this.isRestartListeningInProgress = listenerState.isRestartListeningInProgress;
+            this.isRestartListeningSelfResolved = listenerState.isRestartListeningSelfResolved;
+            this.isRestartListeningWindUp = listenerState.isRestartListeningWindUp;
         }
 
         public ListenStateBuilder setStartedListeningInProgress(boolean startedListeningInProgress) {
