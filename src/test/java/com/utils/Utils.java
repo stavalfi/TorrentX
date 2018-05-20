@@ -9,6 +9,9 @@ import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.*;
+import main.listen.ListenAction;
+import main.listen.reducers.ListenReducer;
+import main.listen.state.tree.ListenState;
 import main.peer.*;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -105,6 +108,13 @@ public class Utils {
                 .freeAll()
                 .flatMap(__ -> BlocksAllocatorImpl.getInstance().updateAllocations(2, 1_000_000))
                 .block();
+
+        TorrentDownloaders.getInstance()
+                .getListenStore()
+                .dispatch(ListenAction.RESTART_LISTENING_IN_PROGRESS)
+                .flatMapMany(__ -> TorrentDownloaders.getInstance().getListenStore().getState$())
+                .takeUntil(listenState -> listenState.equals(ListenReducer.defaultListenState.get()))
+                .blockLast();
     }
 
     public static TorrentStatusState getTorrentStatusState(TorrentInfo torrentInfo, Action lastAction, List<Action> actions) {
@@ -145,6 +155,23 @@ public class Utils {
                 .build();
 
         return new TorrentStatusState(torrentInfo, lastAction, downloadState, peersState, torrentFileSystemState);
+    }
+
+    public static ListenState getListenStatusState(ListenAction lastAction, List<ListenAction> actions) {
+        return ListenState.ListenStateBuilder.builder(lastAction)
+                .setStartedListeningInProgress(actions.contains(ListenAction.START_LISTENING_IN_PROGRESS))
+                .setStartedListeningSelfResolved(actions.contains(ListenAction.START_LISTENING_SELF_RESOLVED))
+                .setStartedListeningWindUp(actions.contains(ListenAction.START_LISTENING_WIND_UP))
+                .setResumeListeningInProgress(actions.contains(ListenAction.RESUME_LISTENING_IN_PROGRESS))
+                .setResumeListeningSelfResolved(actions.contains(ListenAction.RESUME_LISTENING_SELF_RESOLVED))
+                .setResumeListeningWindUp(actions.contains(ListenAction.RESUME_LISTENING_WIND_UP))
+                .setPauseListeningInProgress(actions.contains(ListenAction.PAUSE_LISTENING_IN_PROGRESS))
+                .setPauseListeningSelfResolved(actions.contains(ListenAction.PAUSE_LISTENING_SELF_RESOLVED))
+                .setResumeListeningWindUp(actions.contains(ListenAction.PAUSE_LISTENING_WIND_UP))
+                .setRestartListeningInProgress(actions.contains(ListenAction.RESTART_LISTENING_IN_PROGRESS))
+                .setRestartListeningSelfResolved(actions.contains(ListenAction.RESTART_LISTENING_SELF_RESOLVED))
+                .setRestartListeningWindUp(actions.contains(ListenAction.RESTART_LISTENING_WIND_UP))
+                .build();
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {

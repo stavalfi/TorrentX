@@ -5,6 +5,8 @@ import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
+import main.listen.ListenSideEffects;
+import main.listen.ListenStore;
 import main.peer.Link;
 import main.peer.PeersListener;
 import main.peer.ReceiveMessagesNotifications;
@@ -22,12 +24,22 @@ import java.util.Optional;
 
 public class TorrentDownloaders {
 
+    private ListenStore listenStore = new ListenStore();
+    private ListenSideEffects listenSideEffects = new ListenSideEffects(this.listenStore);
     private PeersListener peersListener = new PeersListener();
 
     private List<TorrentDownloader> torrentDownloaderList = new ArrayList<>();
 
     public PeersListener getPeersListener() {
         return peersListener;
+    }
+
+    public ListenStore getListenStore() {
+        return listenStore;
+    }
+
+    public ListenSideEffects getListenSideEffects() {
+        return listenSideEffects;
     }
 
     public synchronized Flux<TorrentDownloader> getTorrentDownloadersFlux() {
@@ -87,7 +99,7 @@ public class TorrentDownloaders {
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
         // TODO: save the initial status in the mongodb.
         TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-        TorrentStatesSideEffects torrentStatesSideEffects=new TorrentStatesSideEffects(torrentInfo,torrentStatusStore);
+        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
         // TODO: remove the block()
         torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
         SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore);
