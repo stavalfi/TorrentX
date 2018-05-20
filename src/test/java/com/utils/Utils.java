@@ -10,6 +10,7 @@ import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.*;
 import main.listen.ListenerAction;
+import main.listen.ListenerStore;
 import main.listen.reducers.ListenerReducer;
 import main.listen.state.tree.ListenerState;
 import main.peer.*;
@@ -46,8 +47,6 @@ import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
 public class Utils {
-    public static PeersListener peersListener;
-
     public static TorrentInfo createTorrentInfo(String torrentFilePath) throws IOException {
         String torrentFilesPath = "src" + File.separator +
                 "test" + File.separator +
@@ -95,11 +94,13 @@ public class Utils {
         } catch (Exception e) {
             //e.printStackTrace();
         }
-        if (peersListener != null) {
-            peersListener.stop();
-            //TODO: stop listen in the object which TorrentDownloaders have also and we need to restart him in the next test.
-            peersListener = null;
-        }
+        ListenerStore listenStore = TorrentDownloaders.getInstance()
+                .getListenStore();
+
+        listenStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
+                .flatMapMany(__ -> listenStore.getState$())
+                .takeUntil(listenerState -> ListenerReducer.defaultListenState.get().equals(listenerState))
+                .blockLast();
 
         // delete download folder from last test
         Utils.deleteDownloadFolder();
@@ -108,13 +109,6 @@ public class Utils {
                 .freeAll()
                 .flatMap(__ -> BlocksAllocatorImpl.getInstance().updateAllocations(2, 1_000_000))
                 .block();
-
-        TorrentDownloaders.getInstance()
-                .getListenStore()
-                .dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                .flatMapMany(__ -> TorrentDownloaders.getInstance().getListenStore().getState$())
-                .takeUntil(listenState -> listenState.equals(ListenerReducer.defaultListenState.get()))
-                .blockLast();
     }
 
     public static TorrentStatusState getTorrentStatusState(TorrentInfo torrentInfo, Action lastAction, List<Action> actions) {
@@ -192,15 +186,13 @@ public class Utils {
         // TODO: Remove the block
         torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
 
-        peersListener = new PeersListener();
-
         // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
         SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider,
                 peersProvider, peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                 .autoConnect(0));
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(peersListener.getPeersConnectedToMeFlux(torrentInfo)
+                Flux.merge(TorrentDownloaders.getInstance().getListener().getPeers$(torrentInfo)
                         // SocketException == When I shutdown the SocketServer after/before
                         // the tests inside Utils::removeEverythingRelatedToTorrent.
                         .onErrorResume(SocketException.class, throwable -> Flux.empty()), searchPeers.getPeers$())
@@ -240,13 +232,11 @@ public class Utils {
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
                                                                    TorrentStatusStore torrentStatusStore,
                                                                    TorrentStatesSideEffects torrentStatesSideEffects) {
-        peersListener = new PeersListener();
-
         // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
         SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore);
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(peersListener.getPeersConnectedToMeFlux(torrentInfo), searchPeers.getPeers$())
+                Flux.merge(TorrentDownloaders.getInstance().getListener().getPeers$(torrentInfo), searchPeers.getPeers$())
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
@@ -288,14 +278,12 @@ public class Utils {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
-        peersListener = new PeersListener();
-
         // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
         SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider,
                 peersProvider, peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                 .autoConnect(0));
 
-        Flux<Link> incomingPeers$ = peersListener.getPeersConnectedToMeFlux(torrentInfo)
+        Flux<Link> incomingPeers$ = TorrentDownloaders.getInstance().getListener().getPeers$(torrentInfo)
                 // SocketException == When I shutdown the SocketServer after/before
                 // the tests inside Utils::removeEverythingRelatedToTorrent.
                 .onErrorResume(SocketException.class, throwable -> Flux.empty());

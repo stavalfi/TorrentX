@@ -5,10 +5,10 @@ import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
-import main.listen.ListenerSideEffects;
+import main.listen.Listener;
+import main.listen.side.effects.ListenerSideEffects;
 import main.listen.ListenerStore;
 import main.peer.Link;
-import main.peer.PeersListener;
 import main.peer.ReceiveMessagesNotifications;
 import main.peer.SearchPeers;
 import main.statistics.SpeedStatistics;
@@ -26,12 +26,12 @@ public class TorrentDownloaders {
 
     private ListenerStore listenStore = new ListenerStore();
     private ListenerSideEffects listenerSideEffects = new ListenerSideEffects(this.listenStore);
-    private PeersListener peersListener = new PeersListener();
+    private Listener listener;
 
     private List<TorrentDownloader> torrentDownloaderList = new ArrayList<>();
 
-    public PeersListener getPeersListener() {
-        return peersListener;
+    public Listener getListener() {
+        return listener;
     }
 
     public ListenerStore getListenStore() {
@@ -105,7 +105,7 @@ public class TorrentDownloaders {
         SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore);
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(getInstance().peersListener.getPeersConnectedToMeFlux(torrentInfo), searchPeers.getPeers$())
+                Flux.merge(getInstance().getListener().getPeers$(torrentInfo), searchPeers.getPeers$())
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...

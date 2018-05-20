@@ -724,13 +724,13 @@ public class MyStepdefs {
                 .take(1)
                 .single();
 
-//        // my application start listening for new peers.
+        // my application start listening for new peers.
         TorrentDownloaders.getInstance()
-                .getPeersListener()
-                .start()
-                .resume();
+                .getListenStore()
+                .dispatch(ListenerAction.START_LISTENING_IN_PROGRESS)
+                .block();
 
-//        // listen for incoming request messages and response to them.
+        // listen for incoming request messages and response to them.
         torrentStatusStore.dispatch(torrentInfo, Action.START_UPLOAD_IN_PROGRESS).block();
 
         Link fakePeerToMeLink = new PeersProvider(torrentInfo)
