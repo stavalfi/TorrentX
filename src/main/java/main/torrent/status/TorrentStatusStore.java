@@ -52,6 +52,7 @@ public class TorrentStatusStore implements StatusNotifier {
         return this.latestState$.filter(torrentStatusState -> torrentStatusState.getTorrentInfo().equals(torrentInfo))
                 .takeWhile(torrentStatusState -> torrentStatusState.fromAction(correspondingIsProgressAction))
                 .flatMap(torrentStatusState -> dispatch(torrentInfo, windUpActionToChange))
+                .filter(listenState -> listenState.fromAction(windUpActionToChange))
                 .take(1)
                 .single();
     }
