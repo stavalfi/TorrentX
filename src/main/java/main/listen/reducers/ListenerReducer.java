@@ -16,7 +16,7 @@ public class ListenerReducer {
                     .setResumeListeningWindUp(false)
                     .setPauseListeningInProgress(false)
                     .setPauseListeningSelfResolved(false)
-                    .setResumeListeningWindUp(true)
+                    .setPauseListeningWindUp(true)
                     .setRestartListeningInProgress(false)
                     .setRestartListeningSelfResolved(false)
                     .setRestartListeningWindUp(false)
@@ -133,6 +133,8 @@ public class ListenerReducer {
                         .setPauseListeningInProgress(false)
                         .setPauseListeningSelfResolved(false)
                         .setPauseListeningWindUp(true)
+                        .setResumeListeningSelfResolved(false)
+                        .setResumeListeningWindUp(false)
                         .build();
 
             case RESTART_LISTENING_IN_PROGRESS:

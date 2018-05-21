@@ -1383,7 +1383,7 @@ public class MyStepdefs {
                         case START_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
                                     .flatMapMany(__ -> listenStore.getState$())
-                                    .filter(ListenerState::isStartedListeningWindUp)
+                                    .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
                                     .single();
                         case START_LISTENING_SELF_RESOLVED:
@@ -1392,7 +1392,7 @@ public class MyStepdefs {
                                     .take(1)
                                     .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.getState$())
-                                    .filter(ListenerState::isStartedListeningWindUp)
+                                    .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
                                     .single();
                         case RESUME_LISTENING_IN_PROGRESS:

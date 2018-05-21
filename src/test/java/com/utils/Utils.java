@@ -166,7 +166,7 @@ public class Utils {
                 .setResumeListeningWindUp(actions.contains(ListenerAction.RESUME_LISTENING_WIND_UP))
                 .setPauseListeningInProgress(actions.contains(ListenerAction.PAUSE_LISTENING_IN_PROGRESS))
                 .setPauseListeningSelfResolved(actions.contains(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
-                .setResumeListeningWindUp(actions.contains(ListenerAction.PAUSE_LISTENING_WIND_UP))
+                .setPauseListeningWindUp(actions.contains(ListenerAction.PAUSE_LISTENING_WIND_UP))
                 .setRestartListeningInProgress(actions.contains(ListenerAction.RESTART_LISTENING_IN_PROGRESS))
                 .setRestartListeningSelfResolved(actions.contains(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
                 .setRestartListeningWindUp(actions.contains(ListenerAction.RESTART_LISTENING_WIND_UP))

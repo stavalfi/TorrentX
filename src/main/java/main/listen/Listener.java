@@ -32,6 +32,7 @@ public class Listener {
 
     private Flux<ServerSocket> startListen$;
     private Flux<Link> resumeListen$;
+    private Flux<ListenerState> pauseListen$;
     private Flux<ListenerState> restartListener$;
 
     public Listener() {
@@ -75,6 +76,13 @@ public class Listener {
                 .onErrorResume(PeerExceptions.communicationErrors,
                         throwable -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                                 .flatMap(__ -> Mono.empty()))
+                .publish()
+                .autoConnect(0);
+
+        this.pauseListen$ = listenerStore.getByAction$(ListenerAction.PAUSE_LISTENING_IN_PROGRESS)
+                .flatMap(__ -> listenerStore.dispatch(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
+                .filter(listenerState -> listenerState.fromAction(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
+                .doOnNext(serverSocket -> logger.info("paused listening to incoming peers under port: " + getTcpPort()))
                 .publish()
                 .autoConnect(0);
 
