@@ -1,9 +1,9 @@
-package main.listen.side.effects;
+package main.listener.side.effects;
 
-import main.listen.ListenerAction;
-import main.listen.ListenerStore;
-import main.listen.state.tree.ListenerState;
+import main.listener.ListenerAction;
+import main.listener.state.tree.ListenerState;
 import reactor.core.publisher.Flux;
+import redux.store.Store;
 
 public class ListenerSideEffects {
     Flux<ListenerState> startListen$;
@@ -11,7 +11,7 @@ public class ListenerSideEffects {
     Flux<ListenerState> pauseListen$;
     Flux<ListenerState> restartListen$;
 
-    public ListenerSideEffects(ListenerStore store) {
+    public ListenerSideEffects(Store<ListenerState, ListenerAction> store) {
         this.startListen$ = store.getByAction$(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(ListenerAction.START_LISTENING_WIND_UP))
                 .flatMap(__ -> store.dispatch(ListenerAction.RESUME_LISTENING_IN_PROGRESS))
@@ -29,6 +29,7 @@ public class ListenerSideEffects {
                 .autoConnect(0);
 
         this.restartListen$ = store.getByAction$(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
+                .flatMap(__ -> store.dispatch(ListenerAction.PAUSE_LISTENING_IN_PROGRESS))
                 .flatMap(__ -> store.dispatchAsLongNoCancel(ListenerAction.RESTART_LISTENING_WIND_UP))
                 .flatMap(__ -> store.dispatch(ListenerAction.INITIALIZE))
                 .publish()

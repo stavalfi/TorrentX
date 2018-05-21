@@ -9,7 +9,7 @@ Feature: start/stop/restart listening to new peers and include side-effects in t
       | START_LISTENING_WIND_UP  |
       | RESUME_LISTENING_WIND_UP |
 
-  Scenario: (2) start and resume listener
+  Scenario: (2) start and then resume listener
     Given initial listen-status - default
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
@@ -20,7 +20,7 @@ Feature: start/stop/restart listening to new peers and include side-effects in t
       | START_LISTENING_WIND_UP  |
       | RESUME_LISTENING_WIND_UP |
 
-  Scenario: (3) start and pause listener
+  Scenario: (3) start and then pause listener
     Given initial listen-status - default
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
@@ -31,7 +31,7 @@ Feature: start/stop/restart listening to new peers and include side-effects in t
       | START_LISTENING_WIND_UP |
       | PAUSE_LISTENING_WIND_UP |
 
-  Scenario: (4) start and resume and restart listener
+  Scenario: (4) start and then resume and restart listener
     Given initial listen-status - default
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
@@ -43,7 +43,7 @@ Feature: start/stop/restart listening to new peers and include side-effects in t
     Then listen-status will change to: "INITIALIZE":
       | PAUSE_LISTENING_WIND_UP |
 
-  Scenario: (5) start and (resume and restart and the same time) listener
+  Scenario: (5) start and then (resume and restart and the same time) listener
     Given initial listen-status - default
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |

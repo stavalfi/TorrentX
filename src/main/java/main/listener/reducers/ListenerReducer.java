@@ -1,11 +1,12 @@
-package main.listen.reducers;
+package main.listener.reducers;
 
-import main.listen.ListenerAction;
-import main.listen.state.tree.ListenerState;
+import main.listener.ListenerAction;
+import main.listener.state.tree.ListenerState;
+import redux.store.reducer.IReducer;
 
 import java.util.function.Supplier;
 
-public class ListenerReducer {
+public class ListenerReducer implements IReducer<ListenerState,ListenerAction> {
     public static Supplier<ListenerState> defaultListenState = () ->
             ListenerState.ListenStateBuilder.builder(ListenerAction.INITIALIZE)
                     .setStartedListeningInProgress(false)
@@ -123,8 +124,7 @@ public class ListenerReducer {
                         .build();
 
             case PAUSE_LISTENING_WIND_UP:
-                if (lastState.isRestartListeningInProgress() ||
-                        !lastState.isPauseListeningInProgress() ||
+                if (!lastState.isPauseListeningInProgress() ||
                         !lastState.isPauseListeningSelfResolved() ||
                         lastState.isPauseListeningWindUp() ||
                         !lastState.isResumeListeningWindUp())
@@ -138,8 +138,7 @@ public class ListenerReducer {
                         .build();
 
             case RESTART_LISTENING_IN_PROGRESS:
-                if (!lastState.isStartedListeningInProgress() ||
-                        !lastState.isStartedListeningWindUp() ||
+                if (lastState.equals(defaultListenState.get()) ||
                         lastState.isRestartListeningInProgress() ||
                         lastState.isRestartListeningWindUp())
                     return lastState;
@@ -159,7 +158,7 @@ public class ListenerReducer {
             case RESTART_LISTENING_WIND_UP:
                 if (!lastState.isPauseListeningWindUp() ||
                         !lastState.isRestartListeningInProgress() ||
-                        lastState.isRestartListeningSelfResolved() ||
+                        !lastState.isRestartListeningSelfResolved() ||
                         lastState.isRestartListeningWindUp())
                     return lastState;
                 return ListenerState.ListenStateBuilder.builder(action, lastState)

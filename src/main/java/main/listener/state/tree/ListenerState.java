@@ -1,10 +1,11 @@
-package main.listen.state.tree;
+package main.listener.state.tree;
 
-import main.listen.ListenerAction;
+import main.listener.ListenerAction;
+import redux.store.State;
 
 import java.util.Objects;
 
-public class ListenerState {
+public class ListenerState extends State<ListenerAction> {
     private ListenerAction action;
     private boolean isStartedListeningInProgress;
     private boolean isStartedListeningSelfResolved;
@@ -32,7 +33,7 @@ public class ListenerState {
                          boolean isRestartListeningInProgress,
                          boolean isRestartListeningSelfResolved,
                          boolean isRestartListeningWindUp) {
-        this.action = action;
+        super(action);
         this.isStartedListeningInProgress = isStartedListeningInProgress;
         this.isStartedListeningSelfResolved = isStartedListeningSelfResolved;
         this.isStartedListeningWindUp = isStartedListeningWindUp;
@@ -45,10 +46,6 @@ public class ListenerState {
         this.isRestartListeningInProgress = isRestartListeningInProgress;
         this.isRestartListeningSelfResolved = isRestartListeningSelfResolved;
         this.isRestartListeningWindUp = isRestartListeningWindUp;
-    }
-
-    public ListenerAction getAction() {
-        return action;
     }
 
     public boolean isStartedListeningInProgress() {
@@ -143,6 +140,7 @@ public class ListenerState {
                 '}';
     }
 
+    @Override
     public boolean fromAction(ListenerAction action) {
         switch (action) {
             case START_LISTENING_IN_PROGRESS:

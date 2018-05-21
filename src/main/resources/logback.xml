@@ -14,7 +14,7 @@
         <suffixPattern>TorrentX: %logger %msg</suffixPattern>
     </appender>
 
-    <root level="INFO">
+    <root level="DEBUG">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="PAPERTRAIL"/>
     </root>

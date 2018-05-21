@@ -14,10 +14,10 @@ import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.*;
-import main.listen.ListenerAction;
-import main.listen.ListenerStore;
-import main.listen.reducers.ListenerReducer;
-import main.listen.state.tree.ListenerState;
+import main.listener.ListenerAction;
+import main.listener.ListenerStore;
+import main.listener.reducers.ListenerReducer;
+import main.listener.state.tree.ListenerState;
 import main.peer.*;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
@@ -688,7 +688,7 @@ public class MyStepdefs {
                                                                   List<BlockOfPiece> peerRequestBlockList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        // The last step created FileSystemLinkImpl object which listen to custom
+        // The last step created FileSystemLinkImpl object which listener to custom
         // peerResponsesFlux. So I can't expect it to react to the original peerResponsesFlux.
         // Also the last test created torrentStatusController object.
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
@@ -730,7 +730,7 @@ public class MyStepdefs {
                 .dispatch(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .block();
 
-        // listen for incoming request messages and response to them.
+        // listener for incoming request messages and response to them.
         torrentStatusStore.dispatch(torrentInfo, Action.START_UPLOAD_IN_PROGRESS).block();
 
         Link fakePeerToMeLink = new PeersProvider(torrentInfo)
@@ -1463,7 +1463,7 @@ public class MyStepdefs {
                 .getListenStore()
                 .getLatestState$()
                 .doOnNext(actualState ->
-                        Assert.assertEquals("expected and actual listen-module states are not equal.",
+                        Assert.assertEquals("expected and actual listener-module states are not equal.",
                                 expectedState, actualState))
                 .block();
     }

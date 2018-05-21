@@ -5,9 +5,11 @@ import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
-import main.listen.Listener;
-import main.listen.side.effects.ListenerSideEffects;
-import main.listen.ListenerStore;
+import main.listener.Listener;
+import main.listener.ListenerAction;
+import main.listener.reducers.ListenerReducer;
+import main.listener.side.effects.ListenerSideEffects;
+import main.listener.state.tree.ListenerState;
 import main.peer.Link;
 import main.peer.ReceiveMessagesNotifications;
 import main.peer.SearchPeers;
@@ -17,6 +19,7 @@ import main.torrent.status.TorrentStatusStore;
 import main.torrent.status.reducers.Reducer;
 import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import reactor.core.publisher.Flux;
+import redux.store.Store;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,7 +27,10 @@ import java.util.Optional;
 
 public class TorrentDownloaders {
 
-    private ListenerStore listenStore = new ListenerStore();
+    private Store<ListenerState, ListenerAction> listenStore = new Store<>(new ListenerReducer(),
+            ListenerReducer.defaultListenState.get(),
+            ListenerAction::getCorrespondingIsProgressAction);
+
     private ListenerSideEffects listenerSideEffects = new ListenerSideEffects(this.listenStore);
     private Listener listener;
 
@@ -34,7 +40,7 @@ public class TorrentDownloaders {
         return listener;
     }
 
-    public ListenerStore getListenStore() {
+    public Store<ListenerState, ListenerAction> getListenStore() {
         return listenStore;
     }
 

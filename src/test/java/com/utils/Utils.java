@@ -9,11 +9,11 @@ import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.*;
-import main.listen.Listener;
-import main.listen.ListenerAction;
-import main.listen.ListenerStore;
-import main.listen.reducers.ListenerReducer;
-import main.listen.state.tree.ListenerState;
+import main.listener.Listener;
+import main.listener.ListenerAction;
+import main.listener.ListenerStore;
+import main.listener.reducers.ListenerReducer;
+import main.listener.state.tree.ListenerState;
 import main.peer.*;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -98,6 +98,7 @@ public class Utils {
         ListenerStore listenStore = TorrentDownloaders.getInstance()
                 .getListenStore();
 
+        System.out.println("123");
         listenStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                 .flatMapMany(__ -> listenStore.getState$())
                 .takeUntil(listenerState -> ListenerReducer.defaultListenState.get().equals(listenerState))

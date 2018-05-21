@@ -1,11 +1,11 @@
-package main.listen;
+package main.listener;
 
 import main.AppConfig;
 import main.HexByteConverter;
 import main.TorrentInfo;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.listen.state.tree.ListenerState;
+import main.listener.state.tree.ListenerState;
 import main.peer.Link;
 import main.peer.Peer;
 import main.peer.PeerExceptions;
@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import redux.store.Store;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -36,7 +37,7 @@ public class Listener {
     private Flux<ListenerState> restartListener$;
 
     public Listener() {
-        ListenerStore listenerStore = TorrentDownloaders.getInstance()
+        Store<ListenerState, ListenerAction> listenerStore = TorrentDownloaders.getInstance()
                 .getListenStore();
 
         Supplier<Mono<ServerSocket>> serverSocketSupplier = () -> {
@@ -58,7 +59,7 @@ public class Listener {
                         .filter(listenerState -> listenerState.fromAction(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
                                 listenerState.fromAction(ListenerAction.START_LISTENING_WIND_UP))
                         .map(__ -> serverSocket))
-                .doOnNext(serverSocket -> logger.info("created server-socket under port: " + getTcpPort()))
+                .doOnNext(serverSocket -> logger.info("started listening by created server-socket under port: " + getTcpPort()))
                 .replay(1)
                 .autoConnect(0);
 
@@ -68,7 +69,7 @@ public class Listener {
                 .flatMap(serverSocket -> listenerStore.dispatch(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)
                         .filter(listenerState -> listenerState.fromAction(ListenerAction.RESUME_LISTENING_SELF_RESOLVED))
                         .map(__ -> serverSocket))
-                .doOnNext(serverSocket -> logger.info("started listening to incoming peers under port: " + getTcpPort()))
+                .doOnNext(serverSocket -> logger.info("resume listening to incoming peers under port: " + getTcpPort()))
                 .flatMap(serverSocket -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, serverSocket))
                 .flatMap(serverSocket -> acceptPeersLinks(serverSocket))
                 .flatMap(link -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, link))
@@ -86,10 +87,10 @@ public class Listener {
                 .publish()
                 .autoConnect(0);
 
-        Function<ServerSocket, Mono<Void>> closeServerSocket = serverSocket -> {
+        Function<ServerSocket, Mono<ServerSocket>> closeServerSocket = serverSocket -> {
             try {
                 serverSocket.close();
-                return Mono.empty();
+                return Mono.just(serverSocket);
             } catch (IOException e) {
                 return Mono.error(e);
             }
@@ -98,7 +99,8 @@ public class Listener {
         this.restartListener$ = listenerStore.getByAction$(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> startListen$)
                 .flatMap(closeServerSocket)
-                .flatMap(serverSocket -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
+                .doOnError(throwable -> logger.error("fatal error while closing server-socket object under port " + getTcpPort() + ": " + throwable))
+                .flatMap(closedServerSocket -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
                 .filter(listenerState -> listenerState.fromAction(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
@@ -113,6 +115,9 @@ public class Listener {
                 // closed and which errors indicate that the ServerSocket is corrupted.
                 sink.next(peerSocket);
             } catch (IOException e) {
+                // isClosed()==true means that only I caused the serverSocket to be closed.
+                if (serverSocket.isClosed())
+                    sink.complete();
                 sink.error(e);
             }
         });
