@@ -27,24 +27,25 @@ import java.util.Optional;
 
 public class TorrentDownloaders {
 
-    private Store<ListenerState, ListenerAction> listenStore = new Store<>(new ListenerReducer(),
+    private static Store<ListenerState, ListenerAction> listenStore = new Store<>(new ListenerReducer(),
             ListenerReducer.defaultListenState.get(),
             ListenerAction::getCorrespondingIsProgressAction);
 
-    private ListenerSideEffects listenerSideEffects = new ListenerSideEffects(this.listenStore);
-    private Listener listener;
+    private static Listener listener = new Listener();
+
+    private static ListenerSideEffects listenerSideEffects = new ListenerSideEffects(listenStore);
 
     private List<TorrentDownloader> torrentDownloaderList = new ArrayList<>();
 
-    public Listener getListener() {
+    public static Listener getListener() {
         return listener;
     }
 
-    public Store<ListenerState, ListenerAction> getListenStore() {
+    public static Store<ListenerState, ListenerAction> getListenStore() {
         return listenStore;
     }
 
-    public ListenerSideEffects getListenerSideEffects() {
+    public static ListenerSideEffects getListenerSideEffects() {
         return listenerSideEffects;
     }
 

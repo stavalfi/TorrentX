@@ -6,32 +6,76 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import redux.state.State;
 import redux.reducer.IReducer;
+import redux.state.State;
 
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 public class Store<S extends State<A>, A> implements Notifier<S, A> {
     private static Logger logger = LoggerFactory.getLogger(Store.class);
 
-    private S defaultState;
-
-    private FluxSink<S> latestStateSink;
     private Flux<S> latestState$;
     private Flux<S> history$;
     private IReducer<S, A> reducer;
     private Function<A, A> getCorrespondingIsProgressAction;
+    private FluxSink<S> produceNewState;
+    private Semaphore semaphore = new Semaphore(1);
+
+    // for debugging
+    private AtomicInteger transactionCount = new AtomicInteger(0);
 
     public Store(IReducer<S, A> reducer, S defaultState, Function<A, A> getCorrespondingIsProgressAction) {
+        this.reducer = reducer;
+        this.getCorrespondingIsProgressAction = getCorrespondingIsProgressAction;
         this.latestState$ = Flux.<S>create(sink -> {
-            this.latestStateSink = sink;
-            this.latestStateSink.next(defaultState);
-        }).doOnNext(listenerState -> logger.debug("new state: " + listenerState))
-                .replay(1)
+            this.produceNewState = sink;
+            sink.next(defaultState);
+        }).replay(1)
                 .autoConnect(0);
 
         this.history$ = this.latestState$.replay(10) // how much statuses to save.
                 .autoConnect(0);
+    }
+
+    public Mono<S> dispatch(A action) {
+        return Mono.just(transactionCount.getAndIncrement())
+                .publishOn(Schedulers.elastic())
+                .flatMap(transactionCount -> {
+                    try {
+                        this.semaphore.acquire();
+                        logger.info("transaction: " + transactionCount + " - acquired semaphore for action: " + action);
+                        return Mono.just(transactionCount);
+                    } catch (InterruptedException e) {
+                        return Mono.error(e);
+                    }
+                })
+                .flatMap(transactionCount -> {
+                    logger.info("transaction: " + transactionCount + " - getting the last state.");
+                    return getLatestState$()
+                            .flatMap(lastStatus -> {
+                                logger.info("transaction: " + transactionCount + " - dispatching action: " + action +
+                                        ". last state: " + lastStatus);
+                                S newStatus = this.reducer.reducer(lastStatus, action);
+                                if (lastStatus.equals(newStatus)) {
+                                    logger.info("transaction: " + transactionCount + " - didn't dispatch action: " + action +
+                                            " because the new state is illegal or equal to the last state: " + lastStatus);
+                                    return Mono.just(lastStatus)
+                                            .doOnNext(__ -> this.semaphore.release())
+                                            .doOnNext(__ -> logger.info("transaction: " + transactionCount + " - released semaphore for action: " + action));
+                                }
+                                this.produceNewState.next(newStatus);
+                                logger.info("transaction: " + transactionCount + " - dispatched action: " + action +
+                                        ". new state: " + newStatus);
+                                return getState$()
+                                        .filter(newStatus::equals)
+                                        .take(1)
+                                        .single()
+                                        .doOnNext(__ -> this.semaphore.release())
+                                        .doOnNext(__ -> logger.info("transaction: " + transactionCount + " - released semaphore for action: " + action));
+                            });
+                });
     }
 
     @Override
@@ -48,7 +92,7 @@ public class Store<S extends State<A>, A> implements Notifier<S, A> {
 
     @Override
     public Flux<S> getHistory$() {
-        return this.history$.publishOn(Schedulers.elastic());
+        return this.history$;
     }
 
     @Override
@@ -79,28 +123,9 @@ public class Store<S extends State<A>, A> implements Notifier<S, A> {
 
         return this.latestState$
                 .takeWhile(listenState -> listenState.fromAction(correspondingIsProgressAction))
-                .flatMap(listenState -> dispatch(windUpActionToChange))
+                .switchMap(listenState -> dispatch(windUpActionToChange))
                 .filter(listenState -> listenState.fromAction(windUpActionToChange))
                 .take(1)
                 .single();
-    }
-
-    public Mono<S> dispatch(A action) {
-        return this.latestState$
-                .publishOn(Schedulers.single())
-                .take(1)
-                .single()
-                .flatMapMany(lastStatus -> {
-                    System.out.println("123-1");
-                    S newStatus = this.reducer.reducer(lastStatus, action);
-                    if (lastStatus.equals(newStatus))
-                        return getLatestState$();
-                    System.out.println("123-2");
-                    this.latestStateSink.next(newStatus);
-                    return this.latestState$.filter(status -> status.equals(newStatus));
-                })
-                .take(1)
-                .single()
-                .publishOn(Schedulers.parallel());
     }
 }

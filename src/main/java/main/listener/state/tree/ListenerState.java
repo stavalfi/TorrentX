@@ -6,7 +6,6 @@ import redux.state.State;
 import java.util.Objects;
 
 public class ListenerState extends State<ListenerAction> {
-    private ListenerAction action;
     private boolean isStartedListeningInProgress;
     private boolean isStartedListeningSelfResolved;
     private boolean isStartedListeningWindUp;
@@ -100,6 +99,7 @@ public class ListenerState extends State<ListenerAction> {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof ListenerState)) return false;
+        if (!super.equals(o)) return false;
         ListenerState that = (ListenerState) o;
         return isStartedListeningInProgress() == that.isStartedListeningInProgress() &&
                 isStartedListeningSelfResolved() == that.isStartedListeningSelfResolved() &&
@@ -112,20 +112,18 @@ public class ListenerState extends State<ListenerAction> {
                 isResumeListeningWindUp() == that.isResumeListeningWindUp() &&
                 isRestartListeningInProgress() == that.isRestartListeningInProgress() &&
                 isRestartListeningSelfResolved() == that.isRestartListeningSelfResolved() &&
-                isRestartListeningWindUp() == that.isRestartListeningWindUp() &&
-                getAction() == that.getAction();
+                isRestartListeningWindUp() == that.isRestartListeningWindUp();
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getAction(), isStartedListeningInProgress(), isStartedListeningSelfResolved(), isStartedListeningWindUp(), isPauseListeningInProgress(), isPauseListeningSelfResolved(), isPauseListeningWindUp(), isResumeListeningInProgress(), isResumeListeningSelfResolved(), isResumeListeningWindUp(), isRestartListeningInProgress(), isRestartListeningSelfResolved(), isRestartListeningWindUp());
+        return Objects.hash(super.hashCode(), isStartedListeningInProgress(), isStartedListeningSelfResolved(), isStartedListeningWindUp(), isPauseListeningInProgress(), isPauseListeningSelfResolved(), isPauseListeningWindUp(), isResumeListeningInProgress(), isResumeListeningSelfResolved(), isResumeListeningWindUp(), isRestartListeningInProgress(), isRestartListeningSelfResolved(), isRestartListeningWindUp());
     }
 
     @Override
     public String toString() {
-        return "ListenerStore{" +
-                "action=" + action +
-                ", isStartedListeningInProgress=" + isStartedListeningInProgress +
+        return "ListenerState{" + super.toString() +
+                "isStartedListeningInProgress=" + isStartedListeningInProgress +
                 ", isStartedListeningSelfResolved=" + isStartedListeningSelfResolved +
                 ", isStartedListeningWindUp=" + isStartedListeningWindUp +
                 ", isPauseListeningInProgress=" + isPauseListeningInProgress +
@@ -137,7 +135,7 @@ public class ListenerState extends State<ListenerAction> {
                 ", isRestartListeningInProgress=" + isRestartListeningInProgress +
                 ", isRestartListeningSelfResolved=" + isRestartListeningSelfResolved +
                 ", isRestartListeningWindUp=" + isRestartListeningWindUp +
-                '}';
+                "} ";
     }
 
     @Override
