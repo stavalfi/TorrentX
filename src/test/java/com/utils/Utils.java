@@ -18,9 +18,8 @@ import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
-import main.torrent.status.Action;
-import main.torrent.status.TorrentStatusStore;
-import main.torrent.status.reducers.Reducer;
+import main.torrent.status.TorrentStatusAction;
+import main.torrent.status.reducers.TorrentStatusReducer;
 import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.DownloadState;
 import main.torrent.status.state.tree.PeersState;
@@ -77,16 +76,16 @@ public class Utils {
         }
 
 
-        Mono<List<TorrentStatusStore>> torrentDownloadersListMono = TorrentDownloaders.getInstance()
+        Mono<List<Store<TorrentStatusState, TorrentStatusAction>>> torrentDownloadersListMono = TorrentDownloaders.getInstance()
                 .getTorrentDownloadersFlux()
                 .doOnNext(torrentDownloader -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash()))
-                .map(TorrentDownloader::getTorrentStatusStore)
+                .map(TorrentDownloader::getStore)
                 .doOnNext(statusChanger -> {
                     // TODO: uncomment
-//                    statusChanger.dispatch(Action.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
-//                    statusChanger.dispatch(Action.PAUSE_SEARCHING_PEERS).block();
-//                    statusChanger.dispatch(Action.PAUSE_DOWNLOAD).block();
-//                    statusChanger.dispatch(Action.PAUSE_UPLOAD).block();
+//                    statusChanger.dispatch(TorrentStatusAction.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
+//                    statusChanger.dispatch(TorrentStatusAction.PAUSE_SEARCHING_PEERS).block();
+//                    statusChanger.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD).block();
+//                    statusChanger.dispatch(TorrentStatusAction.PAUSE_UPLOAD).block();
                 })
                 .collectList();
         try {
@@ -203,44 +202,44 @@ public class Utils {
                 .blockLast();
     }
 
-    public static TorrentStatusState getTorrentStatusState(TorrentInfo torrentInfo, Action lastAction, List<Action> actions) {
+    public static TorrentStatusState getTorrentStatusState(TorrentInfo torrentInfo, TorrentStatusAction lastTorrentStatusAction, List<TorrentStatusAction> torrentStatusActions) {
         DownloadState downloadState = DownloadState.DownloadStateBuilder.builder()
-                .setStartDownloadInProgress(actions.contains(Action.START_DOWNLOAD_IN_PROGRESS))
-                .setStartDownloadWindUp(actions.contains(Action.START_DOWNLOAD_WIND_UP))
-                .setResumeDownloadInProgress(actions.contains(Action.RESUME_DOWNLOAD_IN_PROGRESS))
-                .setResumeDownloadWindUp(actions.contains(Action.RESUME_DOWNLOAD_WIND_UP))
-                .setPauseDownloadInProgress(actions.contains(Action.PAUSE_DOWNLOAD_IN_PROGRESS))
-                .setPauseDownloadWindUp(actions.contains(Action.PAUSE_DOWNLOAD_WIND_UP))
-                .setCompletedDownloadingInProgress(actions.contains(Action.COMPLETED_DOWNLOADING_IN_PROGRESS))
-                .setCompletedDownloadingWindUp(actions.contains(Action.COMPLETED_DOWNLOADING_WIND_UP))
-                .setStartUploadInProgress(actions.contains(Action.START_UPLOAD_IN_PROGRESS))
-                .setStartUploadWindUp(actions.contains(Action.START_UPLOAD_WIND_UP))
-                .setResumeUploadInProgress(actions.contains(Action.RESUME_UPLOAD_IN_PROGRESS))
-                .setResumeUploadWindUp(actions.contains(Action.RESUME_UPLOAD_WIND_UP))
-                .setPauseUploadInProgress(actions.contains(Action.PAUSE_UPLOAD_IN_PROGRESS))
-                .setPauseUploadWindUp(actions.contains(Action.PAUSE_UPLOAD_WIND_UP))
+                .setStartDownloadInProgress(torrentStatusActions.contains(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS))
+                .setStartDownloadWindUp(torrentStatusActions.contains(TorrentStatusAction.START_DOWNLOAD_WIND_UP))
+                .setResumeDownloadInProgress(torrentStatusActions.contains(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
+                .setResumeDownloadWindUp(torrentStatusActions.contains(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
+                .setPauseDownloadInProgress(torrentStatusActions.contains(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS))
+                .setPauseDownloadWindUp(torrentStatusActions.contains(TorrentStatusAction.PAUSE_DOWNLOAD_WIND_UP))
+                .setCompletedDownloadingInProgress(torrentStatusActions.contains(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS))
+                .setCompletedDownloadingWindUp(torrentStatusActions.contains(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP))
+                .setStartUploadInProgress(torrentStatusActions.contains(TorrentStatusAction.START_UPLOAD_IN_PROGRESS))
+                .setStartUploadWindUp(torrentStatusActions.contains(TorrentStatusAction.START_UPLOAD_WIND_UP))
+                .setResumeUploadInProgress(torrentStatusActions.contains(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS))
+                .setResumeUploadWindUp(torrentStatusActions.contains(TorrentStatusAction.RESUME_UPLOAD_WIND_UP))
+                .setPauseUploadInProgress(torrentStatusActions.contains(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS))
+                .setPauseUploadWindUp(torrentStatusActions.contains(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
                 .build();
 
         PeersState peersState = PeersState.PeersStateBuilder.builder()
-                .setStartedSearchingPeersInProgress(actions.contains(Action.START_SEARCHING_PEERS_IN_PROGRESS))
-                .setStartedSearchingPeersSelfResolved(actions.contains(Action.START_SEARCHING_PEERS_SELF_RESOLVED))
-                .setStartedSearchingPeersWindUp(actions.contains(Action.START_SEARCHING_PEERS_WIND_UP))
-                .setPauseSearchingPeersInProgress(actions.contains(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
-                .setPauseSearchingPeersSelfResolved(actions.contains(Action.PAUSE_SEARCHING_PEERS_SELF_RESOLVED))
-                .setPauseSearchingPeersWindUp(actions.contains(Action.PAUSE_SEARCHING_PEERS_WIND_UP))
-                .setResumeSearchingPeersInProgress(actions.contains(Action.RESUME_SEARCHING_PEERS_IN_PROGRESS))
-                .setResumeSearchingPeersSelfResolved(actions.contains(Action.RESUME_SEARCHING_PEERS_SELF_RESOLVED))
-                .setResumeSearchingPeersWindUp(actions.contains(Action.RESUME_SEARCHING_PEERS_WIND_UP))
+                .setStartedSearchingPeersInProgress(torrentStatusActions.contains(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS))
+                .setStartedSearchingPeersSelfResolved(torrentStatusActions.contains(TorrentStatusAction.START_SEARCHING_PEERS_SELF_RESOLVED))
+                .setStartedSearchingPeersWindUp(torrentStatusActions.contains(TorrentStatusAction.START_SEARCHING_PEERS_WIND_UP))
+                .setPauseSearchingPeersInProgress(torrentStatusActions.contains(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+                .setPauseSearchingPeersSelfResolved(torrentStatusActions.contains(TorrentStatusAction.PAUSE_SEARCHING_PEERS_SELF_RESOLVED))
+                .setPauseSearchingPeersWindUp(torrentStatusActions.contains(TorrentStatusAction.PAUSE_SEARCHING_PEERS_WIND_UP))
+                .setResumeSearchingPeersInProgress(torrentStatusActions.contains(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS))
+                .setResumeSearchingPeersSelfResolved(torrentStatusActions.contains(TorrentStatusAction.RESUME_SEARCHING_PEERS_SELF_RESOLVED))
+                .setResumeSearchingPeersWindUp(torrentStatusActions.contains(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP))
                 .build();
 
         TorrentFileSystemState torrentFileSystemState = TorrentFileSystemState.TorrentFileSystemStateBuilder.builder()
-                .setFilesRemovedInProgress(actions.contains(Action.REMOVE_FILES_IN_PROGRESS))
-                .setFilesRemovedWindUp(actions.contains(Action.REMOVE_FILES_WIND_UP))
-                .setTorrentRemovedInProgress(actions.contains(Action.REMOVE_TORRENT_IN_PROGRESS))
-                .setTorrentRemovedWindUp(actions.contains(Action.REMOVE_TORRENT_WIND_UP))
+                .setFilesRemovedInProgress(torrentStatusActions.contains(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS))
+                .setFilesRemovedWindUp(torrentStatusActions.contains(TorrentStatusAction.REMOVE_FILES_WIND_UP))
+                .setTorrentRemovedInProgress(torrentStatusActions.contains(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS))
+                .setTorrentRemovedWindUp(torrentStatusActions.contains(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
                 .build();
 
-        return new TorrentStatusState(torrentInfo, lastAction, downloadState, peersState, torrentFileSystemState);
+        return new TorrentStatusState(lastTorrentStatusAction, downloadState, peersState, torrentFileSystemState);
     }
 
     public static ListenerState getListenStatusState(ListenerAction lastAction, List<ListenerAction> actions) {
@@ -261,11 +260,11 @@ public class Utils {
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
-        TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
-        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
+        Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
+                TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                TorrentStatusAction::getCorrespondingIsProgressAction);
         return createDefaultTorrentDownloader(torrentInfo, downloadPath,
-                torrentStatusStore, torrentStatesSideEffects);
+                store, new TorrentStatesSideEffects(torrentInfo, store));
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
@@ -273,13 +272,12 @@ public class Utils {
         TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
-        TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
-        // TODO: Remove the block
-        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
-
+        Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
+                TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                TorrentStatusAction::getCorrespondingIsProgressAction);
+        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
         // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
-        SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider,
+        SearchPeers searchPeers = new SearchPeers(torrentInfo, store, trackerProvider,
                 peersProvider, peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                 .autoConnect(0));
 
@@ -295,14 +293,14 @@ public class Utils {
                         .autoConnect(0);
 
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusStore,
+                .createActiveTorrentMono(torrentInfo, downloadPath, store,
                         peersCommunicatorFlux.map(Link::receivePeerMessages)
                                 .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 BittorrentAlgorithmInitializer.v1(torrentInfo,
-                        torrentStatusStore,
+                        store,
                         fileSystemLink,
                         peersCommunicatorFlux);
 
@@ -315,20 +313,20 @@ public class Utils {
                         searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,
-                        torrentStatusStore,
+                        store,
                         torrentSpeedStatistics,
                         torrentStatesSideEffects,
                         peersCommunicatorFlux);
     }
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
-                                                                   TorrentStatusStore torrentStatusStore,
+                                                                   Store<TorrentStatusState, TorrentStatusAction> store,
                                                                    TorrentStatesSideEffects torrentStatesSideEffects) {
         // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
-        SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore);
+        SearchPeers searchPeers = new SearchPeers(torrentInfo, store);
 
         Flux<Link> peersCommunicatorFlux =
-                Flux.merge(TorrentDownloaders.getInstance().getListener().getPeers$(torrentInfo), searchPeers.getPeers$())
+                Flux.merge(TorrentDownloaders.getListener().getPeers$(torrentInfo), searchPeers.getPeers$())
                         // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
                         // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
                         // every time and then I will connect to all the peers again and again...
@@ -336,14 +334,14 @@ public class Utils {
                         .autoConnect(0);
 
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusStore,
+                .createActiveTorrentMono(torrentInfo, downloadPath, store,
                         peersCommunicatorFlux.map(Link::receivePeerMessages)
                                 .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 BittorrentAlgorithmInitializer.v1(torrentInfo,
-                        torrentStatusStore,
+                        store,
                         fileSystemLink,
                         peersCommunicatorFlux);
 
@@ -356,14 +354,14 @@ public class Utils {
                         searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,
-                        torrentStatusStore,
+                        store,
                         torrentSpeedStatistics,
                         torrentStatesSideEffects,
                         peersCommunicatorFlux);
     }
 
     public static TorrentDownloader createCustomTorrentDownloader(TorrentInfo torrentInfo,
-                                                                  TorrentStatusStore torrentStatusStore,
+                                                                  Store<TorrentStatusState, TorrentStatusAction> store,
                                                                   TorrentStatesSideEffects torrentStatesSideEffects,
                                                                   FileSystemLink fileSystemLink,
                                                                   Flux<TrackerConnection> trackerConnectionConnectableFlux) {
@@ -371,7 +369,7 @@ public class Utils {
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
         // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
-        SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider,
+        SearchPeers searchPeers = new SearchPeers(torrentInfo, store, trackerProvider,
                 peersProvider, peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
                 .autoConnect(0));
 
@@ -390,7 +388,7 @@ public class Utils {
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 BittorrentAlgorithmInitializer.v1(torrentInfo,
-                        torrentStatusStore,
+                        store,
                         fileSystemLink,
                         peersCommunicatorFlux);
 
@@ -403,7 +401,7 @@ public class Utils {
                         searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,
-                        torrentStatusStore,
+                        store,
                         torrentSpeedStatistics,
                         torrentStatesSideEffects,
                         peersCommunicatorFlux);
@@ -454,9 +452,10 @@ public class Utils {
                 })
                 .flatMap(pieceMessageToSave -> {
                     ConnectableFlux<PieceMessage> pieceMessageFlux = Flux.just(pieceMessageToSave).publish();
-                    TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-                    torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
-                    return activeTorrents.createActiveTorrentMono(link.getTorrentInfo(), downloadPath, torrentStatusStore, pieceMessageFlux)
+                    Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
+                            TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                            TorrentStatusAction::getCorrespondingIsProgressAction);
+                    return activeTorrents.createActiveTorrentMono(link.getTorrentInfo(), downloadPath, store, pieceMessageFlux)
                             .flatMap(fileSystemLink -> {
                                 Flux<PieceEvent> savedPieces$ = fileSystemLink.savedBlockFlux()
                                         .replay()

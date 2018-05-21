@@ -1,6 +1,6 @@
 package main.torrent.status.reducers;
 
-import main.torrent.status.Action;
+import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentFileSystemState;
 import main.torrent.status.state.tree.TorrentStatusState;
 
@@ -17,10 +17,10 @@ public class TorrentFileSystemStateReducer {
                     .setTorrentRemovedWindUp(false)
                     .build();
 
-    public TorrentFileSystemState reducer(TorrentStatusState lastState, Action action) {
+    public TorrentFileSystemState reducer(TorrentStatusState lastState, TorrentStatusAction torrentStatusAction) {
         TorrentFileSystemState torrentFileSystemState = lastState.getTorrentFileSystemState();
 
-        switch (action) {
+        switch (torrentStatusAction) {
             case REMOVE_FILES_IN_PROGRESS:
                 if (torrentFileSystemState.isFilesRemovedInProgress() ||
                         torrentFileSystemState.isFilesRemovedWindUp())

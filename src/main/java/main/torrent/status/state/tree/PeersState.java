@@ -1,6 +1,6 @@
 package main.torrent.status.state.tree;
 
-import main.torrent.status.Action;
+import main.torrent.status.TorrentStatusAction;
 
 import java.util.Objects;
 
@@ -36,8 +36,8 @@ public class PeersState {
         this.isResumeSearchingPeersWindUp = isResumeSearchingPeersWindUp;
     }
 
-    public boolean fromAction(Action action) {
-        switch (action) {
+    public boolean fromAction(TorrentStatusAction torrentStatusAction) {
+        switch (torrentStatusAction) {
             case START_SEARCHING_PEERS_IN_PROGRESS:
                 return this.isStartedSearchingPeersInProgress;
             case START_SEARCHING_PEERS_SELF_RESOLVED:

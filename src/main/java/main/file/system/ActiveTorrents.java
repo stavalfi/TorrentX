@@ -2,9 +2,11 @@ package main.file.system;
 
 import main.TorrentInfo;
 import main.peer.peerMessages.PieceMessage;
-import main.torrent.status.TorrentStatusStore;
+import main.torrent.status.TorrentStatusAction;
+import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import redux.store.Store;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -18,7 +20,7 @@ public class ActiveTorrents {
     private List<FileSystemLink> fileSystemLinkImplTorrentList = new ArrayList<>();
 
     public synchronized Mono<FileSystemLink> createActiveTorrentMono(TorrentInfo torrentInfo, String downloadPath,
-                                                                     TorrentStatusStore torrentStatusStore,
+                                                                     Store<TorrentStatusState, TorrentStatusAction> store,
                                                                      Flux<PieceMessage> peerResponsesFlux) {
         // TODO: check if this torrent exist in db.
         // firstly, check if there is an active-torrent exist already.
@@ -30,7 +32,7 @@ public class ActiveTorrents {
                     else {
                         try {
                             FileSystemLinkImpl fileSystemLinkImplTorrent = new FileSystemLinkImpl(torrentInfo, downloadPath,
-                                    torrentStatusStore, peerResponsesFlux);
+                                    store, peerResponsesFlux);
                             this.fileSystemLinkImplTorrentList.add(fileSystemLinkImplTorrent);
                             return Mono.just(fileSystemLinkImplTorrent);
                         } catch (IOException e) {

@@ -1,6 +1,6 @@
 package main.torrent.status.reducers;
 
-import main.torrent.status.Action;
+import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.PeersState;
 import main.torrent.status.state.tree.TorrentStatusState;
 
@@ -20,7 +20,7 @@ public class PeersStateReducer {
                     .setResumeSearchingPeersWindUp(false)
                     .build();
 
-    public PeersState reducer(TorrentStatusState lastState, Action action) {
+    public PeersState reducer(TorrentStatusState lastState, TorrentStatusAction torrentStatusAction) {
         PeersState peersState = lastState.getPeersState();
 
         boolean isCompletedOrInProgress = lastState.getDownloadState().isCompletedDownloadingInProgress() ||
@@ -31,7 +31,7 @@ public class PeersStateReducer {
                 lastState.getTorrentFileSystemState().isTorrentRemovedInProgress() ||
                 lastState.getTorrentFileSystemState().isTorrentRemovedWindUp();
 
-        switch (action) {
+        switch (torrentStatusAction) {
             case START_SEARCHING_PEERS_IN_PROGRESS:
                 if (isCompletedOrInProgress ||
                         isSomethingRemovedOrInRemoveOrInProgress ||

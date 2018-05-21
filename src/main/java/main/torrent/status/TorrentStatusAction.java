@@ -1,6 +1,6 @@
 package main.torrent.status;
 
-public enum Action {
+public enum TorrentStatusAction {
     INITIALIZE,
 
     START_DOWNLOAD_IN_PROGRESS,
@@ -51,34 +51,34 @@ public enum Action {
     RESUME_SEARCHING_PEERS_SELF_RESOLVED,
     RESUME_SEARCHING_PEERS_WIND_UP;
 
-    public static Action getCorrespondingIsProgressAction(Action action) {
-        switch (action) {
+    public static TorrentStatusAction getCorrespondingIsProgressAction(TorrentStatusAction torrentStatusAction) {
+        switch (torrentStatusAction) {
             case START_SEARCHING_PEERS_WIND_UP:
-                return Action.START_SEARCHING_PEERS_IN_PROGRESS;
+                return TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS;
             case PAUSE_SEARCHING_PEERS_WIND_UP:
-                return Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS;
+                return TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS;
             case RESUME_SEARCHING_PEERS_WIND_UP:
-                return Action.RESUME_SEARCHING_PEERS_IN_PROGRESS;
+                return TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS;
 
             case REMOVE_FILES_WIND_UP:
-                return Action.REMOVE_FILES_IN_PROGRESS;
+                return TorrentStatusAction.REMOVE_FILES_IN_PROGRESS;
             case REMOVE_TORRENT_WIND_UP:
-                return Action.REMOVE_TORRENT_IN_PROGRESS;
+                return TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS;
 
             case START_DOWNLOAD_WIND_UP:
-                return Action.START_DOWNLOAD_IN_PROGRESS;
+                return TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS;
             case PAUSE_DOWNLOAD_WIND_UP:
-                return Action.PAUSE_DOWNLOAD_IN_PROGRESS;
+                return TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS;
             case RESUME_DOWNLOAD_WIND_UP:
-                return Action.RESUME_DOWNLOAD_IN_PROGRESS;
+                return TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS;
             case START_UPLOAD_WIND_UP:
-                return Action.START_UPLOAD_IN_PROGRESS;
+                return TorrentStatusAction.START_UPLOAD_IN_PROGRESS;
             case PAUSE_UPLOAD_WIND_UP:
-                return Action.PAUSE_UPLOAD_IN_PROGRESS;
+                return TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS;
             case RESUME_UPLOAD_WIND_UP:
-                return Action.RESUME_UPLOAD_IN_PROGRESS;
+                return TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS;
             case COMPLETED_DOWNLOADING_WIND_UP:
-                return Action.COMPLETED_DOWNLOADING_IN_PROGRESS;
+                return TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS;
         }
         return null;
     }

@@ -1,6 +1,6 @@
 package main.torrent.status.state.tree;
 
-import main.torrent.status.Action;
+import main.torrent.status.TorrentStatusAction;
 
 import java.util.Objects;
 
@@ -77,8 +77,8 @@ public class DownloadState {
         this.isCompletedDownloadingWindUp = isCompletedDownloadingWindUp;
     }
 
-    public boolean fromAction(Action action) {
-        switch (action) {
+    public boolean fromAction(TorrentStatusAction torrentStatusAction) {
+        switch (torrentStatusAction) {
             case START_DOWNLOAD_IN_PROGRESS:
                 return this.isStartDownloadInProgress;
             case START_DOWNLOAD_SELF_RESOLVED:

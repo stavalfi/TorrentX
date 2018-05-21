@@ -1,38 +1,29 @@
 package main.torrent.status.state.tree;
 
-import main.TorrentInfo;
-import main.torrent.status.Action;
+import main.torrent.status.TorrentStatusAction;
+import redux.state.State;
 
 import java.util.Objects;
 
-public class TorrentStatusState {
-    private TorrentInfo torrentInfo;
-    private Action action;
-
+public class TorrentStatusState extends State<TorrentStatusAction> {
     private DownloadState downloadState;
     private PeersState peersState;
     private TorrentFileSystemState torrentFileSystemState;
 
-    public TorrentStatusState(TorrentInfo torrentInfo,
-                              Action action,
+    public TorrentStatusState(TorrentStatusAction torrentStatusAction,
                               DownloadState downloadState,
                               PeersState peersState,
                               TorrentFileSystemState torrentFileSystemState) {
-        this.torrentInfo = torrentInfo;
-        this.action = action;
+        super(torrentStatusAction);
         this.downloadState = downloadState;
         this.peersState = peersState;
         this.torrentFileSystemState = torrentFileSystemState;
     }
 
-    public boolean fromAction(Action action) {
-        return this.downloadState.fromAction(action) ||
-                this.peersState.fromAction(action) ||
-                this.torrentFileSystemState.fromAction(action);
-    }
-
-    public Action getAction() {
-        return action;
+    public boolean fromAction(TorrentStatusAction torrentStatusAction) {
+        return this.downloadState.fromAction(torrentStatusAction) ||
+                this.peersState.fromAction(torrentStatusAction) ||
+                this.torrentFileSystemState.fromAction(torrentStatusAction);
     }
 
     public DownloadState getDownloadState() {
@@ -51,30 +42,24 @@ public class TorrentStatusState {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof TorrentStatusState)) return false;
+        if (!super.equals(o)) return false;
         TorrentStatusState that = (TorrentStatusState) o;
-        return Objects.equals(getAction(), that.getAction()) &&
-                Objects.equals(getDownloadState(), that.getDownloadState()) &&
+        return Objects.equals(getDownloadState(), that.getDownloadState()) &&
                 Objects.equals(getPeersState(), that.getPeersState()) &&
                 Objects.equals(getTorrentFileSystemState(), that.getTorrentFileSystemState());
     }
 
     @Override
     public int hashCode() {
-
-        return Objects.hash(getAction(), getDownloadState(), getPeersState(), getTorrentFileSystemState());
+        return Objects.hash(super.hashCode(), getDownloadState(), getPeersState(), getTorrentFileSystemState());
     }
 
     @Override
     public String toString() {
-        return "TorrentStatusState{" +
-                "action=" + action +
-                ", downloadState=" + downloadState +
+        return "TorrentStatusState{" + super.toString() +
+                "downloadState=" + downloadState +
                 ", peersState=" + peersState +
                 ", torrentFileSystemState=" + torrentFileSystemState +
-                '}';
-    }
-
-    public TorrentInfo getTorrentInfo() {
-        return torrentInfo;
+                "} ";
     }
 }

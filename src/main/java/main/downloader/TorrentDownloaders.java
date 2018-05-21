@@ -15,9 +15,10 @@ import main.peer.ReceiveMessagesNotifications;
 import main.peer.SearchPeers;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
-import main.torrent.status.TorrentStatusStore;
-import main.torrent.status.reducers.Reducer;
+import main.torrent.status.TorrentStatusAction;
+import main.torrent.status.reducers.TorrentStatusReducer;
 import main.torrent.status.side.effects.TorrentStatesSideEffects;
+import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import redux.store.Store;
 
@@ -60,7 +61,7 @@ public class TorrentDownloaders {
                                                                   SearchPeers searchPeers,
                                                                   FileSystemLink fileSystemLink,
                                                                   BittorrentAlgorithm bittorrentAlgorithm,
-                                                                  TorrentStatusStore torrentStatusStore,
+                                                                  Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
                                                                   SpeedStatistics torrentSpeedStatistics,
                                                                   TorrentStatesSideEffects torrentStatesSideEffects,
                                                                   Flux<Link> peersCommunicatorFlux) {
@@ -105,11 +106,12 @@ public class TorrentDownloaders {
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
         // TODO: save the initial status in the mongodb.
-        TorrentStatusStore torrentStatusStore = new TorrentStatusStore();
-        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
+        Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
+                TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                TorrentStatusAction::getCorrespondingIsProgressAction);
+        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
         // TODO: remove the block()
-        torrentStatusStore.initializeState(Reducer.defaultTorrentStateSupplier.apply(torrentInfo)).block();
-        SearchPeers searchPeers = new SearchPeers(torrentInfo, torrentStatusStore);
+        SearchPeers searchPeers = new SearchPeers(torrentInfo, store);
 
         Flux<Link> peersCommunicatorFlux =
                 Flux.merge(getInstance().getListener().getPeers$(torrentInfo), searchPeers.getPeers$())
@@ -120,14 +122,14 @@ public class TorrentDownloaders {
                         .autoConnect(0);
 
         FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, downloadPath, torrentStatusStore,
+                .createActiveTorrentMono(torrentInfo, downloadPath, store,
                         peersCommunicatorFlux.map(Link::receivePeerMessages)
                                 .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
                 .block();
 
         BittorrentAlgorithm bittorrentAlgorithm =
                 BittorrentAlgorithmInitializer.v1(torrentInfo,
-                        torrentStatusStore,
+                        store,
                         fileSystemLink,
                         peersCommunicatorFlux);
 
@@ -140,7 +142,7 @@ public class TorrentDownloaders {
                         searchPeers,
                         fileSystemLink,
                         bittorrentAlgorithm,
-                        torrentStatusStore,
+                        store,
                         torrentSpeedStatistics,
                         torrentStatesSideEffects,
                         peersCommunicatorFlux);

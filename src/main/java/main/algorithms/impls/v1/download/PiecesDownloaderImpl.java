@@ -7,9 +7,11 @@ import main.algorithms.PiecesDownloader;
 import main.file.system.BlocksAllocatorImpl;
 import main.file.system.FileSystemLink;
 import main.peer.PeerExceptions;
-import main.torrent.status.TorrentStatusStore;
+import main.torrent.status.TorrentStatusAction;
+import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import redux.store.Store;
 
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
@@ -17,7 +19,7 @@ import java.util.function.Function;
 
 public class PiecesDownloaderImpl implements PiecesDownloader {
     private TorrentInfo torrentInfo;
-    private TorrentStatusStore torrentStatusStore;
+    private Store<TorrentStatusState, TorrentStatusAction> store;
     private PeersToPiecesMapper peersToPiecesMapper;
     private FileSystemLink fileSystemLink;
     private BlockDownloader blockDownloader;
@@ -25,18 +27,18 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
     private Flux<Integer> downloadedPiecesFlux;
 
     public PiecesDownloaderImpl(TorrentInfo torrentInfo,
-                                TorrentStatusStore torrentStatusStore,
+                                Store<TorrentStatusState, TorrentStatusAction> store,
                                 FileSystemLink fileSystemLink,
                                 PeersToPiecesMapper peersToPiecesMapper,
                                 BlockDownloader blockDownloader) {
         this.torrentInfo = torrentInfo;
-        this.torrentStatusStore = torrentStatusStore;
+        this.store = store;
         this.peersToPiecesMapper = peersToPiecesMapper;
         this.fileSystemLink = fileSystemLink;
         this.blockDownloader = blockDownloader;
 
         // TODO: note: if we ask for notification AFTER the download started, we will lose the notification.
-        downloadedPiecesFlux = torrentStatusStore.getState$(torrentInfo)
+        downloadedPiecesFlux = store.getState$()
                 // TODO: uncomment
                 //.filter(TorrentStatusState::isStartedDownload)
                 .take(1)

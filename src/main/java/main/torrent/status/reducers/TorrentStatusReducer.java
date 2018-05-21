@@ -1,18 +1,18 @@
 package main.torrent.status.reducers;
 
-import main.TorrentInfo;
-import main.torrent.status.Action;
+import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.DownloadState;
 import main.torrent.status.state.tree.PeersState;
 import main.torrent.status.state.tree.TorrentFileSystemState;
 import main.torrent.status.state.tree.TorrentStatusState;
+import redux.reducer.IReducer;
 
-import java.util.function.Function;
+import java.util.function.Supplier;
 
-public class Reducer {
+public class TorrentStatusReducer implements IReducer<TorrentStatusState, TorrentStatusAction> {
 
-    public static Function<TorrentInfo, TorrentStatusState> defaultTorrentStateSupplier = torrentInfo ->
-            new TorrentStatusState(torrentInfo, Action.INITIALIZE,
+    public static Supplier<TorrentStatusState> defaultTorrentStateSupplier = () ->
+            new TorrentStatusState(TorrentStatusAction.INITIALIZE,
                     DownloadStateReducer.defaultDownloadStateSupplier.get(),
                     PeersStateReducer.defaultPeersStateSupplier.get(),
                     TorrentFileSystemStateReducer.defaultTorrentFileSystemStateSupplier.get());
@@ -21,16 +21,16 @@ public class Reducer {
     private PeersStateReducer peersStateReducer = new PeersStateReducer();
     private TorrentFileSystemStateReducer torrentFileSystemStateReducer = new TorrentFileSystemStateReducer();
 
-    public TorrentStatusState reducer(TorrentInfo torrentInfo, TorrentStatusState lastState, Action action) {
+    public TorrentStatusState reducer(TorrentStatusState lastState, TorrentStatusAction torrentStatusAction) {
 
-        DownloadState downloadState = this.downloadStateReducer.reducer(lastState, action);
-        PeersState peersState = this.peersStateReducer.reducer(lastState, action);
-        TorrentFileSystemState torrentFileSystemState = this.torrentFileSystemStateReducer.reducer(lastState, action);
+        DownloadState downloadState = this.downloadStateReducer.reducer(lastState, torrentStatusAction);
+        PeersState peersState = this.peersStateReducer.reducer(lastState, torrentStatusAction);
+        TorrentFileSystemState torrentFileSystemState = this.torrentFileSystemStateReducer.reducer(lastState, torrentStatusAction);
         if (lastState.getDownloadState().equals(downloadState) &&
                 lastState.getPeersState().equals(peersState) &&
                 lastState.getTorrentFileSystemState().equals(torrentFileSystemState))
             return lastState;
-        return new TorrentStatusState(torrentInfo, action,
+        return new TorrentStatusState(torrentStatusAction,
                 downloadState,
                 peersState,
                 torrentFileSystemState);

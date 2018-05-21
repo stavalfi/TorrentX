@@ -1,7 +1,9 @@
 package main.torrent.status.side.effects;
 
 import main.TorrentInfo;
-import main.torrent.status.TorrentStatusStore;
+import main.torrent.status.TorrentStatusAction;
+import main.torrent.status.state.tree.TorrentStatusState;
+import redux.store.Store;
 
 public class TorrentStatesSideEffects {
     private TorrentInfo torrentInfo;
@@ -11,11 +13,11 @@ public class TorrentStatesSideEffects {
     private TorrentFileSystemStatesSideEffects torrentFileSystemStatesSideEffects;
 
     public TorrentStatesSideEffects(TorrentInfo torrentInfo,
-                                    TorrentStatusStore store) {
+                                    Store<TorrentStatusState, TorrentStatusAction> store) {
         this.torrentInfo = torrentInfo;
         this.downloadStateSideEffects = new DownloadStateSideEffects(torrentInfo, store);
         this.peersStateSideEffects = new PeersStateSideEffects(torrentInfo, store);
-        this.torrentFileSystemStatesSideEffects = new TorrentFileSystemStatesSideEffects(torrentInfo, store);
+        this.torrentFileSystemStatesSideEffects = new TorrentFileSystemStatesSideEffects(store);
     }
 
     public TorrentInfo getTorrentInfo() {

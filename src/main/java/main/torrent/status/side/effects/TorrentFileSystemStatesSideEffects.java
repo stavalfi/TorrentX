@@ -1,32 +1,28 @@
 package main.torrent.status.side.effects;
 
-import main.TorrentInfo;
-import main.torrent.status.Action;
-import main.torrent.status.TorrentStatusStore;
+import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
+import redux.store.Store;
 
 public class TorrentFileSystemStatesSideEffects {
     private Flux<TorrentStatusState> removeFiles$;
     private Flux<TorrentStatusState> removeTorrent$;
 
-    public TorrentFileSystemStatesSideEffects(TorrentInfo torrentInfo,
-                                              TorrentStatusStore store) {
-        this.removeFiles$ = store.getAction$(torrentInfo)
-                .filter(Action.REMOVE_FILES_IN_PROGRESS::equals)
-                .flatMap(__ -> store.dispatch(torrentInfo, Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
-                .flatMap(__ -> store.dispatch(torrentInfo, Action.PAUSE_DOWNLOAD_IN_PROGRESS))
-                .flatMap(__ -> store.dispatch(torrentInfo, Action.PAUSE_UPLOAD_IN_PROGRESS))
-                .flatMap(__ -> store.dispatchAsLongNoCancel(torrentInfo, Action.REMOVE_FILES_WIND_UP))
+    public TorrentFileSystemStatesSideEffects(Store<TorrentStatusState, TorrentStatusAction> store) {
+        this.removeFiles$ = store.getByAction$(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
+                .flatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+                .flatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS))
+                .flatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS))
+                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.REMOVE_FILES_WIND_UP))
                 .publish()
                 .autoConnect(0);
 
-        this.removeTorrent$ = store.getAction$(torrentInfo)
-                .filter(Action.REMOVE_TORRENT_IN_PROGRESS::equals)
-                .flatMap(__ -> store.dispatch(torrentInfo, Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
-                .flatMap(__ -> store.dispatch(torrentInfo, Action.PAUSE_DOWNLOAD_IN_PROGRESS))
-                .flatMap(__ -> store.dispatch(torrentInfo, Action.PAUSE_UPLOAD_IN_PROGRESS))
-                .flatMap(__ -> store.dispatchAsLongNoCancel(torrentInfo, Action.REMOVE_TORRENT_WIND_UP))
+        this.removeTorrent$ = store.getByAction$(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)
+                .flatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+                .flatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS))
+                .flatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS))
+                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
                 .publish()
                 .autoConnect(0);
     }

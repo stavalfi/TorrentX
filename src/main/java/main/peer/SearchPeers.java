@@ -1,12 +1,13 @@
 package main.peer;
 
 import main.TorrentInfo;
-import main.torrent.status.Action;
-import main.torrent.status.TorrentStatusStore;
+import main.torrent.status.TorrentStatusAction;
+import main.torrent.status.state.tree.TorrentStatusState;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerProvider;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import redux.store.Store;
 
 import java.util.function.Function;
 
@@ -17,11 +18,11 @@ public class SearchPeers {
 
     private Flux<Link> peers$;
 
-    public SearchPeers(TorrentInfo torrentInfo, TorrentStatusStore torrentStatusStore) {
-        this(torrentInfo, torrentStatusStore, new TrackerProvider(torrentInfo), new PeersProvider(torrentInfo));
+    public SearchPeers(TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store) {
+        this(torrentInfo, store, new TrackerProvider(torrentInfo), new PeersProvider(torrentInfo));
     }
 
-    public SearchPeers(TorrentInfo torrentInfo, TorrentStatusStore torrentStatusStore,
+    public SearchPeers(TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store,
                        TrackerProvider trackerProvider, PeersProvider peersProvider) {
         this.torrentInfo = torrentInfo;
         this.trackerProvider = trackerProvider;
@@ -31,51 +32,48 @@ public class SearchPeers {
                 trackerProvider.connectToTrackersFlux()
                         .autoConnect();
 
-        this.peers$ = searchPeers(torrentInfo, torrentStatusStore,
+        this.peers$ = searchPeers(torrentInfo, store,
                 peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux).autoConnect());
     }
 
-    public SearchPeers(TorrentInfo torrentInfo, TorrentStatusStore torrentStatusStore,
+    public SearchPeers(TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store,
                        TrackerProvider trackerProvider, PeersProvider peersProvider, Flux<Link> peers$) {
         this.torrentInfo = torrentInfo;
         this.trackerProvider = trackerProvider;
         this.peersProvider = peersProvider;
-        this.peers$ = searchPeers(torrentInfo, torrentStatusStore, peers$);
+        this.peers$ = searchPeers(torrentInfo, store, peers$);
     }
 
-    private Flux<Link> searchPeers(TorrentInfo torrentInfo, TorrentStatusStore torrentStatusStore, Flux<Link> peers$) {
+    private Flux<Link> searchPeers(TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store,
+                                   Flux<Link> peers$) {
 
-        torrentStatusStore.getAction$(torrentInfo)
-                .filter(Action.START_SEARCHING_PEERS_IN_PROGRESS::equals)
+        store.getByAction$(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS)
                 .take(1)
-                .flatMap(__ -> torrentStatusStore.dispatch(torrentInfo, Action.START_SEARCHING_PEERS_SELF_RESOLVED))
+                .flatMap(__ -> store.dispatch(TorrentStatusAction.START_SEARCHING_PEERS_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
-        torrentStatusStore.getAction$(torrentInfo)
-                .filter(Action.RESUME_SEARCHING_PEERS_IN_PROGRESS::equals)
+        store.getByAction$(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS)
                 .take(1)
-                .flatMap(__ -> torrentStatusStore.dispatch(torrentInfo, Action.RESUME_SEARCHING_PEERS_SELF_RESOLVED))
+                .flatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_SEARCHING_PEERS_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
-        torrentStatusStore.getAction$(torrentInfo)
-                .filter(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS::equals)
+        store.getByAction$(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS)
                 .take(1)
-                .flatMap(__ -> torrentStatusStore.dispatch(torrentInfo, Action.PAUSE_SEARCHING_PEERS_SELF_RESOLVED))
+                .flatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_SEARCHING_PEERS_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
         Function<Link, Mono<Link>> releaseWhenResuming = link ->
-                torrentStatusStore.getState$(torrentInfo)
-                        .map(torrentStatusState -> torrentStatusState.fromAction(Action.RESUME_SEARCHING_PEERS_WIND_UP))
+                store.getState$()
+                        .map(torrentStatusState -> torrentStatusState.fromAction(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP))
                         .filter(Boolean::booleanValue)
                         .map(__ -> link)
                         .take(1)
                         .single();
 
-        return torrentStatusStore.getAction$(torrentInfo)
-                .filter(Action.START_SEARCHING_PEERS_WIND_UP::equals)
+        return store.getByAction$(TorrentStatusAction.START_SEARCHING_PEERS_WIND_UP)
                 .take(1)
                 // TODO: when i'm out of peers, we need to ask more..
                 // but maybe the tests doesn't want more so we need to investigate.

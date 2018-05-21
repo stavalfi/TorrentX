@@ -6,9 +6,11 @@ import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.SearchPeers;
 import main.statistics.SpeedStatistics;
-import main.torrent.status.TorrentStatusStore;
+import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.side.effects.TorrentStatesSideEffects;
+import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
+import redux.store.Store;
 
 public class TorrentDownloader {
 
@@ -16,8 +18,7 @@ public class TorrentDownloader {
     private SearchPeers searchPeers;
     private FileSystemLink fileSystemLink;
     private BittorrentAlgorithm bittorrentAlgorithm;
-    // remove this from here
-    private TorrentStatusStore torrentStatusStore;
+    private Store<TorrentStatusState, TorrentStatusAction> store;
     private SpeedStatistics torrentSpeedStatistics;
     private TorrentStatesSideEffects torrentStatesSideEffects;
 
@@ -27,14 +28,14 @@ public class TorrentDownloader {
                              SearchPeers searchPeers,
                              FileSystemLink fileSystemLink,
                              BittorrentAlgorithm bittorrentAlgorithm,
-                             TorrentStatusStore torrentStatusStore,
+                             Store<TorrentStatusState, TorrentStatusAction> store,
                              SpeedStatistics torrentSpeedStatistics,
                              TorrentStatesSideEffects torrentStatesSideEffects, Flux<Link> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
         this.searchPeers = searchPeers;
         this.fileSystemLink = fileSystemLink;
         this.bittorrentAlgorithm = bittorrentAlgorithm;
-        this.torrentStatusStore = torrentStatusStore;
+        this.store = store;
         this.torrentSpeedStatistics = torrentSpeedStatistics;
         this.torrentStatesSideEffects = torrentStatesSideEffects;
         this.peersCommunicatorFlux = peersCommunicatorFlux;
@@ -48,8 +49,8 @@ public class TorrentDownloader {
         return bittorrentAlgorithm;
     }
 
-    public TorrentStatusStore getTorrentStatusStore() {
-        return torrentStatusStore;
+    public Store<TorrentStatusState, TorrentStatusAction> getStore() {
+        return store;
     }
 
     public FileSystemLink getFileSystemLink() {

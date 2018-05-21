@@ -1,10 +1,10 @@
 package main.torrent.status.side.effects;
 
 import main.TorrentInfo;
-import main.torrent.status.Action;
-import main.torrent.status.TorrentStatusStore;
+import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
+import redux.store.Store;
 
 public class PeersStateSideEffects {
     private Flux<TorrentStatusState> startSearchPeers$;
@@ -12,23 +12,20 @@ public class PeersStateSideEffects {
     private Flux<TorrentStatusState> pauseSearchPeers$;
 
     public PeersStateSideEffects(TorrentInfo torrentInfo,
-                                 TorrentStatusStore store) {
-        this.startSearchPeers$ = store.getAction$(torrentInfo)
-                .filter(Action.START_SEARCHING_PEERS_IN_PROGRESS::equals)
-                .flatMap(__ -> store.dispatchAsLongNoCancel(torrentInfo, Action.START_SEARCHING_PEERS_WIND_UP))
-                .flatMap(__ -> store.dispatch(torrentInfo, Action.RESUME_SEARCHING_PEERS_IN_PROGRESS))
+                                 Store<TorrentStatusState, TorrentStatusAction> store) {
+        this.startSearchPeers$ = store.getByAction$(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS)
+                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.START_SEARCHING_PEERS_WIND_UP))
+                .flatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS))
                 .publish()
                 .autoConnect(0);
 
-        this.resumeSearchPeers$ = store.getAction$(torrentInfo)
-                .filter(Action.RESUME_SEARCHING_PEERS_IN_PROGRESS::equals)
-                .flatMap(__ -> store.dispatchAsLongNoCancel(torrentInfo, Action.RESUME_SEARCHING_PEERS_WIND_UP))
+        this.resumeSearchPeers$ = store.getByAction$(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS)
+                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP))
                 .publish()
                 .autoConnect(0);
 
-        this.pauseSearchPeers$ = store.getAction$(torrentInfo)
-                .filter(Action.PAUSE_SEARCHING_PEERS_IN_PROGRESS::equals)
-                .flatMap(__ -> store.dispatchAsLongNoCancel(torrentInfo, Action.PAUSE_SEARCHING_PEERS_WIND_UP))
+        this.pauseSearchPeers$ = store.getByAction$(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS)
+                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.PAUSE_SEARCHING_PEERS_WIND_UP))
                 .publish()
                 .autoConnect(0);
     }

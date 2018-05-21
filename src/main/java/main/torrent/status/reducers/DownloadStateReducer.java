@@ -1,6 +1,6 @@
 package main.torrent.status.reducers;
 
-import main.torrent.status.Action;
+import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.DownloadState;
 import main.torrent.status.state.tree.TorrentStatusState;
 
@@ -32,7 +32,7 @@ public class DownloadStateReducer {
                     .setPauseUploadWindUp(true)
                     .build();
 
-    public DownloadState reducer(TorrentStatusState lastState, Action action) {
+    public DownloadState reducer(TorrentStatusState lastState, TorrentStatusAction torrentStatusAction) {
         DownloadState downloadState = lastState.getDownloadState();
 
         boolean isCompletedOrInProgress = downloadState.isCompletedDownloadingInProgress() ||
@@ -46,7 +46,7 @@ public class DownloadStateReducer {
                 lastState.getTorrentFileSystemState().isTorrentRemovedSelfResolved() ||
                 lastState.getTorrentFileSystemState().isTorrentRemovedWindUp();
 
-        switch (action) {
+        switch (torrentStatusAction) {
             case START_DOWNLOAD_IN_PROGRESS:
                 if (isSomethingRemovedOrInRemoveOrInProgress ||
                         isCompletedOrInProgress ||
