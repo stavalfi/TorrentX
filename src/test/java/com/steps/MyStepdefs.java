@@ -15,7 +15,6 @@ import main.downloader.TorrentDownloaders;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.*;
 import main.listener.ListenerAction;
-import main.listener.ListenerStore;
 import main.listener.reducers.ListenerReducer;
 import main.listener.state.tree.ListenerState;
 import main.peer.*;
@@ -41,6 +40,7 @@ import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
+import redux.store.Store;
 
 import java.io.File;
 import java.time.Duration;
@@ -1348,7 +1348,7 @@ public class MyStepdefs {
     @Given("^initial torrent-status for torrent: \"([^\"]*)\" in \"([^\"]*)\" with default initial state$")
     public void initialTorrentStatusForTorrentInWithDefaultInitialState(String torrentFileName,
                                                                         String downloadLocation) throws Throwable {
-        // TODO: complete
+        // TODO: complete this method
         Utils.removeEverythingRelatedToLastTest();
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
@@ -1366,93 +1366,10 @@ public class MyStepdefs {
 
     @When("^listen-status is trying to change to:$")
     public void listenStatusIsTryingToChangeTo(List<ListenerAction> changesActionList) throws Throwable {
-        ListenerStore listenStore = TorrentDownloaders.getInstance()
+        Store<ListenerState, ListenerAction> listenStore = TorrentDownloaders.getInstance()
                 .getListenStore();
 
-        Flux.fromIterable(changesActionList)
-                .filter(action -> action.equals(ListenerAction.START_LISTENING_IN_PROGRESS) ||
-                        action.equals(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
-                        action.equals(ListenerAction.RESUME_LISTENING_IN_PROGRESS) ||
-                        action.equals(ListenerAction.RESUME_LISTENING_SELF_RESOLVED) ||
-                        action.equals(ListenerAction.PAUSE_LISTENING_IN_PROGRESS) ||
-                        action.equals(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED) ||
-                        action.equals(ListenerAction.RESTART_LISTENING_IN_PROGRESS) ||
-                        action.equals(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
-                .flatMap(action -> {
-                    switch (action) {
-                        case START_LISTENING_IN_PROGRESS:
-                            return listenStore.dispatch(action)
-                                    .flatMapMany(__ -> listenStore.getState$())
-                                    .filter(ListenerState::isResumeListeningWindUp)
-                                    .take(1)
-                                    .single();
-                        case START_LISTENING_SELF_RESOLVED:
-                            return listenStore.getState$()
-                                    .filter(ListenerState::isStartedListeningInProgress)
-                                    .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMap(__ -> listenStore.getState$())
-                                    .filter(ListenerState::isResumeListeningWindUp)
-                                    .take(1)
-                                    .single();
-                        case RESUME_LISTENING_IN_PROGRESS:
-                            return listenStore.getState$()
-                                    .filter(ListenerState::isStartedListeningWindUp)
-                                    .take(1)
-                                    .single()
-                                    .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMapMany(__ -> listenStore.getState$())
-                                    .filter(ListenerState::isResumeListeningWindUp)
-                                    .take(1)
-                                    .single();
-                        case RESUME_LISTENING_SELF_RESOLVED:
-                            return listenStore.getState$()
-                                    .filter(ListenerState::isResumeListeningInProgress)
-                                    .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMap(__ -> listenStore.getState$())
-                                    .filter(ListenerState::isResumeListeningWindUp)
-                                    .take(1)
-                                    .single();
-                        case PAUSE_LISTENING_IN_PROGRESS:
-                            return listenStore.getState$()
-                                    .filter(ListenerState::isStartedListeningWindUp)
-                                    .take(1)
-                                    .single()
-                                    .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMapMany(__ -> listenStore.getState$())
-                                    .filter(ListenerState::isPauseListeningWindUp)
-                                    .take(1)
-                                    .single();
-                        case PAUSE_LISTENING_SELF_RESOLVED:
-                            return listenStore.getState$()
-                                    .filter(ListenerState::isPauseListeningInProgress)
-                                    .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMap(__ -> listenStore.getState$())
-                                    .filter(ListenerState::isPauseListeningWindUp)
-                                    .take(1)
-                                    .single();
-                        case RESTART_LISTENING_IN_PROGRESS:
-                            return listenStore.dispatch(action)
-                                    .flatMapMany(__ -> listenStore.getState$())
-                                    .filter(ListenerReducer.defaultListenState.get()::equals)
-                                    .take(1)
-                                    .single();
-                        case RESTART_LISTENING_SELF_RESOLVED:
-                            return listenStore.getState$()
-                                    .filter(ListenerState::isRestartListeningInProgress)
-                                    .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMap(__ -> listenStore.getState$())
-                                    .filter(ListenerReducer.defaultListenState.get()::equals)
-                                    .take(1)
-                                    .single();
-                        default:
-                            return Mono.empty();
-                    }
-                }, changesActionList.size())
-                .blockLast();
+        Utils.changeListenerState(changesActionList, listenStore);
     }
 
     @Then("^listen-status will change to: \"([^\"]*)\":$")
@@ -1462,6 +1379,37 @@ public class MyStepdefs {
         TorrentDownloaders.getInstance()
                 .getListenStore()
                 .getLatestState$()
+                .doOnNext(actualState ->
+                        Assert.assertEquals("expected and actual listener-module states are not equal.",
+                                expectedState, actualState))
+                .block();
+
+        Utils.removeEverythingRelatedToLastTest();
+    }
+
+    private Store<ListenerState, ListenerAction> listenStore;
+
+    @Given("^initial listen-status - no side effects:$")
+    public void initialListenStatusNoSideEffects(List<ListenerAction> initialStateByActionList) throws Throwable {
+        Utils.removeEverythingRelatedToLastTest();
+
+        ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
+        this.listenStore = new Store<>(new ListenerReducer(), initialState,
+                ListenerAction::getCorrespondingIsProgressAction);
+    }
+
+    @When("^listen-status is trying to change to - no side effects:$")
+    public void listenStatusIsTryingToChangeToNoSideEffects(List<ListenerAction> changesActionList) throws Throwable {
+        Flux.fromIterable(changesActionList)
+                .flatMap(listenerAction -> this.listenStore.dispatch(listenerAction), changesActionList.size())
+                .blockLast();
+    }
+
+    @Then("^listen-status will change to: \"([^\"]*)\" - no side effects:$")
+    public void listenStatusWillChangeToNoSideEffects(ListenerAction lastAction, List<ListenerAction> expectedActionList) throws Throwable {
+        ListenerState expectedState = Utils.getListenStatusState(lastAction, expectedActionList);
+
+        this.listenStore.getLatestState$()
                 .doOnNext(actualState ->
                         Assert.assertEquals("expected and actual listener-module states are not equal.",
                                 expectedState, actualState))
