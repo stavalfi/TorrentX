@@ -2,12 +2,15 @@ package main.listen;
 
 import main.listen.reducers.ListenerReducer;
 import main.listen.state.tree.ListenerState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 public class ListenerStore implements ListenerNotifier {
+    private static Logger logger = LoggerFactory.getLogger(ListenerStore.class);
 
     private FluxSink<ListenerState> latestStateSink;
     private Flux<ListenerState> latestState$;
@@ -18,7 +21,10 @@ public class ListenerStore implements ListenerNotifier {
         this.latestState$ = Flux.<ListenerState>create(sink -> {
             this.latestStateSink = sink;
             this.latestStateSink.next(ListenerReducer.defaultListenState.get());
-        }).replay(1).autoConnect(0);
+        })
+                .doOnNext(listenerState -> logger.debug("new state: " + listenerState))
+                .replay(1)
+                .autoConnect(0);
 
         this.history$ = this.latestState$.replay(10) // how much statuses to save.
                 .autoConnect(0);
@@ -38,13 +44,29 @@ public class ListenerStore implements ListenerNotifier {
 
     @Override
     public Flux<ListenerState> getHistory$() {
-        return this.history$;
+        return this.history$.publishOn(Schedulers.elastic());
     }
 
     @Override
-    public Flux<ListenerAction> getAction$() {
-        return this.latestState$
-                .map(ListenerState::getAction);
+    public Flux<ListenerState> getByAction$(ListenerAction action) {
+        return getState$().filter(listenerState -> listenerState.getAction().equals(action));
+    }
+
+    @Override
+    public Mono<ListenerState> notifyWhen(ListenerAction when) {
+        return getState$()
+                .filter(listenerState -> listenerState.fromAction(when))
+                .take(1)
+                .single();
+    }
+
+    @Override
+    public <T> Mono<T> notifyWhen(ListenerAction when, T mapTo) {
+        return getState$()
+                .filter(listenerState -> listenerState.fromAction(when))
+                .take(1)
+                .single()
+                .map(listenerState -> mapTo);
     }
 
     public Mono<ListenerState> dispatchAsLongNoCancel(ListenerAction windUpActionToChange) {
@@ -56,7 +78,8 @@ public class ListenerStore implements ListenerNotifier {
                 .flatMap(listenState -> dispatch(windUpActionToChange))
                 .filter(listenState -> listenState.fromAction(windUpActionToChange))
                 .take(1)
-                .single();
+                .single()
+                .doOnNext(listenerState -> System.out.println("hi"));
     }
 
     public Mono<ListenerState> dispatch(ListenerAction action) {

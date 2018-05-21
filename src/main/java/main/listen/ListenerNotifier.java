@@ -11,5 +11,9 @@ public interface ListenerNotifier {
 
     Flux<ListenerState> getHistory$();
 
-    Flux<ListenerAction> getAction$();
+    Flux<ListenerState> getByAction$(ListenerAction action);
+
+    Mono<ListenerState> notifyWhen(ListenerAction when);
+
+    <T> Mono<T> notifyWhen(ListenerAction when, T mapTo);
 }
