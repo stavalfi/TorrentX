@@ -9,6 +9,7 @@ import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.*;
+import main.listen.Listener;
 import main.listen.ListenerAction;
 import main.listen.ListenerStore;
 import main.listen.reducers.ListenerReducer;
@@ -109,6 +110,10 @@ public class Utils {
                 .freeAll()
                 .flatMap(__ -> BlocksAllocatorImpl.getInstance().updateAllocations(2, 1_000_000))
                 .block();
+
+        // TODO: I need this line so java will create a singleton of Listener.
+        // when I will use spring, I can remove this line.
+        Listener.getInstance().getTcpPort();
     }
 
     public static TorrentStatusState getTorrentStatusState(TorrentInfo torrentInfo, Action lastAction, List<Action> actions) {
