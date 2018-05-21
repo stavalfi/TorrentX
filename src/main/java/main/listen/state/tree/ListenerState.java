@@ -223,6 +223,7 @@ public class ListenerState {
         }
 
         private ListenStateBuilder(ListenerAction action, ListenerState listenerState) {
+            this.action = action;
             this.isStartedListeningInProgress = listenerState.isStartedListeningInProgress;
             this.isStartedListeningSelfResolved = listenerState.isStartedListeningSelfResolved;
             this.isStartedListeningWindUp = listenerState.isStartedListeningWindUp;

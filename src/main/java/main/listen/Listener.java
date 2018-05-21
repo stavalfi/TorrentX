@@ -47,29 +47,30 @@ public class Listener {
             }
         };
 
-        this.startListen$ = listenerStore.getAction$()
-                .filter(ListenerAction.START_LISTENING_IN_PROGRESS::equals)
+        this.startListen$ = listenerStore.getByAction$(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> serverSocketSupplier.get())
                 .doOnError(throwable -> logger.error("failed to create ServerSocket object.", throwable))
                 .onErrorResume(PeerExceptions.communicationErrors,
                         throwable -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                                 .flatMap(__ -> Mono.empty()))
                 .flatMap(serverSocket -> listenerStore.dispatch(ListenerAction.START_LISTENING_SELF_RESOLVED)
+                        .filter(listenerState -> listenerState.fromAction(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
+                                listenerState.fromAction(ListenerAction.START_LISTENING_WIND_UP))
                         .map(__ -> serverSocket))
                 .doOnNext(serverSocket -> logger.info("created server-socket under port: " + getTcpPort()))
                 .replay(1)
-                .autoConnect();
+                .autoConnect(0);
 
 
-        this.resumeListen$ = listenerStore.getAction$()
-                .filter(ListenerAction.RESUME_LISTENING_IN_PROGRESS::equals)
+        this.resumeListen$ = listenerStore.getByAction$(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> startListen$.take(1))
                 .flatMap(serverSocket -> listenerStore.dispatch(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)
+                        .filter(listenerState -> listenerState.fromAction(ListenerAction.RESUME_LISTENING_SELF_RESOLVED))
                         .map(__ -> serverSocket))
                 .doOnNext(serverSocket -> logger.info("started listening to incoming peers under port: " + getTcpPort()))
-                .flatMap(serverSocket -> notifyWhenResume$(listenerStore, serverSocket))
+                .flatMap(serverSocket -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, serverSocket))
                 .flatMap(serverSocket -> acceptPeersLinks(serverSocket))
-                .flatMap(link -> notifyWhenResume$(listenerStore, link))
+                .flatMap(link -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, link))
                 .doOnError(throwable -> logger.error("fatal error while accepting peer connection or in server-socket object", throwable))
                 .onErrorResume(PeerExceptions.communicationErrors,
                         throwable -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
@@ -86,20 +87,13 @@ public class Listener {
             }
         };
 
-        this.restartListener$ = listenerStore.getAction$()
-                .filter(ListenerAction.RESTART_LISTENING_IN_PROGRESS::equals)
+        this.restartListener$ = listenerStore.getByAction$(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> startListen$)
                 .flatMap(closeServerSocket)
                 .flatMap(serverSocket -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
+                .filter(listenerState -> listenerState.fromAction(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
-    }
-
-    private <T> Flux<T> notifyWhenResume$(ListenerStore listenerStore, T t) {
-        return listenerStore.getState$()
-                .filter(ListenerState::isResumeListeningWindUp)
-                .take(1)
-                .map(__ -> t);
     }
 
     private Flux<Link> acceptPeersLinks(ServerSocket serverSocket) {

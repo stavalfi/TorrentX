@@ -27,7 +27,7 @@ public class ListenerReducer {
             case INITIALIZE:
                 if (!lastState.isRestartListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setRestartListeningWindUp(false)
                         .build();
 
@@ -35,7 +35,7 @@ public class ListenerReducer {
                 if (lastState.isStartedListeningInProgress() ||
                         lastState.isStartedListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setStartedListeningInProgress(true)
                         .build();
 
@@ -44,7 +44,7 @@ public class ListenerReducer {
                         lastState.isStartedListeningSelfResolved() ||
                         lastState.isStartedListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setStartedListeningSelfResolved(true)
                         .build();
 
@@ -53,7 +53,7 @@ public class ListenerReducer {
                         !lastState.isStartedListeningSelfResolved() ||
                         lastState.isStartedListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setStartedListeningInProgress(false)
                         .setStartedListeningSelfResolved(false)
                         .setStartedListeningWindUp(true)
@@ -67,7 +67,7 @@ public class ListenerReducer {
                         lastState.isResumeListeningWindUp() ||
                         !lastState.isPauseListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setResumeListeningInProgress(true)
                         .build();
 
@@ -79,7 +79,7 @@ public class ListenerReducer {
                         lastState.isResumeListeningWindUp() ||
                         !lastState.isPauseListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setResumeListeningSelfResolved(true)
                         .build();
 
@@ -91,7 +91,7 @@ public class ListenerReducer {
                         lastState.isResumeListeningWindUp() ||
                         !lastState.isPauseListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setResumeListeningInProgress(false)
                         .setResumeListeningSelfResolved(false)
                         .setResumeListeningWindUp(true)
@@ -104,7 +104,7 @@ public class ListenerReducer {
                         lastState.isPauseListeningWindUp() ||
                         !lastState.isResumeListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setPauseListeningInProgress(true)
                         .setResumeListeningInProgress(false)
                         .setResumeListeningSelfResolved(false)
@@ -116,7 +116,7 @@ public class ListenerReducer {
                         lastState.isPauseListeningWindUp() ||
                         !lastState.isResumeListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setPauseListeningSelfResolved(true)
                         .setResumeListeningInProgress(false)
                         .setResumeListeningSelfResolved(false)
@@ -129,19 +129,19 @@ public class ListenerReducer {
                         lastState.isPauseListeningWindUp() ||
                         !lastState.isResumeListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setPauseListeningInProgress(false)
                         .setPauseListeningSelfResolved(false)
                         .setPauseListeningWindUp(true)
                         .build();
 
             case RESTART_LISTENING_IN_PROGRESS:
-                if (lastState.isStartedListeningInProgress() ||
-                        lastState.isStartedListeningWindUp() ||
+                if (!lastState.isStartedListeningInProgress() ||
+                        !lastState.isStartedListeningWindUp() ||
                         lastState.isRestartListeningInProgress() ||
                         lastState.isRestartListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setRestartListeningInProgress(true)
                         .build();
 
@@ -150,7 +150,7 @@ public class ListenerReducer {
                         lastState.isRestartListeningSelfResolved() ||
                         lastState.isRestartListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setRestartListeningSelfResolved(true)
                         .build();
 
@@ -160,7 +160,7 @@ public class ListenerReducer {
                         lastState.isRestartListeningSelfResolved() ||
                         lastState.isRestartListeningWindUp())
                     return lastState;
-                return ListenerState.ListenStateBuilder.builder(action)
+                return ListenerState.ListenStateBuilder.builder(action, lastState)
                         .setStartedListeningInProgress(false)
                         .setStartedListeningSelfResolved(false)
                         .setStartedListeningWindUp(false)

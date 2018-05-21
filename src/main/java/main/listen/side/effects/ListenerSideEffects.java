@@ -12,27 +12,23 @@ public class ListenerSideEffects {
     Flux<ListenerState> restartListen$;
 
     public ListenerSideEffects(ListenerStore store) {
-        this.startListen$ = store.getAction$()
-                .filter(ListenerAction.START_LISTENING_IN_PROGRESS::equals)
+        this.startListen$ = store.getByAction$(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(ListenerAction.START_LISTENING_WIND_UP))
                 .flatMap(__ -> store.dispatch(ListenerAction.RESUME_LISTENING_IN_PROGRESS))
                 .publish()
                 .autoConnect(0);
 
-        this.resumeListen$ = store.getAction$()
-                .filter(ListenerAction.RESUME_LISTENING_IN_PROGRESS::equals)
+        this.resumeListen$ = store.getByAction$(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(ListenerAction.RESUME_LISTENING_WIND_UP))
                 .publish()
                 .autoConnect(0);
 
-        this.pauseListen$ = store.getAction$()
-                .filter(ListenerAction.PAUSE_LISTENING_IN_PROGRESS::equals)
+        this.pauseListen$ = store.getByAction$(ListenerAction.PAUSE_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(ListenerAction.PAUSE_LISTENING_WIND_UP))
                 .publish()
                 .autoConnect(0);
 
-        this.restartListen$ = store.getAction$()
-                .filter(ListenerAction.RESTART_LISTENING_IN_PROGRESS::equals)
+        this.restartListen$ = store.getByAction$(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(ListenerAction.RESTART_LISTENING_WIND_UP))
                 .flatMap(__ -> store.dispatch(ListenerAction.INITIALIZE))
                 .publish()
