@@ -1,6 +1,6 @@
-package redux.store.reducer;
+package redux.reducer;
 
-import redux.store.State;
+import redux.state.State;
 
 public interface IReducer<S extends State<A>, A> {
 

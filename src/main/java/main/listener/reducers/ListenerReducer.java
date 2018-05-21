@@ -2,7 +2,7 @@ package main.listener.reducers;
 
 import main.listener.ListenerAction;
 import main.listener.state.tree.ListenerState;
-import redux.store.reducer.IReducer;
+import redux.reducer.IReducer;
 
 import java.util.function.Supplier;
 

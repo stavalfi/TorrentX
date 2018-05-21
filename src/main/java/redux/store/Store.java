@@ -6,7 +6,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import redux.store.reducer.IReducer;
+import redux.state.State;
+import redux.reducer.IReducer;
 
 import java.util.function.Function;
 

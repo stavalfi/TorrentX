@@ -1,7 +1,7 @@
 package main.listener.state.tree;
 
 import main.listener.ListenerAction;
-import redux.store.State;
+import redux.state.State;
 
 import java.util.Objects;
 
