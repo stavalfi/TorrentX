@@ -10,6 +10,8 @@ import reactor.core.scheduler.Schedulers;
 import redux.reducer.Reducer;
 import redux.state.State;
 
+import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -17,30 +19,31 @@ public class StoreNew<S extends State<A>, A> implements Notifier<S, A> {
     private static Logger logger = LoggerFactory.getLogger(StoreNew.class);
 
     private Function<A, A> getCorrespondingIsProgressAction;
-    private FluxSink<RequestForChange<A>> actionsSink;
-    private Flux<S> equalStates$;
+    private FluxSink<Request<A>> actionsSink;
+    private Flux<Request<A>> ignoredRequests$;
     private Flux<S> states$;
     private Flux<S> history$;
 
     public StoreNew(Reducer<S, A> reducer, S defaultState, Function<A, A> getCorrespondingIsProgressAction) {
         this.getCorrespondingIsProgressAction = getCorrespondingIsProgressAction;
-        DirectProcessor<S> equalStates$ = DirectProcessor.create();
-        FluxSink<S> equalStatesSink = equalStates$.sink(FluxSink.OverflowStrategy.BUFFER);
+        DirectProcessor<Request<A>> ignoreRequests = DirectProcessor.create();
+        FluxSink<Request<A>> ignoreRequestsSink = ignoreRequests.sink(FluxSink.OverflowStrategy.BUFFER);
 
-        this.equalStates$ = equalStates$.replay(1);
+        this.ignoredRequests$ = ignoreRequests.replay(1).autoConnect(0);
 
-        DirectProcessor<RequestForChange<A>> newStates$ = DirectProcessor.create();
+        DirectProcessor<Request<A>> newStates$ = DirectProcessor.create();
         this.actionsSink = newStates$.sink(FluxSink.OverflowStrategy.BUFFER);
 
         // for debugging
         AtomicInteger transactionCount = new AtomicInteger(0);
 
-        this.states$ = newStates$.scan(defaultState, (S lastState, RequestForChange<A> action) -> {
-            logger.info("transaction: " + transactionCount.get() + " - dispatching action: " + action +
+        this.states$ = newStates$.scan(defaultState, (S lastState, Request<A> request) -> {
+            logger.info("transaction: " + transactionCount.get() + " - dispatching request: " + request +
                     ". last state: " + lastState);
-            S newState = reducer.reducer(lastState, action.getAction());
+            S newState = reducer.reducer(lastState, request);
             if (newState.equals(lastState)) {
-                equalStatesSink.next(lastState);
+                logger.info("transaction: " + transactionCount.get() + " - ignored request: " + request);
+                ignoreRequestsSink.next(request);
             }
             return newState;
         }).distinctUntilChanged()
@@ -53,15 +56,19 @@ public class StoreNew<S extends State<A>, A> implements Notifier<S, A> {
     }
 
     public Mono<S> dispatch(A action) {
-        return Mono.just(new RequestForChange<>(action))
+        return Mono.just(new Request<>(action))
                 .publishOn(Schedulers.single())
-                .doOnNext(requestForChange -> this.actionsSink.next(requestForChange))
-                .flatMap(requestForChange ->
-                        Flux.merge(this.equalStates$.publishOn(Schedulers.elastic()),
-                                this.states$.publishOn(Schedulers.elastic()))
-                                .filter(equalState -> equalState.getId().equals(requestForChange.getId()))
-                                .take(1)
-                                .single())
+                .doOnNext(request -> this.actionsSink.next(request))
+                .map(Request::getId)
+                .flatMapMany(requestId ->
+                        Flux.merge(this.ignoredRequests$.subscribeOn(Schedulers.elastic())
+                                        .map(ignoredRequest -> ignoredRequest.getId()),
+                                this.states$.subscribeOn(Schedulers.elastic())
+                                        .map(newState -> newState.getId()))
+                                .filter(ignoredRequestId -> ignoredRequestId.equals(requestId)))
+                .flatMap(__ -> latestState$())
+                .take(1)
+                .single()
                 .publishOn(Schedulers.parallel());
     }
 
@@ -77,31 +84,30 @@ public class StoreNew<S extends State<A>, A> implements Notifier<S, A> {
                 .single();
     }
 
-
     @Override
-    public Mono<S> getStates$() {
+    public Mono<S> latestState$() {
         return this.states$.take(1)
                 .single();
     }
 
     @Override
-    public Flux<S> getState$() {
+    public Flux<S> states$() {
         return this.states$;
     }
 
     @Override
-    public Flux<S> getHistory$() {
+    public Flux<S> statesHistory() {
         return this.history$;
     }
 
     @Override
-    public Flux<S> getByAction$(A action) {
-        return getState$().filter(listenerState -> listenerState.getAction().equals(action));
+    public Flux<S> statesByAction(A action) {
+        return states$().filter(listenerState -> listenerState.getAction().equals(action));
     }
 
     @Override
     public Mono<S> notifyWhen(A when) {
-        return getState$()
+        return states$()
                 .filter(listenerState -> listenerState.fromAction(when))
                 .take(1)
                 .single();
@@ -109,10 +115,49 @@ public class StoreNew<S extends State<A>, A> implements Notifier<S, A> {
 
     @Override
     public <T> Mono<T> notifyWhen(A when, T mapTo) {
-        return getState$()
+        return states$()
                 .filter(listenerState -> listenerState.fromAction(when))
                 .take(1)
                 .single()
                 .map(listenerState -> mapTo);
+    }
+
+    public static class Request<A> {
+        private A action;
+        private String id;
+
+        private Request(A action) {
+            this.action = action;
+            this.id = UUID.randomUUID().toString();
+        }
+
+        public A getAction() {
+            return action;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof State)) return false;
+            State<?> state = (State<?>) o;
+            return Objects.equals(getId(), state.getId());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getId());
+        }
+
+        @Override
+        public String toString() {
+            return "Request{" +
+                    "action=" + action +
+                    ", id='" + id + '\'' +
+                    '}';
+        }
     }
 }

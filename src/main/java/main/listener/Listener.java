@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import redux.store.Store;
+import redux.store.StoreNew;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -38,7 +38,7 @@ public class Listener {
     private Flux<ListenerState> restartListener$;
 
     public Listener() {
-        Store<ListenerState, ListenerAction> listenerStore = TorrentDownloaders.getListenStore();
+        StoreNew<ListenerState, ListenerAction> listenerStore = TorrentDownloaders.getListenStore();
 
         Supplier<Mono<ServerSocket>> serverSocketSupplier = () -> {
             try {
@@ -49,7 +49,7 @@ public class Listener {
             }
         };
 
-        this.startListen$ = listenerStore.getByAction$(ListenerAction.START_LISTENING_IN_PROGRESS)
+        this.startListen$ = listenerStore.statesByAction(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .switchMap(__ -> serverSocketSupplier.get())
                 .doOnError(throwable -> logger.error("failed to create ServerSocket object.", throwable))
                 .onErrorResume(PeerExceptions.communicationErrors,
@@ -63,7 +63,7 @@ public class Listener {
                 .replay(1)
                 .autoConnect(0);
 
-        this.resumeListen$ = listenerStore.getByAction$(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
+        this.resumeListen$ = listenerStore.statesByAction(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
                 .switchMap(__ -> startListen$.take(1))
                 .switchMap(serverSocket -> listenerStore.dispatch(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)
                         .filter(listenerState -> listenerState.fromAction(ListenerAction.RESUME_LISTENING_SELF_RESOLVED))
@@ -80,7 +80,7 @@ public class Listener {
                 .publish()
                 .autoConnect(0);
 
-        this.pauseListen$ = listenerStore.getByAction$(ListenerAction.PAUSE_LISTENING_IN_PROGRESS)
+        this.pauseListen$ = listenerStore.statesByAction(ListenerAction.PAUSE_LISTENING_IN_PROGRESS)
                 .switchMap(__ -> listenerStore.dispatch(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
                 .filter(listenerState -> listenerState.fromAction(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
                 .doOnNext(serverSocket -> logger.info("paused listening to incoming peers under port: " + getTcpPort()))
@@ -96,7 +96,7 @@ public class Listener {
             }
         };
 
-        this.restartListener$ = listenerStore.getByAction$(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
+        this.restartListener$ = listenerStore.statesByAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> startListen$)
                 .flatMap(closeServerSocket)
                 .doOnError(throwable -> logger.error("fatal error while closing server-socket object under port " + getTcpPort() + ": " + throwable))

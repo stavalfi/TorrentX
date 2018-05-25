@@ -18,39 +18,39 @@ public class DownloadStateSideEffects {
 
     public DownloadStateSideEffects(TorrentInfo torrentInfo,
                                     Store<TorrentStatusState, TorrentStatusAction> store) {
-        this.startDownload$ = store.getByAction$(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
+        this.startDownload$ = store.statesByAction(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.START_DOWNLOAD_WIND_UP))
                 .flatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
                 .publish()
                 .autoConnect(0);
 
-        this.resumeDownload$ = store.getByAction$(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS)
+        this.resumeDownload$ = store.statesByAction(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
                 .publish()
                 .autoConnect(0);
 
-        this.pauseDownload$ = store.getByAction$(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS)
+        this.pauseDownload$ = store.statesByAction(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.PAUSE_DOWNLOAD_WIND_UP))
                 .publish()
                 .autoConnect(0);
 
-        this.startUpload$ = store.getByAction$(TorrentStatusAction.START_UPLOAD_IN_PROGRESS)
+        this.startUpload$ = store.statesByAction(TorrentStatusAction.START_UPLOAD_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.START_UPLOAD_WIND_UP))
                 .flatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS))
                 .publish()
                 .autoConnect(0);
 
-        this.resumeUpload$ = store.getByAction$(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS)
+        this.resumeUpload$ = store.statesByAction(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.RESUME_UPLOAD_WIND_UP))
                 .publish()
                 .autoConnect(0);
 
-        this.pauseUpload$ = store.getByAction$(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS)
+        this.pauseUpload$ = store.statesByAction(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
                 .publish()
                 .autoConnect(0);
 
-        this.completeDownload$ = store.getByAction$(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
+        this.completeDownload$ = store.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
                 .flatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS))
                 .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
                 .publish()

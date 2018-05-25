@@ -40,6 +40,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 import redux.store.Store;
+import redux.store.StoreNew;
 
 import java.io.File;
 import java.time.Duration;
@@ -676,7 +677,7 @@ public class MyStepdefs {
         TorrentStatusState expectedState = Utils.getTorrentStatusState(torrentInfo, lastTorrentStatusAction, expectedTorrentStatusActionList);
 
         // test with the status we received from the "last-status-mono"
-        Assert.assertEquals(expectedState, torrentStatusStore.getStates$().block());
+        Assert.assertEquals(expectedState, torrentStatusStore.latestState$().block());
         // test with the actual last status we received in the last time we tried to change the status
         if (this.actualLastStatus != null)
             Assert.assertEquals(expectedState, this.actualLastStatus);
@@ -1371,35 +1372,41 @@ public class MyStepdefs {
 
     @When("^listen-status is trying to change to:$")
     public void listenStatusIsTryingToChangeTo(List<ListenerAction> changesActionList) throws Throwable {
-        Store<ListenerState, ListenerAction> listenStore = TorrentDownloaders.getInstance()
-                .getListenStore();
-
-        Utils.changeListenerState(changesActionList, listenStore);
+        Utils.changeListenerState(changesActionList, TorrentDownloaders.getListenStore());
     }
 
     @Then("^listen-status will change to: \"([^\"]*)\":$")
     public void listenStatusWillBeWithAction(ListenerAction lastAction, List<ListenerAction> expectedActionList) throws Throwable {
         ListenerState expectedState = Utils.getListenStatusState(lastAction, expectedActionList);
 
-        TorrentDownloaders.getInstance()
-                .getListenStore()
-                .getStates$()
-                .doOnNext(actualState ->
-                        Assert.assertEquals("expected and actual listener-module states are not equal.",
-                                expectedState, actualState))
+        TorrentDownloaders.getListenStore()
+                .latestState$()
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.getAction(), actualState.getAction()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningInProgress(), actualState.isStartedListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningSelfResolved(), actualState.isStartedListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningWindUp(), actualState.isStartedListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningInProgress(), actualState.isResumeListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningSelfResolved(), actualState.isResumeListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningWindUp(), actualState.isResumeListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningInProgress(), actualState.isPauseListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningSelfResolved(), actualState.isPauseListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningWindUp(), actualState.isPauseListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningInProgress(), actualState.isRestartListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningSelfResolved(), actualState.isRestartListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningWindUp(), actualState.isRestartListeningWindUp()))
                 .block();
 
         Utils.removeEverythingRelatedToLastTest();
     }
 
-    private Store<ListenerState, ListenerAction> listenStore;
+    private StoreNew<ListenerState, ListenerAction> listenStore;
 
     @Given("^initial listen-status - no side effects:$")
     public void initialListenStatusNoSideEffects(List<ListenerAction> initialStateByActionList) throws Throwable {
         Utils.removeEverythingRelatedToLastTest();
 
         ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
-        this.listenStore = new Store<>(new ListenerReducer(), initialState,
+        this.listenStore = new StoreNew<>(new ListenerReducer(), initialState,
                 ListenerAction::getCorrespondingIsProgressAction);
     }
 
@@ -1414,10 +1421,20 @@ public class MyStepdefs {
     public void listenStatusWillChangeToNoSideEffects(ListenerAction lastAction, List<ListenerAction> expectedActionList) throws Throwable {
         ListenerState expectedState = Utils.getListenStatusState(lastAction, expectedActionList);
 
-        this.listenStore.getStates$()
-                .doOnNext(actualState ->
-                        Assert.assertEquals("expected and actual listener-module states are not equal.",
-                                expectedState, actualState))
+        this.listenStore.latestState$()
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.getAction(), actualState.getAction()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningInProgress(), actualState.isStartedListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningSelfResolved(), actualState.isStartedListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningWindUp(), actualState.isStartedListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningInProgress(), actualState.isResumeListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningSelfResolved(), actualState.isResumeListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningWindUp(), actualState.isResumeListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningInProgress(), actualState.isPauseListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningSelfResolved(), actualState.isPauseListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningWindUp(), actualState.isPauseListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningInProgress(), actualState.isRestartListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningSelfResolved(), actualState.isRestartListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningWindUp(), actualState.isRestartListeningWindUp()))
                 .block();
     }
 }

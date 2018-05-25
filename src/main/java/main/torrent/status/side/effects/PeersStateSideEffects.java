@@ -13,18 +13,18 @@ public class PeersStateSideEffects {
 
     public PeersStateSideEffects(TorrentInfo torrentInfo,
                                  Store<TorrentStatusState, TorrentStatusAction> store) {
-        this.startSearchPeers$ = store.getByAction$(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS)
+        this.startSearchPeers$ = store.statesByAction(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.START_SEARCHING_PEERS_WIND_UP))
                 .flatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS))
                 .publish()
                 .autoConnect(0);
 
-        this.resumeSearchPeers$ = store.getByAction$(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS)
+        this.resumeSearchPeers$ = store.statesByAction(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP))
                 .publish()
                 .autoConnect(0);
 
-        this.pauseSearchPeers$ = store.getByAction$(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS)
+        this.pauseSearchPeers$ = store.statesByAction(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS)
                 .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.PAUSE_SEARCHING_PEERS_WIND_UP))
                 .publish()
                 .autoConnect(0);

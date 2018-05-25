@@ -47,33 +47,33 @@ public class SearchPeers {
     private Flux<Link> searchPeers(TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store,
                                    Flux<Link> peers$) {
 
-        store.getByAction$(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS)
+        store.statesByAction(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS)
                 .take(1)
                 .flatMap(__ -> store.dispatch(TorrentStatusAction.START_SEARCHING_PEERS_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
-        store.getByAction$(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS)
+        store.statesByAction(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS)
                 .take(1)
                 .flatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_SEARCHING_PEERS_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
-        store.getByAction$(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS)
+        store.statesByAction(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS)
                 .take(1)
                 .flatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_SEARCHING_PEERS_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
         Function<Link, Mono<Link>> releaseWhenResuming = link ->
-                store.getState$()
+                store.states$()
                         .map(torrentStatusState -> torrentStatusState.fromAction(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP))
                         .filter(Boolean::booleanValue)
                         .map(__ -> link)
                         .take(1)
                         .single();
 
-        return store.getByAction$(TorrentStatusAction.START_SEARCHING_PEERS_WIND_UP)
+        return store.statesByAction(TorrentStatusAction.START_SEARCHING_PEERS_WIND_UP)
                 .take(1)
                 // TODO: when i'm out of peers, we need to ask more..
                 // but maybe the tests doesn't want more so we need to investigate.

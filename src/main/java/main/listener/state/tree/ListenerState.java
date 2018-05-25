@@ -2,7 +2,7 @@ package main.listener.state.tree;
 
 import main.listener.ListenerAction;
 import redux.state.State;
-import redux.store.RequestForChange;
+import redux.store.StoreNew;
 
 public class ListenerState extends State<ListenerAction> {
     private boolean isStartedListeningInProgress;
@@ -18,7 +18,7 @@ public class ListenerState extends State<ListenerAction> {
     private boolean isRestartListeningSelfResolved;
     private boolean isRestartListeningWindUp;
 
-    public ListenerState(RequestForChange<ListenerAction> requestForChange,
+    public ListenerState(String id, ListenerAction action,
                          boolean isStartedListeningInProgress,
                          boolean isStartedListeningSelfResolved,
                          boolean isStartedListeningWindUp,
@@ -31,7 +31,7 @@ public class ListenerState extends State<ListenerAction> {
                          boolean isRestartListeningInProgress,
                          boolean isRestartListeningSelfResolved,
                          boolean isRestartListeningWindUp) {
-        super(requestForChange);
+        super(id, action);
         this.isStartedListeningInProgress = isStartedListeningInProgress;
         this.isStartedListeningSelfResolved = isStartedListeningSelfResolved;
         this.isStartedListeningWindUp = isStartedListeningWindUp;
@@ -145,6 +145,7 @@ public class ListenerState extends State<ListenerAction> {
     }
 
     public static class ListenStateBuilder {
+        private String id;
         private ListenerAction action;
         private boolean isStartedListeningInProgress;
         private boolean isStartedListeningSelfResolved;
@@ -159,16 +160,8 @@ public class ListenerState extends State<ListenerAction> {
         private boolean isRestartListeningSelfResolved;
         private boolean isRestartListeningWindUp;
 
-        private ListenStateBuilder() {
-
-        }
-
-        private ListenStateBuilder(ListenerAction action) {
-            this.action = action;
-        }
-
-        public static ListenerState.ListenStateBuilder builder(ListenerAction action, ListenerState listenerState) {
-            return new ListenerState.ListenStateBuilder(action, listenerState);
+        public static ListenerState.ListenStateBuilder builder(StoreNew.Request<ListenerAction> request, ListenerState listenerState) {
+            return new ListenerState.ListenStateBuilder(request, listenerState);
         }
 
         public static ListenerState.ListenStateBuilder builder(ListenerAction action) {
@@ -176,8 +169,8 @@ public class ListenerState extends State<ListenerAction> {
         }
 
         public ListenerState build() {
-            return new ListenerState(
-                    new RequestForChange<ListenerAction>(this.action),
+            return new ListenerState(this.id,
+                    this.action,
                     this.isStartedListeningInProgress,
                     this.isStartedListeningSelfResolved,
                     this.isStartedListeningWindUp,
@@ -192,8 +185,18 @@ public class ListenerState extends State<ListenerAction> {
                     this.isRestartListeningWindUp);
         }
 
-        private ListenStateBuilder(ListenerAction action, ListenerState listenerState) {
+        private ListenStateBuilder(ListenerAction action) {
             this.action = action;
+        }
+
+        private ListenStateBuilder(StoreNew.Request<ListenerAction> request) {
+            this.id = request.getId();
+            this.action = request.getAction();
+        }
+
+        private ListenStateBuilder(StoreNew.Request<ListenerAction> request, ListenerState listenerState) {
+            this.id = request.getId();
+            this.action = request.getAction();
             this.isStartedListeningInProgress = listenerState.isStartedListeningInProgress;
             this.isStartedListeningSelfResolved = listenerState.isStartedListeningSelfResolved;
             this.isStartedListeningWindUp = listenerState.isStartedListeningWindUp;

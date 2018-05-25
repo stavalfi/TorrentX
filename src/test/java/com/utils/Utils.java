@@ -31,8 +31,8 @@ import org.junit.Assert;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import redux.store.RequestForChange;
 import redux.store.Store;
+import redux.store.StoreNew;
 
 import java.io.File;
 import java.io.IOException;
@@ -94,12 +94,10 @@ public class Utils {
         } catch (Exception e) {
             //e.printStackTrace();
         }
-        Store<ListenerState, ListenerAction> listenStore = TorrentDownloaders.getInstance()
-                .getListenStore();
 
-        System.out.println("123");
-        listenStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                .flatMapMany(__ -> listenStore.getState$())
+        TorrentDownloaders.getListenStore()
+                .dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
+                .flatMapMany(__ -> TorrentDownloaders.getListenStore().states$())
                 .takeUntil(listenerState -> ListenerReducer.defaultListenState.equals(listenerState))
                 .blockLast();
 
@@ -116,7 +114,7 @@ public class Utils {
         TorrentDownloaders.getListener().getTcpPort();
     }
 
-    public static void changeListenerState(List<ListenerAction> changesActionList, Store<ListenerState, ListenerAction> listenStore) {
+    public static void changeListenerState(List<ListenerAction> changesActionList, StoreNew<ListenerState, ListenerAction> listenStore) {
         Flux.fromIterable(changesActionList)
                 .filter(action -> action.equals(ListenerAction.START_LISTENING_IN_PROGRESS) ||
                         action.equals(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
@@ -130,69 +128,69 @@ public class Utils {
                     switch (action) {
                         case START_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
-                                    .flatMapMany(__ -> listenStore.getState$())
+                                    .flatMapMany(__ -> listenStore.states$())
                                     .filter(listenerState -> listenerState.isResumeListeningWindUp())
                                     .take(1)
                                     .single();
                         case START_LISTENING_SELF_RESOLVED:
-                            return listenStore.getState$()
+                            return listenStore.states$()
                                     .filter(ListenerState::isStartedListeningInProgress)
                                     .take(1)
                                     .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMap(__ -> listenStore.getState$())
+                                    .flatMap(__ -> listenStore.states$())
                                     .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
                                     .single();
                         case RESUME_LISTENING_IN_PROGRESS:
-                            return listenStore.getState$()
+                            return listenStore.states$()
                                     .filter(ListenerState::isStartedListeningWindUp)
                                     .take(1)
                                     .single()
                                     .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMapMany(__ -> listenStore.getState$())
+                                    .flatMapMany(__ -> listenStore.states$())
                                     .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
                                     .single();
                         case RESUME_LISTENING_SELF_RESOLVED:
-                            return listenStore.getState$()
+                            return listenStore.states$()
                                     .filter(ListenerState::isResumeListeningInProgress)
                                     .take(1)
                                     .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMap(__ -> listenStore.getState$())
+                                    .flatMap(__ -> listenStore.states$())
                                     .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
                                     .single();
                         case PAUSE_LISTENING_IN_PROGRESS:
-                            return listenStore.getState$()
+                            return listenStore.states$()
                                     .filter(ListenerState::isStartedListeningWindUp)
                                     .take(1)
                                     .single()
                                     .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMapMany(__ -> listenStore.getState$())
+                                    .flatMapMany(__ -> listenStore.states$())
                                     .filter(ListenerState::isPauseListeningWindUp)
                                     .take(1)
                                     .single();
                         case PAUSE_LISTENING_SELF_RESOLVED:
-                            return listenStore.getState$()
+                            return listenStore.states$()
                                     .filter(ListenerState::isPauseListeningInProgress)
                                     .take(1)
                                     .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMap(__ -> listenStore.getState$())
+                                    .flatMap(__ -> listenStore.states$())
                                     .filter(ListenerState::isPauseListeningWindUp)
                                     .take(1)
                                     .single();
                         case RESTART_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
-                                    .flatMapMany(__ -> listenStore.getState$())
+                                    .flatMapMany(__ -> listenStore.states$())
                                     .filter(ListenerReducer.defaultListenState::equals)
                                     .take(1)
                                     .single();
                         case RESTART_LISTENING_SELF_RESOLVED:
-                            return listenStore.getState$()
+                            return listenStore.states$()
                                     .filter(ListenerState::isRestartListeningInProgress)
                                     .take(1)
                                     .flatMap(__ -> listenStore.dispatch(action))
-                                    .flatMap(__ -> listenStore.getState$())
+                                    .flatMap(__ -> listenStore.states$())
                                     .filter(ListenerReducer.defaultListenState::equals)
                                     .take(1)
                                     .single();
@@ -240,7 +238,7 @@ public class Utils {
                 .setTorrentRemovedWindUp(torrentStatusActions.contains(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
                 .build();
 
-        return new TorrentStatusState(new RequestForChange<>(lastTorrentStatusAction), downloadState, peersState, torrentFileSystemState);
+        return new TorrentStatusState(null, lastTorrentStatusAction, downloadState, peersState, torrentFileSystemState);
     }
 
     public static ListenerState getListenStatusState(ListenerAction lastAction, List<ListenerAction> actions) {

@@ -21,6 +21,7 @@ import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import redux.store.Store;
+import redux.store.StoreNew;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,7 +29,7 @@ import java.util.Optional;
 
 public class TorrentDownloaders {
 
-    private static Store<ListenerState, ListenerAction> listenStore = new Store<>(new ListenerReducer(),
+    private static StoreNew<ListenerState, ListenerAction> listenStore = new StoreNew<>(new ListenerReducer(),
             ListenerReducer.defaultListenState,
             ListenerAction::getCorrespondingIsProgressAction);
 
@@ -42,7 +43,7 @@ public class TorrentDownloaders {
         return listener;
     }
 
-    public static Store<ListenerState, ListenerAction> getListenStore() {
+    public static StoreNew<ListenerState, ListenerAction> getListenStore() {
         return listenStore;
     }
 

@@ -1,26 +1,24 @@
 package redux.state;
 
-import redux.store.RequestForChange;
-
 import java.util.Objects;
 
 public abstract class State<A> {
-    private A action;
     private String id;
+    private A action;
 
-    public State(RequestForChange<A> requestForChange) {
-        this.action = requestForChange.getAction();
-        this.id = requestForChange.getId();
+    public State(String id, A action) {
+        this.id = id == null ? "INITIALIZE-ID" : id;
+        this.action = action;
     }
 
     public abstract boolean fromAction(A action);
 
-    public A getAction() {
-        return action;
-    }
-
     public String getId() {
         return id;
+    }
+
+    public A getAction() {
+        return action;
     }
 
     @Override
@@ -38,9 +36,7 @@ public abstract class State<A> {
 
     @Override
     public String toString() {
-        return "State{" +
-                "action=" + action +
-                ", id='" + id + '\'' +
-                '}';
+        return "action=" + action +
+                ", id='" + id + '\'' + ",";
     }
 }
