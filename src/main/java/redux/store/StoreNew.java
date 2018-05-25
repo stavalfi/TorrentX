@@ -37,16 +37,18 @@ public class StoreNew<S extends State<A>, A> implements Notifier<S, A> {
         // for debugging
         AtomicInteger transactionCount = new AtomicInteger(0);
 
-        this.states$ = newStates$.scan(defaultState, (S lastState, Request<A> request) -> {
-            logger.info("transaction: " + transactionCount.get() + " - dispatching request: " + request +
-                    ". last state: " + lastState);
-            S newState = reducer.reducer(lastState, request);
-            if (newState.equals(lastState)) {
-                logger.info("transaction: " + transactionCount.get() + " - ignored request: " + request);
-                ignoreRequestsSink.next(request);
-            }
-            return newState;
-        }).distinctUntilChanged()
+        this.states$ = newStates$.publishOn(Schedulers.elastic())
+                .scan(defaultState, (S lastState, Request<A> request) -> {
+                    logger.info("transaction: " + transactionCount.get() + " - dispatching request: " + request +
+                            ". last state: " + lastState);
+                    S newState = reducer.reducer(lastState, request);
+                    if (newState.equals(lastState)) {
+                        logger.info("transaction: " + transactionCount.get() + " - ignored request: " + request);
+                        ignoreRequestsSink.next(request);
+                    }
+                    return newState;
+                })
+                .distinctUntilChanged()
                 .doOnNext(newState -> logger.info("transaction: " + transactionCount.getAndIncrement() + " - new state: " + newState))
                 .replay(1)
                 .autoConnect(0);
@@ -57,28 +59,27 @@ public class StoreNew<S extends State<A>, A> implements Notifier<S, A> {
 
     public Mono<S> dispatch(A action) {
         return Mono.just(new Request<>(action))
-                .publishOn(Schedulers.single())
+                .publishOn(Schedulers.elastic())
                 .doOnNext(request -> this.actionsSink.next(request))
-                .map(Request::getId)
-                .flatMapMany(requestId ->
-                        Flux.merge(this.ignoredRequests$.subscribeOn(Schedulers.elastic())
+                //.map(request1 -> request1.getId())
+                .flatMap(requestId ->
+                        Flux.merge(this.ignoredRequests$.publishOn(Schedulers.elastic())
                                         .map(ignoredRequest -> ignoredRequest.getId()),
-                                this.states$.subscribeOn(Schedulers.elastic())
+                                this.states$.publishOn(Schedulers.elastic())
                                         .map(newState -> newState.getId()))
-                                .filter(ignoredRequestId -> ignoredRequestId.equals(requestId)))
-                .flatMap(__ -> latestState$())
-                .take(1)
-                .single()
-                .publishOn(Schedulers.parallel());
+                                .filter(ignoredRequestId -> ignoredRequestId.equals(requestId.id))
+                                .limitRequest(1)
+                                .single())
+                .flatMap(__ -> latestState$());
     }
 
     public Mono<S> dispatchAsLongNoCancel(A windUpActionToChange) {
         A correspondingIsProgressAction = this.getCorrespondingIsProgressAction.apply(windUpActionToChange);
         assert correspondingIsProgressAction != null;
 
-        return this.states$
+        return this.states$.publishOn(Schedulers.elastic())
                 .takeWhile(listenState -> listenState.fromAction(correspondingIsProgressAction))
-                .switchMap(listenState -> dispatch(windUpActionToChange))
+                .concatMap(listenState -> dispatch(windUpActionToChange))
                 .filter(listenState -> listenState.fromAction(windUpActionToChange))
                 .take(1)
                 .single();
@@ -87,27 +88,31 @@ public class StoreNew<S extends State<A>, A> implements Notifier<S, A> {
     @Override
     public Mono<S> latestState$() {
         return this.states$.take(1)
-                .single();
+                .single()
+                .publishOn(Schedulers.elastic());
     }
 
     @Override
     public Flux<S> states$() {
-        return this.states$;
+        return this.states$
+                .publishOn(Schedulers.elastic());
     }
 
     @Override
     public Flux<S> statesHistory() {
-        return this.history$;
+        return this.history$
+                .publishOn(Schedulers.elastic());
     }
 
     @Override
     public Flux<S> statesByAction(A action) {
-        return states$().filter(listenerState -> listenerState.getAction().equals(action));
+        return states$().filter(listenerState -> listenerState.getAction().equals(action))
+                .publishOn(Schedulers.elastic());
     }
 
     @Override
     public Mono<S> notifyWhen(A when) {
-        return states$()
+        return states$().publishOn(Schedulers.elastic())
                 .filter(listenerState -> listenerState.fromAction(when))
                 .take(1)
                 .single();
@@ -115,7 +120,7 @@ public class StoreNew<S extends State<A>, A> implements Notifier<S, A> {
 
     @Override
     public <T> Mono<T> notifyWhen(A when, T mapTo) {
-        return states$()
+        return states$().publishOn(Schedulers.elastic())
                 .filter(listenerState -> listenerState.fromAction(when))
                 .take(1)
                 .single()

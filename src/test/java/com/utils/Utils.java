@@ -95,11 +95,25 @@ public class Utils {
             //e.printStackTrace();
         }
 
+        BiPredicate<ListenerState, ListenerState> isEqualByProperties = (defaultListenState, listenerState) ->
+                defaultListenState.getAction().equals(listenerState.getAction()) &&
+                        defaultListenState.isStartedListeningInProgress() == listenerState.isStartedListeningInProgress() &&
+                        defaultListenState.isStartedListeningSelfResolved() == listenerState.isStartedListeningSelfResolved() &&
+                        defaultListenState.isStartedListeningWindUp() == listenerState.isStartedListeningWindUp() &&
+                        defaultListenState.isResumeListeningInProgress() == listenerState.isResumeListeningInProgress() &&
+                        defaultListenState.isResumeListeningSelfResolved() == listenerState.isResumeListeningSelfResolved() &&
+                        defaultListenState.isResumeListeningWindUp() == listenerState.isResumeListeningWindUp() &&
+                        defaultListenState.isPauseListeningInProgress() == listenerState.isPauseListeningInProgress() &&
+                        defaultListenState.isPauseListeningSelfResolved() == listenerState.isPauseListeningSelfResolved() &&
+                        defaultListenState.isPauseListeningWindUp() == listenerState.isPauseListeningWindUp() &&
+                        defaultListenState.isRestartListeningInProgress() == listenerState.isRestartListeningInProgress() &&
+                        defaultListenState.isRestartListeningSelfResolved() == listenerState.isRestartListeningSelfResolved() &&
+                        defaultListenState.isRestartListeningWindUp() == listenerState.isRestartListeningWindUp();
         TorrentDownloaders.getListenStore()
                 .dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                 .flatMapMany(__ -> TorrentDownloaders.getListenStore().states$())
-                .takeUntil(listenerState -> ListenerReducer.defaultListenState.equals(listenerState))
-                .blockLast();
+                .filter(listenerState -> isEqualByProperties.test(ListenerReducer.defaultListenState, listenerState))
+                .blockFirst();
 
         // delete download folder from last test
         Utils.deleteDownloadFolder();

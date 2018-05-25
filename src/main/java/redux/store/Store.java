@@ -124,7 +124,7 @@ public class Store<S extends State<A>, A> implements Notifier<S, A> {
 
         return this.latestState$
                 .takeWhile(listenState -> listenState.fromAction(correspondingIsProgressAction))
-                .switchMap(listenState -> dispatch(windUpActionToChange))
+                .flatMap(listenState -> dispatch(windUpActionToChange))
                 .filter(listenState -> listenState.fromAction(windUpActionToChange))
                 .take(1)
                 .single();
