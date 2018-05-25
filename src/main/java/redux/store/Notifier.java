@@ -5,13 +5,13 @@ import reactor.core.publisher.Mono;
 import redux.state.State;
 
 public interface Notifier<S extends State<A>, A> {
-    Mono<S> getStates$();
+    Mono<S> latestState$();
 
-    Flux<S> getState$();
+    Flux<S> states$();
 
-    Flux<S> getHistory$();
+    Flux<S> statesHistory();
 
-    Flux<S> getByAction$(A action);
+    Flux<S> statesByAction(A action);
 
     Mono<S> notifyWhen(A when);
 
