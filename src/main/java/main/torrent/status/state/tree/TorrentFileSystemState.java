@@ -2,8 +2,6 @@ package main.torrent.status.state.tree;
 
 import main.torrent.status.TorrentStatusAction;
 
-import java.util.Objects;
-
 public class TorrentFileSystemState {
     private boolean isTorrentRemovedInProgress;
     private boolean isTorrentRemovedSelfResolved;
@@ -150,22 +148,5 @@ public class TorrentFileSystemState {
                 isFilesRemovedInProgress() == that.isFilesRemovedInProgress() &&
                 isFilesRemovedSelfResolved() == that.isFilesRemovedSelfResolved() &&
                 isFilesRemovedWindUp() == that.isFilesRemovedWindUp();
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(isTorrentRemovedInProgress(), isTorrentRemovedSelfResolved(), isTorrentRemovedWindUp(), isFilesRemovedInProgress(), isFilesRemovedSelfResolved(), isFilesRemovedWindUp());
-    }
-
-    @Override
-    public String toString() {
-        return "TorrentFileSystemState{" +
-                "isTorrentRemovedInProgress=" + isTorrentRemovedInProgress +
-                ", isTorrentRemovedSelfResolved=" + isTorrentRemovedSelfResolved +
-                ", isTorrentRemovedWindUp=" + isTorrentRemovedWindUp +
-                ", isFilesRemovedInProgress=" + isFilesRemovedInProgress +
-                ", isFilesRemovedSelfResolved=" + isFilesRemovedSelfResolved +
-                ", isFilesRemovedWindUp=" + isFilesRemovedWindUp +
-                '}';
     }
 }

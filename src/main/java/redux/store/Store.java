@@ -2,11 +2,9 @@ package redux.store;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.*;
 import reactor.core.scheduler.Schedulers;
-import redux.reducer.IReducer;
+import redux.reducer.Reducer;
 import redux.state.State;
 
 import java.util.concurrent.Semaphore;
@@ -18,7 +16,7 @@ public class Store<S extends State<A>, A> implements Notifier<S, A> {
 
     private Flux<S> latestState$;
     private Flux<S> history$;
-    private IReducer<S, A> reducer;
+    private Reducer<S, A> reducer;
     private Function<A, A> getCorrespondingIsProgressAction;
     private FluxSink<S> produceNewState;
     private Semaphore semaphore = new Semaphore(1);
@@ -26,9 +24,10 @@ public class Store<S extends State<A>, A> implements Notifier<S, A> {
     // for debugging
     private AtomicInteger transactionCount = new AtomicInteger(0);
 
-    public Store(IReducer<S, A> reducer, S defaultState, Function<A, A> getCorrespondingIsProgressAction) {
+    public Store(Reducer<S, A> reducer, S defaultState, Function<A, A> getCorrespondingIsProgressAction) {
         this.reducer = reducer;
         this.getCorrespondingIsProgressAction = getCorrespondingIsProgressAction;
+
         this.latestState$ = Flux.<S>create(sink -> {
             this.produceNewState = sink;
             sink.next(defaultState);
@@ -53,7 +52,7 @@ public class Store<S extends State<A>, A> implements Notifier<S, A> {
                 })
                 .flatMap(transactionCount -> {
                     logger.info("transaction: " + transactionCount + " - getting the last state.");
-                    return getLatestState$()
+                    return getStates$()
                             .flatMap(lastStatus -> {
                                 logger.info("transaction: " + transactionCount + " - dispatching action: " + action +
                                         ". last state: " + lastStatus);
@@ -79,7 +78,7 @@ public class Store<S extends State<A>, A> implements Notifier<S, A> {
     }
 
     @Override
-    public Mono<S> getLatestState$() {
+    public Mono<S> getStates$() {
         return this.latestState$
                 .take(1)
                 .single();

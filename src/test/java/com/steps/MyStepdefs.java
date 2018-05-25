@@ -354,7 +354,7 @@ public class MyStepdefs {
                 .block();
 
         Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                TorrentStatusReducer.defaultTorrentState,
                 TorrentStatusAction::getCorrespondingIsProgressAction);
         TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
@@ -441,7 +441,7 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                TorrentStatusReducer.defaultTorrentState,
                 TorrentStatusAction::getCorrespondingIsProgressAction);
         TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 
@@ -676,7 +676,7 @@ public class MyStepdefs {
         TorrentStatusState expectedState = Utils.getTorrentStatusState(torrentInfo, lastTorrentStatusAction, expectedTorrentStatusActionList);
 
         // test with the status we received from the "last-status-mono"
-        Assert.assertEquals(expectedState, torrentStatusStore.getLatestState$().block());
+        Assert.assertEquals(expectedState, torrentStatusStore.getStates$().block());
         // test with the actual last status we received in the last time we tried to change the status
         if (this.actualLastStatus != null)
             Assert.assertEquals(expectedState, this.actualLastStatus);
@@ -699,7 +699,7 @@ public class MyStepdefs {
                 .get();
 
         Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                TorrentStatusReducer.defaultTorrentState,
                 TorrentStatusAction::getCorrespondingIsProgressAction);
         TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 
@@ -1357,7 +1357,7 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                TorrentStatusReducer.defaultTorrentState,
                 TorrentStatusAction::getCorrespondingIsProgressAction);
         TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 
@@ -1383,7 +1383,7 @@ public class MyStepdefs {
 
         TorrentDownloaders.getInstance()
                 .getListenStore()
-                .getLatestState$()
+                .getStates$()
                 .doOnNext(actualState ->
                         Assert.assertEquals("expected and actual listener-module states are not equal.",
                                 expectedState, actualState))
@@ -1414,7 +1414,7 @@ public class MyStepdefs {
     public void listenStatusWillChangeToNoSideEffects(ListenerAction lastAction, List<ListenerAction> expectedActionList) throws Throwable {
         ListenerState expectedState = Utils.getListenStatusState(lastAction, expectedActionList);
 
-        this.listenStore.getLatestState$()
+        this.listenStore.getStates$()
                 .doOnNext(actualState ->
                         Assert.assertEquals("expected and actual listener-module states are not equal.",
                                 expectedState, actualState))

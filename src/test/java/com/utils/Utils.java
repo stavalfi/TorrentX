@@ -31,6 +31,7 @@ import org.junit.Assert;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import redux.store.RequestForChange;
 import redux.store.Store;
 
 import java.io.File;
@@ -99,7 +100,7 @@ public class Utils {
         System.out.println("123");
         listenStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                 .flatMapMany(__ -> listenStore.getState$())
-                .takeUntil(listenerState -> ListenerReducer.defaultListenState.get().equals(listenerState))
+                .takeUntil(listenerState -> ListenerReducer.defaultListenState.equals(listenerState))
                 .blockLast();
 
         // delete download folder from last test
@@ -183,7 +184,7 @@ public class Utils {
                         case RESTART_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
                                     .flatMapMany(__ -> listenStore.getState$())
-                                    .filter(ListenerReducer.defaultListenState.get()::equals)
+                                    .filter(ListenerReducer.defaultListenState::equals)
                                     .take(1)
                                     .single();
                         case RESTART_LISTENING_SELF_RESOLVED:
@@ -192,7 +193,7 @@ public class Utils {
                                     .take(1)
                                     .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.getState$())
-                                    .filter(ListenerReducer.defaultListenState.get()::equals)
+                                    .filter(ListenerReducer.defaultListenState::equals)
                                     .take(1)
                                     .single();
                         default:
@@ -239,7 +240,7 @@ public class Utils {
                 .setTorrentRemovedWindUp(torrentStatusActions.contains(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
                 .build();
 
-        return new TorrentStatusState(lastTorrentStatusAction, downloadState, peersState, torrentFileSystemState);
+        return new TorrentStatusState(new RequestForChange<>(lastTorrentStatusAction), downloadState, peersState, torrentFileSystemState);
     }
 
     public static ListenerState getListenStatusState(ListenerAction lastAction, List<ListenerAction> actions) {
@@ -261,7 +262,7 @@ public class Utils {
 
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
         Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                TorrentStatusReducer.defaultTorrentState,
                 TorrentStatusAction::getCorrespondingIsProgressAction);
         return createDefaultTorrentDownloader(torrentInfo, downloadPath,
                 store, new TorrentStatesSideEffects(torrentInfo, store));
@@ -273,7 +274,7 @@ public class Utils {
         PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
         Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                TorrentStatusReducer.defaultTorrentState,
                 TorrentStatusAction::getCorrespondingIsProgressAction);
         TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
         // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
@@ -453,7 +454,7 @@ public class Utils {
                 .flatMap(pieceMessageToSave -> {
                     ConnectableFlux<PieceMessage> pieceMessageFlux = Flux.just(pieceMessageToSave).publish();
                     Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                            TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                            TorrentStatusReducer.defaultTorrentState,
                             TorrentStatusAction::getCorrespondingIsProgressAction);
                     return activeTorrents.createActiveTorrentMono(link.getTorrentInfo(), downloadPath, store, pieceMessageFlux)
                             .flatMap(fileSystemLink -> {

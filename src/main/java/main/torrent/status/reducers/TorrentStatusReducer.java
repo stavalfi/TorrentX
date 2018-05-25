@@ -5,14 +5,13 @@ import main.torrent.status.state.tree.DownloadState;
 import main.torrent.status.state.tree.PeersState;
 import main.torrent.status.state.tree.TorrentFileSystemState;
 import main.torrent.status.state.tree.TorrentStatusState;
-import redux.reducer.IReducer;
+import redux.reducer.Reducer;
+import redux.store.RequestForChange;
 
-import java.util.function.Supplier;
+public class TorrentStatusReducer implements Reducer<TorrentStatusState, TorrentStatusAction> {
 
-public class TorrentStatusReducer implements IReducer<TorrentStatusState, TorrentStatusAction> {
-
-    public static Supplier<TorrentStatusState> defaultTorrentStateSupplier = () ->
-            new TorrentStatusState(TorrentStatusAction.INITIALIZE,
+    public static TorrentStatusState defaultTorrentState =
+            new TorrentStatusState(new RequestForChange<>(TorrentStatusAction.INITIALIZE),
                     DownloadStateReducer.defaultDownloadStateSupplier.get(),
                     PeersStateReducer.defaultPeersStateSupplier.get(),
                     TorrentFileSystemStateReducer.defaultTorrentFileSystemStateSupplier.get());
@@ -30,7 +29,7 @@ public class TorrentStatusReducer implements IReducer<TorrentStatusState, Torren
                 lastState.getPeersState().equals(peersState) &&
                 lastState.getTorrentFileSystemState().equals(torrentFileSystemState))
             return lastState;
-        return new TorrentStatusState(torrentStatusAction,
+        return new TorrentStatusState(new RequestForChange<>(torrentStatusAction),
                 downloadState,
                 peersState,
                 torrentFileSystemState);

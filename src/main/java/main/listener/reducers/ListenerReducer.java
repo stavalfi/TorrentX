@@ -2,12 +2,10 @@ package main.listener.reducers;
 
 import main.listener.ListenerAction;
 import main.listener.state.tree.ListenerState;
-import redux.reducer.IReducer;
+import redux.reducer.Reducer;
 
-import java.util.function.Supplier;
-
-public class ListenerReducer implements IReducer<ListenerState,ListenerAction> {
-    public static Supplier<ListenerState> defaultListenState = () ->
+public class ListenerReducer implements Reducer<ListenerState, ListenerAction> {
+    public static ListenerState defaultListenState =
             ListenerState.ListenStateBuilder.builder(ListenerAction.INITIALIZE)
                     .setStartedListeningInProgress(false)
                     .setStartedListeningSelfResolved(false)
@@ -138,7 +136,7 @@ public class ListenerReducer implements IReducer<ListenerState,ListenerAction> {
                         .build();
 
             case RESTART_LISTENING_IN_PROGRESS:
-                if (lastState.equals(defaultListenState.get()) ||
+                if (lastState.equals(defaultListenState) ||
                         lastState.isRestartListeningInProgress() ||
                         lastState.isRestartListeningWindUp())
                     return lastState;

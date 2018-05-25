@@ -2,8 +2,7 @@ package main.listener.state.tree;
 
 import main.listener.ListenerAction;
 import redux.state.State;
-
-import java.util.Objects;
+import redux.store.RequestForChange;
 
 public class ListenerState extends State<ListenerAction> {
     private boolean isStartedListeningInProgress;
@@ -19,7 +18,7 @@ public class ListenerState extends State<ListenerAction> {
     private boolean isRestartListeningSelfResolved;
     private boolean isRestartListeningWindUp;
 
-    public ListenerState(ListenerAction action,
+    public ListenerState(RequestForChange<ListenerAction> requestForChange,
                          boolean isStartedListeningInProgress,
                          boolean isStartedListeningSelfResolved,
                          boolean isStartedListeningWindUp,
@@ -32,7 +31,7 @@ public class ListenerState extends State<ListenerAction> {
                          boolean isRestartListeningInProgress,
                          boolean isRestartListeningSelfResolved,
                          boolean isRestartListeningWindUp) {
-        super(action);
+        super(requestForChange);
         this.isStartedListeningInProgress = isStartedListeningInProgress;
         this.isStartedListeningSelfResolved = isStartedListeningSelfResolved;
         this.isStartedListeningWindUp = isStartedListeningWindUp;
@@ -93,31 +92,6 @@ public class ListenerState extends State<ListenerAction> {
 
     public boolean isRestartListeningWindUp() {
         return isRestartListeningWindUp;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof ListenerState)) return false;
-        if (!super.equals(o)) return false;
-        ListenerState that = (ListenerState) o;
-        return isStartedListeningInProgress() == that.isStartedListeningInProgress() &&
-                isStartedListeningSelfResolved() == that.isStartedListeningSelfResolved() &&
-                isStartedListeningWindUp() == that.isStartedListeningWindUp() &&
-                isPauseListeningInProgress() == that.isPauseListeningInProgress() &&
-                isPauseListeningSelfResolved() == that.isPauseListeningSelfResolved() &&
-                isPauseListeningWindUp() == that.isPauseListeningWindUp() &&
-                isResumeListeningInProgress() == that.isResumeListeningInProgress() &&
-                isResumeListeningSelfResolved() == that.isResumeListeningSelfResolved() &&
-                isResumeListeningWindUp() == that.isResumeListeningWindUp() &&
-                isRestartListeningInProgress() == that.isRestartListeningInProgress() &&
-                isRestartListeningSelfResolved() == that.isRestartListeningSelfResolved() &&
-                isRestartListeningWindUp() == that.isRestartListeningWindUp();
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), isStartedListeningInProgress(), isStartedListeningSelfResolved(), isStartedListeningWindUp(), isPauseListeningInProgress(), isPauseListeningSelfResolved(), isPauseListeningWindUp(), isResumeListeningInProgress(), isResumeListeningSelfResolved(), isResumeListeningWindUp(), isRestartListeningInProgress(), isRestartListeningSelfResolved(), isRestartListeningWindUp());
     }
 
     @Override
@@ -203,7 +177,7 @@ public class ListenerState extends State<ListenerAction> {
 
         public ListenerState build() {
             return new ListenerState(
-                    this.action,
+                    new RequestForChange<ListenerAction>(this.action),
                     this.isStartedListeningInProgress,
                     this.isStartedListeningSelfResolved,
                     this.isStartedListeningWindUp,

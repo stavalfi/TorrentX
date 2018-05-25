@@ -29,7 +29,7 @@ import java.util.Optional;
 public class TorrentDownloaders {
 
     private static Store<ListenerState, ListenerAction> listenStore = new Store<>(new ListenerReducer(),
-            ListenerReducer.defaultListenState.get(),
+            ListenerReducer.defaultListenState,
             ListenerAction::getCorrespondingIsProgressAction);
 
     private static Listener listener = new Listener();
@@ -107,7 +107,7 @@ public class TorrentDownloaders {
     public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
         // TODO: save the initial status in the mongodb.
         Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentStateSupplier.get(),
+                TorrentStatusReducer.defaultTorrentState,
                 TorrentStatusAction::getCorrespondingIsProgressAction);
         TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
         // TODO: remove the block()

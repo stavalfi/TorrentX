@@ -5,7 +5,7 @@ import reactor.core.publisher.Mono;
 import redux.state.State;
 
 public interface Notifier<S extends State<A>, A> {
-    Mono<S> getLatestState$();
+    Mono<S> getStates$();
 
     Flux<S> getState$();
 

@@ -1,19 +1,18 @@
-package redux.state;
+package redux.store;
 
-import redux.store.RequestForChange;
+import redux.state.State;
 
 import java.util.Objects;
+import java.util.UUID;
 
-public abstract class State<A> {
+public class RequestForChange<A> {
     private A action;
     private String id;
 
-    public State(RequestForChange<A> requestForChange) {
-        this.action = requestForChange.getAction();
-        this.id = requestForChange.getId();
+    public RequestForChange(A action) {
+        this.action = action;
+        this.id = UUID.randomUUID().toString();
     }
-
-    public abstract boolean fromAction(A action);
 
     public A getAction() {
         return action;
@@ -38,7 +37,7 @@ public abstract class State<A> {
 
     @Override
     public String toString() {
-        return "State{" +
+        return "RequestForChange{" +
                 "action=" + action +
                 ", id='" + id + '\'' +
                 '}';
