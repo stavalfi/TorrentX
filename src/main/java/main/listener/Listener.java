@@ -70,8 +70,7 @@ public class Listener {
                         .map(__ -> serverSocket))
                 .doOnNext(serverSocket -> logger.info("resume listening to incoming peers under port: " + getTcpPort()))
                 .concatMap(serverSocket -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, serverSocket))
-                .publishOn(Schedulers.elastic())
-                .concatMap(serverSocket -> acceptPeersLinks(serverSocket))
+                .concatMap(this::acceptPeersLinks)
                 .concatMap(link -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, link))
                 .doOnError(throwable -> logger.error("fatal error while accepting peer connection or in server-socket object", throwable))
                 .onErrorResume(PeerExceptions.communicationErrors,
@@ -97,8 +96,9 @@ public class Listener {
         };
 
         this.restartListener$ = listenerStore.statesByAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> startListen$)
+                .concatMap(__ -> this.startListen$.take(1))
                 .concatMap(closeServerSocket)
+                // TODO: In case we came here before we actaully started listening, then maybe the serverSocket wasn't open yet so we got an object which is very old and also closed.
                 .doOnError(throwable -> logger.error("fatal error while closing server-socket object under port " + getTcpPort() + ": " + throwable))
                 .concatMap(closedServerSocket -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
                 .filter(listenerState -> listenerState.fromAction(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
@@ -182,6 +182,7 @@ public class Listener {
     }
 
     public Flux<Link> getPeers$(TorrentInfo torrentInfo) {
-        return resumeListen$.filter(link -> link.getTorrentInfo().equals(torrentInfo));
+        return resumeListen$.publishOn(Schedulers.elastic())
+                .filter(link -> link.getTorrentInfo().equals(torrentInfo));
     }
 }

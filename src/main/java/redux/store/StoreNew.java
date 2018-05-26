@@ -94,33 +94,19 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
                 .flatMap(__ -> result);
     }
 
-    public Mono<STATE_IMPL> dispatchAsLongNoCancel(ACTION windUpActionToChange) {
-        ACTION correspondingIsProgressAction = this.getCorrespondingIsProgressAction.apply(windUpActionToChange);
-        assert correspondingIsProgressAction != null;
-
-        return this.states$.publishOn(Schedulers.elastic())
-                .doOnNext(stateImpl -> System.out.println("is going to stop change to " + windUpActionToChange + "? :" + stateImpl))
-                .takeWhile(stateImpl -> stateImpl.fromAction(correspondingIsProgressAction))
-                .concatMap(stateImpl -> dispatch(windUpActionToChange))
-                .doOnNext(stateImpl -> System.out.println("did we succeed to change to " + windUpActionToChange + "? "
-                        + stateImpl.fromAction(windUpActionToChange) + ":" + stateImpl))
-                .filter(stateImpl -> stateImpl.fromAction(windUpActionToChange))
-                .take(1)
-                .single()
-                .doOnSuccess(stateImpl -> System.out.println("we finally succeed to change to " + windUpActionToChange + "!"));
-    }
-
     public Mono<STATE_IMPL> dispatchAsLongNoCancel(ACTION action, BiPredicate<ACTION, STATE_IMPL> isCanceled) {
         return this.states$.publishOn(Schedulers.elastic())
                 .doOnNext(stateImpl -> System.out.println("is going to stop change to " + action + "? :" + stateImpl))
-                .takeWhile(stateImpl -> isCanceled.test(action, stateImpl))
+                .takeWhile(stateImpl -> isCanceled.negate().test(action, stateImpl))
                 .concatMap(stateImpl -> dispatch(action))
                 .doOnNext(stateImpl -> System.out.println("did we succeed to change to " + action + "? "
                         + stateImpl.fromAction(action) + ":" + stateImpl))
                 .filter(stateImpl -> stateImpl.fromAction(action))
+                .doOnNext(stateImpl -> System.out.println("we finally succeed to change to " + action + "!"))
                 .take(1)
-                .single()
-                .doOnSuccess(stateImpl -> System.out.println("we finally succeed to change to " + action + "!"));
+                .switchIfEmpty(latestState$()
+                        .doOnNext(__ -> System.out.println("we failed to change to: " + action)))
+                .single();
     }
 
     @Override

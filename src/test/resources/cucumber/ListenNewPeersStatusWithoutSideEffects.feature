@@ -35,8 +35,10 @@ Feature: start/stop/restart listening to new peers
       | RESUME_LISTENING_WIND_UP |
     When listen-status is trying to change to - no side effects:
       | PAUSE_LISTENING_IN_PROGRESS |
-    When listen-status is trying to change "PAUSE_LISTENING_WIND_UP" when it can and also - no side effects:
+    When listen-status is trying to change to - no side effects:
       | PAUSE_LISTENING_SELF_RESOLVED |
+    When listen-status is trying to change to - no side effects:
+      | PAUSE_LISTENING_WIND_UP |
     Then listen-status will change to: "PAUSE_LISTENING_WIND_UP" - no side effects:
       | START_LISTENING_WIND_UP |
       | PAUSE_LISTENING_WIND_UP |
@@ -144,17 +146,18 @@ Feature: start/stop/restart listening to new peers
       | RESTART_LISTENING_WIND_UP       |
       | PAUSE_LISTENING_IN_PROGRESS     |
       | RESTART_LISTENING_SELF_RESOLVED |
-    # will change to PAUSE_LISTENING_WIND_UP
-    When listen-status is trying to change "PAUSE_LISTENING_WIND_UP" when it can and also - no side effects:
+    # will change to PAUSE_LISTENING_SELF_RESOLVED
+    When listen-status is trying to change to - no side effects:
       | PAUSE_LISTENING_SELF_RESOLVED |
+    # will change to PAUSE_LISTENING_WIND_UP
+    When listen-status is trying to change to - no side effects:
+      | PAUSE_LISTENING_WIND_UP       |
       | PAUSE_LISTENING_SELF_RESOLVED |
       | PAUSE_LISTENING_SELF_RESOLVED |
       | RESTART_LISTENING_IN_PROGRESS |
     # will change to RESTART_LISTENING_WIND_UP because everything is already set up
-    When listen-status is trying to change "RESTART_LISTENING_WIND_UP" when it can and also - no side effects:
-      | PAUSE_LISTENING_WIND_UP       |
-      | RESTART_LISTENING_WIND_UP     |
-      | RESTART_LISTENING_IN_PROGRESS |
+    When listen-status is trying to change to - no side effects:
+      | RESTART_LISTENING_WIND_UP |
     # will change to ---nothing---
     When listen-status is trying to change to - no side effects:
       | PAUSE_LISTENING_WIND_UP       |
@@ -199,8 +202,10 @@ Feature: start/stop/restart listening to new peers
     When listen-status is trying to change "START_LISTENING_WIND_UP" when it can and also - no side effects:
       | START_LISTENING_SELF_RESOLVED |
       | RESTART_LISTENING_IN_PROGRESS |
-    When listen-status is trying to change "RESTART_LISTENING_WIND_UP" when it can and also - no side effects:
+    When listen-status is trying to change to - no side effects:
       | RESTART_LISTENING_SELF_RESOLVED |
+    When listen-status is trying to change to - no side effects:
+      | RESTART_LISTENING_WIND_UP |
     Then listen-status will change to: "RESTART_LISTENING_WIND_UP" - no side effects:
       | RESTART_LISTENING_WIND_UP |
       | PAUSE_LISTENING_WIND_UP   |
