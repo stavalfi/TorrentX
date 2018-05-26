@@ -2,54 +2,61 @@ package redux.store;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.DirectProcessor;
+import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.function.Tuple2;
 import redux.reducer.Reducer;
 import redux.state.State;
 
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 
-public class StoreNew<S extends State<A>, A> implements Notifier<S, A> {
+public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier<STATE_IMPL, ACTION> {
     private static Logger logger = LoggerFactory.getLogger(StoreNew.class);
 
-    private Function<A, A> getCorrespondingIsProgressAction;
-    private FluxSink<Request<A>> actionsSink;
-    private Flux<Request<A>> ignoredRequests$;
-    private Flux<S> states$;
-    private Flux<S> history$;
+    private Function<ACTION, ACTION> getCorrespondingIsProgressAction;
+    private FluxSink<Request<ACTION>> actionsSink;
+    private Flux<Request<ACTION>> ignoredRequests$;
+    private Flux<STATE_IMPL> states$;
+    private Flux<STATE_IMPL> history$;
 
-    public StoreNew(Reducer<S, A> reducer, S defaultState, Function<A, A> getCorrespondingIsProgressAction) {
+    public StoreNew(Reducer<STATE_IMPL, ACTION> reducer, STATE_IMPL defaultState,
+                    Function<ACTION, ACTION> getCorrespondingIsProgressAction) {
         this.getCorrespondingIsProgressAction = getCorrespondingIsProgressAction;
-        DirectProcessor<Request<A>> ignoreRequests = DirectProcessor.create();
-        FluxSink<Request<A>> ignoreRequestsSink = ignoreRequests.sink(FluxSink.OverflowStrategy.BUFFER);
+        EmitterProcessor<Request<ACTION>> ignoreRequests = EmitterProcessor.create();
+        FluxSink<Request<ACTION>> ignoreRequestsSink = ignoreRequests.sink(FluxSink.OverflowStrategy.BUFFER);
 
-        this.ignoredRequests$ = ignoreRequests.replay(1).autoConnect(0);
+        this.ignoredRequests$ = ignoreRequests
+                .doOnNext(request -> logger.debug("4: " + request + "\n"))
+                .replay(1)
+                .autoConnect(0);
 
-        DirectProcessor<Request<A>> newStates$ = DirectProcessor.create();
+        EmitterProcessor<Request<ACTION>> newStates$ = EmitterProcessor.create();
         this.actionsSink = newStates$.sink(FluxSink.OverflowStrategy.BUFFER);
 
-        // for debugging
-        AtomicInteger transactionCount = new AtomicInteger(0);
-
-        this.states$ = newStates$.publishOn(Schedulers.elastic())
-                .scan(defaultState, (S lastState, Request<A> request) -> {
-                    logger.info("transaction: " + transactionCount.get() + " - dispatching request: " + request +
-                            ". last state: " + lastState);
-                    S newState = reducer.reducer(lastState, request);
+        this.states$ = newStates$
+                .doOnNext(request -> logger.debug("3: " + request + "\n"))
+                .index()
+                .scan(defaultState, (STATE_IMPL lastState, Tuple2<Long, Request<ACTION>> request) -> {
+                    long transactionCount = request.getT1();
+                    //logger.debug("transaction: " + transactionCount + " - dispatching request: " + request.getT2() +
+                    // ". last state: " + lastState + "\n");
+                    STATE_IMPL newState = reducer.reducer(lastState, request.getT2());
                     if (newState.equals(lastState)) {
-                        logger.info("transaction: " + transactionCount.get() + " - ignored request: " + request);
-                        ignoreRequestsSink.next(request);
+                        ignoreRequestsSink.next(request.getT2());
+                        //logger.debug("transaction: " + transactionCount + " - ignored request: " + request.getT2() + "\n");
+                    } else {
+                        //logger.info("transaction: " + transactionCount + " - new state: " + newState + "\n");
                     }
                     return newState;
                 })
                 .distinctUntilChanged()
-                .doOnNext(newState -> logger.info("transaction: " + transactionCount.getAndIncrement() + " - new state: " + newState))
+                .doOnNext(request -> logger.debug("4: " + request + "\n"))
                 .replay(1)
                 .autoConnect(0);
 
@@ -57,74 +64,105 @@ public class StoreNew<S extends State<A>, A> implements Notifier<S, A> {
                 .autoConnect(0);
     }
 
-    public Mono<S> dispatch(A action) {
+    public Mono<STATE_IMPL> dispatch(ACTION action) {
+        Request<ACTION> request = new Request<>(action);
+        Mono<STATE_IMPL> result = Flux.merge(this.ignoredRequests$.publishOn(Schedulers.elastic())
+                        .map(ignoredRequest -> ignoredRequest.getId())
+                        .filter(ignoredRequestId -> ignoredRequestId.equals(request.id))
+                //.doOnNext(__ -> logger.debug("finally - ignored request: " + request + "\n"))
+                ,
+                this.states$.publishOn(Schedulers.elastic())
+                        .map(newState -> newState.getId())
+                        .filter(ignoredRequestId -> ignoredRequestId.equals(request.id))
+                //.doOnNext(__ -> logger.debug("finally - accepted request: " + request + "\n"))
+        )
+                .doOnNext(__ -> logger.debug("5: " + request + "\n"))
+                .map(__ -> request)
+                .limitRequest(1)
+                .replay(1)
+                .autoConnect(0)
+                .flatMap(__ -> this.states$)
+                .take(1)
+                .single()
+                .doOnNext(___ -> logger.debug("6: " + request + "\n"))
+                .doOnNext(___ -> logger.debug("7: " + request + "\n"));
+
         return Mono.just(new Request<>(action))
-                .publishOn(Schedulers.elastic())
-                .doOnNext(request -> this.actionsSink.next(request))
-                //.map(request1 -> request1.getId())
-                .flatMap(requestId ->
-                        Flux.merge(this.ignoredRequests$.publishOn(Schedulers.elastic())
-                                        .map(ignoredRequest -> ignoredRequest.getId()),
-                                this.states$.publishOn(Schedulers.elastic())
-                                        .map(newState -> newState.getId()))
-                                .filter(ignoredRequestId -> ignoredRequestId.equals(requestId.id))
-                                .limitRequest(1)
-                                .single())
-                .flatMap(__ -> latestState$());
+                .doOnNext(__ -> logger.debug("1: " + request + "\n"))
+                .doOnNext(__ -> logger.debug("2: " + request + "\n"))
+                .doOnNext(__ -> this.actionsSink.next(request))
+                .flatMap(__ -> result);
     }
 
-    public Mono<S> dispatchAsLongNoCancel(A windUpActionToChange) {
-        A correspondingIsProgressAction = this.getCorrespondingIsProgressAction.apply(windUpActionToChange);
+    public Mono<STATE_IMPL> dispatchAsLongNoCancel(ACTION windUpActionToChange) {
+        ACTION correspondingIsProgressAction = this.getCorrespondingIsProgressAction.apply(windUpActionToChange);
         assert correspondingIsProgressAction != null;
 
         return this.states$.publishOn(Schedulers.elastic())
-                .takeWhile(listenState -> listenState.fromAction(correspondingIsProgressAction))
-                .concatMap(listenState -> dispatch(windUpActionToChange))
-                .filter(listenState -> listenState.fromAction(windUpActionToChange))
+                .doOnNext(stateImpl -> System.out.println("is going to stop change to " + windUpActionToChange + "? :" + stateImpl))
+                .takeWhile(stateImpl -> stateImpl.fromAction(correspondingIsProgressAction))
+                .concatMap(stateImpl -> dispatch(windUpActionToChange))
+                .doOnNext(stateImpl -> System.out.println("did we succeed to change to " + windUpActionToChange + "? "
+                        + stateImpl.fromAction(windUpActionToChange) + ":" + stateImpl))
+                .filter(stateImpl -> stateImpl.fromAction(windUpActionToChange))
                 .take(1)
-                .single();
+                .single()
+                .doOnSuccess(stateImpl -> System.out.println("we finally succeed to change to " + windUpActionToChange + "!"));
+    }
+
+    public Mono<STATE_IMPL> dispatchAsLongNoCancel(ACTION action, BiPredicate<ACTION, STATE_IMPL> isCanceled) {
+        return this.states$.publishOn(Schedulers.elastic())
+                .doOnNext(stateImpl -> System.out.println("is going to stop change to " + action + "? :" + stateImpl))
+                .takeWhile(stateImpl -> isCanceled.test(action, stateImpl))
+                .concatMap(stateImpl -> dispatch(action))
+                .doOnNext(stateImpl -> System.out.println("did we succeed to change to " + action + "? "
+                        + stateImpl.fromAction(action) + ":" + stateImpl))
+                .filter(stateImpl -> stateImpl.fromAction(action))
+                .take(1)
+                .single()
+                .doOnSuccess(stateImpl -> System.out.println("we finally succeed to change to " + action + "!"));
     }
 
     @Override
-    public Mono<S> latestState$() {
+    public Mono<STATE_IMPL> latestState$() {
         return this.states$.take(1)
                 .single()
                 .publishOn(Schedulers.elastic());
     }
 
     @Override
-    public Flux<S> states$() {
+    public Flux<STATE_IMPL> states$() {
         return this.states$
                 .publishOn(Schedulers.elastic());
     }
 
     @Override
-    public Flux<S> statesHistory() {
+    public Flux<STATE_IMPL> statesHistory() {
         return this.history$
                 .publishOn(Schedulers.elastic());
     }
 
     @Override
-    public Flux<S> statesByAction(A action) {
-        return states$().filter(listenerState -> listenerState.getAction().equals(action))
-                .publishOn(Schedulers.elastic());
+    public Flux<STATE_IMPL> statesByAction(ACTION action) {
+        return this.states$.publishOn(Schedulers.elastic())
+                .filter(stateImpl -> stateImpl.getAction().equals(action));
     }
 
     @Override
-    public Mono<S> notifyWhen(A when) {
+    public Mono<STATE_IMPL> notifyWhen(ACTION when) {
         return states$().publishOn(Schedulers.elastic())
-                .filter(listenerState -> listenerState.fromAction(when))
+                .filter(stateImpl -> stateImpl.fromAction(when))
                 .take(1)
                 .single();
     }
 
     @Override
-    public <T> Mono<T> notifyWhen(A when, T mapTo) {
+    public <T> Mono<T> notifyWhen(ACTION when, T mapTo) {
         return states$().publishOn(Schedulers.elastic())
-                .filter(listenerState -> listenerState.fromAction(when))
+                .filter(stateImpl -> stateImpl.fromAction(when))
                 .take(1)
                 .single()
-                .map(listenerState -> mapTo);
+                .map(stateImpl -> mapTo);
     }
 
     public static class Request<A> {

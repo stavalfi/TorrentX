@@ -33,6 +33,8 @@ import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
 import org.junit.Assert;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
@@ -47,6 +49,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -54,6 +57,7 @@ import java.util.stream.Stream;
 import static org.mockito.Mockito.mock;
 
 public class MyStepdefs {
+    private static Logger logger = LoggerFactory.getLogger(MyStepdefs.class);
 
     static {
         Hooks.onErrorDropped(throwable -> {
@@ -1397,6 +1401,10 @@ public class MyStepdefs {
                 .block();
 
         Utils.removeEverythingRelatedToLastTest();
+
+        System.out.println("*************************************");
+        System.out.println("*************************************");
+        System.out.println("*************************************");
     }
 
     private StoreNew<ListenerState, ListenerAction> listenStore;
@@ -1413,7 +1421,32 @@ public class MyStepdefs {
     @When("^listen-status is trying to change to - no side effects:$")
     public void listenStatusIsTryingToChangeToNoSideEffects(List<ListenerAction> changesActionList) throws Throwable {
         Flux.fromIterable(changesActionList)
-                .flatMap(listenerAction -> this.listenStore.dispatch(listenerAction), changesActionList.size())
+                .flatMap(listenerAction -> this.listenStore.dispatch(listenerAction).publishOn(Schedulers.elastic()),
+                        changesActionList.size())
+                //.index()
+                //.doOnNext(tuple2 -> logger.debug("count: " + tuple2.getT1() + ", state: " + tuple2.getT2() + "\n"))
+                .blockLast();
+    }
+
+    @When("^listen-status is trying to change \"([^\"]*)\" when it can and also - no side effects:$")
+    public void listenStatusIsTryingToChangeWhenItCanAndAlsoNoSideEffects(ListenerAction listenerAction,
+                                                                          List<ListenerAction> changesActionList) throws Throwable {
+        BiPredicate<ListenerAction, ListenerState> isCanceled = (desiredChange, listenerState) ->
+                listenerState.fromAction(ListenerAction.INITIALIZE) ||
+                        listenerState.fromAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS) ||
+                        listenerState.fromAction(ListenerAction.RESTART_LISTENING_WIND_UP) ||
+                        listenerState.fromAction(ListenerAction.getCorrespondingIsProgressAction(desiredChange));
+
+
+        Mono<List<ListenerState>> changeTo$ = Flux.fromIterable(changesActionList)
+                .flatMap(action -> this.listenStore.dispatch(action).publishOn(Schedulers.elastic()),
+                        changesActionList.size())
+                .collectList()
+                .doOnNext(__ -> System.out.println("we finally ended to change according the given list"));
+
+        Flux.merge(this.listenStore.dispatchAsLongNoCancel(listenerAction, isCanceled).publishOn(Schedulers.elastic())
+                        .defaultIfEmpty(ListenerReducer.defaultListenState),
+                changeTo$.publishOn(Schedulers.elastic()))
                 .blockLast();
     }
 
@@ -1436,6 +1469,10 @@ public class MyStepdefs {
                 .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningSelfResolved(), actualState.isRestartListeningSelfResolved()))
                 .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningWindUp(), actualState.isRestartListeningWindUp()))
                 .block();
+
+        System.out.println("*************************************");
+        System.out.println("*************************************");
+        System.out.println("*************************************");
     }
 }
 

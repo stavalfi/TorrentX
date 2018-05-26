@@ -2,22 +2,22 @@ package redux.state;
 
 import java.util.Objects;
 
-public abstract class State<A> {
+public abstract class State<ACTION> {
     private String id;
-    private A action;
+    private ACTION action;
 
-    public State(String id, A action) {
+    public State(String id, ACTION action) {
         this.id = id == null ? "INITIALIZE-ID" : id;
         this.action = action;
     }
 
-    public abstract boolean fromAction(A action);
+    public abstract boolean fromAction(ACTION action);
 
     public String getId() {
         return id;
     }
 
-    public A getAction() {
+    public ACTION getAction() {
         return action;
     }
 

@@ -56,6 +56,21 @@ public class Utils {
         return new TorrentInfo(torrentFilesPath, TorrentParser.parseTorrent(torrentFilesPath));
     }
 
+    private static BiPredicate<ListenerState, ListenerState> isEqualByProperties = (defaultListenState, listenerState) ->
+            defaultListenState.getAction().equals(listenerState.getAction()) &&
+                    defaultListenState.isStartedListeningInProgress() == listenerState.isStartedListeningInProgress() &&
+                    defaultListenState.isStartedListeningSelfResolved() == listenerState.isStartedListeningSelfResolved() &&
+                    defaultListenState.isStartedListeningWindUp() == listenerState.isStartedListeningWindUp() &&
+                    defaultListenState.isResumeListeningInProgress() == listenerState.isResumeListeningInProgress() &&
+                    defaultListenState.isResumeListeningSelfResolved() == listenerState.isResumeListeningSelfResolved() &&
+                    defaultListenState.isResumeListeningWindUp() == listenerState.isResumeListeningWindUp() &&
+                    defaultListenState.isPauseListeningInProgress() == listenerState.isPauseListeningInProgress() &&
+                    defaultListenState.isPauseListeningSelfResolved() == listenerState.isPauseListeningSelfResolved() &&
+                    defaultListenState.isPauseListeningWindUp() == listenerState.isPauseListeningWindUp() &&
+                    defaultListenState.isRestartListeningInProgress() == listenerState.isRestartListeningInProgress() &&
+                    defaultListenState.isRestartListeningSelfResolved() == listenerState.isRestartListeningSelfResolved() &&
+                    defaultListenState.isRestartListeningWindUp() == listenerState.isRestartListeningWindUp();
+
     public static void removeEverythingRelatedToLastTest() {
 
         BlocksAllocatorImpl.getInstance().freeAll();
@@ -95,24 +110,11 @@ public class Utils {
             //e.printStackTrace();
         }
 
-        BiPredicate<ListenerState, ListenerState> isEqualByProperties = (defaultListenState, listenerState) ->
-                defaultListenState.getAction().equals(listenerState.getAction()) &&
-                        defaultListenState.isStartedListeningInProgress() == listenerState.isStartedListeningInProgress() &&
-                        defaultListenState.isStartedListeningSelfResolved() == listenerState.isStartedListeningSelfResolved() &&
-                        defaultListenState.isStartedListeningWindUp() == listenerState.isStartedListeningWindUp() &&
-                        defaultListenState.isResumeListeningInProgress() == listenerState.isResumeListeningInProgress() &&
-                        defaultListenState.isResumeListeningSelfResolved() == listenerState.isResumeListeningSelfResolved() &&
-                        defaultListenState.isResumeListeningWindUp() == listenerState.isResumeListeningWindUp() &&
-                        defaultListenState.isPauseListeningInProgress() == listenerState.isPauseListeningInProgress() &&
-                        defaultListenState.isPauseListeningSelfResolved() == listenerState.isPauseListeningSelfResolved() &&
-                        defaultListenState.isPauseListeningWindUp() == listenerState.isPauseListeningWindUp() &&
-                        defaultListenState.isRestartListeningInProgress() == listenerState.isRestartListeningInProgress() &&
-                        defaultListenState.isRestartListeningSelfResolved() == listenerState.isRestartListeningSelfResolved() &&
-                        defaultListenState.isRestartListeningWindUp() == listenerState.isRestartListeningWindUp();
         TorrentDownloaders.getListenStore()
                 .dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                 .flatMapMany(__ -> TorrentDownloaders.getListenStore().states$())
                 .filter(listenerState -> isEqualByProperties.test(ListenerReducer.defaultListenState, listenerState))
+                .doOnNext(__ -> System.out.println("finsihed test"))
                 .blockFirst();
 
         // delete download folder from last test
@@ -196,7 +198,7 @@ public class Utils {
                         case RESTART_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
                                     .flatMapMany(__ -> listenStore.states$())
-                                    .filter(ListenerReducer.defaultListenState::equals)
+                                    .filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
                                     .take(1)
                                     .single();
                         case RESTART_LISTENING_SELF_RESOLVED:
@@ -205,7 +207,7 @@ public class Utils {
                                     .take(1)
                                     .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.states$())
-                                    .filter(ListenerReducer.defaultListenState::equals)
+                                    .filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
                                     .take(1)
                                     .single();
                         default:
