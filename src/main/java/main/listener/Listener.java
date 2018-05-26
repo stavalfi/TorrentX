@@ -64,10 +64,18 @@ public class Listener {
                 .autoConnect(0);
 
         this.resumeListen$ = listenerStore.statesByAction(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
+                .doOnNext(listenerState -> logger.debug("start resume.... 1. current state is: " + listenerState))
                 .concatMap(__ -> startListen$.take(1))
-                .concatMap(serverSocket -> listenerStore.dispatch(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)
-                        .filter(listenerState -> listenerState.fromAction(ListenerAction.RESUME_LISTENING_SELF_RESOLVED))
-                        .map(__ -> serverSocket))
+                .doOnNext(__ -> logger.debug("start resume.... 2: " + __))
+                .concatMap(serverSocket ->
+                {
+                    logger.debug("start resume.... 2.1");
+                    return listenerStore.dispatch(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)
+                            .doOnNext(__ -> System.out.println("start resume.... 3"))
+                            .filter(listenerState -> listenerState.fromAction(ListenerAction.RESUME_LISTENING_SELF_RESOLVED))
+                            .map(__ -> serverSocket);
+                })
+                .doOnNext(__ -> logger.debug("start resume.... 4"))
                 .doOnNext(serverSocket -> logger.info("resume listening to incoming peers under port: " + getTcpPort()))
                 .concatMap(serverSocket -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, serverSocket))
                 .concatMap(this::acceptPeersLinks)

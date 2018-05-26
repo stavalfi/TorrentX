@@ -1453,8 +1453,11 @@ public class MyStepdefs {
         BiPredicate<ListenerAction, ListenerState> isCorrespondingIsProgressCanceled = (desiredChange, listenerState) ->
                 !listenerState.fromAction(ListenerAction.getCorrespondingIsProgressAction(desiredChange));
 
+        BiPredicate<ListenerAction, ListenerState> didWeAlreadySucceed = (desiredChange, listenerState) ->
+                listenerState.fromAction(desiredChange);
+
         BiPredicate<ListenerAction, ListenerState> isCanceled = isInitialized.or(isRestartedOrRestarting)
-                .or(isCorrespondingIsProgressCanceled);
+                .or(didWeAlreadySucceed).or(isCorrespondingIsProgressCanceled);
 
         Mono<List<ListenerState>> changeTo$ = Flux.fromIterable(changesActionList)
                 .flatMap(action -> this.listenStore.dispatch(action).publishOn(Schedulers.elastic()),

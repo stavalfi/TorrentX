@@ -3,6 +3,8 @@ package main.listener.side.effects;
 import main.listener.ListenerAction;
 import main.listener.reducers.ListenerReducer;
 import main.listener.state.tree.ListenerState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
 import redux.store.StoreNew;
@@ -10,6 +12,8 @@ import redux.store.StoreNew;
 import java.util.function.BiPredicate;
 
 public class ListenerSideEffects {
+    private static Logger logger = LoggerFactory.getLogger(ListenerSideEffects.class);
+
     private Flux<ListenerState> startListen$;
     private Flux<ListenerState> resumeListen$;
     private Flux<ListenerState> pauseListen$;
@@ -38,19 +42,25 @@ public class ListenerSideEffects {
         BiPredicate<ListenerAction, ListenerState> isCorrespondingIsProgressCanceled = (desiredChange, listenerState) ->
                 !listenerState.fromAction(ListenerAction.getCorrespondingIsProgressAction(desiredChange));
 
+        BiPredicate<ListenerAction, ListenerState> didWeAlreadySucceed = (desiredChange, listenerState) ->
+                listenerState.fromAction(desiredChange);
+
         BiPredicate<ListenerAction, ListenerState> isStartCanceled = isInitialized.or(isRestartedOrRestarting)
-                .or(isCorrespondingIsProgressCanceled);
+                .or(didWeAlreadySucceed).or(isCorrespondingIsProgressCanceled);
 
         BiPredicate<ListenerAction, ListenerState> isResumeCanceled = isInitialized.or(isRestartedOrRestarting)
-                .or(isCorrespondingIsProgressCanceled);
+                .or(didWeAlreadySucceed).or(isCorrespondingIsProgressCanceled);
 
         this.startListen$ = store.statesByAction(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .concatMap(__ -> store.dispatchAsLongNoCancel(ListenerAction.START_LISTENING_WIND_UP, isStartCanceled))
+                .doOnNext(__ -> logger.debug("side effects end deal with start and it start resume... 1 :" + __))
                 .concatMap(__ -> store.dispatch(ListenerAction.RESUME_LISTENING_IN_PROGRESS))
+                .doOnNext(__ -> logger.debug("side effects end deal with start and it start resume... 2 :" + __))
                 .publish()
                 .autoConnect(0);
 
         this.resumeListen$ = store.statesByAction(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
+                .doOnNext(__ -> logger.debug("side effects start deal with resume... 1 :" + __))
                 .concatMap(__ -> store.dispatchAsLongNoCancel(ListenerAction.RESUME_LISTENING_WIND_UP, isResumeCanceled))
                 .publish()
                 .autoConnect(0);
@@ -62,17 +72,17 @@ public class ListenerSideEffects {
                 .autoConnect(0);
 
         this.restartListen$ = store.statesByAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                .doOnNext(__ -> System.out.println("8"))
+                .doOnNext(__ -> logger.debug("8..."))
                 .concatMap(__ -> store.dispatch(ListenerAction.PAUSE_LISTENING_IN_PROGRESS))
-                .doOnNext(__ -> System.out.println("9"))
+                .doOnNext(__ -> logger.debug("9..."))
                 .concatMap(__ -> store.notifyWhen(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
-                .doOnNext(__ -> System.out.println("10"))
+                .doOnNext(__ -> logger.debug("10..."))
                 .concatMap(__ -> store.notifyWhen(ListenerAction.PAUSE_LISTENING_WIND_UP))
-                .doOnNext(__ -> System.out.println("11"))
+                .doOnNext(__ -> logger.debug("11..."))
                 .concatMap(__ -> store.dispatch(ListenerAction.RESTART_LISTENING_WIND_UP))
-                .doOnNext(__ -> System.out.println("12"))
+                .doOnNext(__ -> logger.debug("12..."))
                 .concatMap(__ -> store.dispatch(ListenerAction.INITIALIZE))
-                .doOnNext(__ -> System.out.println("13"))
+                .doOnNext(__ -> logger.debug("13..."))
                 .publish()
                 .autoConnect(0);
     }

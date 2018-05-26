@@ -159,14 +159,19 @@ public class Utils {
                                     .single();
                         case RESUME_LISTENING_IN_PROGRESS:
                             return listenStore.states$()
+                                    .doOnNext(__-> System.out.println("test 1"))
                                     .filter(ListenerState::isStartedListeningWindUp)
+                                    .doOnNext(__-> System.out.println("test 2"))
                                     .take(1)
                                     .single()
                                     .flatMap(__ -> listenStore.dispatch(action))
+                                    .doOnNext(__-> System.out.println("test 3"))
                                     .flatMapMany(__ -> listenStore.states$())
+                                    .doOnNext(__-> System.out.println("test 4"))
                                     .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
-                                    .single();
+                                    .single()
+                                    .doOnNext(__-> System.out.println("test 5"));
                         case RESUME_LISTENING_SELF_RESOLVED:
                             return listenStore.states$()
                                     .filter(ListenerState::isResumeListeningInProgress)

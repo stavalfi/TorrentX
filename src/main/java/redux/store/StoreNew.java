@@ -65,6 +65,7 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
     }
 
     public Mono<STATE_IMPL> dispatch(ACTION action) {
+        logger.debug("getting ready for dispatching action: " + action);
         Request<ACTION> request = new Request<>(action);
         Mono<STATE_IMPL> result = Flux.merge(this.ignoredRequests$.publishOn(Schedulers.elastic())
                         .map(ignoredRequest -> ignoredRequest.getId())
@@ -81,13 +82,13 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
                 .limitRequest(1)
                 .replay(1)
                 .autoConnect(0)
-                .flatMap(__ -> this.states$)
+                .flatMap(__ -> this.states$.publishOn(Schedulers.elastic()))
                 .take(1)
                 .single()
                 .doOnNext(___ -> logger.debug("6: " + request + "\n"))
                 .doOnNext(___ -> logger.debug("7: " + request + "\n"));
 
-        return Mono.just(new Request<>(action))
+        return Mono.just(request)
                 .doOnNext(__ -> logger.debug("1: " + request + "\n"))
                 .doOnNext(__ -> logger.debug("2: " + request + "\n"))
                 .doOnNext(__ -> this.actionsSink.next(request))
@@ -96,16 +97,16 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 
     public Mono<STATE_IMPL> dispatchAsLongNoCancel(ACTION action, BiPredicate<ACTION, STATE_IMPL> isCanceled) {
         return this.states$.publishOn(Schedulers.elastic())
-                .doOnNext(stateImpl -> System.out.println("is going to stop change to " + action + "? :" + stateImpl))
+                .doOnNext(stateImpl -> logger.debug("is going to stop change to " + action + "? :" + stateImpl))
                 .takeWhile(stateImpl -> isCanceled.negate().test(action, stateImpl))
                 .concatMap(stateImpl -> dispatch(action))
-                .doOnNext(stateImpl -> System.out.println("did we succeed to change to " + action + "? "
+                .doOnNext(stateImpl -> logger.debug("did we succeed to change to " + action + "? "
                         + stateImpl.fromAction(action) + ":" + stateImpl))
                 .filter(stateImpl -> stateImpl.fromAction(action))
-                .doOnNext(stateImpl -> System.out.println("we finally succeed to change to " + action + "!"))
+                .doOnNext(stateImpl -> logger.debug("we finally succeed to change to " + action + "!"))
                 .take(1)
                 .switchIfEmpty(latestState$()
-                        .doOnNext(__ -> System.out.println("we failed to change to: " + action)))
+                        .doOnNext(__ -> logger.debug("we failed to change to: " + action)))
                 .single();
     }
 
