@@ -32,9 +32,10 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
         FluxSink<Request<ACTION>> ignoreRequestsSink = ignoreRequests.sink(FluxSink.OverflowStrategy.BUFFER);
 
         this.ignoredRequests$ = ignoreRequests
-                .doOnNext(request -> logger.debug("4: " + request + "\n"))
+                .doOnNext(request -> logger.debug("ignore - 4: " + request + "\n"))
                 .replay(1)
-                .autoConnect(0);
+                .autoConnect(0)
+                .doOnNext(request -> logger.debug("4.1: " + request + "\n"));
 
         EmitterProcessor<Request<ACTION>> newStates$ = EmitterProcessor.create();
         this.actionsSink = newStates$.sink(FluxSink.OverflowStrategy.BUFFER);
@@ -56,7 +57,7 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
                     return newState;
                 })
                 .distinctUntilChanged()
-                .doOnNext(request -> logger.debug("4: " + request + "\n"))
+                .doOnNext(stateImpl -> logger.debug("pass - 4: " + stateImpl + "\n"))
                 .replay(1)
                 .autoConnect(0);
 
@@ -65,16 +66,22 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
     }
 
     public Mono<STATE_IMPL> dispatch(ACTION action) {
-        logger.debug("getting ready for dispatching action: " + action);
         Request<ACTION> request = new Request<>(action);
+        logger.debug("getting ready for dispatching request: " + request);
         Mono<STATE_IMPL> result = Flux.merge(this.ignoredRequests$.publishOn(Schedulers.elastic())
+                        .doOnNext(__ -> logger.debug("ignore - 4.2: " + request + "\n"))
                         .map(ignoredRequest -> ignoredRequest.getId())
+                        .doOnNext(__ -> logger.debug("ignore - 4.3: " + request + "\n"))
                         .filter(ignoredRequestId -> ignoredRequestId.equals(request.id))
+                        .doOnNext(__ -> logger.debug("ignore - 4.4: " + request + "\n"))
                 //.doOnNext(__ -> logger.debug("finally - ignored request: " + request + "\n"))
                 ,
                 this.states$.publishOn(Schedulers.elastic())
+                        .doOnNext(__ -> logger.debug("pass - 4.2: " + request + "\n"))
                         .map(newState -> newState.getId())
+                        .doOnNext(__ -> logger.debug("pass - 4.3: " + request + "\n"))
                         .filter(ignoredRequestId -> ignoredRequestId.equals(request.id))
+                        .doOnNext(__ -> logger.debug("pass - 4.4: " + request + "\n"))
                 //.doOnNext(__ -> logger.debug("finally - accepted request: " + request + "\n"))
         )
                 .doOnNext(__ -> logger.debug("5: " + request + "\n"))
@@ -91,7 +98,9 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
         return Mono.just(request)
                 .doOnNext(__ -> logger.debug("1: " + request + "\n"))
                 .doOnNext(__ -> logger.debug("2: " + request + "\n"))
+                .publishOn(Schedulers.single())
                 .doOnNext(__ -> this.actionsSink.next(request))
+                .publishOn(Schedulers.elastic())
                 .flatMap(__ -> result);
     }
 

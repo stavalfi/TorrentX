@@ -209,3 +209,24 @@ Feature: start/stop/restart listening to new peers
     Then listen-status will change to: "RESTART_LISTENING_WIND_UP" - no side effects:
       | RESTART_LISTENING_WIND_UP |
       | PAUSE_LISTENING_WIND_UP   |
+
+  Scenario: (13) when restart try to do anything but we will get ignored
+    Given initial listen-status - no side effects:
+      | PAUSE_LISTENING_WIND_UP   |
+      | RESTART_LISTENING_WIND_UP |
+    When listen-status is trying to change to - no side effects:
+      | START_LISTENING_IN_PROGRESS     |
+      | START_LISTENING_SELF_RESOLVED   |
+      | START_LISTENING_WIND_UP         |
+      | RESUME_LISTENING_IN_PROGRESS    |
+      | RESUME_LISTENING_SELF_RESOLVED  |
+      | RESUME_LISTENING_WIND_UP        |
+      | PAUSE_LISTENING_IN_PROGRESS     |
+      | PAUSE_LISTENING_SELF_RESOLVED   |
+      | PAUSE_LISTENING_WIND_UP         |
+      | RESTART_LISTENING_IN_PROGRESS   |
+      | RESTART_LISTENING_SELF_RESOLVED |
+      | RESTART_LISTENING_WIND_UP       |
+    Then listen-status will change to: "INITIALIZE" - no side effects:
+      | PAUSE_LISTENING_WIND_UP   |
+      | RESTART_LISTENING_WIND_UP |
