@@ -13,34 +13,34 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 public class Store<S extends State<A>, A> implements Notifier<S, A> {
-    private static Logger logger = LoggerFactory.getLogger(Store.class);
+	private static Logger logger = LoggerFactory.getLogger(Store.class);
 
-    private Flux<S> latestState$;
-    private Flux<S> history$;
-    private Reducer<S, A> reducer;
-    private Function<A, A> getCorrespondingIsProgressAction;
-    private FluxSink<S> produceNewState;
-    private Semaphore semaphore = new Semaphore(1);
+	private Flux<S> latestState$;
+	private Flux<S> history$;
+	private Reducer<S, A> reducer;
+	private Function<A, A> getCorrespondingIsProgressAction;
+	private FluxSink<S> produceNewState;
+	private Semaphore semaphore = new Semaphore(1);
 
-    // for debugging
-    private AtomicInteger transactionCount = new AtomicInteger(0);
+	// for debugging
+	private AtomicInteger transactionCount = new AtomicInteger(0);
 
-    public Store(Reducer<S, A> reducer, S defaultState, Function<A, A> getCorrespondingIsProgressAction) {
-        this.reducer = reducer;
-        this.getCorrespondingIsProgressAction = getCorrespondingIsProgressAction;
+	public Store(Reducer<S, A> reducer, S defaultState, Function<A, A> getCorrespondingIsProgressAction) {
+		this.reducer = reducer;
+		this.getCorrespondingIsProgressAction = getCorrespondingIsProgressAction;
 
-        this.latestState$ = Flux.<S>create(sink -> {
-            this.produceNewState = sink;
-            sink.next(defaultState);
-        }).replay(1)
-                .autoConnect(0);
+		this.latestState$ = Flux.<S>create(sink -> {
+			this.produceNewState = sink;
+			sink.next(defaultState);
+		}).replay(1)
+				.autoConnect(0);
 
-        this.history$ = this.latestState$.replay(10) // how much statuses to save.
-                .autoConnect(0);
-    }
+		this.history$ = this.latestState$.replay(10) // how much statuses to save.
+				.autoConnect(0);
+	}
 
-    public Mono<S> dispatch(A action) {
-        return Mono.error(Exception::new);
+	public Mono<S> dispatch(A action) {
+		return Mono.error(new Exception());
 //        return Mono.just(transactionCount.getAndIncrement())
 //                .publishOn(Schedulers.elastic())
 //                .flatMap(transactionCount -> {
@@ -77,56 +77,56 @@ public class Store<S extends State<A>, A> implements Notifier<S, A> {
 //                                        .doOnNext(__ -> logger.info("transaction: " + transactionCount + " - released semaphore for action: " + action));
 //                            });
 //                });
-    }
+	}
 
-    @Override
-    public Mono<S> latestState$() {
-        return this.latestState$
-                .take(1)
-                .single();
-    }
+	@Override
+	public Mono<S> latestState$() {
+		return this.latestState$
+				.take(1)
+				.single();
+	}
 
-    @Override
-    public Flux<S> states$() {
-        return this.latestState$;
-    }
+	@Override
+	public Flux<S> states$() {
+		return this.latestState$;
+	}
 
-    @Override
-    public Flux<S> statesHistory() {
-        return this.history$;
-    }
+	@Override
+	public Flux<S> statesHistory() {
+		return this.history$;
+	}
 
-    @Override
-    public Flux<S> statesByAction(A action) {
-        return states$().filter(listenerState -> listenerState.getAction().equals(action));
-    }
+	@Override
+	public Flux<S> statesByAction(A action) {
+		return states$().filter(listenerState -> listenerState.getAction().equals(action));
+	}
 
-    @Override
-    public Mono<S> notifyWhen(A when) {
-        return states$()
-                .filter(listenerState -> listenerState.fromAction(when))
-                .take(1)
-                .single();
-    }
+	@Override
+	public Mono<S> notifyWhen(A when) {
+		return states$()
+				.filter(listenerState -> listenerState.fromAction(when))
+				.take(1)
+				.single();
+	}
 
-    @Override
-    public <T> Mono<T> notifyWhen(A when, T mapTo) {
-        return states$()
-                .filter(listenerState -> listenerState.fromAction(when))
-                .take(1)
-                .single()
-                .map(listenerState -> mapTo);
-    }
+	@Override
+	public <T> Mono<T> notifyWhen(A when, T mapTo) {
+		return states$()
+				.filter(listenerState -> listenerState.fromAction(when))
+				.take(1)
+				.single()
+				.map(listenerState -> mapTo);
+	}
 
-    public Mono<S> dispatchAsLongNoCancel(A windUpActionToChange) {
-        A correspondingIsProgressAction = this.getCorrespondingIsProgressAction.apply(windUpActionToChange);
-        assert correspondingIsProgressAction != null;
+	public Mono<S> dispatchAsLongNoCancel(A windUpActionToChange) {
+		A correspondingIsProgressAction = this.getCorrespondingIsProgressAction.apply(windUpActionToChange);
+		assert correspondingIsProgressAction != null;
 
-        return this.latestState$
-                .takeWhile(listenState -> listenState.fromAction(correspondingIsProgressAction))
-                .flatMap(listenState -> dispatch(windUpActionToChange))
-                .filter(listenState -> listenState.fromAction(windUpActionToChange))
-                .take(1)
-                .single();
-    }
+		return this.latestState$
+				.takeWhile(listenState -> listenState.fromAction(correspondingIsProgressAction))
+				.flatMap(listenState -> dispatch(windUpActionToChange))
+				.filter(listenState -> listenState.fromAction(windUpActionToChange))
+				.take(1)
+				.single();
+	}
 }
