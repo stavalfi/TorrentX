@@ -31,6 +31,7 @@ import org.junit.Assert;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import redux.store.Store;
 import redux.store.StoreNew;
 
@@ -145,6 +146,8 @@ public class Utils {
 					switch (action) {
 						case START_LISTENING_IN_PROGRESS:
 							return listenStore.dispatch(action)
+									.subscribeOn(Schedulers.elastic())
+									.publishOn(Schedulers.elastic())
 									.flatMapMany(__ -> listenStore.states$())
 									.filter(listenerState -> listenerState.isResumeListeningWindUp())
 									.take(1)
@@ -153,13 +156,17 @@ public class Utils {
 							return listenStore.states$()
 									.filter(ListenerState::isStartedListeningInProgress)
 									.take(1)
-									.flatMap(__ -> listenStore.dispatch(action))
+									.flatMap(__ -> listenStore.dispatch(action)
+											.subscribeOn(Schedulers.elastic())
+											.publishOn(Schedulers.elastic()))
 									.flatMap(__ -> listenStore.states$())
 									.filter(ListenerState::isResumeListeningWindUp)
 									.take(1)
 									.single();
 						case RESUME_LISTENING_IN_PROGRESS:
 							return listenStore.dispatch(action)
+									.subscribeOn(Schedulers.elastic())
+									.publishOn(Schedulers.elastic())
 									.flatMapMany(__ -> listenStore.states$())
 									.filter(ListenerState::isResumeListeningWindUp)
 									.take(1)
@@ -168,13 +175,17 @@ public class Utils {
 							return listenStore.states$()
 									.filter(ListenerState::isResumeListeningInProgress)
 									.take(1)
-									.flatMap(__ -> listenStore.dispatch(action))
+									.flatMap(__ -> listenStore.dispatch(action)
+											.subscribeOn(Schedulers.elastic())
+											.publishOn(Schedulers.elastic()))
 									.flatMap(__ -> listenStore.states$())
 									.filter(ListenerState::isResumeListeningWindUp)
 									.take(1)
 									.single();
 						case PAUSE_LISTENING_IN_PROGRESS:
 							return listenStore.dispatch(action)
+									.subscribeOn(Schedulers.elastic())
+									.publishOn(Schedulers.elastic())
 									.flatMapMany(__ -> listenStore.states$())
 									.filter(ListenerState::isPauseListeningWindUp)
 									.take(1)
@@ -183,13 +194,17 @@ public class Utils {
 							return listenStore.states$()
 									.filter(ListenerState::isPauseListeningInProgress)
 									.take(1)
-									.flatMap(__ -> listenStore.dispatch(action))
+									.flatMap(__ -> listenStore.dispatch(action)
+											.subscribeOn(Schedulers.elastic())
+											.publishOn(Schedulers.elastic()))
 									.flatMap(__ -> listenStore.states$())
 									.filter(ListenerState::isPauseListeningWindUp)
 									.take(1)
 									.single();
 						case RESTART_LISTENING_IN_PROGRESS:
 							return listenStore.dispatch(action)
+									.subscribeOn(Schedulers.elastic())
+									.publishOn(Schedulers.elastic())
 									.flatMapMany(__ -> listenStore.states$())
 									.filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
 									.take(1)
@@ -198,7 +213,9 @@ public class Utils {
 							return listenStore.states$()
 									.filter(ListenerState::isRestartListeningInProgress)
 									.take(1)
-									.flatMap(__ -> listenStore.dispatch(action))
+									.flatMap(__ -> listenStore.dispatch(action)
+											.subscribeOn(Schedulers.elastic())
+											.publishOn(Schedulers.elastic()))
 									.flatMap(__ -> listenStore.states$())
 									.filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
 									.take(1)
@@ -206,7 +223,7 @@ public class Utils {
 						default:
 							return Mono.empty();
 					}
-				}, 1)
+				}, changesActionList.size())
 				.blockLast();
 	}
 
