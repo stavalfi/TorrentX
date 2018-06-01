@@ -1401,10 +1401,6 @@ public class MyStepdefs {
 				.block();
 
 		Utils.removeEverythingRelatedToLastTest();
-
-		System.out.println("*************************************");
-		System.out.println("*************************************");
-		System.out.println("*************************************");
 	}
 
 	private StoreNew<ListenerState, ListenerAction> listenStore;
@@ -1422,8 +1418,6 @@ public class MyStepdefs {
 		Flux.fromIterable(changesActionList)
 				.flatMap(listenerAction -> this.listenStore.dispatch(listenerAction).publishOn(Schedulers.elastic()),
 						changesActionList.size())
-				//.index()
-				//.doOnNext(tuple2 -> logger.debug("count: " + tuple2.getT1() + ", state: " + tuple2.getT2() + "\n"))
 				.blockLast();
 	}
 
@@ -1461,8 +1455,7 @@ public class MyStepdefs {
 		Mono<List<ListenerState>> changeTo$ = Flux.fromIterable(changesActionList)
 				.flatMap(action -> this.listenStore.dispatch(action).publishOn(Schedulers.elastic()),
 						changesActionList.size())
-				.collectList()
-				.doOnNext(__ -> System.out.println("we finally ended to change according the given list"));
+				.collectList();
 
 		Flux.merge(this.listenStore.dispatchAsLongNoCancel(listenerAction, isCanceled).publishOn(Schedulers.elastic())
 						.defaultIfEmpty(ListenerReducer.defaultListenState),
@@ -1473,9 +1466,6 @@ public class MyStepdefs {
 	@Then("^listen-status will change to: \"([^\"]*)\" - no side effects:$")
 	public void listenStatusWillChangeToNoSideEffects(ListenerAction lastAction, List<ListenerAction> expectedActionList) throws Throwable {
 		ListenerState expectedState = Utils.getListenStatusState(lastAction, expectedActionList);
-		System.out.println("--------- WHEN ----------");
-		System.out.println("--------- WHEN ----------");
-		System.out.println("--------- WHEN ----------");
 		this.listenStore.latestState$()
 				.doOnNext(actualState -> Assert.assertEquals(expectedState.getAction(), actualState.getAction()))
 				.doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningInProgress(), actualState.isStartedListeningInProgress()))
@@ -1491,10 +1481,6 @@ public class MyStepdefs {
 				.doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningSelfResolved(), actualState.isRestartListeningSelfResolved()))
 				.doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningWindUp(), actualState.isRestartListeningWindUp()))
 				.block();
-
-		System.out.println("*************************************");
-		System.out.println("*************************************");
-		System.out.println("*************************************");
 	}
 }
 

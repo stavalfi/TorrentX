@@ -2,7 +2,6 @@ package redux.store;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
@@ -23,16 +22,22 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 	private Flux<Result<STATE_IMPL, ACTION>> results$;
 	private Flux<STATE_IMPL> states$;
 
-	private FluxSink<Request<ACTION>> emitRequestsSink;
 	private BlockingQueue<Request<ACTION>> requestsQueue = new LinkedBlockingQueue<>();
 
 	public StoreNew(Reducer<STATE_IMPL, ACTION> reducer, STATE_IMPL defaultState) {
 		Result<STATE_IMPL, ACTION> initialResult = new Result<>(new Request<>(defaultState.getAction()), defaultState, true);
 
-		EmitterProcessor<Request<ACTION>> emitRequests = EmitterProcessor.create(Integer.MAX_VALUE);
-		this.emitRequestsSink = emitRequests.sink(FluxSink.OverflowStrategy.BUFFER);
-
-		this.results$ = emitRequests
+		this.results$ = Flux.create((FluxSink<Request<ACTION>> sink) -> {
+			while (true) {
+				try {
+					Request<ACTION> request = requestsQueue.take();
+					sink.next(request);
+				} catch (InterruptedException e) {
+					sink.error(e);
+					return;
+				}
+			}
+		}).subscribeOn(Schedulers.elastic())
 				.doOnNext(request -> logger.debug("3: " + request + "\n"))
 				.scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
 					STATE_IMPL newState = reducer.reducer(lastResult.getState(), request);
@@ -43,39 +48,31 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 					logger.debug("passed - request: " + request + " new state: " + newState + "\n");
 					return new Result<>(request, newState, true);
 				})
-				.replay()
+				.replay(1)
 				.autoConnect(0);
 
 		this.states$ = this.results$
-				.doOnNext(__ -> System.out.println("is new state?: " + __))
 				.map(Result::getState)
 				.distinctUntilChanged()
-				.doOnNext(__ -> System.out.println("new state1: " + __))
 				.replay(1)
-				.autoConnect(0)
-				.doOnNext(__ -> System.out.println("new state2: " + __));
+				.autoConnect(0);
 	}
 
 	private Mono<Result<STATE_IMPL, ACTION>> dispatch2(ACTION action) {
 		Request<ACTION> request = new Request<>(action);
-		logger.debug("getting ready for dispatching request: " + request);
-		Flux<Result<STATE_IMPL, ACTION>> resultFlux = this.results$.doOnNext(__ -> System.out.println("received result 1: " + __))
-				.doOnNext(__ -> System.out.println("received result 2: " + __))
+		Mono<Result<STATE_IMPL, ACTION>> resultFlux = this.results$
 				.filter(result -> result.getRequest().equals(request))
-				.doOnNext(__ -> System.out.println("received result 3: " + __))
 				.take(1)
-				.doOnNext(__ -> System.out.println("received result 4: " + __))
-				.replay()
-				.autoConnect(0, disposable -> System.out.println("canceled!"))
-				.doOnNext(__ -> System.out.println("received result 5: " + __));
-		this.emitRequestsSink.next(request);
-		return resultFlux
-				.doOnNext(__ -> System.out.println("received result 6: " + __))
+				.replay(1)
+				.autoConnect(0)
 				.take(1)
-				.doOnNext(__ -> System.out.println("received result 7: " + __))
-				.single()
-				.doOnNext(__ -> System.out.println("received result 8: " + __))
-				.doOnNext(result -> logger.debug("finish process request: " + request));
+				.single();
+		try {
+			this.requestsQueue.put(request);
+		} catch (InterruptedException e) {
+			return Mono.error(e);
+		}
+		return resultFlux;
 	}
 
 	public Mono<STATE_IMPL> dispatch(ACTION action) {
@@ -84,11 +81,8 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 
 	public Mono<STATE_IMPL> dispatchAsLongNoCancel(ACTION action, BiPredicate<ACTION, STATE_IMPL> isCanceled) {
 		return states$()
-				.doOnNext(stateImpl -> logger.debug("is going to stop change to " + action + "? :" + stateImpl))
 				.takeWhile(stateImpl -> isCanceled.negate().test(action, stateImpl))
 				.concatMap(stateImpl -> dispatch(action))
-				.doOnNext(stateImpl -> logger.debug("did we succeed to change to " + action + "? "
-						+ stateImpl.fromAction(action) + ":" + stateImpl))
 				.filter(stateImpl -> stateImpl.fromAction(action))
 				.doOnNext(stateImpl -> logger.debug("we finally succeed to change to " + action + "!"))
 				.take(1)
@@ -99,14 +93,14 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 
 	@Override
 	public Mono<STATE_IMPL> latestState$() {
-		return this.states$.doOnNext(stateImpl -> logger.debug("latestState$ :" + stateImpl))
+		return this.states$
 				.take(1)
 				.single();
 	}
 
 	@Override
 	public Flux<STATE_IMPL> states$() {
-		return this.states$.doOnNext(stateImpl -> logger.debug("states$ :" + stateImpl))
+		return this.states$
 				.publishOn(Schedulers.elastic());
 	}
 
@@ -117,33 +111,24 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 
 	@Override
 	public Flux<STATE_IMPL> statesByAction(ACTION action) {
-		return states$().doOnNext(stateImpl -> logger.debug("statesByAction :" + action + " - " + stateImpl))
+		return states$()
 				.filter(stateImpl -> stateImpl.getAction().equals(action));
 	}
 
 	@Override
 	public Mono<STATE_IMPL> notifyWhen(ACTION when) {
-		System.out.println("notifyWhen 1 - " + when);
 		return states$()
-				.doOnNext(__ -> System.out.println("notifyWhen 2 - " + when + ": " + __))
-				.doOnNext(__ -> System.out.println("notifyWhen 3 - " + when + ": " + __))
 				.filter(stateImpl -> stateImpl.fromAction(when))
-				.doOnNext(__ -> System.out.println("notifyWhen 4 - " + when + ": " + __))
 				.take(1)
-				.doOnNext(__ -> System.out.println("notifyWhen 5 - " + when + ": " + __))
 				.single();
 	}
 
 	@Override
 	public <T> Mono<T> notifyWhen(ACTION when, T mapTo) {
-		System.out.println("notifyWhenMap 1 - " + when);
-		return states$().doOnNext(__ -> System.out.println("notifyWhenMap 2 - " + when + ": " + __))
+		return states$()
 				.filter(stateImpl -> stateImpl.fromAction(when))
-				.doOnNext(__ -> System.out.println("notifyWhenMap 3 - " + when + ": " + __))
 				.take(1)
-				.doOnNext(__ -> System.out.println("notifyWhenMap 4 - " + when + ": " + __))
 				.single()
-				.doOnNext(__ -> System.out.println("notifyWhenMap 5 - " + when + ": " + __))
 				.map(stateImpl -> mapTo);
 	}
 
@@ -235,15 +220,3 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 		}
 	}
 }
-
-//Flux.create((FluxSink<Request<ACTION>> sink) -> {
-//		while (true) {
-//		try {
-//		Request<ACTION> request = requestsQueue.take();
-//		sink.next(request);
-//		} catch (InterruptedException e) {
-//		sink.error(e);
-//		return;
-//		}
-//		}
-//		})

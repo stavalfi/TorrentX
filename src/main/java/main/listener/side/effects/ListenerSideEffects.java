@@ -66,11 +66,8 @@ public class ListenerSideEffects {
 				.autoConnect(0);
 
 		this.pauseListen$ = store.statesByAction(ListenerAction.PAUSE_LISTENING_IN_PROGRESS)
-				.doOnNext(__ -> System.out.println("side effects - pause 1 - " + __))
 				.concatMap(__ -> store.notifyWhen(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
-				.doOnNext(__ -> System.out.println("side effects - pause 2 - " + __))
 				.concatMap(__ -> store.dispatch(ListenerAction.PAUSE_LISTENING_WIND_UP))
-				.doOnNext(__ -> System.out.println("side effects - pause 3 - " + __))
 				.publish()
 				.autoConnect(0);
 

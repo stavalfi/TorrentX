@@ -113,15 +113,9 @@ public class Utils {
 		TorrentDownloaders.getListenStore()
 				.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
 				.flatMapMany(__ -> TorrentDownloaders.getListenStore().states$())
-				.filter(listenerState -> {
-					boolean test = isEqualByProperties.test(ListenerReducer.defaultListenState, listenerState);
-					System.out.println("test: " + test);
-					return test;
-				})
-				.doOnNext(__ -> System.out.println("finsihed test: 1"))
+				.filter(listenerState -> isEqualByProperties.test(ListenerReducer.defaultListenState, listenerState))
 				.take(1)
 				.single()
-				.doOnNext(__ -> System.out.println("finsihed test: 2"))
 				.block();
 
 		// delete download folder from last test
@@ -151,15 +145,10 @@ public class Utils {
 					switch (action) {
 						case START_LISTENING_IN_PROGRESS:
 							return listenStore.dispatch(action)
-									.doOnNext(__ -> System.out.println("changeListenerState1 START_LISTENING_IN_PROGRESS: " + __))
 									.flatMapMany(__ -> listenStore.states$())
-									.doOnNext(__ -> System.out.println("changeListenerState2 START_LISTENING_IN_PROGRESS: " + __))
 									.filter(listenerState -> listenerState.isResumeListeningWindUp())
-									.doOnNext(__ -> System.out.println("changeListenerState3 START_LISTENING_IN_PROGRESS: " + __))
 									.take(1)
-									.doOnNext(__ -> System.out.println("changeListenerState4 START_LISTENING_IN_PROGRESS: " + __))
-									.single()
-									.doOnNext(__ -> System.out.println("changeListenerState5 START_LISTENING_IN_PROGRESS: " + __));
+									.single();
 						case START_LISTENING_SELF_RESOLVED:
 							return listenStore.states$()
 									.filter(ListenerState::isStartedListeningInProgress)
@@ -171,13 +160,10 @@ public class Utils {
 									.single();
 						case RESUME_LISTENING_IN_PROGRESS:
 							return listenStore.dispatch(action)
-									.doOnNext(__ -> System.out.println("test 1"))
 									.flatMapMany(__ -> listenStore.states$())
-									.doOnNext(__ -> System.out.println("test 2"))
 									.filter(ListenerState::isResumeListeningWindUp)
 									.take(1)
-									.single()
-									.doOnNext(__ -> System.out.println("test 3"));
+									.single();
 						case RESUME_LISTENING_SELF_RESOLVED:
 							return listenStore.states$()
 									.filter(ListenerState::isResumeListeningInProgress)
