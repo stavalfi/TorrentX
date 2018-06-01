@@ -29,132 +29,131 @@ import java.util.Optional;
 
 public class TorrentDownloaders {
 
-    private static StoreNew<ListenerState, ListenerAction> listenStore = new StoreNew<>(new ListenerReducer(),
-            ListenerReducer.defaultListenState,
-            ListenerAction::getCorrespondingIsProgressAction);
+	private static StoreNew<ListenerState, ListenerAction> listenStore = new StoreNew<>(new ListenerReducer(),
+			ListenerReducer.defaultListenState);
 
-    private static Listener listener = new Listener();
+	private static Listener listener = new Listener();
 
-    private static ListenerSideEffects listenerSideEffects = new ListenerSideEffects(listenStore);
+	private static ListenerSideEffects listenerSideEffects = new ListenerSideEffects(listenStore);
 
-    private List<TorrentDownloader> torrentDownloaderList = new ArrayList<>();
+	private List<TorrentDownloader> torrentDownloaderList = new ArrayList<>();
 
-    public static Listener getListener() {
-        return listener;
-    }
+	public static Listener getListener() {
+		return listener;
+	}
 
-    public static StoreNew<ListenerState, ListenerAction> getListenStore() {
-        return listenStore;
-    }
+	public static StoreNew<ListenerState, ListenerAction> getListenStore() {
+		return listenStore;
+	}
 
-    public static ListenerSideEffects getListenerSideEffects() {
-        return listenerSideEffects;
-    }
+	public static ListenerSideEffects getListenerSideEffects() {
+		return listenerSideEffects;
+	}
 
-    public synchronized Flux<TorrentDownloader> getTorrentDownloadersFlux() {
-        // TODO: I can't go over this list and delete it in the same time. I will get concurrenctodificationException.
-        // I should not save this list in the first place. for now I will copy it.
+	public synchronized Flux<TorrentDownloader> getTorrentDownloadersFlux() {
+		// TODO: I can't go over this list and delete it in the same time. I will get concurrenctodificationException.
+		// I should not save this list in the first place. for now I will copy it.
 
-        return Flux.fromIterable(new ArrayList<>(this.torrentDownloaderList));
-    }
+		return Flux.fromIterable(new ArrayList<>(this.torrentDownloaderList));
+	}
 
-    public synchronized TorrentDownloader createTorrentDownloader(TorrentInfo torrentInfo,
-                                                                  SearchPeers searchPeers,
-                                                                  FileSystemLink fileSystemLink,
-                                                                  BittorrentAlgorithm bittorrentAlgorithm,
-                                                                  Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
-                                                                  SpeedStatistics torrentSpeedStatistics,
-                                                                  TorrentStatesSideEffects torrentStatesSideEffects,
-                                                                  Flux<Link> peersCommunicatorFlux) {
-        return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .orElseGet(() -> {
-                    TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
-                            searchPeers,
-                            fileSystemLink,
-                            bittorrentAlgorithm,
-                            torrentStatusStore,
-                            torrentSpeedStatistics,
-                            torrentStatesSideEffects, peersCommunicatorFlux);
+	public synchronized TorrentDownloader createTorrentDownloader(TorrentInfo torrentInfo,
+																  SearchPeers searchPeers,
+																  FileSystemLink fileSystemLink,
+																  BittorrentAlgorithm bittorrentAlgorithm,
+																  Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
+																  SpeedStatistics torrentSpeedStatistics,
+																  TorrentStatesSideEffects torrentStatesSideEffects,
+																  Flux<Link> peersCommunicatorFlux) {
+		return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+				.orElseGet(() -> {
+					TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
+							searchPeers,
+							fileSystemLink,
+							bittorrentAlgorithm,
+							torrentStatusStore,
+							torrentSpeedStatistics,
+							torrentStatesSideEffects, peersCommunicatorFlux);
 
-                    this.torrentDownloaderList.add(torrentDownloader);
+					this.torrentDownloaderList.add(torrentDownloader);
 
-                    return torrentDownloader;
-                });
-    }
+					return torrentDownloader;
+				});
+	}
 
-    /**
-     * This method is only for tests because if the client want to delete the torrent but not the file,
-     * he can do that using TorrentStatusController::removeTorrent.
-     * There is no reason to remove the TorrentDownloader object also.
-     *
-     * @param torrentInfoHash of torrent we need to delete it's TorrentDownload object
-     * @return boolean which indicated if the deletion was successful.
-     */
-    public synchronized boolean deleteTorrentDownloader(String torrentInfoHash) {
-        Optional<TorrentDownloader> torrentDownloaderOptional = findTorrentDownloader(torrentInfoHash);
-        torrentDownloaderOptional.ifPresent(torrentDownloader ->
-                this.torrentDownloaderList.remove(torrentDownloader));
-        return torrentDownloaderOptional.isPresent();
-    }
+	/**
+	 * This method is only for tests because if the client want to delete the torrent but not the file,
+	 * he can do that using TorrentStatusController::removeTorrent.
+	 * There is no reason to remove the TorrentDownloader object also.
+	 *
+	 * @param torrentInfoHash of torrent we need to delete it's TorrentDownload object
+	 * @return boolean which indicated if the deletion was successful.
+	 */
+	public synchronized boolean deleteTorrentDownloader(String torrentInfoHash) {
+		Optional<TorrentDownloader> torrentDownloaderOptional = findTorrentDownloader(torrentInfoHash);
+		torrentDownloaderOptional.ifPresent(torrentDownloader ->
+				this.torrentDownloaderList.remove(torrentDownloader));
+		return torrentDownloaderOptional.isPresent();
+	}
 
-    public synchronized Optional<TorrentDownloader> findTorrentDownloader(String torrentInfoHash) {
-        return this.torrentDownloaderList
-                .stream()
-                .filter(torrentDownloader -> torrentDownloader.getTorrentInfo()
-                        .getTorrentInfoHash().toLowerCase().equals(torrentInfoHash.toLowerCase()))
-                .findFirst();
-    }
+	public synchronized Optional<TorrentDownloader> findTorrentDownloader(String torrentInfoHash) {
+		return this.torrentDownloaderList
+				.stream()
+				.filter(torrentDownloader -> torrentDownloader.getTorrentInfo()
+						.getTorrentInfoHash().toLowerCase().equals(torrentInfoHash.toLowerCase()))
+				.findFirst();
+	}
 
-    public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
-        // TODO: save the initial status in the mongodb.
-        Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentState,
-                TorrentStatusAction::getCorrespondingIsProgressAction);
-        TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
-        // TODO: remove the block()
-        SearchPeers searchPeers = new SearchPeers(torrentInfo, store);
+	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
+		// TODO: save the initial status in the mongodb.
+		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
+				TorrentStatusReducer.defaultTorrentState,
+				TorrentStatusAction::getCorrespondingIsProgressAction);
+		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
+		// TODO: remove the block()
+		SearchPeers searchPeers = new SearchPeers(torrentInfo, store);
 
-        Flux<Link> peersCommunicatorFlux =
-                Flux.merge(getInstance().getListener().getPeers$(torrentInfo), searchPeers.getPeers$())
-                        // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-                        // multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
-                        // every time and then I will connect to all the peers again and again...
-                        .publish()
-                        .autoConnect(0);
+		Flux<Link> peersCommunicatorFlux =
+				Flux.merge(getInstance().getListener().getPeers$(torrentInfo), searchPeers.getPeers$())
+						// multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
+						// multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
+						// every time and then I will connect to all the peers again and again...
+						.publish()
+						.autoConnect(0);
 
-        FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, downloadPath, store,
-                        peersCommunicatorFlux.map(Link::receivePeerMessages)
-                                .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
-                .block();
+		FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
+				.createActiveTorrentMono(torrentInfo, downloadPath, store,
+						peersCommunicatorFlux.map(Link::receivePeerMessages)
+								.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
+				.block();
 
-        BittorrentAlgorithm bittorrentAlgorithm =
-                BittorrentAlgorithmInitializer.v1(torrentInfo,
-                        store,
-                        fileSystemLink,
-                        peersCommunicatorFlux);
+		BittorrentAlgorithm bittorrentAlgorithm =
+				BittorrentAlgorithmInitializer.v1(torrentInfo,
+						store,
+						fileSystemLink,
+						peersCommunicatorFlux);
 
-        SpeedStatistics torrentSpeedStatistics =
-                new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-                        peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
+		SpeedStatistics torrentSpeedStatistics =
+				new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
+						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 
-        return TorrentDownloaders.getInstance()
-                .createTorrentDownloader(torrentInfo,
-                        searchPeers,
-                        fileSystemLink,
-                        bittorrentAlgorithm,
-                        store,
-                        torrentSpeedStatistics,
-                        torrentStatesSideEffects,
-                        peersCommunicatorFlux);
-    }
+		return TorrentDownloaders.getInstance()
+				.createTorrentDownloader(torrentInfo,
+						searchPeers,
+						fileSystemLink,
+						bittorrentAlgorithm,
+						store,
+						torrentSpeedStatistics,
+						torrentStatesSideEffects,
+						peersCommunicatorFlux);
+	}
 
-    private TorrentDownloaders() {
-    }
+	private TorrentDownloaders() {
+	}
 
-    private static TorrentDownloaders instance = new TorrentDownloaders();
+	private static TorrentDownloaders instance = new TorrentDownloaders();
 
-    public static TorrentDownloaders getInstance() {
-        return instance;
-    }
+	public static TorrentDownloaders getInstance() {
+		return instance;
+	}
 }

@@ -28,169 +28,172 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class Listener {
-    private static Logger logger = LoggerFactory.getLogger(Listener.class);
+	private static Logger logger = LoggerFactory.getLogger(Listener.class);
 
-    private final int TCP_PORT = 8040;
+	private final int TCP_PORT = 8040;
 
-    private Flux<ServerSocket> startListen$;
-    private Flux<Link> resumeListen$;
-    private Flux<ListenerState> pauseListen$;
-    private Flux<ListenerState> restartListener$;
+	private Flux<ServerSocket> startListen$;
+	private Flux<Link> resumeListen$;
+	private Flux<ListenerState> pauseListen$;
+	private Flux<ListenerState> restartListener$;
 
-    public Listener() {
-        StoreNew<ListenerState, ListenerAction> listenerStore = TorrentDownloaders.getListenStore();
+	public Listener() {
+		StoreNew<ListenerState, ListenerAction> listenerStore = TorrentDownloaders.getListenStore();
 
-        Supplier<Mono<ServerSocket>> serverSocketSupplier = () -> {
-            try {
-                ServerSocket serverSocket = new ServerSocket(TCP_PORT);
-                return Mono.just(serverSocket);
-            } catch (IOException e) {
-                return Mono.error(e);
-            }
-        };
+		Supplier<Mono<ServerSocket>> serverSocketSupplier = () -> {
+			try {
+				ServerSocket serverSocket = new ServerSocket(TCP_PORT);
+				return Mono.just(serverSocket);
+			} catch (IOException e) {
+				return Mono.error(e);
+			}
+		};
 
-        this.startListen$ = listenerStore.statesByAction(ListenerAction.START_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> serverSocketSupplier.get())
-                .doOnError(throwable -> logger.error("failed to create ServerSocket object.", throwable))
-                .onErrorResume(PeerExceptions.communicationErrors,
-                        throwable -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                                .flatMap(__ -> Mono.empty()))
-                .concatMap(serverSocket -> listenerStore.dispatch(ListenerAction.START_LISTENING_SELF_RESOLVED)
-                        .filter(listenerState -> listenerState.fromAction(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
-                                listenerState.fromAction(ListenerAction.START_LISTENING_WIND_UP))
-                        .map(__ -> serverSocket))
-                .doOnNext(serverSocket -> logger.info("started listening by created server-socket under port: " + getTcpPort()))
-                .replay(1)
-                .autoConnect(0);
+		this.startListen$ = listenerStore.statesByAction(ListenerAction.START_LISTENING_IN_PROGRESS)
+				.concatMap(__ -> serverSocketSupplier.get())
+				.doOnError(throwable -> logger.error("failed to create ServerSocket object.", throwable))
+				.onErrorResume(PeerExceptions.communicationErrors,
+						throwable -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
+								.flatMap(__ -> Mono.empty()))
+				.concatMap(serverSocket -> listenerStore.dispatch(ListenerAction.START_LISTENING_SELF_RESOLVED)
+						.filter(listenerState -> listenerState.fromAction(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
+								listenerState.fromAction(ListenerAction.START_LISTENING_WIND_UP))
+						.map(__ -> serverSocket))
+				.doOnNext(serverSocket -> logger.info("started listening by created server-socket under port: " + getTcpPort()))
+				.replay(1)
+				.autoConnect(0);
 
-        this.resumeListen$ = listenerStore.statesByAction(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
-                .doOnNext(listenerState -> logger.debug("start resume.... 1. current state is: " + listenerState))
-                .concatMap(__ -> startListen$.take(1))
-                .doOnNext(__ -> logger.debug("start resume.... 2: " + __))
-                .concatMap(serverSocket ->
-                {
-                    logger.debug("start resume.... 2.1");
-                    return listenerStore.dispatch(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)
-                            .doOnNext(__ -> System.out.println("start resume.... 3"))
-                            .filter(listenerState -> listenerState.fromAction(ListenerAction.RESUME_LISTENING_SELF_RESOLVED))
-                            .map(__ -> serverSocket);
-                })
-                .doOnNext(__ -> logger.debug("start resume.... 4"))
-                .doOnNext(serverSocket -> logger.info("resume listening to incoming peers under port: " + getTcpPort()))
-                .concatMap(serverSocket -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, serverSocket))
-                .concatMap(this::acceptPeersLinks)
-                .concatMap(link -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, link))
-                .doOnError(throwable -> logger.error("fatal error while accepting peer connection or in server-socket object", throwable))
-                .onErrorResume(PeerExceptions.communicationErrors,
-                        throwable -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                                .flatMap(__ -> Mono.empty()))
-                .publish()
-                .autoConnect(0);
+		this.resumeListen$ = listenerStore.statesByAction(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
+				.doOnNext(listenerState -> logger.debug("start resume.... 1. current state is: " + listenerState))
+				.concatMap(__ -> startListen$.take(1))
+				.doOnNext(__ -> logger.debug("start resume.... 2: " + __))
+				.concatMap(serverSocket ->
+				{
+					logger.debug("start resume.... 2.1");
+					return listenerStore.dispatch(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)
+							.doOnNext(__ -> System.out.println("start resume.... 3"))
+							.filter(listenerState -> listenerState.fromAction(ListenerAction.RESUME_LISTENING_SELF_RESOLVED))
+							.map(__ -> serverSocket);
+				})
+				.doOnNext(__ -> logger.debug("start resume.... 4"))
+				.doOnNext(serverSocket -> logger.info("resume listening to incoming peers under port: " + getTcpPort()))
+				.concatMap(serverSocket -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, serverSocket))
+				.publishOn(Schedulers.elastic())
+				.concatMap(this::acceptPeersLinks)
+				.concatMap(link -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, link))
+				.doOnError(throwable -> logger.error("fatal error while accepting peer connection or in server-socket object", throwable))
+				.onErrorResume(PeerExceptions.communicationErrors,
+						throwable -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
+								.flatMap(__ -> Mono.empty()))
+				.publish()
+				.autoConnect(0);
 
-        this.pauseListen$ = listenerStore.statesByAction(ListenerAction.PAUSE_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> listenerStore.dispatch(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
-                .filter(listenerState -> listenerState.fromAction(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
-                .doOnNext(serverSocket -> logger.info("paused listening to incoming peers under port: " + getTcpPort()))
-                .publish()
-                .autoConnect(0);
+		this.pauseListen$ = listenerStore.statesByAction(ListenerAction.PAUSE_LISTENING_IN_PROGRESS)
+				.doOnNext(__ -> System.out.println("Listener - pause 1 - " + __))
+				.concatMap(__ -> listenerStore.dispatch(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
+				.doOnNext(__ -> System.out.println("Listener - pause 2 - " + __))
+				.filter(listenerState -> listenerState.fromAction(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
+				.doOnNext(serverSocket -> logger.info("paused listening to incoming peers under port: " + getTcpPort()))
+				.publish()
+				.autoConnect(0);
 
-        Function<ServerSocket, Mono<ServerSocket>> closeServerSocket = serverSocket -> {
-            try {
-                serverSocket.close();
-                return Mono.just(serverSocket);
-            } catch (IOException e) {
-                return Mono.error(e);
-            }
-        };
+		Function<ServerSocket, Mono<ServerSocket>> closeServerSocket = serverSocket -> {
+			try {
+				serverSocket.close();
+				return Mono.just(serverSocket);
+			} catch (IOException e) {
+				return Mono.error(e);
+			}
+		};
 
-        this.restartListener$ = listenerStore.statesByAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> this.startListen$.take(1))
-                .concatMap(closeServerSocket)
-                // TODO: In case we came here before we actaully started listening, then maybe the serverSocket wasn't open yet so we got an object which is very old and also closed.
-                .doOnError(throwable -> logger.error("fatal error while closing server-socket object under port " + getTcpPort() + ": " + throwable))
-                .concatMap(closedServerSocket -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
-                .filter(listenerState -> listenerState.fromAction(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
-                .publish()
-                .autoConnect(0);
-    }
+		this.restartListener$ = listenerStore.statesByAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
+				.concatMap(__ -> this.startListen$.take(1))
+				.concatMap(closeServerSocket)
+				// TODO: In case we came here before we actaully started listening, then maybe the serverSocket wasn't open yet so we got an object which is very old and also closed.
+				.doOnError(throwable -> logger.error("fatal error while closing server-socket object under port " + getTcpPort() + ": " + throwable))
+				.concatMap(closedServerSocket -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
+				.filter(listenerState -> listenerState.fromAction(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
+				.publish()
+				.autoConnect(0);
+	}
 
-    private Flux<Link> acceptPeersLinks(ServerSocket serverSocket) {
+	private Flux<Link> acceptPeersLinks(ServerSocket serverSocket) {
 
-        Flux<Socket> peersSocket = Flux.generate(sink -> {
-            try {
-                Socket peerSocket = serverSocket.accept();
-                // TODO: check which errors indicate that the peer
-                // closed and which errors indicate that the ServerSocket is corrupted.
-                sink.next(peerSocket);
-            } catch (IOException e) {
-                // isClosed()==true means that only I caused the serverSocket to be closed.
-                if (serverSocket.isClosed())
-                    sink.complete();
-                sink.error(e);
-            }
-        });
+		Flux<Socket> peersSocket = Flux.generate(sink -> {
+			try {
+				Socket peerSocket = serverSocket.accept();
+				// TODO: check which errors indicate that the peer
+				// closed and which errors indicate that the ServerSocket is corrupted.
+				sink.next(peerSocket);
+			} catch (IOException e) {
+				// isClosed()==true means that only I caused the serverSocket to be closed.
+				if (serverSocket.isClosed())
+					sink.complete();
+				sink.error(e);
+			}
+		});
 
-        return peersSocket.concatMap(peerSocket -> acceptPeerConnection(peerSocket)
-                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty()));
-    }
+		return peersSocket.concatMap(peerSocket -> acceptPeerConnection(peerSocket)
+				.onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty()));
+	}
 
-    private Mono<Link> acceptPeerConnection(Socket peerSocket) {
-        DataOutputStream peerDataOutputStream;
-        DataInputStream peerDataInputStream;
-        HandShake handShakeReceived;
-        try {
-            peerDataOutputStream = new DataOutputStream(peerSocket.getOutputStream());
-            peerDataInputStream = new DataInputStream(peerSocket.getInputStream());
+	private Mono<Link> acceptPeerConnection(Socket peerSocket) {
+		DataOutputStream peerDataOutputStream;
+		DataInputStream peerDataInputStream;
+		HandShake handShakeReceived;
+		try {
+			peerDataOutputStream = new DataOutputStream(peerSocket.getOutputStream());
+			peerDataInputStream = new DataInputStream(peerSocket.getInputStream());
 
-            // firstly, we need to receive Handshake message from the peer and send him Handshake back.
-            handShakeReceived = new HandShake(peerDataInputStream);
-        } catch (IOException e) {
-            logger.error("could accept peer connection", e);
-            return Mono.error(e);
-        }
+			// firstly, we need to receive Handshake message from the peer and send him Handshake back.
+			handShakeReceived = new HandShake(peerDataInputStream);
+		} catch (IOException e) {
+			logger.error("could accept peer connection", e);
+			return Mono.error(e);
+		}
 
-        String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
+		String receivedTorrentInfoHash = HexByteConverter.byteToHex(handShakeReceived.getTorrentInfoHash());
 
-        Optional<TorrentInfo> torrentInfo = haveThisTorrent(receivedTorrentInfoHash);
+		Optional<TorrentInfo> torrentInfo = haveThisTorrent(receivedTorrentInfoHash);
 
-        if (!torrentInfo.isPresent()) {
-            // the peer sent me invalid HandShake message.
-            // by the p2p spec, I need to close to the socket.
-            try {
-                peerDataInputStream.close();
-                peerDataOutputStream.close();
-                peerSocket.close();
-            } catch (IOException exception) {
-                //TODO: do something with this shit.
-            }
-            BadResponseException badResponseException = new BadResponseException("peer returned handshake with incorrect torrent-hash-info.");
-            return Mono.error(badResponseException);
-        }
+		if (!torrentInfo.isPresent()) {
+			// the peer sent me invalid HandShake message.
+			// by the p2p spec, I need to close to the socket.
+			try {
+				peerDataInputStream.close();
+				peerDataOutputStream.close();
+				peerSocket.close();
+			} catch (IOException exception) {
+				//TODO: do something with this shit.
+			}
+			BadResponseException badResponseException = new BadResponseException("peer returned handshake with incorrect torrent-hash-info.");
+			return Mono.error(badResponseException);
+		}
 
-        HandShake handShakeSending = new HandShake(handShakeReceived.getTorrentInfoHash(), AppConfig.getInstance().getPeerId().getBytes());
-        try {
-            peerDataOutputStream.write(handShakeSending.createPacketFromObject());
-        } catch (IOException e) {
-            return Mono.error(e);
-        }
-        // all went well, I accept this connection.
-        Peer peer = new Peer(peerSocket.getInetAddress().getHostAddress(), peerSocket.getPort());
-        return Mono.just(new Link(torrentInfo.get(), peer, peerSocket, peerDataInputStream, peerDataOutputStream));
-    }
+		HandShake handShakeSending = new HandShake(handShakeReceived.getTorrentInfoHash(), AppConfig.getInstance().getPeerId().getBytes());
+		try {
+			peerDataOutputStream.write(handShakeSending.createPacketFromObject());
+		} catch (IOException e) {
+			return Mono.error(e);
+		}
+		// all went well, I accept this connection.
+		Peer peer = new Peer(peerSocket.getInetAddress().getHostAddress(), peerSocket.getPort());
+		return Mono.just(new Link(torrentInfo.get(), peer, peerSocket, peerDataInputStream, peerDataOutputStream));
+	}
 
-    private Optional<TorrentInfo> haveThisTorrent(String receivedTorrentInfoHash) {
-        return TorrentDownloaders.getInstance()
-                .findTorrentDownloader(receivedTorrentInfoHash)
-                // Optional pipeline:
-                .map(TorrentDownloader::getTorrentInfo);
-    }
+	private Optional<TorrentInfo> haveThisTorrent(String receivedTorrentInfoHash) {
+		return TorrentDownloaders.getInstance()
+				.findTorrentDownloader(receivedTorrentInfoHash)
+				// Optional pipeline:
+				.map(TorrentDownloader::getTorrentInfo);
+	}
 
-    public int getTcpPort() {
-        return TCP_PORT;
-    }
+	public int getTcpPort() {
+		return TCP_PORT;
+	}
 
-    public Flux<Link> getPeers$(TorrentInfo torrentInfo) {
-        return resumeListen$.publishOn(Schedulers.elastic())
-                .filter(link -> link.getTorrentInfo().equals(torrentInfo));
-    }
+	public Flux<Link> getPeers$(TorrentInfo torrentInfo) {
+		return resumeListen$.publishOn(Schedulers.elastic())
+				.filter(link -> link.getTorrentInfo().equals(torrentInfo));
+	}
 }

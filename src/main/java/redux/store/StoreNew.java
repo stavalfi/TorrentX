@@ -7,196 +7,243 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
-import reactor.util.function.Tuple2;
 import redux.reducer.Reducer;
 import redux.state.State;
 
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.BiPredicate;
-import java.util.function.Function;
 
 public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier<STATE_IMPL, ACTION> {
-    private static Logger logger = LoggerFactory.getLogger(StoreNew.class);
+	private static Logger logger = LoggerFactory.getLogger(StoreNew.class);
 
-    private Function<ACTION, ACTION> getCorrespondingIsProgressAction;
-    private FluxSink<Request<ACTION>> actionsSink;
-    private Flux<Request<ACTION>> ignoredRequests$;
-    private Flux<STATE_IMPL> states$;
-    private Flux<STATE_IMPL> history$;
+	private FluxSink<Request<ACTION>> actionsSink;
+	private Flux<Result<STATE_IMPL, ACTION>> results$;
+	private Flux<STATE_IMPL> states$;
 
-    public StoreNew(Reducer<STATE_IMPL, ACTION> reducer, STATE_IMPL defaultState,
-                    Function<ACTION, ACTION> getCorrespondingIsProgressAction) {
-        this.getCorrespondingIsProgressAction = getCorrespondingIsProgressAction;
-        EmitterProcessor<Request<ACTION>> ignoreRequests = EmitterProcessor.create();
-        FluxSink<Request<ACTION>> ignoreRequestsSink = ignoreRequests.sink(FluxSink.OverflowStrategy.BUFFER);
+	private FluxSink<Request<ACTION>> emitRequestsSink;
+	private BlockingQueue<Request<ACTION>> requestsQueue = new LinkedBlockingQueue<>();
 
-        this.ignoredRequests$ = ignoreRequests
-                .doOnNext(request -> logger.debug("ignore - 4: " + request + "\n"))
-                .replay(1)
-                .autoConnect(0)
-                .doOnNext(request -> logger.debug("4.1: " + request + "\n"));
+	public StoreNew(Reducer<STATE_IMPL, ACTION> reducer, STATE_IMPL defaultState) {
+		Result<STATE_IMPL, ACTION> initialResult = new Result<>(new Request<>(defaultState.getAction()), defaultState, true);
 
-        EmitterProcessor<Request<ACTION>> newStates$ = EmitterProcessor.create();
-        this.actionsSink = newStates$.sink(FluxSink.OverflowStrategy.BUFFER);
+		EmitterProcessor<Request<ACTION>> emitRequests = EmitterProcessor.create(Integer.MAX_VALUE);
+		this.emitRequestsSink = emitRequests.sink(FluxSink.OverflowStrategy.BUFFER);
 
-        this.states$ = newStates$
-                .doOnNext(request -> logger.debug("3: " + request + "\n"))
-                .index()
-                .scan(defaultState, (STATE_IMPL lastState, Tuple2<Long, Request<ACTION>> request) -> {
-                    long transactionCount = request.getT1();
-                    //logger.debug("transaction: " + transactionCount + " - dispatching request: " + request.getT2() +
-                    // ". last state: " + lastState + "\n");
-                    STATE_IMPL newState = reducer.reducer(lastState, request.getT2());
-                    if (newState.equals(lastState)) {
-                        ignoreRequestsSink.next(request.getT2());
-                        //logger.debug("transaction: " + transactionCount + " - ignored request: " + request.getT2() + "\n");
-                    } else {
-                        //logger.info("transaction: " + transactionCount + " - new state: " + newState + "\n");
-                    }
-                    return newState;
-                })
-                .distinctUntilChanged()
-                .doOnNext(stateImpl -> logger.debug("pass - 4: " + stateImpl + "\n"))
-                .replay(1)
-                .autoConnect(0);
+		this.results$ = emitRequests
+				.doOnNext(request -> logger.debug("3: " + request + "\n"))
+				.scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
+					STATE_IMPL newState = reducer.reducer(lastResult.getState(), request);
+					if (newState.equals(lastResult.getState())) {
+						logger.debug("ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
+						return new Result<>(request, lastResult.getState(), false);
+					}
+					logger.debug("passed - request: " + request + " new state: " + newState + "\n");
+					return new Result<>(request, newState, true);
+				})
+				.replay()
+				.autoConnect(0);
 
-        this.history$ = this.states$.replay(10) // how much statuses to save.
-                .autoConnect(0);
-    }
+		this.states$ = this.results$
+				.doOnNext(__ -> System.out.println("is new state?: " + __))
+				.map(Result::getState)
+				.distinctUntilChanged()
+				.doOnNext(__ -> System.out.println("new state1: " + __))
+				.replay(1)
+				.autoConnect(0)
+				.doOnNext(__ -> System.out.println("new state2: " + __));
+	}
 
-    public Mono<STATE_IMPL> dispatch(ACTION action) {
-        Request<ACTION> request = new Request<>(action);
-        logger.debug("getting ready for dispatching request: " + request);
-        Mono<STATE_IMPL> result = Flux.merge(this.ignoredRequests$.publishOn(Schedulers.elastic())
-                        .doOnNext(__ -> logger.debug("ignore - 4.2: " + request + "\n"))
-                        .map(ignoredRequest -> ignoredRequest.getId())
-                        .doOnNext(__ -> logger.debug("ignore - 4.3: " + request + "\n"))
-                        .filter(ignoredRequestId -> ignoredRequestId.equals(request.id))
-                        .doOnNext(__ -> logger.debug("ignore - 4.4: " + request + "\n"))
-                //.doOnNext(__ -> logger.debug("finally - ignored request: " + request + "\n"))
-                ,
-                this.states$.publishOn(Schedulers.elastic())
-                        .doOnNext(__ -> logger.debug("pass - 4.2: " + request + "\n"))
-                        .map(newState -> newState.getId())
-                        .doOnNext(__ -> logger.debug("pass - 4.3: " + request + "\n"))
-                        .filter(ignoredRequestId -> ignoredRequestId.equals(request.id))
-                        .doOnNext(__ -> logger.debug("pass - 4.4: " + request + "\n"))
-                //.doOnNext(__ -> logger.debug("finally - accepted request: " + request + "\n"))
-        )
-                .doOnNext(__ -> logger.debug("5: " + request + "\n"))
-                .map(__ -> request)
-                .limitRequest(1)
-                .replay(1)
-                .autoConnect(0)
-                .flatMap(__ -> this.states$.publishOn(Schedulers.elastic()))
-                .take(1)
-                .single()
-                .doOnNext(___ -> logger.debug("6: " + request + "\n"))
-                .doOnNext(___ -> logger.debug("7: " + request + "\n"));
+	private Mono<Result<STATE_IMPL, ACTION>> dispatch2(ACTION action) {
+		Request<ACTION> request = new Request<>(action);
+		logger.debug("getting ready for dispatching request: " + request);
+		Flux<Result<STATE_IMPL, ACTION>> resultFlux = this.results$.doOnNext(__ -> System.out.println("received result 1: " + __))
+				.doOnNext(__ -> System.out.println("received result 2: " + __))
+				.filter(result -> result.getRequest().equals(request))
+				.doOnNext(__ -> System.out.println("received result 3: " + __))
+				.take(1)
+				.doOnNext(__ -> System.out.println("received result 4: " + __))
+				.replay()
+				.autoConnect(0, disposable -> System.out.println("canceled!"))
+				.doOnNext(__ -> System.out.println("received result 5: " + __));
+		this.emitRequestsSink.next(request);
+		return resultFlux
+				.doOnNext(__ -> System.out.println("received result 6: " + __))
+				.take(1)
+				.doOnNext(__ -> System.out.println("received result 7: " + __))
+				.single()
+				.doOnNext(__ -> System.out.println("received result 8: " + __))
+				.doOnNext(result -> logger.debug("finish process request: " + request));
+	}
 
-        return Mono.just(request)
-                .doOnNext(__ -> logger.debug("1: " + request + "\n"))
-                .doOnNext(__ -> logger.debug("2: " + request + "\n"))
-                .publishOn(Schedulers.single())
-                .doOnNext(__ -> this.actionsSink.next(request))
-                .publishOn(Schedulers.elastic())
-                .flatMap(__ -> result);
-    }
+	public Mono<STATE_IMPL> dispatch(ACTION action) {
+		return dispatch2(action).map(Result::getState);
+	}
 
-    public Mono<STATE_IMPL> dispatchAsLongNoCancel(ACTION action, BiPredicate<ACTION, STATE_IMPL> isCanceled) {
-        return this.states$.publishOn(Schedulers.elastic())
-                .doOnNext(stateImpl -> logger.debug("is going to stop change to " + action + "? :" + stateImpl))
-                .takeWhile(stateImpl -> isCanceled.negate().test(action, stateImpl))
-                .concatMap(stateImpl -> dispatch(action))
-                .doOnNext(stateImpl -> logger.debug("did we succeed to change to " + action + "? "
-                        + stateImpl.fromAction(action) + ":" + stateImpl))
-                .filter(stateImpl -> stateImpl.fromAction(action))
-                .doOnNext(stateImpl -> logger.debug("we finally succeed to change to " + action + "!"))
-                .take(1)
-                .switchIfEmpty(latestState$()
-                        .doOnNext(__ -> logger.debug("we failed to change to: " + action)))
-                .single();
-    }
+	public Mono<STATE_IMPL> dispatchAsLongNoCancel(ACTION action, BiPredicate<ACTION, STATE_IMPL> isCanceled) {
+		return states$()
+				.doOnNext(stateImpl -> logger.debug("is going to stop change to " + action + "? :" + stateImpl))
+				.takeWhile(stateImpl -> isCanceled.negate().test(action, stateImpl))
+				.concatMap(stateImpl -> dispatch(action))
+				.doOnNext(stateImpl -> logger.debug("did we succeed to change to " + action + "? "
+						+ stateImpl.fromAction(action) + ":" + stateImpl))
+				.filter(stateImpl -> stateImpl.fromAction(action))
+				.doOnNext(stateImpl -> logger.debug("we finally succeed to change to " + action + "!"))
+				.take(1)
+				.switchIfEmpty(latestState$()
+						.doOnNext(__ -> logger.debug("we failed to change to: " + action)))
+				.single();
+	}
 
-    @Override
-    public Mono<STATE_IMPL> latestState$() {
-        return this.states$.take(1)
-                .single()
-                .publishOn(Schedulers.elastic());
-    }
+	@Override
+	public Mono<STATE_IMPL> latestState$() {
+		return this.states$.doOnNext(stateImpl -> logger.debug("latestState$ :" + stateImpl))
+				.take(1)
+				.single();
+	}
 
-    @Override
-    public Flux<STATE_IMPL> states$() {
-        return this.states$
-                .publishOn(Schedulers.elastic());
-    }
+	@Override
+	public Flux<STATE_IMPL> states$() {
+		return this.states$.doOnNext(stateImpl -> logger.debug("states$ :" + stateImpl))
+				.publishOn(Schedulers.elastic());
+	}
 
-    @Override
-    public Flux<STATE_IMPL> statesHistory() {
-        return this.history$
-                .publishOn(Schedulers.elastic());
-    }
+	@Override
+	public Flux<STATE_IMPL> statesHistory() {
+		return null;
+	}
 
-    @Override
-    public Flux<STATE_IMPL> statesByAction(ACTION action) {
-        return this.states$.publishOn(Schedulers.elastic())
-                .filter(stateImpl -> stateImpl.getAction().equals(action));
-    }
+	@Override
+	public Flux<STATE_IMPL> statesByAction(ACTION action) {
+		return states$().doOnNext(stateImpl -> logger.debug("statesByAction :" + action + " - " + stateImpl))
+				.filter(stateImpl -> stateImpl.getAction().equals(action));
+	}
 
-    @Override
-    public Mono<STATE_IMPL> notifyWhen(ACTION when) {
-        return states$().publishOn(Schedulers.elastic())
-                .filter(stateImpl -> stateImpl.fromAction(when))
-                .take(1)
-                .single();
-    }
+	@Override
+	public Mono<STATE_IMPL> notifyWhen(ACTION when) {
+		System.out.println("notifyWhen 1 - " + when);
+		return states$()
+				.doOnNext(__ -> System.out.println("notifyWhen 2 - " + when + ": " + __))
+				.doOnNext(__ -> System.out.println("notifyWhen 3 - " + when + ": " + __))
+				.filter(stateImpl -> stateImpl.fromAction(when))
+				.doOnNext(__ -> System.out.println("notifyWhen 4 - " + when + ": " + __))
+				.take(1)
+				.doOnNext(__ -> System.out.println("notifyWhen 5 - " + when + ": " + __))
+				.single();
+	}
 
-    @Override
-    public <T> Mono<T> notifyWhen(ACTION when, T mapTo) {
-        return states$().publishOn(Schedulers.elastic())
-                .filter(stateImpl -> stateImpl.fromAction(when))
-                .take(1)
-                .single()
-                .map(stateImpl -> mapTo);
-    }
+	@Override
+	public <T> Mono<T> notifyWhen(ACTION when, T mapTo) {
+		System.out.println("notifyWhenMap 1 - " + when);
+		return states$().doOnNext(__ -> System.out.println("notifyWhenMap 2 - " + when + ": " + __))
+				.filter(stateImpl -> stateImpl.fromAction(when))
+				.doOnNext(__ -> System.out.println("notifyWhenMap 3 - " + when + ": " + __))
+				.take(1)
+				.doOnNext(__ -> System.out.println("notifyWhenMap 4 - " + when + ": " + __))
+				.single()
+				.doOnNext(__ -> System.out.println("notifyWhenMap 5 - " + when + ": " + __))
+				.map(stateImpl -> mapTo);
+	}
 
-    public static class Request<A> {
-        private A action;
-        private String id;
+	public static class Result<S extends State<A>, A> {
+		private Request<A> request;
+		private S state;
+		private boolean isNewState;
 
-        private Request(A action) {
-            this.action = action;
-            this.id = UUID.randomUUID().toString();
-        }
+		public Result(Request<A> request, S state, boolean isNewState) {
+			this.request = request;
+			this.state = state;
+			this.isNewState = isNewState;
+		}
 
-        public A getAction() {
-            return action;
-        }
+		public Request<A> getRequest() {
+			return request;
+		}
 
-        public String getId() {
-            return id;
-        }
+		public S getState() {
+			return state;
+		}
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof State)) return false;
-            State<?> state = (State<?>) o;
-            return Objects.equals(getId(), state.getId());
-        }
+		public boolean isNewState() {
+			return isNewState;
+		}
 
-        @Override
-        public int hashCode() {
-            return Objects.hash(getId());
-        }
+		@Override
+		public boolean equals(Object o) {
+			if (this == o) return true;
+			if (o == null || getClass() != o.getClass()) return false;
+			Result<?, ?> result = (Result<?, ?>) o;
+			return isNewState == result.isNewState &&
+					Objects.equals(request, result.request) &&
+					Objects.equals(state, result.state);
+		}
 
-        @Override
-        public String toString() {
-            return "Request{" +
-                    "action=" + action +
-                    ", id='" + id + '\'' +
-                    '}';
-        }
-    }
+		@Override
+		public int hashCode() {
+
+			return Objects.hash(request, state, isNewState);
+		}
+
+		@Override
+		public String toString() {
+			return "Result{" +
+					"request=" + request +
+					", state=" + state +
+					", isNewState=" + isNewState +
+					'}';
+		}
+	}
+
+	public static class Request<A> {
+		private A action;
+		private String id;
+
+		private Request(A action) {
+			this.action = action;
+			this.id = UUID.randomUUID().toString();
+		}
+
+		public A getAction() {
+			return action;
+		}
+
+		public String getId() {
+			return id;
+		}
+
+		@Override
+		public boolean equals(Object o) {
+			if (this == o) return true;
+			if (!(o instanceof State)) return false;
+			State<?> state = (State<?>) o;
+			return Objects.equals(getId(), state.getId());
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(getId());
+		}
+
+		@Override
+		public String toString() {
+			return "Request{" +
+					"action=" + action +
+					", id='" + id + '\'' +
+					'}';
+		}
+	}
 }
+
+//Flux.create((FluxSink<Request<ACTION>> sink) -> {
+//		while (true) {
+//		try {
+//		Request<ACTION> request = requestsQueue.take();
+//		sink.next(request);
+//		} catch (InterruptedException e) {
+//		sink.error(e);
+//		return;
+//		}
+//		}
+//		})
