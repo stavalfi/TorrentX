@@ -230,3 +230,21 @@ Feature: start/stop/restart listening to new peers
     Then listen-status will change to: "INITIALIZE" - no side effects:
       | PAUSE_LISTENING_WIND_UP   |
       | RESTART_LISTENING_WIND_UP |
+
+  Scenario: (14) start listener
+    Given initial listen-status - no side effects:
+      | PAUSE_LISTENING_WIND_UP |
+    When listen-status is trying to change to - no side effects:
+      | START_LISTENING_IN_PROGRESS |
+    Then listen-status will change to: "START_LISTENING_IN_PROGRESS" - no side effects:
+      | START_LISTENING_IN_PROGRESS |
+      | PAUSE_LISTENING_WIND_UP     |
+
+  Scenario: (15) start listener
+    Given initial listen-status - no side effects:
+      | PAUSE_LISTENING_WIND_UP |
+    When listen-status is trying to change to - no side effects:
+      | START_LISTENING_IN_PROGRESS |
+    Then listen-status will change to: "START_LISTENING_IN_PROGRESS" - no side effects:
+      | START_LISTENING_IN_PROGRESS |
+      | PAUSE_LISTENING_WIND_UP     |
