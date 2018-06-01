@@ -31,17 +31,12 @@ So many measurement and analytical studies have published suggestions for differ
 
 ## Dependencies
 * [Project Reactor](https://github.com/reactor/reactor-core)
-* [Spring 5.0](https://spring.io/) - Didn't mitigrate yet
 * [Cucumber](https://cucumber.io/) - 200+ tests
 * [PaperTrail](https://papertrailapp.com/) - Cloud logger
 
 ## Continues Integration
 * [Circle CI](https://circleci.com/)
 * [Travis CI](https://travis-ci.org/)
-
-## Continues Deployment
-
-- Docker - Not implemented yet
 
 ## Installation
 1. Clone the repository: `git clone https://github.com/UniversityFinalProjects/TorrentX`
