@@ -248,3 +248,9 @@ Feature: start/stop/restart listening to new peers
     Then listen-status will change to: "START_LISTENING_IN_PROGRESS" - no side effects:
       | START_LISTENING_IN_PROGRESS |
       | PAUSE_LISTENING_WIND_UP     |
+
+  Scenario: (16) get the first state without dispatching anything
+    Given initial listen-status - no side effects:
+      | PAUSE_LISTENING_WIND_UP |
+    Then listen-status will change to: "INITIALIZE" - no side effects:
+      | PAUSE_LISTENING_WIND_UP     |
