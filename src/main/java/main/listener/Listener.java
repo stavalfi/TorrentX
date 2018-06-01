@@ -89,9 +89,7 @@ public class Listener {
 				.autoConnect(0);
 
 		this.pauseListen$ = listenerStore.statesByAction(ListenerAction.PAUSE_LISTENING_IN_PROGRESS)
-				.doOnNext(__ -> System.out.println("Listener - pause 1 - " + __))
 				.concatMap(__ -> listenerStore.dispatch(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
-				.doOnNext(__ -> System.out.println("Listener - pause 2 - " + __))
 				.filter(listenerState -> listenerState.fromAction(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
 				.doOnNext(serverSocket -> logger.info("paused listening to incoming peers under port: " + getTcpPort()))
 				.publish()
