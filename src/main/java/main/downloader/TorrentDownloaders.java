@@ -5,6 +5,9 @@ import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
+import main.file.system.allocator.AllocatorAction;
+import main.file.system.allocator.AllocatorReducer;
+import main.file.system.allocator.AllocatorState;
 import main.listener.Listener;
 import main.listener.ListenerAction;
 import main.listener.reducers.ListenerReducer;
@@ -28,6 +31,9 @@ import java.util.List;
 import java.util.Optional;
 
 public class TorrentDownloaders {
+
+	private static StoreNew<AllocatorState, AllocatorAction> allocatorStore = new StoreNew<>(new AllocatorReducer(),
+			AllocatorReducer.defaultAllocatorState);
 
 	private static StoreNew<ListenerState, ListenerAction> listenStore = new StoreNew<>(new ListenerReducer(),
 			ListenerReducer.defaultListenState);

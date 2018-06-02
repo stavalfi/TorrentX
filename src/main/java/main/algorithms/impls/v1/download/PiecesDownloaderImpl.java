@@ -4,7 +4,7 @@ import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
 import main.algorithms.PeersToPiecesMapper;
 import main.algorithms.PiecesDownloader;
-import main.file.system.BlocksAllocatorImpl;
+import main.file.system.allocator.BlocksAllocatorImpl;
 import main.file.system.FileSystemLink;
 import main.peer.PeerExceptions;
 import main.torrent.status.TorrentStatusAction;

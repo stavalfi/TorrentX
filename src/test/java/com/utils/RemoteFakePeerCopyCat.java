@@ -1,7 +1,7 @@
 package com.utils;
 
 import main.TorrentInfo;
-import main.file.system.BlocksAllocatorImpl;
+import main.file.system.allocator.BlocksAllocatorImpl;
 import main.peer.Peer;
 import main.peer.PeerMessageFactory;
 import main.peer.SendMessages;

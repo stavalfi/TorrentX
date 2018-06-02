@@ -9,6 +9,8 @@ import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.*;
+import main.file.system.allocator.BlocksAllocator;
+import main.file.system.allocator.BlocksAllocatorImpl;
 import main.listener.ListenerAction;
 import main.listener.reducers.ListenerReducer;
 import main.listener.state.tree.ListenerState;
@@ -122,10 +124,10 @@ public class Utils {
 		// delete download folder from last test
 		Utils.deleteDownloadFolder();
 
-		BlocksAllocatorImpl.getInstance()
-				.freeAll()
-				.flatMap(__ -> BlocksAllocatorImpl.getInstance().updateAllocations(2, 1_000_000))
-				.block();
+//		BlocksAllocatorImpl.getInstance()
+//				.freeAll()
+//				.flatMap(__ -> BlocksAllocatorImpl.getInstance().updateAllocations(2, 1_000_000))
+//				.block();
 
 		// TODO: I need this line so java will create a singleton of Listener.
 		// when I will use spring, I can remove this line.

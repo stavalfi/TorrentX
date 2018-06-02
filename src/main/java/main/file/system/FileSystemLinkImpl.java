@@ -4,6 +4,7 @@ import christophedetroyer.torrent.TorrentFile;
 import main.TorrentInfo;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentPieceStatus;
+import main.file.system.allocator.BlocksAllocatorImpl;
 import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;

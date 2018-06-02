@@ -14,6 +14,10 @@ import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.*;
+import main.file.system.allocator.AllocatedBlock;
+import main.file.system.allocator.AllocatorState;
+import main.file.system.allocator.BlocksAllocator;
+import main.file.system.allocator.BlocksAllocatorImpl;
 import main.listener.ListenerAction;
 import main.listener.reducers.ListenerReducer;
 import main.listener.state.tree.ListenerState;
@@ -1144,21 +1148,6 @@ public class MyStepdefs {
 				.verifyComplete();
 	}
 
-	@When("^the application free the following blocks:$")
-	public void theApplicationFreeTheFollowingBlocks(List<Integer> allocationToFreeList) throws Throwable {
-		BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
-
-		blocksAllocator.getLatestState$()
-				.flatMapMany(allocatorState -> Flux.fromIterable(allocationToFreeList)
-						.flatMap(index -> blocksAllocator.free(allocatorState.getAllocatedBlocks()[index])
-								.doOnNext(newState -> Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(index)))
-								.doOnNext(newState -> Assert.assertTrue(newState.getFreeBlocksStatus().get(index)))))
-				.as(StepVerifier::create)
-				.expectNextCount(allocationToFreeList.size())
-				.verifyComplete();
-	}
-
-	private Flux<AllocatorState> allocatorStateFlux;
 	private List<PieceMessage> actualPieceMessageList;
 
 
@@ -1169,7 +1158,7 @@ public class MyStepdefs {
 
 		BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
 
-		this.allocatorStateFlux = blocksAllocator.getState$()
+		Flux<AllocatorState> allocatorStateFlux = blocksAllocator.getState$()
 				.replay(blockOfPieceList.size())
 				.autoConnect(0);
 
@@ -1197,6 +1186,18 @@ public class MyStepdefs {
 				.doOnNext(pieceMessage -> System.out.println("created the following pieceMessage: " + pieceMessage))
 				.collectList()
 				.block();
+
+//		// check that the states during the allocations are valid:
+//
+//		Flux.zip(allocatorStateFlux, Flux.fromIterable(this.actualPieceMessageList),
+//				(allocatorState, pieceMessage) -> {
+//					int blockIndex = pieceMessage.getAllocatedBlock().getBlockIndex();
+//					Assert.assertEquals(allocatorState.getAllocatedBlocks()[blockIndex], pieceMessage.getAllocatedBlock());
+//					Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(blockIndex));
+//					return pieceMessage;
+//				}).as(StepVerifier::create)
+//				.expectNextCount(blockOfPieceList.size())
+//				.verifyComplete();
 	}
 
 	@Then("^we created the following piece-messages for torrent: \"([^\"]*)\":$")
@@ -1220,18 +1221,6 @@ public class MyStepdefs {
 				.collect(Collectors.toList());
 
 		Utils.assertListEqualNotByOrder(expectedPieceMessageList, actualBlockOfPieceList, BlockOfPiece::equals);
-
-		// check that the states during the allocations are valid:
-
-		Flux.zip(allocatorStateFlux, Flux.fromIterable(this.actualPieceMessageList),
-				(allocatorState, pieceMessage) -> {
-					int blockIndex = pieceMessage.getAllocatedBlock().getBlockIndex();
-					Assert.assertEquals(allocatorState.getAllocatedBlocks()[blockIndex], pieceMessage.getAllocatedBlock());
-					Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(blockIndex));
-					return pieceMessage;
-				}).as(StepVerifier::create)
-				.expectNextCount(blockOfPieceList.size())
-				.verifyComplete();
 	}
 
 	private List<RequestMessage> actualRequestMessageList;
@@ -1348,7 +1337,7 @@ public class MyStepdefs {
 				.doOnNext(allocatorState ->
 						IntStream.range(0, allocatorState.getAmountOfBlocks())
 								.forEach(index -> Assert.assertTrue("we freed all blocks but" +
-												" this index is not freed: " + index,
+												" this index is not freed: " + index + " in state: " + allocatorState,
 										allocatorState.getFreeBlocksStatus().get(index))))
 				.as(StepVerifier::create)
 				.expectNextCount(1)

@@ -9,8 +9,6 @@ import reactor.core.scheduler.Schedulers;
 import redux.reducer.Reducer;
 import redux.state.State;
 
-import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.BiPredicate;
@@ -40,13 +38,13 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 		}).subscribeOn(Schedulers.elastic())
 				.doOnNext(request -> logger.debug("3: " + request + "\n"))
 				.scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
-					STATE_IMPL newState = reducer.reducer(lastResult.getState(), request);
-					if (newState.equals(lastResult.getState())) {
+					Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
+					if (!result.isNewState()) {
 						logger.debug("ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
-						return new Result<>(request, lastResult.getState(), false);
+						return result;
 					}
-					logger.debug("passed - request: " + request + " new state: " + newState + "\n");
-					return new Result<>(request, newState, true);
+					logger.debug("passed - request: " + request + " new state: " + result.getState() + "\n");
+					return result;
 				})
 				.publish()
 				// start emit only when this.states$ listen so he will get the initial state.
@@ -59,8 +57,7 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 				.autoConnect(0);
 	}
 
-	private Mono<Result<STATE_IMPL, ACTION>> dispatch2(ACTION action) {
-		Request<ACTION> request = new Request<>(action);
+	private Mono<Result<STATE_IMPL, ACTION>> dispatch2(Request<ACTION> request) {
 		Mono<Result<STATE_IMPL, ACTION>> resultFlux = this.results$
 				.filter(result -> result.getRequest().equals(request))
 				.take(1)
@@ -77,7 +74,11 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 	}
 
 	public Mono<STATE_IMPL> dispatch(ACTION action) {
-		return dispatch2(action).map(Result::getState);
+		return dispatch2(new Request<>(action)).map(Result::getState);
+	}
+
+	public Mono<Result<STATE_IMPL, ACTION>> dispatch(Request<ACTION> request) {
+		return dispatch2(request);
 	}
 
 	public Mono<STATE_IMPL> dispatchAsLongNoCancel(ACTION action, BiPredicate<ACTION, STATE_IMPL> isCanceled) {
@@ -131,93 +132,5 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 				.take(1)
 				.single()
 				.map(stateImpl -> mapTo);
-	}
-
-	public static class Result<S extends State<A>, A> {
-		private Request<A> request;
-		private S state;
-		private boolean isNewState;
-
-		public Result(Request<A> request, S state, boolean isNewState) {
-			this.request = request;
-			this.state = state;
-			this.isNewState = isNewState;
-		}
-
-		public Request<A> getRequest() {
-			return request;
-		}
-
-		public S getState() {
-			return state;
-		}
-
-		public boolean isNewState() {
-			return isNewState;
-		}
-
-		@Override
-		public boolean equals(Object o) {
-			if (this == o) return true;
-			if (o == null || getClass() != o.getClass()) return false;
-			Result<?, ?> result = (Result<?, ?>) o;
-			return isNewState == result.isNewState &&
-					Objects.equals(request, result.request) &&
-					Objects.equals(state, result.state);
-		}
-
-		@Override
-		public int hashCode() {
-
-			return Objects.hash(request, state, isNewState);
-		}
-
-		@Override
-		public String toString() {
-			return "Result{" +
-					"request=" + request +
-					", state=" + state +
-					", isNewState=" + isNewState +
-					'}';
-		}
-	}
-
-	public static class Request<A> {
-		private A action;
-		private String id;
-
-		private Request(A action) {
-			this.action = action;
-			this.id = UUID.randomUUID().toString();
-		}
-
-		public A getAction() {
-			return action;
-		}
-
-		public String getId() {
-			return id;
-		}
-
-		@Override
-		public boolean equals(Object o) {
-			if (this == o) return true;
-			if (!(o instanceof State)) return false;
-			State<?> state = (State<?>) o;
-			return Objects.equals(getId(), state.getId());
-		}
-
-		@Override
-		public int hashCode() {
-			return Objects.hash(getId());
-		}
-
-		@Override
-		public String toString() {
-			return "Request{" +
-					"action=" + action +
-					", id='" + id + '\'' +
-					'}';
-		}
 	}
 }

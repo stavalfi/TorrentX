@@ -1,6 +1,6 @@
 package main.peer.peerMessages;
 
-import main.file.system.AllocatedBlock;
+import main.file.system.allocator.AllocatedBlock;
 import main.peer.Peer;
 import main.peer.SendMessages;
 import reactor.core.publisher.Mono;

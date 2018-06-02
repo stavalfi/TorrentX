@@ -2,7 +2,7 @@ package main.peer;
 
 import main.App;
 import main.TorrentInfo;
-import main.file.system.BlocksAllocatorImpl;
+import main.file.system.allocator.BlocksAllocatorImpl;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;

@@ -1,7 +1,7 @@
 package main.peer;
 
 import main.TorrentInfo;
-import main.file.system.BlocksAllocatorImpl;
+import main.file.system.allocator.BlocksAllocatorImpl;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Mono;
 

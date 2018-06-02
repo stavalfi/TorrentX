@@ -1,4 +1,4 @@
-package main.file.system;
+package main.file.system.allocator;
 
 import main.peer.Peer;
 import main.peer.peerMessages.PieceMessage;

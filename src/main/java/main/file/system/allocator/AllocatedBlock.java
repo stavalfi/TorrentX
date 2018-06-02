@@ -1,4 +1,4 @@
-package main.file.system;
+package main.file.system.allocator;
 
 public interface AllocatedBlock {
     byte[] getBlock();
