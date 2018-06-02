@@ -76,3 +76,16 @@ Feature: start/stop/restart listening to new peers and include side-effects in t
     Given initial listen-status - without dispaching anything - default
     Then listen-status will change to: "INITIALIZE":
       | PAUSE_LISTENING_WIND_UP |
+
+  Scenario Outline: (9) fake-peers connect to me
+    Given initial listen-status - default
+    Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" with default initial state
+    When fake-peer on port "8050" try to connect for torrent "<torrent>", he receive the following error: "TimeoutException"
+    When fake-peer on port "8051" try to connect for torrent "<torrent>", he receive the following error: "TimeoutException"
+    When listen-status is trying to change to:
+      | START_LISTENING_IN_PROGRESS |
+    When fake-peer on port "8050" try to connect for torrent "<torrent>", he succeed
+    When fake-peer on port "8051" try to connect for torrent "<torrent>", he succeed
+    Examples:
+      | torrent                       | downloadLocation |
+      | torrent-file-example1.torrent | torrents-test    |

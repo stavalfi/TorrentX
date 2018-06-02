@@ -45,6 +45,7 @@ import redux.store.Store;
 import redux.store.StoreNew;
 
 import java.io.File;
+import java.security.InvalidParameterException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Semaphore;
@@ -1357,16 +1358,9 @@ public class MyStepdefs {
 	@Given("^initial torrent-status for torrent: \"([^\"]*)\" in \"([^\"]*)\" with default initial state$")
 	public void initialTorrentStatusForTorrentInWithDefaultInitialState(String torrentFileName,
 																		String downloadLocation) throws Throwable {
-		// TODO: complete this method
-		Utils.removeEverythingRelatedToLastTest();
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				TorrentStatusReducer.defaultTorrentState,
-				TorrentStatusAction::getCorrespondingIsProgressAction);
-		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
-
-
+		String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
+		TorrentDownloaders.createDefaultTorrentDownloader(torrentInfo, fullDownloadPath);
 	}
 
 	@Given("^initial listen-status - default$")
@@ -1495,5 +1489,51 @@ public class MyStepdefs {
 
 		Utils.removeEverythingRelatedToLastTest();
 	}
-}
 
+	@When("^fake-peer on port \"([^\"]*)\" try to connect for torrent \"([^\"]*)\", he receive the following error: \"([^\"]*)\"$")
+	public void fakePeerOnPortTryToConnectForTorrentHeReceiveTheFollowingError(String fakePeerPort, String torrentFileName, String exceptionType) throws Throwable {
+		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+		Throwable throwable;
+		switch (exceptionType) {
+			case "TimeoutException":
+				throwable = new TimeoutException();
+				break;
+			default:
+				throw new InvalidParameterException("the given exception type is not supported in this test case");
+		}
+
+		Peer App = new Peer("localhost", TorrentDownloaders.getListener().getTcpPort());
+		Mono<Link> publisher = new PeersProvider(torrentInfo).connectToPeerMono(App)
+				.doOnNext(Link::closeConnection);
+		if (PeerExceptions.peerNotResponding.test(throwable))
+			StepVerifier.create(publisher)
+					.verifyComplete();
+		else
+			StepVerifier.create(publisher)
+					.expectError(throwable.getClass())
+					.verify();
+
+
+	}
+
+	@When("^fake-peer on port \"([^\"]*)\" try to connect for torrent \"([^\"]*)\", he succeed$")
+	public void fakePeerOnPortTryToConnectForTorrentHeSucceed(String fakePeerPort, String torrentFileName) throws Throwable {
+		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+		Flux<Link> linkFlux = TorrentDownloaders.getListener()
+				.getPeers$(torrentInfo)
+				.replay()
+				.autoConnect(0);
+
+		Peer App = new Peer("localhost", TorrentDownloaders.getListener().getTcpPort());
+		Mono<Link> publisher = new PeersProvider(torrentInfo).connectToPeerMono(App)
+				.doOnNext(Link::closeConnection);
+		StepVerifier.create(publisher)
+				.expectNextCount(1)
+				.verifyComplete();
+
+		StepVerifier.create(linkFlux.take(1))
+				.expectNextCount(1)
+				.verifyComplete();
+	}
+}
