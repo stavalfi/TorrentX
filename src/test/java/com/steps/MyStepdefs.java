@@ -1374,6 +1374,11 @@ public class MyStepdefs {
 		Utils.removeEverythingRelatedToLastTest();
 	}
 
+
+	@Given("^initial listen-status - without dispaching anything - default$")
+	public void initialListenStatusWithoutDispachingAnythingDefault() throws Throwable {
+	}
+
 	@When("^listen-status is trying to change to:$")
 	public void listenStatusIsTryingToChangeTo(List<ListenerAction> changesActionList) throws Throwable {
 		Utils.changeListenerState(changesActionList, TorrentDownloaders.getListenStore());
@@ -1409,6 +1414,12 @@ public class MyStepdefs {
 	public void initialListenStatusNoSideEffects(List<ListenerAction> initialStateByActionList) throws Throwable {
 		Utils.removeEverythingRelatedToLastTest();
 
+		ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
+		this.listenStore = new StoreNew<>(new ListenerReducer(), initialState);
+	}
+
+	@Given("^initial listen-status - without dispaching anything - no side effects:$")
+	public void initialListenStatusWithoutDispachingAnythingNoSideEffects(List<ListenerAction> initialStateByActionList) throws Throwable {
 		ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
 		this.listenStore = new StoreNew<>(new ListenerReducer(), initialState);
 	}
@@ -1481,6 +1492,8 @@ public class MyStepdefs {
 				.doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningSelfResolved(), actualState.isRestartListeningSelfResolved()))
 				.doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningWindUp(), actualState.isRestartListeningWindUp()))
 				.block();
+
+		Utils.removeEverythingRelatedToLastTest();
 	}
 }
 

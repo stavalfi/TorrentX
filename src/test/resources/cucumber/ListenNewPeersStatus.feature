@@ -73,6 +73,6 @@ Feature: start/stop/restart listening to new peers and include side-effects in t
       | RESUME_LISTENING_WIND_UP |
 
   Scenario: (8) get the first state without dispatching anything
-    Given initial listen-status - default
+    Given initial listen-status - without dispaching anything - default
     Then listen-status will change to: "INITIALIZE":
       | PAUSE_LISTENING_WIND_UP |
