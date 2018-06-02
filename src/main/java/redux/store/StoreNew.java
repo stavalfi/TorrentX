@@ -48,8 +48,9 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 					logger.debug("passed - request: " + request + " new state: " + newState + "\n");
 					return new Result<>(request, newState, true);
 				})
-				.replay(1)
-				.autoConnect(0);
+				.publish()
+				// start emit only when this.states$ listen so he will get the initial state.
+				.autoConnect(1);
 
 		this.states$ = this.results$
 				.map(Result::getState)
