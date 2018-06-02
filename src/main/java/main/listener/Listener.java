@@ -100,6 +100,7 @@ public class Listener {
 				serverSocket.close();
 				return Mono.just(serverSocket);
 			} catch (IOException e) {
+				logger.error("fatal error while closing server-socket object under port " + getTcpPort() + ": " + e);
 				return Mono.error(e);
 			}
 		};
@@ -107,8 +108,6 @@ public class Listener {
 		this.restartListener$ = listenerStore.statesByAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
 				.concatMap(__ -> this.startListen$.take(1))
 				.concatMap(closeServerSocket)
-				// TODO: In case we came here before we actaully started listening, then maybe the serverSocket wasn't open yet so we got an object which is very old and also closed.
-				.doOnError(throwable -> logger.error("fatal error while closing server-socket object under port " + getTcpPort() + ": " + throwable))
 				.concatMap(closedServerSocket -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
 				.filter(listenerState -> listenerState.fromAction(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
 				.publish()
