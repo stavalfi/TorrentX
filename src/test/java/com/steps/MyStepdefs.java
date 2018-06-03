@@ -449,7 +449,6 @@ public class MyStepdefs {
 																		  List<BlockOfPiece> blockList) throws Throwable {
 		// delete everything from the last test.
 		Utils.removeEverythingRelatedToLastTest();
-		this.actualCompletedSavedPiecesReadByFS$ = null;
 
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
@@ -522,14 +521,11 @@ public class MyStepdefs {
 		// I must waitForMessage it here because later I need to get the torrentStatusController which was already created here.
 		// If I'm not creating TorrentDownloader object here, I will waitForMessage 2 different torrentStatusController objects.
 		TorrentDownloaders.getInstance()
-				.createTorrentDownloader(torrentInfo,
-						null,
-						fileSystemLink,
-						null,
-						store,
-						null,
-						sideEffects,
-						null);
+				.createTorrentDownloader(TorrentDownloaderBuilder.builder(torrentInfo)
+						.setTorrentStatusStore(store)
+						.setTorrentStatesSideEffects(sideEffects)
+						.setFileSystemLink(fileSystemLink)
+						.build());
 	}
 
 	@Then("^the only completed pieces are - for torrent: \"([^\"]*)\":$")
@@ -644,18 +640,13 @@ public class MyStepdefs {
 		// clean from the last test.
 		TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentInfo.getTorrentInfoHash());
 
-		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				Utils.getTorrentStatusState(torrentInfo, TorrentStatusAction.INITIALIZE, torrentStatusActions));
+		TorrentStatusState torrentStatusState = Utils.getTorrentStatusState(torrentInfo, TorrentStatusAction.INITIALIZE, torrentStatusActions);
+		Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(), torrentStatusState);
 
 		TorrentDownloaders.getInstance()
-				.createTorrentDownloader(torrentInfo,
-						null,
-						null,
-						null,
-						store,
-						null,
-						null,
-						null);
+				.createTorrentDownloader(TorrentDownloaderBuilder.builder(torrentInfo)
+						.setTorrentStatusStore(torrentStatusStore)
+						.build());
 	}
 
 	private TorrentStatusState actualLastStatus = null;
