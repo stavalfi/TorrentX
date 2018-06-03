@@ -12,6 +12,7 @@ import main.TorrentInfo;
 import main.downloader.*;
 import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
+import main.file.system.FileSystemLinkImpl;
 import main.file.system.allocator.AllocatedBlock;
 import main.file.system.allocator.AllocatorState;
 import main.listener.ListenerAction;
@@ -266,14 +267,17 @@ public class MyStepdefs {
 		// this will waitForMessage an activeTorrent object.
 		String downloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
 
-		TorrentDownloaders.getInstance()
-				.createTorrentDownloader(TorrentDownloaderBuilder.builder(torrentInfo)
-						.setToDefaultTorrentStatusStore()
-						.setToDefaultTorrentStatesSideEffects()
-						.setToDefaultSearchPeers()
-						.setToDefaultPeersCommunicatorFlux()
-						.setToDefaultFileSystemLink(downloadPath)
-						.build());
+		TorrentDownloaderBuilder.builder(torrentInfo)
+				.setToDefaultTorrentStatusStore()
+				.setToDefaultTorrentStatesSideEffects()
+				.setToDefaultSearchPeers()
+				.setToDefaultPeersCommunicatorFlux()
+				.setToDefaultFileSystemLink(downloadPath)
+				.build()
+				.map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+				.as(StepVerifier::create)
+				.expectNextCount(1)
+				.verifyComplete();
 	}
 
 	@Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
@@ -371,6 +375,7 @@ public class MyStepdefs {
 
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
 				TorrentStatusReducer.defaultTorrentState);
+		TorrentStatesSideEffects sideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 
 		// release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
 		int amountOfAllocatedBlocks = TorrentDownloaders.getAllocatorStore()
@@ -399,46 +404,45 @@ public class MyStepdefs {
 				.createActiveTorrentMono(torrentInfo, fullDownloadPath, store, allBlocksMessages$)
 				.block();
 
-		Mono<List<Integer>> piecesCompleted1 = fileSystemLink.savedBlockFlux()
-				//.doOnNext(pieceEvent -> System.out.println("block complete:" + pieceEvent))
-				.flatMap(pieceEvent ->
-				{
-					AllocatedBlock allocatedBlock = pieceEvent.getReceivedPiece().getAllocatedBlock();
-					return TorrentDownloaders.getAllocatorStore()
-							.free(allocatedBlock)
-							.map(allocatorState -> pieceEvent);
+		TorrentDownloaderBuilder.builder(torrentInfo)
+				.setTorrentStatusStore(store)
+				.setTorrentStatesSideEffects(sideEffects)
+				.setFileSystemLink$(FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, store, allBlocksMessages$))
+				.build()
+				.map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+				.doOnNext(torrentDownloader -> {
+					Mono<List<Integer>> piecesCompleted1 = fileSystemLink.savedBlockFlux()
+							//.doOnNext(pieceEvent -> System.out.println("block complete:" + pieceEvent))
+							.flatMap(pieceEvent ->
+							{
+								AllocatedBlock allocatedBlock = pieceEvent.getReceivedPiece().getAllocatedBlock();
+								return TorrentDownloaders.getAllocatorStore()
+										.free(allocatedBlock)
+										.map(allocatorState -> pieceEvent);
+							})
+							.doOnNext(pieceEvent -> semaphore.release())
+							.filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
+							.map(PieceEvent::getReceivedPiece)
+							.map(PieceMessage::getIndex)
+							.doOnNext(pieceIndex -> System.out.println("saved piece index: " + pieceIndex))
+							.replay()
+							.autoConnect(0)
+							.collectList();
+
+					Mono<List<Integer>> piecesCompleted2 = fileSystemLink.savedPieceFlux()
+							.replay()
+							.autoConnect(0)
+							.collectList();
+
+					allBlocksMessages$.connect();
+
+					List<Integer> expected = piecesCompleted1.block();
+					List<Integer> actual = piecesCompleted2.block();
+					Utils.assertListEqualNotByOrder(expected, actual, Integer::equals);
 				})
-				.doOnNext(pieceEvent -> semaphore.release())
-				.filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
-				.map(PieceEvent::getReceivedPiece)
-				.map(PieceMessage::getIndex)
-				.doOnNext(pieceIndex -> System.out.println("saved piece index: " + pieceIndex))
-				.replay()
-				.autoConnect(0)
-				.collectList();
-
-		Mono<List<Integer>> piecesCompleted2 = fileSystemLink.savedPieceFlux()
-				.replay()
-				.autoConnect(0)
-				.collectList();
-
-		allBlocksMessages$.connect();
-
-		List<Integer> expected = piecesCompleted1.block();
-		List<Integer> actual = piecesCompleted2.block();
-		Utils.assertListEqualNotByOrder(expected, actual, Integer::equals);
-
-		// I must waitForMessage it here because later I need to get the torrentStatusController which was already created here.
-		// If I'm not creating TorrentDownloader object here, I will waitForMessage 2 different torrentStatusController objects.
-		TorrentDownloaders.getInstance()
-				.createTorrentDownloader(torrentInfo,
-						null,
-						fileSystemLink,
-						null,
-						store,
-						null,
-						null,
-						null);
+				.as(StepVerifier::create)
+				.expectNextCount(1)
+				.verifyComplete();
 	}
 
 	private Flux<Integer> actualCompletedSavedPiecesReadByFS$ = null;
@@ -479,53 +483,55 @@ public class MyStepdefs {
 				.createActiveTorrentMono(torrentInfo, fullDownloadPath, store, generatedWrittenPieceMessages$)
 				.block();
 
-		// this.actualCompletedSavedPiecesReadByFS$ will be used in later step.
-		this.actualCompletedSavedPiecesReadByFS$ = fileSystemLink.savedPieceFlux()
-				.replay()
-				.autoConnect(0);
+		TorrentDownloaderBuilder.builder(torrentInfo)
+				.setTorrentStatusStore(store)
+				.setTorrentStatesSideEffects(sideEffects)
+				.setFileSystemLink$(FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, store, generatedWrittenPieceMessages$))
+				.build()
+				.map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+				.doOnNext(torrentDownloader -> {
+					// this.actualCompletedSavedPiecesReadByFS$ will be used in later step.
+					this.actualCompletedSavedPiecesReadByFS$ = fileSystemLink.savedPieceFlux()
+							.replay()
+							.autoConnect(0);
 
-		Flux.zip(fileSystemLink.savedBlockFlux().map(PieceEvent::getReceivedPiece),
-				generatedWrittenPieceMessages$,
-				(actualPieceFromFSNotifier, expectedPieceMessage) -> {
-					Assert.assertEquals("the FS notifier notified about other block which he saved than the block we expected to save.",
-							expectedPieceMessage, actualPieceFromFSNotifier);
-					return expectedPieceMessage;
+					Flux.zip(fileSystemLink.savedBlockFlux().map(PieceEvent::getReceivedPiece),
+							generatedWrittenPieceMessages$,
+							(actualPieceFromFSNotifier, expectedPieceMessage) -> {
+								Assert.assertEquals("the FS notifier notified about other block which he saved than the block we expected to save.",
+										expectedPieceMessage, actualPieceFromFSNotifier);
+								return expectedPieceMessage;
+							})
+							.doOnNext(pieceMessage -> System.out.println("saved from: " + pieceMessage.getBegin() +
+									", length: " + pieceMessage.getAllocatedBlock().getLength()))
+							.flatMap(expectedPieceMessage -> TorrentDownloaders.getAllocatorStore()
+									.createRequestMessage(null, null, expectedPieceMessage.getIndex(),
+											expectedPieceMessage.getBegin(),
+											expectedPieceMessage.getAllocatedBlock().getLength(),
+											torrentInfo.getPieceLength(expectedPieceMessage.getIndex()))
+									.flatMap(requestMessage -> Utils.readFromFile(torrentInfo, fullDownloadPath, requestMessage)
+											.doOnNext(actualPieceMessage -> {
+												System.out.println(
+														"assert actualPieceFromFS: " +
+																"saved from: " + actualPieceMessage.getBegin() +
+																", length: " + actualPieceMessage.getAllocatedBlock().getLength() +
+																" <----> generatedPieceMessage: " +
+																"saved from: " + expectedPieceMessage.getBegin() +
+																", length: " + expectedPieceMessage.getAllocatedBlock().getLength());
+												Assert.assertEquals("the pieces we read from filesystem are not equal to the pieces we tried to save to the filesystem.",
+														expectedPieceMessage.getAllocatedBlock(), actualPieceMessage.getAllocatedBlock());
+											})
+											// free the write and read blocks.
+											.flatMap(actualPieceMessage -> TorrentDownloaders.getAllocatorStore().free(actualPieceMessage.getAllocatedBlock()))
+											.flatMap(__ -> TorrentDownloaders.getAllocatorStore().free(expectedPieceMessage.getAllocatedBlock()))))
+							// tell upstream that we freed the buffer and he can give us one more signal (if he have any left)
+							.doOnNext(__ -> semaphore.release())
+							.collectList()
+							.block();
 				})
-				.doOnNext(pieceMessage -> System.out.println("saved from: " + pieceMessage.getBegin() +
-						", length: " + pieceMessage.getAllocatedBlock().getLength()))
-				.flatMap(expectedPieceMessage -> TorrentDownloaders.getAllocatorStore()
-						.createRequestMessage(null, null, expectedPieceMessage.getIndex(),
-								expectedPieceMessage.getBegin(),
-								expectedPieceMessage.getAllocatedBlock().getLength(),
-								torrentInfo.getPieceLength(expectedPieceMessage.getIndex()))
-						.flatMap(requestMessage -> Utils.readFromFile(torrentInfo, fullDownloadPath, requestMessage)
-								.doOnNext(actualPieceMessage -> {
-									System.out.println(
-											"assert actualPieceFromFS: " +
-													"saved from: " + actualPieceMessage.getBegin() +
-													", length: " + actualPieceMessage.getAllocatedBlock().getLength() +
-													" <----> generatedPieceMessage: " +
-													"saved from: " + expectedPieceMessage.getBegin() +
-													", length: " + expectedPieceMessage.getAllocatedBlock().getLength());
-									Assert.assertEquals("the pieces we read from filesystem are not equal to the pieces we tried to save to the filesystem.",
-											expectedPieceMessage.getAllocatedBlock(), actualPieceMessage.getAllocatedBlock());
-								})
-								// free the write and read blocks.
-								.flatMap(actualPieceMessage -> TorrentDownloaders.getAllocatorStore().free(actualPieceMessage.getAllocatedBlock()))
-								.flatMap(__ -> TorrentDownloaders.getAllocatorStore().free(expectedPieceMessage.getAllocatedBlock()))))
-				// tell upstream that we freed the buffer and he can give us one more signal (if he have any left)
-				.doOnNext(__ -> semaphore.release())
-				.collectList()
-				.block();
-
-		// I must waitForMessage it here because later I need to get the torrentStatusController which was already created here.
-		// If I'm not creating TorrentDownloader object here, I will waitForMessage 2 different torrentStatusController objects.
-		TorrentDownloaders.getInstance()
-				.createTorrentDownloader(TorrentDownloaderBuilder.builder(torrentInfo)
-						.setTorrentStatusStore(store)
-						.setTorrentStatesSideEffects(sideEffects)
-						.setFileSystemLink(fileSystemLink)
-						.build());
+				.as(StepVerifier::create)
+				.expectNextCount(1)
+				.verifyComplete();
 	}
 
 	@Then("^the only completed pieces are - for torrent: \"([^\"]*)\":$")
@@ -621,7 +627,7 @@ public class MyStepdefs {
 		List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
 
 		peersFromResponses.stream()
-				.filter(peer -> connectedPeers.contains(peer))
+				.filter(connectedPeers::contains)
 				.findFirst()
 				.ifPresent(peer -> Assert.fail("We received from the following peer" +
 						" messages but he doesn't exist in the connected peers flux: " + peer));
@@ -643,10 +649,13 @@ public class MyStepdefs {
 		TorrentStatusState torrentStatusState = Utils.getTorrentStatusState(torrentInfo, TorrentStatusAction.INITIALIZE, torrentStatusActions);
 		Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(), torrentStatusState);
 
-		TorrentDownloaders.getInstance()
-				.createTorrentDownloader(TorrentDownloaderBuilder.builder(torrentInfo)
-						.setTorrentStatusStore(torrentStatusStore)
-						.build());
+		TorrentDownloaderBuilder.builder(torrentInfo)
+				.setTorrentStatusStore(torrentStatusStore)
+				.build()
+				.map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+				.as(StepVerifier::create)
+				.expectNextCount(1)
+				.verifyComplete();
 	}
 
 	private TorrentStatusState actualLastStatus = null;

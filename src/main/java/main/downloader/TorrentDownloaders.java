@@ -63,14 +63,14 @@ public class TorrentDownloaders {
 		return Flux.fromIterable(new ArrayList<>(this.torrentDownloaderList));
 	}
 
-	public synchronized TorrentDownloader createTorrentDownloader(TorrentInfo torrentInfo,
-																  SearchPeers searchPeers,
-																  FileSystemLink fileSystemLink,
-																  BittorrentAlgorithm bittorrentAlgorithm,
-																  Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
-																  SpeedStatistics torrentSpeedStatistics,
-																  TorrentStatesSideEffects torrentStatesSideEffects,
-																  Flux<Link> peersCommunicatorFlux) {
+	public synchronized TorrentDownloader saveTorrentDownloader(TorrentInfo torrentInfo,
+																SearchPeers searchPeers,
+																FileSystemLink fileSystemLink,
+																BittorrentAlgorithm bittorrentAlgorithm,
+																Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
+																SpeedStatistics torrentSpeedStatistics,
+																TorrentStatesSideEffects torrentStatesSideEffects,
+																Flux<Link> peersCommunicatorFlux) {
 		return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
 				.orElseGet(() -> {
 					TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
@@ -86,7 +86,7 @@ public class TorrentDownloaders {
 				});
 	}
 
-	public synchronized TorrentDownloader createTorrentDownloader(TorrentDownloader torrentDownloader) {
+	public synchronized TorrentDownloader saveTorrentDownloader(TorrentDownloader torrentDownloader) {
 		return findTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash())
 				.orElseGet(() -> {
 					this.torrentDownloaderList.add(torrentDownloader);
@@ -150,7 +150,7 @@ public class TorrentDownloaders {
 						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 
 		return TorrentDownloaders.getInstance()
-				.createTorrentDownloader(torrentInfo,
+				.saveTorrentDownloader(torrentInfo,
 						searchPeers,
 						fileSystemLink,
 						bittorrentAlgorithm,

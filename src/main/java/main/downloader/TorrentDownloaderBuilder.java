@@ -15,14 +15,15 @@ import main.torrent.status.reducers.TorrentStatusReducer;
 import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import redux.store.Store;
 
 // TODO: save the initial status in the mongodb.
 public class TorrentDownloaderBuilder {
 	private TorrentInfo torrentInfo;
 	private SearchPeers searchPeers;
-	private FileSystemLink fileSystemLink;
-	private BittorrentAlgorithm bittorrentAlgorithm;
+	private Mono<FileSystemLink> fileSystemLink$;
+	private Mono<BittorrentAlgorithm> bittorrentAlgorithm$;
 	private Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore;
 	private TorrentStatesSideEffects torrentStatesSideEffects;
 	private SpeedStatistics torrentSpeedStatistics;
@@ -37,7 +38,7 @@ public class TorrentDownloaderBuilder {
 		return new TorrentDownloaderBuilder(torrentInfo);
 	}
 
-	public static TorrentDownloader buildDefault(TorrentInfo torrentInfo, String downloadPath) {
+	public static Mono<TorrentDownloader> buildDefault(TorrentInfo torrentInfo, String downloadPath) {
 		return builder(torrentInfo)
 				.setToDefaultTorrentStatusStore()
 				.setToDefaultTorrentStatesSideEffects()
@@ -49,15 +50,39 @@ public class TorrentDownloaderBuilder {
 				.build();
 	}
 
-	public TorrentDownloader build() {
-		return new TorrentDownloader(this.torrentInfo,
-				this.searchPeers,
-				this.fileSystemLink,
-				this.bittorrentAlgorithm,
-				this.torrentStatusStore,
-				this.torrentSpeedStatistics,
-				this.torrentStatesSideEffects,
-				this.peersCommunicatorFlux);
+	public Mono<TorrentDownloader> build() {
+		if (this.fileSystemLink$ == null) {
+			if (this.bittorrentAlgorithm$ == null)
+				return Mono.just(new TorrentDownloader(this.torrentInfo,
+						this.searchPeers,
+						null,
+						null,
+						this.torrentStatusStore,
+						this.torrentSpeedStatistics,
+						this.torrentStatesSideEffects,
+						this.peersCommunicatorFlux));
+			// it can't be that fileSystemLink$==null and bittorrentAlgorithm$!=null
+			// because we need fileSystemLink object to create bittorrentAlgorithm object.
+		}
+		if (this.bittorrentAlgorithm$ == null) {
+			return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
+					this.searchPeers,
+					fileSystemLink,
+					null,
+					this.torrentStatusStore,
+					this.torrentSpeedStatistics,
+					this.torrentStatesSideEffects,
+					this.peersCommunicatorFlux));
+		}
+		return this.bittorrentAlgorithm$.flatMap(bittorrentAlgorithm ->
+				this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
+						this.searchPeers,
+						fileSystemLink,
+						bittorrentAlgorithm,
+						this.torrentStatusStore,
+						this.torrentSpeedStatistics,
+						this.torrentStatesSideEffects,
+						this.peersCommunicatorFlux)));
 	}
 
 	public TorrentDownloaderBuilder setSearchPeers(SearchPeers searchPeers) {
@@ -71,32 +96,31 @@ public class TorrentDownloaderBuilder {
 		return this;
 	}
 
-	public TorrentDownloaderBuilder setFileSystemLink(FileSystemLink fileSystemLink) {
-		this.fileSystemLink = fileSystemLink;
+	public TorrentDownloaderBuilder setFileSystemLink$(Mono<FileSystemLink> fileSystemLink$) {
+		this.fileSystemLink$ = fileSystemLink$;
 		return this;
 	}
 
 	public TorrentDownloaderBuilder setToDefaultFileSystemLink(String downloadPath) {
 		assert this.torrentStatusStore != null;
-		this.fileSystemLink = ActiveTorrents.getInstance()
+		this.fileSystemLink$ = ActiveTorrents.getInstance()
 				.createActiveTorrentMono(torrentInfo, downloadPath, this.torrentStatusStore,
 						this.peersCommunicatorFlux.map(Link::receivePeerMessages)
-								.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
-				.block();
+								.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux));
 		return this;
 	}
 
-	public TorrentDownloaderBuilder setBittorrentAlgorithm(BittorrentAlgorithm bittorrentAlgorithm) {
-		this.bittorrentAlgorithm = bittorrentAlgorithm;
+	public TorrentDownloaderBuilder setBittorrentAlgorithm$(Mono<BittorrentAlgorithm> bittorrentAlgorithm$) {
+		this.bittorrentAlgorithm$ = bittorrentAlgorithm$;
 		return this;
 	}
 
 	public TorrentDownloaderBuilder setToDefaultBittorrentAlgorithm() {
 		assert this.torrentStatusStore != null;
-		this.bittorrentAlgorithm = BittorrentAlgorithmInitializer.v1(torrentInfo,
+		this.bittorrentAlgorithm$ = this.fileSystemLink$.map(fileSystemLink -> BittorrentAlgorithmInitializer.v1(torrentInfo,
 				this.torrentStatusStore,
 				fileSystemLink,
-				peersCommunicatorFlux);
+				peersCommunicatorFlux));
 		return this;
 	}
 

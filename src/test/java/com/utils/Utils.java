@@ -8,7 +8,9 @@ import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.file.system.*;
+import main.file.system.ActiveTorrents;
+import main.file.system.ActualFileImpl;
+import main.file.system.FileSystemLink;
 import main.listener.ListenerAction;
 import main.listener.reducers.ListenerReducer;
 import main.listener.state.tree.ListenerState;
@@ -327,7 +329,7 @@ public class Utils {
 						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 
 		return TorrentDownloaders.getInstance()
-				.createTorrentDownloader(torrentInfo,
+				.saveTorrentDownloader(torrentInfo,
 						searchPeers,
 						fileSystemLink,
 						bittorrentAlgorithm,
@@ -368,7 +370,7 @@ public class Utils {
 						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 
 		return TorrentDownloaders.getInstance()
-				.createTorrentDownloader(torrentInfo,
+				.saveTorrentDownloader(torrentInfo,
 						searchPeers,
 						fileSystemLink,
 						bittorrentAlgorithm,
@@ -415,7 +417,7 @@ public class Utils {
 						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 
 		return TorrentDownloaders.getInstance()
-				.createTorrentDownloader(torrentInfo,
+				.saveTorrentDownloader(torrentInfo,
 						searchPeers,
 						fileSystemLink,
 						bittorrentAlgorithm,

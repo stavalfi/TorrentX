@@ -28,11 +28,21 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 	private static Logger logger = LoggerFactory.getLogger(FileSystemLinkImpl.class);
+
+	public static Mono<FileSystemLink> create(TorrentInfo torrentInfo, String downloadPath,
+											  Store<TorrentStatusState, TorrentStatusAction> store,
+											  Flux<PieceMessage> peerResponsesFlux) {
+		return Mono.just(torrentInfo)
+				.doOnNext(__ -> createFolders(torrentInfo, downloadPath))
+				.flatMap(__ -> createActiveTorrentFileList(torrentInfo, downloadPath))
+				.map(actualFileList -> new FileSystemLinkImpl(torrentInfo, downloadPath, actualFileList, store, peerResponsesFlux));
+	}
 
 	private final List<ActualFile> actualFileImplList;
 	private final BitSet piecesStatus;
@@ -41,9 +51,10 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 	private Flux<Integer> savedPiecesFlux;
 	private Flux<PieceEvent> savedBlocksFlux;
 
-	public FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
-							  Store<TorrentStatusState, TorrentStatusAction> store,
-							  Flux<PieceMessage> peerResponsesFlux) throws IOException {
+	private FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
+							   List<ActualFile> actualFileList,
+							   Store<TorrentStatusState, TorrentStatusAction> store,
+							   Flux<PieceMessage> peerResponsesFlux) {
 		super(torrentInfo);
 		this.downloadPath = downloadPath;
 		this.piecesStatus = new BitSet(getPieces().size());
@@ -51,7 +62,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
 		createFolders(torrentInfo, downloadPath);
 
-		this.actualFileImplList = createActiveTorrentFileList(torrentInfo, downloadPath);
+		this.actualFileImplList = actualFileList;
 
 		store.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
 				.concatMap(__ -> store.dispatch(TorrentStatusAction.COMPLETED_DOWNLOADING_SELF_RESOLVED))
@@ -273,7 +284,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 		});
 	}
 
-	private List<ActualFile> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) throws IOException {
+	private static Mono<List<ActualFile>> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) {
 		String mainFolder = !torrentInfo.isSingleFileTorrent() ?
 				downloadPath + torrentInfo.getName() + File.separator :
 				downloadPath;
@@ -286,16 +297,21 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 					.getFileDirs()
 					.stream()
 					.collect(Collectors.joining(File.separator, mainFolder, ""));
-			SeekableByteChannel seekableByteChannel = createFile(filePath);
+			SeekableByteChannel seekableByteChannel = null;
+			try {
+				seekableByteChannel = createFile(filePath);
+			} catch (IOException e) {
+				return Mono.error(e);
+			}
 			ActualFile actualFile = new ActualFileImpl(filePath, position, position + torrentFile.getFileLength(),
 					seekableByteChannel);
 			actualFileList.add(actualFile);
 			position += torrentFile.getFileLength();
 		}
-		return actualFileList;
+		return Mono.just(actualFileList);
 	}
 
-	private SeekableByteChannel createFile(String filePathToCreate) throws IOException {
+	private static SeekableByteChannel createFile(String filePathToCreate) throws IOException {
 		OpenOption[] options = {
 				StandardOpenOption.WRITE,
 				StandardOpenOption.CREATE_NEW,
@@ -305,7 +321,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 		return Files.newByteChannel(Paths.get(filePathToCreate), options);
 	}
 
-	private void createFolders(TorrentInfo torrentInfo, String downloadPath) {
+	private static void createFolders(TorrentInfo torrentInfo, String downloadPath) {
 		// waitForMessage main folder for the download of the torrent.
 		String mainFolder = !torrentInfo.isSingleFileTorrent() ?
 				downloadPath + torrentInfo.getName() + File.separator :
@@ -318,13 +334,13 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 				.map(christophedetroyer.torrent.TorrentFile::getFileDirs)
 				.filter(fileAndFolders -> fileAndFolders.size() > 1)
 				.map(fileAndFolders -> fileAndFolders.subList(0, fileAndFolders.size() - 1))
-				.map(strings -> strings.stream())
+				.map(Collection::stream)
 				.map(stringStream -> stringStream.collect(Collectors.joining(File.separator, mainFolder, "")))
 				.distinct()
-				.forEach(this::createFolder);
+				.forEach(FileSystemLinkImpl::createFolder);
 	}
 
-	private void createFolder(String path) {
+	private static void createFolder(String path) {
 		File file = new File(path);
 		File parentFile = file.getParentFile();
 		parentFile.mkdirs();
