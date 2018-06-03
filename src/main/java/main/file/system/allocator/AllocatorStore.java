@@ -9,11 +9,11 @@ import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import redux.store.Result;
-import redux.store.StoreNew;
+import redux.store.Store;
 
 public class AllocatorStore {
 
-	private StoreNew<AllocatorState, AllocatorAction> allocatorStore = new StoreNew<>(new AllocatorReducer(),
+	private Store<AllocatorState, AllocatorAction> allocatorStore = new Store<>(new AllocatorReducer(),
 			AllocatorReducer.defaultAllocatorState);
 
 	public Mono<AllocatorState> updateAllocations(int amountOfBlocks, int blockLength) {

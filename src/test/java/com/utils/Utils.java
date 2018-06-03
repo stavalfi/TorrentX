@@ -33,7 +33,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import redux.store.Store;
-import redux.store.StoreNew;
 
 import java.io.File;
 import java.io.IOException;
@@ -132,7 +131,7 @@ public class Utils {
 		TorrentDownloaders.getListener().getTcpPort();
 	}
 
-	public static void changeListenerState(List<ListenerAction> changesActionList, StoreNew<ListenerState, ListenerAction> listenStore) {
+	public static void changeListenerState(List<ListenerAction> changesActionList, Store<ListenerState, ListenerAction> listenStore) {
 		Flux.fromIterable(changesActionList)
 				.filter(action -> action.equals(ListenerAction.START_LISTENING_IN_PROGRESS) ||
 						action.equals(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
@@ -286,8 +285,7 @@ public class Utils {
 
 	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				TorrentStatusReducer.defaultTorrentState,
-				TorrentStatusAction::getCorrespondingIsProgressAction);
+				TorrentStatusReducer.defaultTorrentState);
 		return createDefaultTorrentDownloader(torrentInfo, downloadPath,
 				store, new TorrentStatesSideEffects(torrentInfo, store));
 	}
@@ -298,8 +296,7 @@ public class Utils {
 		PeersProvider peersProvider = new PeersProvider(torrentInfo);
 
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				TorrentStatusReducer.defaultTorrentState,
-				TorrentStatusAction::getCorrespondingIsProgressAction);
+				TorrentStatusReducer.defaultTorrentState);
 		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 		// TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
 		SearchPeers searchPeers = new SearchPeers(torrentInfo, store, trackerProvider,
@@ -478,8 +475,7 @@ public class Utils {
 				.flatMap(pieceMessageToSave -> {
 					ConnectableFlux<PieceMessage> pieceMessageFlux = Flux.just(pieceMessageToSave).publish();
 					Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-							TorrentStatusReducer.defaultTorrentState,
-							TorrentStatusAction::getCorrespondingIsProgressAction);
+							TorrentStatusReducer.defaultTorrentState);
 					return activeTorrents.createActiveTorrentMono(link.getTorrentInfo(), downloadPath, store, pieceMessageFlux)
 							.flatMap(fileSystemLink -> {
 								Flux<PieceEvent> savedPieces$ = fileSystemLink.savedBlockFlux()

@@ -37,7 +37,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private Flux<PieceEvent> savedBlocksFlux;
 
     public FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
-                              Store<TorrentStatusState, TorrentStatusAction> store,
+							  Store<TorrentStatusState, TorrentStatusAction> store,
                               Flux<PieceMessage> peerResponsesFlux) throws IOException {
         super(torrentInfo);
         this.downloadPath = downloadPath;

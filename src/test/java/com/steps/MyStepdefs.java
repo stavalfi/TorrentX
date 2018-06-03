@@ -44,7 +44,6 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 import redux.store.Store;
-import redux.store.StoreNew;
 
 import java.io.File;
 import java.security.InvalidParameterException;
@@ -362,8 +361,7 @@ public class MyStepdefs {
 				.block();
 
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				TorrentStatusReducer.defaultTorrentState,
-				TorrentStatusAction::getCorrespondingIsProgressAction);
+				TorrentStatusReducer.defaultTorrentState);
 		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 		// release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
 		int amountOfAllocatedBlocks = TorrentDownloaders.getAllocatorStore()
@@ -449,8 +447,7 @@ public class MyStepdefs {
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				TorrentStatusReducer.defaultTorrentState,
-				TorrentStatusAction::getCorrespondingIsProgressAction);
+				TorrentStatusReducer.defaultTorrentState);
 		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 
 		// release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
@@ -637,8 +634,7 @@ public class MyStepdefs {
 		Utils.removeEverythingRelatedToLastTest();
 
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				Utils.getTorrentStatusState(torrentInfo, TorrentStatusAction.INITIALIZE, torrentStatusActions),
-				TorrentStatusAction::getCorrespondingIsProgressAction);
+				Utils.getTorrentStatusState(torrentInfo, TorrentStatusAction.INITIALIZE, torrentStatusActions));
 		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 
 		TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
@@ -707,8 +703,7 @@ public class MyStepdefs {
 				.get();
 
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				TorrentStatusReducer.defaultTorrentState,
-				TorrentStatusAction::getCorrespondingIsProgressAction);
+				TorrentStatusReducer.defaultTorrentState);
 		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 
 		FileSystemLink fileSystemLink = torrentDownloader.getFileSystemLink();
@@ -737,8 +732,7 @@ public class MyStepdefs {
 				.single();
 
 		// my application start listening for new peers.
-		TorrentDownloaders.getInstance()
-				.getListenStore()
+		TorrentDownloaders.getListenStore()
 				.dispatch(ListenerAction.START_LISTENING_IN_PROGRESS)
 				.block();
 
@@ -1378,20 +1372,20 @@ public class MyStepdefs {
 		Utils.removeEverythingRelatedToLastTest();
 	}
 
-	private StoreNew<ListenerState, ListenerAction> listenStore;
+	private Store<ListenerState, ListenerAction> listenStore;
 
 	@Given("^initial listen-status - no side effects:$")
 	public void initialListenStatusNoSideEffects(List<ListenerAction> initialStateByActionList) throws Throwable {
 		Utils.removeEverythingRelatedToLastTest();
 
 		ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
-		this.listenStore = new StoreNew<>(new ListenerReducer(), initialState);
+		this.listenStore = new Store<>(new ListenerReducer(), initialState);
 	}
 
 	@Given("^initial listen-status - without dispaching anything - no side effects:$")
 	public void initialListenStatusWithoutDispachingAnythingNoSideEffects(List<ListenerAction> initialStateByActionList) throws Throwable {
 		ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
-		this.listenStore = new StoreNew<>(new ListenerReducer(), initialState);
+		this.listenStore = new Store<>(new ListenerReducer(), initialState);
 	}
 
 	@When("^listen-status is trying to change to - no side effects:$")

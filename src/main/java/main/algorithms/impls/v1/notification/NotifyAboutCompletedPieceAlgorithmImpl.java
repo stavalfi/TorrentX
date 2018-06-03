@@ -25,7 +25,7 @@ public class NotifyAboutCompletedPieceAlgorithmImpl implements NotifyAboutComple
     private Flux<Integer> notifiedCompletedPiecesFlux;
 
     public NotifyAboutCompletedPieceAlgorithmImpl(TorrentInfo torrentInfo,
-                                                  Store<TorrentStatusState, TorrentStatusAction> store,
+												  Store<TorrentStatusState, TorrentStatusAction> store,
                                                   FileSystemLink fileSystemLink,
                                                   Flux<Link> recordedFreePeerFlux) {
         this.torrentInfo = torrentInfo;

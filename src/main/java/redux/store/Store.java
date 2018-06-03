@@ -2,131 +2,126 @@ package redux.store;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import redux.reducer.Reducer;
 import redux.state.State;
 
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.function.BiPredicate;
 
-public class Store<S extends State<A>, A> implements Notifier<S, A> {
+public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier<STATE_IMPL, ACTION> {
 	private static Logger logger = LoggerFactory.getLogger(Store.class);
 
-	private Flux<S> latestState$;
-	private Flux<S> history$;
-	private Reducer<S, A> reducer;
-	private Function<A, A> getCorrespondingIsProgressAction;
-	private FluxSink<S> produceNewState;
-	private Semaphore semaphore = new Semaphore(1);
+	private FluxSink<Request<ACTION>> actionsSink;
+	private Flux<Result<STATE_IMPL, ACTION>> results$;
+	private Flux<STATE_IMPL> states$;
 
-	// for debugging
-	private AtomicInteger transactionCount = new AtomicInteger(0);
+	private FluxSink<Request<ACTION>> emitRequestsSink;
+	private BlockingQueue<Request<ACTION>> requestsQueue = new LinkedBlockingQueue<>();
 
-	public Store(Reducer<S, A> reducer, S defaultState, Function<A, A> getCorrespondingIsProgressAction) {
-		this.reducer = reducer;
-		this.getCorrespondingIsProgressAction = getCorrespondingIsProgressAction;
+	public Store(Reducer<STATE_IMPL, ACTION> reducer, STATE_IMPL defaultState) {
+		Result<STATE_IMPL, ACTION> initialResult = new Result<>(new Request<>(defaultState.getAction()), defaultState, true);
 
-		this.latestState$ = Flux.<S>create(sink -> {
-			this.produceNewState = sink;
-			sink.next(defaultState);
-		}).replay(1)
+		EmitterProcessor<Request<ACTION>> emitRequests = EmitterProcessor.create(Integer.MAX_VALUE);
+		this.emitRequestsSink = emitRequests.sink(FluxSink.OverflowStrategy.BUFFER);
+
+		this.results$ = emitRequests
+				.scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
+					Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
+					if (result.isNewState())
+						logger.debug("ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
+					else
+						logger.debug("passed - request: " + request + " new state: " + result.getState() + "\n");
+					return result;
+				})
+				.replay()
 				.autoConnect(0);
 
-		this.history$ = this.latestState$.replay(10) // how much statuses to save.
+		this.states$ = this.results$
+				.map(Result::getState)
+				.distinctUntilChanged()
+				.replay(1)
 				.autoConnect(0);
 	}
 
-	public Mono<S> dispatch(A action) {
-		return Mono.error(new Exception());
-//        return Mono.just(transactionCount.getAndIncrement())
-//                .publishOn(Schedulers.elastic())
-//                .flatMap(transactionCount -> {
-//                    try {
-//                        this.semaphore.acquire();
-//                        logger.info("transaction: " + transactionCount + " - acquired semaphore for action: " + action);
-//                        return Mono.just(transactionCount);
-//                    } catch (InterruptedException e) {
-//                        return Mono.error(e);
-//                    }
-//                })
-//                .flatMap(transactionCount -> {
-//                    logger.info("transaction: " + transactionCount + " - getting the last state.");
-//                    return getStates$()
-//                            .flatMap(lastStatus -> {
-//                                logger.info("transaction: " + transactionCount + " - dispatching action: " + action +
-//                                        ". last state: " + lastStatus);
-//                                S newStatus = this.reducer.reducer(lastStatus, action);
-//                                if (lastStatus.equals(newStatus)) {
-//                                    logger.info("transaction: " + transactionCount + " - didn't dispatch action: " + action +
-//                                            " because the new state is illegal or equal to the last state: " + lastStatus);
-//                                    return Mono.just(lastStatus)
-//                                            .doOnNext(__ -> this.semaphore.release())
-//                                            .doOnNext(__ -> logger.info("transaction: " + transactionCount + " - released semaphore for action: " + action));
-//                                }
-//                                this.produceNewState.next(newStatus);
-//                                logger.info("transaction: " + transactionCount + " - dispatched action: " + action +
-//                                        ". new state: " + newStatus);
-//                                return getState$()
-//                                        .filter(newStatus::equals)
-//                                        .take(1)
-//                                        .single()
-//                                        .doOnNext(__ -> this.semaphore.release())
-//                                        .doOnNext(__ -> logger.info("transaction: " + transactionCount + " - released semaphore for action: " + action));
-//                            });
-//                });
+	public void dispatchNonBlocking(ACTION action) {
+		Request<ACTION> request = new Request<>(action);
+		logger.debug("getting ready for dispatching request: " + request);
+		this.emitRequestsSink.next(request);
+	}
+
+	public Mono<Result<STATE_IMPL, ACTION>> dispatch(Request<ACTION> request) {
+		logger.debug("getting ready for dispatching request: " + request);
+		Flux<Result<STATE_IMPL, ACTION>> resultFlux = this.results$
+				.filter(result -> result.getRequest().equals(request))
+				.take(1)
+				.replay()
+				.autoConnect(0);
+		this.emitRequestsSink.next(request);
+		return resultFlux.take(1)
+				.single();
+	}
+
+	public Mono<STATE_IMPL> dispatch(ACTION action) {
+		Request<ACTION> request = new Request<>(action);
+		return dispatch(request)
+				.map(Result::getState);
+
+	}
+
+	public Mono<STATE_IMPL> dispatchAsLongNoCancel(ACTION action, BiPredicate<ACTION, STATE_IMPL> isCanceled) {
+		return states$()
+				.takeWhile(stateImpl -> isCanceled.negate().test(action, stateImpl))
+				.concatMap(stateImpl -> dispatch(action))
+				.filter(stateImpl -> stateImpl.fromAction(action))
+				.take(1)
+				.switchIfEmpty(latestState$())
+				.single();
 	}
 
 	@Override
-	public Mono<S> latestState$() {
-		return this.latestState$
+	public Mono<STATE_IMPL> latestState$() {
+		return this.states$
 				.take(1)
 				.single();
 	}
 
 	@Override
-	public Flux<S> states$() {
-		return this.latestState$;
+	public Flux<STATE_IMPL> states$() {
+		return this.states$
+				.publishOn(Schedulers.elastic());
 	}
 
 	@Override
-	public Flux<S> statesHistory() {
-		return this.history$;
+	public Flux<STATE_IMPL> statesHistory() {
+		return null;
 	}
 
 	@Override
-	public Flux<S> statesByAction(A action) {
-		return states$().filter(listenerState -> listenerState.getAction().equals(action));
-	}
-
-	@Override
-	public Mono<S> notifyWhen(A when) {
+	public Flux<STATE_IMPL> statesByAction(ACTION action) {
 		return states$()
-				.filter(listenerState -> listenerState.fromAction(when))
+				.filter(stateImpl -> stateImpl.getAction().equals(action));
+	}
+
+	@Override
+	public Mono<STATE_IMPL> notifyWhen(ACTION when) {
+		return states$()
+				.filter(stateImpl -> stateImpl.fromAction(when))
 				.take(1)
 				.single();
 	}
 
 	@Override
-	public <T> Mono<T> notifyWhen(A when, T mapTo) {
+	public <T> Mono<T> notifyWhen(ACTION when, T mapTo) {
 		return states$()
-				.filter(listenerState -> listenerState.fromAction(when))
+				.filter(stateImpl -> stateImpl.fromAction(when))
 				.take(1)
 				.single()
-				.map(listenerState -> mapTo);
-	}
-
-	public Mono<S> dispatchAsLongNoCancel(A windUpActionToChange) {
-		A correspondingIsProgressAction = this.getCorrespondingIsProgressAction.apply(windUpActionToChange);
-		assert correspondingIsProgressAction != null;
-
-		return this.latestState$
-				.takeWhile(listenState -> listenState.fromAction(correspondingIsProgressAction))
-				.flatMap(listenState -> dispatch(windUpActionToChange))
-				.filter(listenState -> listenState.fromAction(windUpActionToChange))
-				.take(1)
-				.single();
+				.map(stateImpl -> mapTo);
 	}
 }

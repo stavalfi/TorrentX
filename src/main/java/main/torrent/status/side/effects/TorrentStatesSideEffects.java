@@ -13,7 +13,7 @@ public class TorrentStatesSideEffects {
     private TorrentFileSystemStatesSideEffects torrentFileSystemStatesSideEffects;
 
     public TorrentStatesSideEffects(TorrentInfo torrentInfo,
-                                    Store<TorrentStatusState, TorrentStatusAction> store) {
+									Store<TorrentStatusState, TorrentStatusAction> store) {
         this.torrentInfo = torrentInfo;
         this.downloadStateSideEffects = new DownloadStateSideEffects(torrentInfo, store);
         this.peersStateSideEffects = new PeersStateSideEffects(torrentInfo, store);

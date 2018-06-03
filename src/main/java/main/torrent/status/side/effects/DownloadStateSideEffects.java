@@ -6,82 +6,97 @@ import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import redux.store.Store;
 
+import java.util.function.BiPredicate;
+
 public class DownloadStateSideEffects {
 
-    private Flux<TorrentStatusState> startDownload$;
-    private Flux<TorrentStatusState> resumeDownload$;
-    private Flux<TorrentStatusState> pauseDownload$;
-    private Flux<TorrentStatusState> startUpload$;
-    private Flux<TorrentStatusState> resumeUpload$;
-    private Flux<TorrentStatusState> pauseUpload$;
-    private Flux<TorrentStatusState> completeDownload$;
+	private Flux<TorrentStatusState> startDownload$;
+	private Flux<TorrentStatusState> resumeDownload$;
+	private Flux<TorrentStatusState> pauseDownload$;
+	private Flux<TorrentStatusState> startUpload$;
+	private Flux<TorrentStatusState> resumeUpload$;
+	private Flux<TorrentStatusState> pauseUpload$;
+	private Flux<TorrentStatusState> completeDownload$;
 
-    public DownloadStateSideEffects(TorrentInfo torrentInfo,
-                                    Store<TorrentStatusState, TorrentStatusAction> store) {
-        this.startDownload$ = store.statesByAction(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
-                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.START_DOWNLOAD_WIND_UP))
-                .flatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
-                .publish()
-                .autoConnect(0);
+	public DownloadStateSideEffects(TorrentInfo torrentInfo,
+									Store<TorrentStatusState, TorrentStatusAction> store) {
+		// TODO: complete all methods:
+		BiPredicate<TorrentStatusAction, TorrentStatusState> shouldCancelStartDownload = (torrentStatusAction, torrentStatusState) -> true;
 
-        this.resumeDownload$ = store.statesByAction(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS)
-                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
-                .publish()
-                .autoConnect(0);
+		BiPredicate<TorrentStatusAction, TorrentStatusState> shouldCancelResumeDownload = (torrentStatusAction, torrentStatusState) -> true;
 
-        this.pauseDownload$ = store.statesByAction(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS)
-                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.PAUSE_DOWNLOAD_WIND_UP))
-                .publish()
-                .autoConnect(0);
+		BiPredicate<TorrentStatusAction, TorrentStatusState> shouldCancelCompleteDownload = (torrentStatusAction, torrentStatusState) -> true;
 
-        this.startUpload$ = store.statesByAction(TorrentStatusAction.START_UPLOAD_IN_PROGRESS)
-                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.START_UPLOAD_WIND_UP))
-                .flatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS))
-                .publish()
-                .autoConnect(0);
+		BiPredicate<TorrentStatusAction, TorrentStatusState> shouldCancelStartUpload = (torrentStatusAction, torrentStatusState) -> true;
 
-        this.resumeUpload$ = store.statesByAction(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS)
-                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.RESUME_UPLOAD_WIND_UP))
-                .publish()
-                .autoConnect(0);
+		BiPredicate<TorrentStatusAction, TorrentStatusState> shouldCancelResumeUpload = (torrentStatusAction, torrentStatusState) -> true;
 
-        this.pauseUpload$ = store.statesByAction(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS)
-                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
-                .publish()
-                .autoConnect(0);
+		this.startDownload$ = store.statesByAction(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
+				.concatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.START_DOWNLOAD_WIND_UP, shouldCancelStartDownload))
+				.concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
+				.publish()
+				.autoConnect(0);
 
-        this.completeDownload$ = store.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
-                .flatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS))
-                .flatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
-                .publish()
-                .autoConnect(0);
-    }
+		this.resumeDownload$ = store.statesByAction(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS)
+				.concatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP, shouldCancelResumeDownload))
+				.publish()
+				.autoConnect(0);
 
-    public Flux<TorrentStatusState> getStartDownload$() {
-        return startDownload$;
-    }
+		this.pauseDownload$ = store.statesByAction(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS)
+				.concatMap(__ -> store.notifyWhen(TorrentStatusAction.PAUSE_DOWNLOAD_SELF_RESOLVED))
+				.concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_WIND_UP))
+				.publish()
+				.autoConnect(0);
 
-    public Flux<TorrentStatusState> getResumeDownload$() {
-        return resumeDownload$;
-    }
+		this.completeDownload$ = store.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
+				.concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS))
+				.concatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP, shouldCancelCompleteDownload))
+				.publish()
+				.autoConnect(0);
 
-    public Flux<TorrentStatusState> getPauseDownload$() {
-        return pauseDownload$;
-    }
+		this.startUpload$ = store.statesByAction(TorrentStatusAction.START_UPLOAD_IN_PROGRESS)
+				.concatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.START_UPLOAD_WIND_UP, shouldCancelStartUpload))
+				.concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS))
+				.publish()
+				.autoConnect(0);
 
-    public Flux<TorrentStatusState> getStartUpload$() {
-        return startUpload$;
-    }
+		this.resumeUpload$ = store.statesByAction(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS)
+				.concatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.RESUME_UPLOAD_WIND_UP, shouldCancelResumeUpload))
+				.publish()
+				.autoConnect(0);
 
-    public Flux<TorrentStatusState> getResumeUpload$() {
-        return resumeUpload$;
-    }
+		this.pauseUpload$ = store.statesByAction(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS)
+				.concatMap(__ -> store.notifyWhen(TorrentStatusAction.PAUSE_UPLOAD_SELF_RESOLVED))
+				.concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
+				.publish()
+				.autoConnect(0);
+	}
 
-    public Flux<TorrentStatusState> getPauseUpload$() {
-        return pauseUpload$;
-    }
+	public Flux<TorrentStatusState> getStartDownload$() {
+		return startDownload$;
+	}
 
-    public Flux<TorrentStatusState> getCompleteDownload$() {
-        return completeDownload$;
-    }
+	public Flux<TorrentStatusState> getResumeDownload$() {
+		return resumeDownload$;
+	}
+
+	public Flux<TorrentStatusState> getPauseDownload$() {
+		return pauseDownload$;
+	}
+
+	public Flux<TorrentStatusState> getStartUpload$() {
+		return startUpload$;
+	}
+
+	public Flux<TorrentStatusState> getResumeUpload$() {
+		return resumeUpload$;
+	}
+
+	public Flux<TorrentStatusState> getPauseUpload$() {
+		return pauseUpload$;
+	}
+
+	public Flux<TorrentStatusState> getCompleteDownload$() {
+		return completeDownload$;
+	}
 }

@@ -28,7 +28,7 @@ public class TorrentDownloader {
                              SearchPeers searchPeers,
                              FileSystemLink fileSystemLink,
                              BittorrentAlgorithm bittorrentAlgorithm,
-                             Store<TorrentStatusState, TorrentStatusAction> store,
+							 Store<TorrentStatusState, TorrentStatusAction> store,
                              SpeedStatistics torrentSpeedStatistics,
                              TorrentStatesSideEffects torrentStatesSideEffects, Flux<Link> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;
@@ -68,4 +68,8 @@ public class TorrentDownloader {
     public TorrentInfo getTorrentInfo() {
         return torrentInfo;
     }
+
+	public TorrentStatesSideEffects getTorrentStatesSideEffects() {
+		return torrentStatesSideEffects;
+	}
 }

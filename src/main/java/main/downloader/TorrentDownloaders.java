@@ -22,7 +22,6 @@ import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import redux.store.Store;
-import redux.store.StoreNew;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,7 +35,7 @@ public class TorrentDownloaders {
 		return allocatorStore;
 	}
 
-	private static StoreNew<ListenerState, ListenerAction> listenStore = new StoreNew<>(new ListenerReducer(),
+	private static Store<ListenerState, ListenerAction> listenStore = new Store<>(new ListenerReducer(),
 			ListenerReducer.defaultListenState);
 
 	private static Listener listener = new Listener();
@@ -49,7 +48,7 @@ public class TorrentDownloaders {
 		return listener;
 	}
 
-	public static StoreNew<ListenerState, ListenerAction> getListenStore() {
+	public static Store<ListenerState, ListenerAction> getListenStore() {
 		return listenStore;
 	}
 
@@ -114,8 +113,7 @@ public class TorrentDownloaders {
 	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
 		// TODO: save the initial status in the mongodb.
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				TorrentStatusReducer.defaultTorrentState,
-				TorrentStatusAction::getCorrespondingIsProgressAction);
+				TorrentStatusReducer.defaultTorrentState);
 		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 		// TODO: remove the block()
 		SearchPeers searchPeers = new SearchPeers(torrentInfo, store);

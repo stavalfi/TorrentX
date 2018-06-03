@@ -27,7 +27,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
     private Flux<Integer> downloadedPiecesFlux;
 
     public PiecesDownloaderImpl(TorrentInfo torrentInfo,
-                                Store<TorrentStatusState, TorrentStatusAction> store,
+								Store<TorrentStatusState, TorrentStatusAction> store,
                                 FileSystemLink fileSystemLink,
                                 PeersToPiecesMapper peersToPiecesMapper,
                                 BlockDownloader blockDownloader) {

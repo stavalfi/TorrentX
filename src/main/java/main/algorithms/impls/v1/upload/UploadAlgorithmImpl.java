@@ -19,7 +19,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
     private Flux<PieceEvent> uploadedBlocksFlux;
 
     public UploadAlgorithmImpl(TorrentInfo torrentInfo,
-                               Store<TorrentStatusState, TorrentStatusAction> store,
+							   Store<TorrentStatusState, TorrentStatusAction> store,
                                FileSystemLink fileSystemLink,
                                Flux<Link> peersCommunicatorFlux) {
         this.torrentInfo = torrentInfo;

@@ -7,7 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Schedulers;
-import redux.store.StoreNew;
+import redux.store.Store;
 
 import java.util.function.BiPredicate;
 
@@ -19,7 +19,7 @@ public class ListenerSideEffects {
 	private Flux<ListenerState> pauseListen$;
 	private Flux<ListenerState> restartListen$;
 
-	public ListenerSideEffects(StoreNew<ListenerState, ListenerAction> store) {
+	public ListenerSideEffects(Store<ListenerState, ListenerAction> store) {
 		BiPredicate<ListenerAction, ListenerState> isInitialized = (desiredChange, listenerState) ->
 				ListenerReducer.defaultListenState.getAction().equals(listenerState.getAction()) &&
 						ListenerReducer.defaultListenState.isStartedListeningInProgress() == listenerState.isStartedListeningInProgress() &&

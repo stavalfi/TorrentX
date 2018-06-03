@@ -16,7 +16,7 @@ import redux.store.Store;
 
 public class BittorrentAlgorithmInitializer {
     public static BittorrentAlgorithm v1(TorrentInfo torrentInfo,
-                                         Store<TorrentStatusState, TorrentStatusAction> store,
+										 Store<TorrentStatusState, TorrentStatusAction> store,
                                          FileSystemLink fileSystemLink,
                                          Flux<Link> peersCommunicatorFlux) {
         Flux<Link> recordedPeerFlux = peersCommunicatorFlux
