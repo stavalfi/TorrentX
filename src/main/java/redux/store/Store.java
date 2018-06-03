@@ -33,7 +33,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 		this.results$ = emitRequests
 				.scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
 					Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
-					if (result.isNewState())
+					if (!result.isNewState())
 						logger.debug("ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
 					else
 						logger.debug("passed - request: " + request + " new state: " + result.getState() + "\n");

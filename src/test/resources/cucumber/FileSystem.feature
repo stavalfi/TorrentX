@@ -1,5 +1,7 @@
 Feature: create get and delete active torrents
 
+  # TODO: there is a bug here which cause blocking
+
 #  Scenario Outline: we create active torrent
 #    When application create active-torrent for: "<torrent>","<downloadLocation>"
 #    Then active-torrent exist: "true" for torrent: "<torrent>"
@@ -17,8 +19,11 @@ Feature: create get and delete active torrents
 #    Then application delete active-torrent: "<torrent>": "false" and file: "true"
 #    Then files of torrent: "<torrent>" exist: "false" in "<downloadLocation>"
 #    Then active-torrent exist: "true" for torrent: "<torrent>"
-#    Then torrent-status for torrent "<torrent>" will be:
-#      | REMOVE_FILES |
+#    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_FILES_WIND_UP":
+#      | REMOVE_FILES_WIND_UP          |
+#      | PAUSE_DOWNLOAD_WIND_UP        |
+#      | PAUSE_UPLOAD_WIND_UP          |
+#      | PAUSE_SEARCHING_PEERS_WIND_UP |
 #
 #    Examples:
 #      | torrent                                   | downloadLocation |
@@ -32,8 +37,11 @@ Feature: create get and delete active torrents
 #    Then application delete active-torrent: "<torrent>": "true" and file: "false"
 #    Then files of torrent: "<torrent>" exist: "true" in "<downloadLocation>"
 #    Then active-torrent exist: "false" for torrent: "<torrent>"
-#    Then torrent-status for torrent "<torrent>" will be:
-#      | REMOVE_TORRENT |
+#    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_TORRENT_WIND_UP":
+#      | REMOVE_TORRENT_WIND_UP        |
+#      | PAUSE_DOWNLOAD_WIND_UP        |
+#      | PAUSE_UPLOAD_WIND_UP          |
+#      | PAUSE_SEARCHING_PEERS_WIND_UP |
 #
 #    Examples:
 #      | torrent                                   | downloadLocation |
@@ -47,15 +55,21 @@ Feature: create get and delete active torrents
 #    Then application delete active-torrent: "<torrent>": "true" and file: "true"
 #    When application create active-torrent for: "<torrent>","<downloadLocation>"
 #    Then application delete active-torrent: "<torrent>": "true" and file: "true"
-#    Then torrent-status for torrent "<torrent>" will be:
-#      | REMOVE_TORRENT |
-#      | REMOVE_FILES   |
+#    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_TORRENT_WIND_UP":
+#      | REMOVE_TORRENT_WIND_UP        |
+#      | REMOVE_FILES_WIND_UP          |
+#      | PAUSE_DOWNLOAD_WIND_UP        |
+#      | PAUSE_UPLOAD_WIND_UP          |
+#      | PAUSE_SEARCHING_PEERS_WIND_UP |
 #    Then active-torrent exist: "false" for torrent: "<torrent>"
 #    Then files of torrent: "<torrent>" exist: "false" in "<downloadLocation>"
 #    Then active-torrent exist: "false" for torrent: "<torrent>"
-#    Then torrent-status for torrent "<torrent>" will be:
-#      | REMOVE_TORRENT |
-#      | REMOVE_FILES   |
+#    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_TORRENT_WIND_UP":
+#      | REMOVE_TORRENT_WIND_UP        |
+#      | REMOVE_FILES_WIND_UP          |
+#      | PAUSE_DOWNLOAD_WIND_UP        |
+#      | PAUSE_UPLOAD_WIND_UP          |
+#      | PAUSE_SEARCHING_PEERS_WIND_UP |
 #
 #    Examples:
 #      | torrent                                   | downloadLocation |

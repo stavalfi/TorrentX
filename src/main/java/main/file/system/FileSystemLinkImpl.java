@@ -13,6 +13,7 @@ import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import redux.store.Store;
 
 import java.io.File;
@@ -73,6 +74,8 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 					}
 					return peerResponsesFlux;
 				})
+				// If I won't switch thread then I will block redux thread.
+				.publishOn(Schedulers.parallel())
 				.filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
 				.flatMap(this::writeBlock)
 				// takeUntil will signal the last next signal he received and then he will send complete signal.

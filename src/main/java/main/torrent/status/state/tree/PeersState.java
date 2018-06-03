@@ -2,6 +2,8 @@ package main.torrent.status.state.tree;
 
 import main.torrent.status.TorrentStatusAction;
 
+import java.util.Objects;
+
 public class PeersState {
 
     private boolean isStartedSearchingPeersInProgress;
@@ -95,7 +97,29 @@ public class PeersState {
         return isResumeSearchingPeersWindUp;
     }
 
-    @Override
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) return true;
+		if (o == null || getClass() != o.getClass()) return false;
+		PeersState that = (PeersState) o;
+		return isStartedSearchingPeersInProgress == that.isStartedSearchingPeersInProgress &&
+				isStartedSearchingPeersSelfResolved == that.isStartedSearchingPeersSelfResolved &&
+				isStartedSearchingPeersWindUp == that.isStartedSearchingPeersWindUp &&
+				isPauseSearchingPeersInProgress == that.isPauseSearchingPeersInProgress &&
+				isPauseSearchingPeersSelfResolved == that.isPauseSearchingPeersSelfResolved &&
+				isPauseSearchingPeersWindUp == that.isPauseSearchingPeersWindUp &&
+				isResumeSearchingPeersInProgress == that.isResumeSearchingPeersInProgress &&
+				isResumeSearchingPeersSelfResolved == that.isResumeSearchingPeersSelfResolved &&
+				isResumeSearchingPeersWindUp == that.isResumeSearchingPeersWindUp;
+	}
+
+	@Override
+	public int hashCode() {
+
+		return Objects.hash(isStartedSearchingPeersInProgress, isStartedSearchingPeersSelfResolved, isStartedSearchingPeersWindUp, isPauseSearchingPeersInProgress, isPauseSearchingPeersSelfResolved, isPauseSearchingPeersWindUp, isResumeSearchingPeersInProgress, isResumeSearchingPeersSelfResolved, isResumeSearchingPeersWindUp);
+	}
+
+	@Override
     public String toString() {
         return "PeersState{" +
                 "isStartedSearchingPeersInProgress=" + isStartedSearchingPeersInProgress +

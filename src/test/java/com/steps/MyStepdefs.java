@@ -331,21 +331,25 @@ public class MyStepdefs {
 													  boolean deleteTorrentFiles) throws Throwable {
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-		FileSystemLink fileSystemLink = TorrentDownloaders.getInstance()
+		Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = TorrentDownloaders.getInstance()
 				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-				.get()
-				.getFileSystemLink();
+				.map(TorrentDownloader::getStore)
+				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
-		Mono<FileSystemLink> deletionTaskMono;
-		if (deleteTorrentFiles && deleteActiveTorrent)
-			deletionTaskMono = fileSystemLink.deleteFileOnlyMono()
-					.flatMap(activeTorrent -> activeTorrent.deleteActiveTorrentOnlyMono());
-		else if (deleteTorrentFiles)
-			deletionTaskMono = fileSystemLink.deleteFileOnlyMono();
-		else // deleteActiveTorrent == true
-			deletionTaskMono = fileSystemLink.deleteActiveTorrentOnlyMono();
-
-		StepVerifier.create(deletionTaskMono)
+		torrentStatusStore.latestState$()
+				.as(state$ -> {
+					if (deleteTorrentFiles)
+						return state$.flatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS))
+								.flatMap(__ -> torrentStatusStore.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP));
+					return state$;
+				})
+				.as(state$ -> {
+					if (deleteActiveTorrent)
+						return state$.flatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS))
+								.flatMap(__ -> torrentStatusStore.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP));
+					return state$;
+				})
+				.as(StepVerifier::create)
 				.expectNextCount(1)
 				.verifyComplete();
 	}
@@ -653,38 +657,71 @@ public class MyStepdefs {
 	@When("^torrent-status for torrent \"([^\"]*)\" is trying to change to:$")
 	public void torrentStatusForIsTryingToChangeTo(String torrentFileName,
 												   List<TorrentStatusAction> changeTorrentStatusActionList) throws Throwable {
-		// remove every state from the last test.
-		this.actualLastStatus = null;
-
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 		Store<TorrentStatusState, TorrentStatusAction> store = TorrentDownloaders.getInstance()
 				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-				.get()
+				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
 				.getStore();
 
 		this.actualLastStatus = Flux.fromIterable(changeTorrentStatusActionList)
-				.flatMap(action -> store.dispatch(action), 1, 1)
+				.flatMap(action -> store.dispatch(action), changeTorrentStatusActionList.size(), changeTorrentStatusActionList.size())
 				.blockLast();
 		System.out.println();
+	}
+
+	@Then("^torrent-status for torrent \"([^\"]*)\" will be with action: \"([^\"]*)\" - no side effects:$")
+	public void torrentStatusForWillBeWithoutSideEffects(String torrentFileName, TorrentStatusAction lastTorrentStatusAction,
+														 List<TorrentStatusAction> expectedTorrentStatusActionList) throws Throwable {
+		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+		Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = TorrentDownloaders.getInstance()
+				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+				.getStore();
+
+		TorrentStatusState expectedState = Utils.getTorrentStatusState(torrentInfo, lastTorrentStatusAction, expectedTorrentStatusActionList);
+
+		// test with the actual last status we received in the last time we tried to change the status
+		if (this.actualLastStatus != null) {
+			Assert.assertEquals(expectedState.getAction(), this.actualLastStatus.getAction());
+			Assert.assertEquals(expectedState.getDownloadState(), this.actualLastStatus.getDownloadState());
+			Assert.assertEquals(expectedState.getTorrentFileSystemState(), this.actualLastStatus.getTorrentFileSystemState());
+			Assert.assertEquals(expectedState.getPeersState(), this.actualLastStatus.getPeersState());
+			this.actualLastStatus = null;
+		}
+
+		torrentStatusStore.latestState$()
+				.doOnNext(torrentStatusState -> {
+					Assert.assertEquals(expectedState.getAction(), torrentStatusState.getAction());
+					Assert.assertEquals(expectedState.getDownloadState(), torrentStatusState.getDownloadState());
+					Assert.assertEquals(expectedState.getTorrentFileSystemState(), torrentStatusState.getTorrentFileSystemState());
+					Assert.assertEquals(expectedState.getPeersState(), torrentStatusState.getPeersState());
+				})
+				.as(StepVerifier::create)
+				.expectNextCount(1)
+				.verifyComplete();
 	}
 
 	@Then("^torrent-status for torrent \"([^\"]*)\" will be with action: \"([^\"]*)\":$")
 	public void torrentStatusForWillBe(String torrentFileName, TorrentStatusAction lastTorrentStatusAction,
 									   List<TorrentStatusAction> expectedTorrentStatusActionList) throws Throwable {
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-		Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = TorrentDownloaders.getInstance()
-				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-				.get()
-				.getStore();
 
 		TorrentStatusState expectedState = Utils.getTorrentStatusState(torrentInfo, lastTorrentStatusAction, expectedTorrentStatusActionList);
 
-		// test with the status we received from the "last-status-mono"
-		Assert.assertEquals(expectedState, torrentStatusStore.latestState$().block());
-		// test with the actual last status we received in the last time we tried to change the status
-		if (this.actualLastStatus != null)
-			Assert.assertEquals(expectedState, this.actualLastStatus);
-		this.actualLastStatus = null;
+		TorrentDownloaders.getInstance()
+				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+				.getStore()
+				.latestState$()
+				.doOnNext(torrentStatusState -> {
+					Assert.assertEquals(expectedState.getAction(), torrentStatusState.getAction());
+					Assert.assertEquals(expectedState.getDownloadState(), torrentStatusState.getDownloadState());
+					Assert.assertEquals(expectedState.getTorrentFileSystemState(), torrentStatusState.getTorrentFileSystemState());
+					Assert.assertEquals(expectedState.getPeersState(), torrentStatusState.getPeersState());
+				})
+				.as(StepVerifier::create)
+				.expectNextCount(1)
+				.verifyComplete();
 	}
 
 	private Mono<Link> meToFakePeerLink;
@@ -700,7 +737,7 @@ public class MyStepdefs {
 		// Also the last test created torrentStatusController object.
 		TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
 				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-				.get();
+				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
 				TorrentStatusReducer.defaultTorrentState);
@@ -769,7 +806,7 @@ public class MyStepdefs {
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 		TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
 				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-				.get();
+				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
 		// I must record this because when I subscribe to this.requestsFromFakePeerToMeListMono,
 		// fake-peer will send me request messages and I response to him **piece messages**
@@ -844,7 +881,7 @@ public class MyStepdefs {
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 		TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
 				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-				.get();
+				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
 		this.recordedMeToFakePeersLinks$ = torrentDownloader.getPeersCommunicatorFlux()
 				// send interested message to the fake-peer.
@@ -885,7 +922,7 @@ public class MyStepdefs {
 //		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 //		TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
 //				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-//				.get();
+//				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 //
 //		// all fake peers connect to me. In this test there must be only one fake-peer.
 //		this.recordedFakePeersToMeLinks$ = Flux.fromIterable(this.fakePeersToMeLinkMap.entrySet())
@@ -991,7 +1028,7 @@ public class MyStepdefs {
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 		TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
 				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-				.get();
+				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
 		this.availablePieces$ = torrentDownloader.getBittorrentAlgorithm()
 				.getDownloadAlgorithm()
@@ -1005,7 +1042,7 @@ public class MyStepdefs {
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 		TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
 				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-				.get();
+				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
 		List<Integer> actualAvailablePiecesList = this.availablePieces$.collectList()
 				.block(Duration.ofMillis(500));
