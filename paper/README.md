@@ -2,13 +2,20 @@
 
 ##### Stav Alfi | 204031397
 
-
 1. [Introduction](#introduction)  
-2. [Enviroment](#enviroment)  
-3. [Dependencies](#dependencies)  
-4. [Continues Integration](#continues-integration)  
-5. [Continues Deployment](#continues-deployment)  
-5. [Installation](#installation)
+2. [The Need](#the-need)  
+3. [The BitTorrent protocol ](#the-bittorrent-protocol)  
+4. [TorrentX implementation ](#torrentx-implementation )  
+5. [Design patterns](#design-patterns)
+6. [TorrentX capabilities](#torrentx-capabilities)
+7. [Enviroment](#enviroment)
+8. [Main dependencies](#main-dependencies)
+9. [Tests](#tests)
+10. [Logs](#logs)
+11. [Builds](#builds)
+12. [Network](#network)
+13. [GUI](#gui)
+14. [Tests](#tests)
 
 ## Introduction
 
@@ -100,25 +107,6 @@ I also make a havy use of [_Redux_ design pattern](https://redux.js.org/introduc
 
 As a consequence of the above, TorrentX is fully [asynchronous](https://en.wikipedia.org/wiki/Asynchrony_(computer_programming)) implementation of the BitTorrent protocol.
 
-#### Enviroment
-* Linux 16.04
-* Windows 10 
-
-#### Main dependencies
-* [Project Reactor](https://github.com/reactor/reactor-core)
-
-#### Tests
-* [Cucumber](https://cucumber.io/) - 200+ tests
-
-#### Logs
-* [PaperTrail](https://papertrailapp.com/) - Cloud logger
-
-#### Builds
-* Git
-* GitHub
-* [Circle CI](https://circleci.com/)
-* [Travis CI](https://travis-ci.org/)
-
 ## Design patterns
 
 ##### [Redux](https://redux.js.org/introduction) 
@@ -146,7 +134,7 @@ Each torrent we download is represented by a download object. To save all the do
 
 I use it in the tests to build a fake message to a peer or to a tracker by the type of the message. (2 factories).
 
-General note: I use more design patterns without actually implement them so I didn't list them. Such as: Observer and Iterator.
+> General note: I use more design patterns without actually implement them so I didn't list them. Such as: Observer and Iterator.
 
 ## TorrentX capabilities
 
@@ -158,6 +146,25 @@ General note: I use more design patterns without actually implement them so I di
 6. Upload a torrent to multiple peers.
 7. Recover from trackers errors - shutdown, UDP messages curraption and more.
 8. Recover from peers errors - Not responding, not cuaparating with me (only requets but doesn't give back).
+
+#### Enviroment
+* Linux 16.04
+* Windows 10 
+
+#### Main dependencies
+* [Project Reactor](https://github.com/reactor/reactor-core)
+
+#### Tests
+* [Cucumber](https://cucumber.io/) - 200+ tests
+
+#### Logs
+* [PaperTrail](https://papertrailapp.com/) - Cloud logger
+
+#### Builds
+* Git
+* GitHub
+* [Circle CI](https://circleci.com/)
+* [Travis CI](https://travis-ci.org/)
 
 ## Network
 
