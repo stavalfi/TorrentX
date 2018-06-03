@@ -32,6 +32,7 @@ import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.test.StepVerifier;
 import redux.store.Store;
 
 import java.io.File;
@@ -72,63 +73,58 @@ public class Utils {
 					defaultListenState.isRestartListeningWindUp() == listenerState.isRestartListeningWindUp();
 
 	public static void removeEverythingRelatedToLastTest() {
+		TorrentDownloaders.getAllocatorStore()
+				.freeAll()
+				.flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(2, 1_000_000))
+				.as(StepVerifier::create)
+				.expectNextCount(1)
+				.verifyComplete();
 
-		TorrentDownloaders.getAllocatorStore().freeAll();
-
-		Mono<List<FileSystemLink>> activeTorrentsListMono = ActiveTorrents.getInstance()
-				.getActiveTorrentsFlux()
-				.flatMap(activeTorrent -> activeTorrent.deleteFileOnlyMono()
-						// if the test deleted the files then I will get NoSuchFileException and we will not delete the FileSystemLinkImpl object.
-						.onErrorResume(Throwable.class, throwable -> Mono.just(activeTorrent)))
-				.flatMap(activeTorrent -> activeTorrent.deleteActiveTorrentOnlyMono()
-						// if the test deleted the FileSystemLinkImpl object then I may get an exception which I clearly don't want.
-						.onErrorResume(Throwable.class, throwable -> Mono.just(activeTorrent)))
-
-				.collectList();
-		try {
-			activeTorrentsListMono.block();
-		} catch (Exception e) {
-			//e.printStackTrace();
-		}
-
-
-		Mono<List<Store<TorrentStatusState, TorrentStatusAction>>> torrentDownloadersListMono = TorrentDownloaders.getInstance()
+		TorrentDownloaders.getInstance()
 				.getTorrentDownloadersFlux()
-				.doOnNext(torrentDownloader -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash()))
+				.filter(torrentDownloader -> torrentDownloader.getStore() != null)
 				.map(TorrentDownloader::getStore)
-				.doOnNext(statusChanger -> {
-					// TODO: uncomment
-//                    statusChanger.dispatch(TorrentStatusAction.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
-//                    statusChanger.dispatch(TorrentStatusAction.PAUSE_SEARCHING_PEERS).block();
-//                    statusChanger.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD).block();
-//                    statusChanger.dispatch(TorrentStatusAction.PAUSE_UPLOAD).block();
-				})
-				.collectList();
-		try {
-			torrentDownloadersListMono.block();
-		} catch (Exception e) {
-			//e.printStackTrace();
-		}
+				.flatMap(store -> store.dispatch(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
+						.flatMap(__ -> store.dispatch(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)))
+				.defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
+				.as(StepVerifier::create)
+				.expectNextCount(1)
+				.verifyComplete();
+
+		TorrentDownloaders.getInstance()
+				.getTorrentDownloadersFlux()
+				.filter(torrentDownloader -> torrentDownloader.getStore() != null)
+				.filter(torrentDownloader -> torrentDownloader.getTorrentStatesSideEffects() != null)
+				.map(TorrentDownloader::getStore)
+				.flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP, store))
+				.flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
+				.defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
+				.as(StepVerifier::create)
+				.expectNextCount(1)
+				.verifyComplete();
+
+		TorrentDownloaders.getInstance()
+				.getTorrentDownloadersFlux()
+				.map(TorrentDownloader::getTorrentInfo)
+				.map(TorrentInfo::getTorrentInfoHash)
+				// TODO: incase I get the objects from remote server like mongodb one by one, then this flux will never be over so collectList will never emit next signal.
+				.doOnNext(torrentInfoHash -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentInfoHash))
+				.collectList()
+				.as(StepVerifier::create)
+				.expectNextCount(1)
+				.verifyComplete();
 
 		TorrentDownloaders.getListenStore()
 				.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
 				.flatMapMany(__ -> TorrentDownloaders.getListenStore().states$())
 				.filter(listenerState -> isEqualByProperties.test(ListenerReducer.defaultListenState, listenerState))
 				.take(1)
-				.single()
-				.block();
+				.as(StepVerifier::create)
+				.expectNextCount(1)
+				.verifyComplete();
 
 		// delete download folder from last test
 		Utils.deleteDownloadFolder();
-
-		TorrentDownloaders.getAllocatorStore()
-				.freeAll()
-				.flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(2, 1_000_000))
-				.block();
-
-		// TODO: I need this line so java will create a singleton of Listener.
-		// when I will use spring, I can remove this line.
-		TorrentDownloaders.getListener().getTcpPort();
 	}
 
 	public static void changeListenerState(List<ListenerAction> changesActionList, Store<ListenerState, ListenerAction> listenStore) {
@@ -458,7 +454,8 @@ public class Utils {
 		}
 	}
 
-	private static Mono<SendMessagesNotifications> createAndSendFakePieceMessage(TorrentInfo torrentInfo, String downloadPath, Link link) {
+	private static Mono<SendMessagesNotifications> createAndSendFakePieceMessage(TorrentInfo torrentInfo, String downloadPath,
+																				 Link link) {
 		ActiveTorrents activeTorrents = ActiveTorrents.getInstance();
 		int pieceIndex = 3;
 		int pieceLength = torrentInfo.getPieceLength(pieceIndex);
@@ -492,9 +489,13 @@ public class Utils {
 										.map(__ -> new RequestMessage(link.getMe(), link.getPeer(), pieceIndex, begin, blockLength))
 										.flatMap(requestMessage -> fileSystemLink.buildPieceMessage(requestMessage))
 										.flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
-												.flatMap(sendMessagesNotifications -> fileSystemLink.deleteActiveTorrentOnlyMono()
-														.flatMap(__ -> fileSystemLink.deleteFileOnlyMono())
-														.map(__ -> sendMessagesNotifications)))
+												.flatMap(sendMessagesNotifications -> {
+													store.dispatchNonBlocking(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS);
+													store.dispatchNonBlocking(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS);
+													return store.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP)
+															.flatMap(___ -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
+															.map(___ -> sendMessagesNotifications);
+												}))
 										.take(1)
 										.single();
 							});

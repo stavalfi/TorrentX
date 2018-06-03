@@ -13,7 +13,8 @@ import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.downloader.TorrentPieceStatus;
-import main.file.system.*;
+import main.file.system.ActiveTorrents;
+import main.file.system.FileSystemLink;
 import main.file.system.allocator.AllocatedBlock;
 import main.file.system.allocator.AllocatorState;
 import main.listener.ListenerAction;
@@ -366,7 +367,7 @@ public class MyStepdefs {
 
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
 				TorrentStatusReducer.defaultTorrentState);
-		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
+
 		// release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
 		int amountOfAllocatedBlocks = TorrentDownloaders.getAllocatorStore()
 				.latestState$()
@@ -434,7 +435,7 @@ public class MyStepdefs {
 						null,
 						store,
 						null,
-						torrentStatesSideEffects,
+						null,
 						null);
 	}
 
@@ -450,9 +451,11 @@ public class MyStepdefs {
 
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
+		// I only need this object because the constructor of FileSystemLink listen to signals (which I never signal).
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
 				TorrentStatusReducer.defaultTorrentState);
-		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
+		// I need this object for the cleanup after this test so I can wait until all the files were actually removed.
+		TorrentStatesSideEffects sideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 
 		// release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
 		Semaphore semaphore = new Semaphore(1, true);
@@ -523,7 +526,7 @@ public class MyStepdefs {
 						null,
 						store,
 						null,
-						torrentStatesSideEffects,
+						sideEffects,
 						null);
 	}
 
@@ -633,7 +636,11 @@ public class MyStepdefs {
 	public void activeTorrentForInWithTheFollowingStatus(String torrentFileName, String downloadLocation,
 														 List<TorrentStatusAction> torrentStatusActions) throws Throwable {
 		Utils.removeEverythingRelatedToLastTest();
+
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+		// clean from the last test.
+		TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentInfo.getTorrentInfoHash());
 
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
 				Utils.getTorrentStatusState(torrentInfo, TorrentStatusAction.INITIALIZE, torrentStatusActions));
@@ -661,9 +668,8 @@ public class MyStepdefs {
 				.getStore();
 
 		this.actualLastStatus = Flux.fromIterable(changeTorrentStatusActionList)
-				.flatMap(action -> store.dispatch(action), changeTorrentStatusActionList.size(), changeTorrentStatusActionList.size())
+				.flatMap(store::dispatch, changeTorrentStatusActionList.size(), changeTorrentStatusActionList.size())
 				.blockLast();
-		System.out.println();
 	}
 
 	@Then("^torrent-status for torrent \"([^\"]*)\" will be with action: \"([^\"]*)\" - no side effects:$")

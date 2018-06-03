@@ -5,12 +5,15 @@ import main.TorrentInfo;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloaders;
 import main.downloader.TorrentPieceStatus;
+import main.file.system.exceptions.PieceNotDownloadedYetException;
 import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -29,6 +32,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
+	private static Logger logger = LoggerFactory.getLogger(FileSystemLinkImpl.class);
+
 	private final List<ActualFile> actualFileImplList;
 	private final BitSet piecesStatus;
 	private final long[] downloadedBytesInPieces;
@@ -74,10 +79,12 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 					}
 					return peerResponsesFlux;
 				})
+				.doOnNext(pieceMessage -> logger.trace("start saving piece-message: " + pieceMessage))
 				// If I won't switch thread then I will block redux thread.
 				.publishOn(Schedulers.parallel())
 				.filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
 				.flatMap(this::writeBlock)
+				.doOnNext(pieceMessage -> logger.trace("finished saving piece-message: " + pieceMessage))
 				// takeUntil will signal the last next signal he received and then he will send complete signal.
 				.takeUntil(pieceEvent -> minMissingPieceIndex() == -1)
 				.doOnComplete(() -> store.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS))
@@ -88,6 +95,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 				.filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
 				.map(PieceEvent::getReceivedPiece)
 				.map(PieceMessage::getIndex)
+				.doOnNext(pieceIndex -> logger.debug("completed saving piece-index: " + pieceIndex))
 				.distinct()
 				.publish()
 				.autoConnect(0);
