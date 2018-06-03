@@ -629,26 +629,23 @@ public class MyStepdefs {
 		Utils.removeEverythingRelatedToLastTest();
 	}
 
-	@Given("^initial torrent-status for torrent: \"([^\"]*)\" in \"([^\"]*)\" is:$")
+	@Given("^initial torrent-status for torrent: \"([^\"]*)\" in \"([^\"]*)\" is - no side effects:$")
 	public void activeTorrentForInWithTheFollowingStatus(String torrentFileName, String downloadLocation,
 														 List<TorrentStatusAction> torrentStatusActions) throws Throwable {
-		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-		// delete everything from the last test.
 		Utils.removeEverythingRelatedToLastTest();
+		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
 		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
 				Utils.getTorrentStatusState(torrentInfo, TorrentStatusAction.INITIALIZE, torrentStatusActions));
-		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 
-		TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+		TorrentDownloaders.getInstance()
 				.createTorrentDownloader(torrentInfo,
 						null,
 						null,
 						null,
 						store,
 						null,
-						torrentStatesSideEffects,
+						null,
 						null);
 	}
 

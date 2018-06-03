@@ -2,81 +2,81 @@ Feature: create get and delete active torrents
 
   # TODO: there is a bug here which cause blocking
 
-#  Scenario Outline: we create active torrent
-#    When application create active-torrent for: "<torrent>","<downloadLocation>"
-#    Then active-torrent exist: "true" for torrent: "<torrent>"
-#    Then files of torrent: "<torrent>" exist: "true" in "<downloadLocation>"
-#
-#    Examples:
-#      | torrent                                   | downloadLocation |
-#      | torrent-file-example1.torrent             | torrents-test    |
-#      | torrent-file-example2.torrent             | torrents-test    |
-#      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-#      | ComplexFolderStructure.torrent            | torrents-test    |
-#
-#  Scenario Outline: we delete torrent files only
-#    When application create active-torrent for: "<torrent>","<downloadLocation>"
-#    Then application delete active-torrent: "<torrent>": "false" and file: "true"
-#    Then files of torrent: "<torrent>" exist: "false" in "<downloadLocation>"
-#    Then active-torrent exist: "true" for torrent: "<torrent>"
-#    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_FILES_WIND_UP":
-#      | REMOVE_FILES_WIND_UP          |
-#      | PAUSE_DOWNLOAD_WIND_UP        |
-#      | PAUSE_UPLOAD_WIND_UP          |
-#      | PAUSE_SEARCHING_PEERS_WIND_UP |
-#
-#    Examples:
-#      | torrent                                   | downloadLocation |
-#      | torrent-file-example1.torrent             | torrents-test    |
-#      | torrent-file-example2.torrent             | torrents-test    |
-#      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-#      | ComplexFolderStructure.torrent            | torrents-test    |
-#
-#  Scenario Outline: we delete active torrent only
-#    When application create active-torrent for: "<torrent>","<downloadLocation>"
-#    Then application delete active-torrent: "<torrent>": "true" and file: "false"
-#    Then files of torrent: "<torrent>" exist: "true" in "<downloadLocation>"
-#    Then active-torrent exist: "false" for torrent: "<torrent>"
-#    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_TORRENT_WIND_UP":
-#      | REMOVE_TORRENT_WIND_UP        |
-#      | PAUSE_DOWNLOAD_WIND_UP        |
-#      | PAUSE_UPLOAD_WIND_UP          |
-#      | PAUSE_SEARCHING_PEERS_WIND_UP |
-#
-#    Examples:
-#      | torrent                                   | downloadLocation |
-#      | torrent-file-example1.torrent             | torrents-test    |
-#      | torrent-file-example2.torrent             | torrents-test    |
-#      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-#      | ComplexFolderStructure.torrent            | torrents-test    |
-#
-#  Scenario Outline: we delete active torrent and files twice
-#    When application create active-torrent for: "<torrent>","<downloadLocation>"
-#    Then application delete active-torrent: "<torrent>": "true" and file: "true"
-#    When application create active-torrent for: "<torrent>","<downloadLocation>"
-#    Then application delete active-torrent: "<torrent>": "true" and file: "true"
-#    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_TORRENT_WIND_UP":
-#      | REMOVE_TORRENT_WIND_UP        |
-#      | REMOVE_FILES_WIND_UP          |
-#      | PAUSE_DOWNLOAD_WIND_UP        |
-#      | PAUSE_UPLOAD_WIND_UP          |
-#      | PAUSE_SEARCHING_PEERS_WIND_UP |
-#    Then active-torrent exist: "false" for torrent: "<torrent>"
-#    Then files of torrent: "<torrent>" exist: "false" in "<downloadLocation>"
-#    Then active-torrent exist: "false" for torrent: "<torrent>"
-#    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_TORRENT_WIND_UP":
-#      | REMOVE_TORRENT_WIND_UP        |
-#      | REMOVE_FILES_WIND_UP          |
-#      | PAUSE_DOWNLOAD_WIND_UP        |
-#      | PAUSE_UPLOAD_WIND_UP          |
-#      | PAUSE_SEARCHING_PEERS_WIND_UP |
-#
-#    Examples:
-#      | torrent                                   | downloadLocation |
-#      | torrent-file-example1.torrent             | torrents-test    |
-#      | torrent-file-example2.torrent             | torrents-test    |
-#      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-#      | ComplexFolderStructure.torrent            | torrents-test    |
+  Scenario Outline: we create active torrent
+    When application create active-torrent for: "<torrent>","<downloadLocation>"
+    Then active-torrent exist: "true" for torrent: "<torrent>"
+    Then files of torrent: "<torrent>" exist: "true" in "<downloadLocation>"
+
+    Examples:
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
+
+  Scenario Outline: we delete torrent files only
+    When application create active-torrent for: "<torrent>","<downloadLocation>"
+    Then application delete active-torrent: "<torrent>": "false" and file: "true"
+    Then files of torrent: "<torrent>" exist: "false" in "<downloadLocation>"
+    Then active-torrent exist: "true" for torrent: "<torrent>"
+    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_FILES_WIND_UP":
+      | REMOVE_FILES_WIND_UP          |
+      | PAUSE_DOWNLOAD_WIND_UP        |
+      | PAUSE_UPLOAD_WIND_UP          |
+      | PAUSE_SEARCHING_PEERS_WIND_UP |
+
+    Examples:
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
+
+  Scenario Outline: we delete active torrent only
+    When application create active-torrent for: "<torrent>","<downloadLocation>"
+    Then application delete active-torrent: "<torrent>": "true" and file: "false"
+    Then files of torrent: "<torrent>" exist: "true" in "<downloadLocation>"
+    Then active-torrent exist: "false" for torrent: "<torrent>"
+    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_TORRENT_WIND_UP":
+      | REMOVE_TORRENT_WIND_UP        |
+      | PAUSE_DOWNLOAD_WIND_UP        |
+      | PAUSE_UPLOAD_WIND_UP          |
+      | PAUSE_SEARCHING_PEERS_WIND_UP |
+
+    Examples:
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
+
+  Scenario Outline: we delete active torrent and files twice
+    When application create active-torrent for: "<torrent>","<downloadLocation>"
+    Then application delete active-torrent: "<torrent>": "true" and file: "true"
+    When application create active-torrent for: "<torrent>","<downloadLocation>"
+    Then application delete active-torrent: "<torrent>": "true" and file: "true"
+    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_TORRENT_WIND_UP":
+      | REMOVE_TORRENT_WIND_UP        |
+      | REMOVE_FILES_WIND_UP          |
+      | PAUSE_DOWNLOAD_WIND_UP        |
+      | PAUSE_UPLOAD_WIND_UP          |
+      | PAUSE_SEARCHING_PEERS_WIND_UP |
+    Then active-torrent exist: "false" for torrent: "<torrent>"
+    Then files of torrent: "<torrent>" exist: "false" in "<downloadLocation>"
+    Then active-torrent exist: "false" for torrent: "<torrent>"
+    Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_TORRENT_WIND_UP":
+      | REMOVE_TORRENT_WIND_UP        |
+      | REMOVE_FILES_WIND_UP          |
+      | PAUSE_DOWNLOAD_WIND_UP        |
+      | PAUSE_UPLOAD_WIND_UP          |
+      | PAUSE_SEARCHING_PEERS_WIND_UP |
+
+    Examples:
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
 #
 #  Scenario Outline: we save pieces of active torrent and read it
 #    # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
