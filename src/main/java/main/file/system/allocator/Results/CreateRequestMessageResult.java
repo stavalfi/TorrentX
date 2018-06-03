@@ -14,4 +14,8 @@ public class CreateRequestMessageResult extends Result<AllocatorState, Allocator
 		super(request, state, isNewState);
 		this.requestMessage = requestMessage;
 	}
+
+	public RequestMessage getRequestMessage() {
+		return requestMessage;
+	}
 }

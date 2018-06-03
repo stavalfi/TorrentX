@@ -15,17 +15,6 @@ import java.util.stream.IntStream;
 public class AllocatorReducer implements Reducer<AllocatorState, AllocatorAction> {
 	public static AllocatorState defaultAllocatorState = createInitialState(1, 1);
 
-	private static AllocatorState createInitialState(int amountOfBlocks, int blockLength) {
-		BitSet freeBlocksStatus = new BitSet(amountOfBlocks);
-		freeBlocksStatus.set(0, amountOfBlocks, true);
-		AllocatedBlock[] allocatedBlocks = IntStream.range(0, amountOfBlocks)
-				.mapToObj(index -> new AllocatedBlockImpl(index, blockLength))
-				.toArray(AllocatedBlock[]::new);
-
-		return new AllocatorState("INITIALIZE-id", AllocatorAction.INITIALIZE,
-				blockLength, amountOfBlocks, freeBlocksStatus, allocatedBlocks);
-	}
-
 	@Override
 	public Result<AllocatorState, AllocatorAction> reducer(AllocatorState lastState, Request<AllocatorAction> request) {
 		switch (request.getAction()) {
@@ -37,9 +26,9 @@ public class AllocatorReducer implements Reducer<AllocatorState, AllocatorAction
 				return createRequestMessage(lastState, (CreateRequestMessageRequest) request);
 			case UPDATE_ALLOCATIONS_ARRAY:
 				return createNewStateToUpdateAllocationArray(lastState, (UpdateAllocationArrayRequest) request);
-			case FREE_ALLOCATION:
-				return createNewStateToFreeAllAllocations(lastState, (FreeAllAllocationsRequest) request);
 			case FREE_ALL_ALLOCATIONS:
+				return createNewStateToFreeAllAllocations(lastState, (FreeAllAllocationsRequest) request);
+			case FREE_ALLOCATION:
 				return createNewStateToFreeAllocation(lastState, (FreeAllocationRequest) request);
 			default:
 				return new Result<>(request, lastState, false);
@@ -77,7 +66,15 @@ public class AllocatorReducer implements Reducer<AllocatorState, AllocatorAction
 	}
 
 	private Result<AllocatorState, AllocatorAction> createNewStateToFreeAllAllocations(AllocatorState oldState, FreeAllAllocationsRequest request) {
-		return null;
+		BitSet freeBlocksStatus = new BitSet(oldState.getAmountOfBlocks());
+		freeBlocksStatus.set(0, oldState.getAmountOfBlocks());
+		AllocatorState newState = new AllocatorState(request.getId(),
+				request.getAction(),
+				oldState.getBlockLength(),
+				oldState.getAmountOfBlocks(),
+				freeBlocksStatus,
+				oldState.getAllocatedBlocks());
+		return new Result<>(request, newState, true);
 	}
 
 	private Result<AllocatorState, AllocatorAction> createNewStateToFreeAllocation(AllocatorState oldState, FreeAllocationRequest request) {
@@ -174,5 +171,16 @@ public class AllocatorReducer implements Reducer<AllocatorState, AllocatorAction
 			// (4) -> (5) -> newBlockLength <= pieceLength
 		}
 		return newBlockLength;
+	}
+
+	private static AllocatorState createInitialState(int amountOfBlocks, int blockLength) {
+		BitSet freeBlocksStatus = new BitSet(amountOfBlocks);
+		freeBlocksStatus.set(0, amountOfBlocks, true);
+		AllocatedBlock[] allocatedBlocks = IntStream.range(0, amountOfBlocks)
+				.mapToObj(index -> new AllocatedBlockImpl(index, blockLength))
+				.toArray(AllocatedBlock[]::new);
+
+		return new AllocatorState("INITIALIZE-id", AllocatorAction.INITIALIZE,
+				blockLength, amountOfBlocks, freeBlocksStatus, allocatedBlocks);
 	}
 }

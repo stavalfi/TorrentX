@@ -124,6 +124,7 @@ public class Listener {
 		});
 
 		return peersSocket.concatMap(peerSocket -> acceptPeerConnection(peerSocket)
+				.doOnNext(link -> logger.info("new peer connected to me successfully: " + link))
 				.onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty()));
 	}
 

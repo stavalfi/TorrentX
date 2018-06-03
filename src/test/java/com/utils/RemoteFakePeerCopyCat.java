@@ -1,7 +1,7 @@
 package com.utils;
 
 import main.TorrentInfo;
-import main.file.system.allocator.BlocksAllocatorImpl;
+import main.downloader.TorrentDownloaders;
 import main.peer.Peer;
 import main.peer.PeerMessageFactory;
 import main.peer.SendMessages;
@@ -91,7 +91,7 @@ public class RemoteFakePeerCopyCat extends Peer {
             peerMessage.sendMessage(sendMessages)
                     .filter(__ -> peerMessage instanceof PieceMessage)
                     .map(__ -> (PieceMessage) peerMessage)
-                    .flatMap(pieceMessage -> BlocksAllocatorImpl.getInstance().free(pieceMessage.getAllocatedBlock()))
+                    .flatMap(pieceMessage -> TorrentDownloaders.getAllocatorStore().free(pieceMessage.getAllocatedBlock()))
                     .block();
             receivedMessagesAmount++;
         }

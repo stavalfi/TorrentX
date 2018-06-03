@@ -33,11 +33,10 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 		this.results$ = emitRequests
 				.scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
 					Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
-					if (!result.isNewState()) {
+					if (result.isNewState())
 						logger.debug("ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
-						return result;
-					}
-					logger.debug("passed - request: " + request + " new state: " + result.getState() + "\n");
+					else
+						logger.debug("passed - request: " + request + " new state: " + result.getState() + "\n");
 					return result;
 				})
 				.replay()
@@ -50,9 +49,22 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 				.autoConnect(0);
 	}
 
+
 	private Mono<Result<STATE_IMPL, ACTION>> dispatch2(ACTION action) {
 		Request<ACTION> request = new Request<>(action);
 		return dispatch(request);
+	}
+
+	public Mono<Result<STATE_IMPL, ACTION>> dispatch(Request<ACTION> request) {
+		logger.debug("getting ready for dispatching request: " + request);
+		Flux<Result<STATE_IMPL, ACTION>> resultFlux = this.results$
+				.filter(result -> result.getRequest().equals(request))
+				.take(1)
+				.replay()
+				.autoConnect(0);
+		this.emitRequestsSink.next(request);
+		return resultFlux.take(1)
+				.single();
 	}
 
 	public Mono<STATE_IMPL> dispatch(ACTION action) {
@@ -66,10 +78,8 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 				.takeWhile(stateImpl -> isCanceled.negate().test(action, stateImpl))
 				.concatMap(stateImpl -> dispatch(action))
 				.filter(stateImpl -> stateImpl.fromAction(action))
-				.doOnNext(stateImpl -> logger.debug("we finally succeed to change to " + action + "!"))
 				.take(1)
-				.switchIfEmpty(latestState$()
-						.doOnNext(__ -> logger.debug("we failed to change to: " + action)))
+				.switchIfEmpty(latestState$())
 				.single();
 	}
 

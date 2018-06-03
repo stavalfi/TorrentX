@@ -3,8 +3,8 @@ package main.file.system;
 import christophedetroyer.torrent.TorrentFile;
 import main.TorrentInfo;
 import main.downloader.PieceEvent;
+import main.downloader.TorrentDownloaders;
 import main.downloader.TorrentPieceStatus;
-import main.file.system.allocator.BlocksAllocatorImpl;
 import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -214,7 +214,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
         int pieceLength = super.getPieceLength(requestMessage.getIndex());
 
-        return BlocksAllocatorImpl.getInstance()
+        return TorrentDownloaders.getAllocatorStore()
                 .createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
                         requestMessage.getIndex(), requestMessage.getBegin(),
                         requestMessage.getBlockLength(), pieceLength)

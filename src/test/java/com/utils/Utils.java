@@ -9,8 +9,6 @@ import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.*;
-import main.file.system.allocator.BlocksAllocator;
-import main.file.system.allocator.BlocksAllocatorImpl;
 import main.listener.ListenerAction;
 import main.listener.reducers.ListenerReducer;
 import main.listener.state.tree.ListenerState;
@@ -76,7 +74,7 @@ public class Utils {
 
 	public static void removeEverythingRelatedToLastTest() {
 
-		BlocksAllocatorImpl.getInstance().freeAll();
+		TorrentDownloaders.getAllocatorStore().freeAll();
 
 		Mono<List<FileSystemLink>> activeTorrentsListMono = ActiveTorrents.getInstance()
 				.getActiveTorrentsFlux()
@@ -124,10 +122,10 @@ public class Utils {
 		// delete download folder from last test
 		Utils.deleteDownloadFolder();
 
-//		BlocksAllocatorImpl.getInstance()
-//				.freeAll()
-//				.flatMap(__ -> BlocksAllocatorImpl.getInstance().updateAllocations(2, 1_000_000))
-//				.block();
+		TorrentDownloaders.getAllocatorStore()
+				.freeAll()
+				.flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(2, 1_000_000))
+				.block();
 
 		// TODO: I need this line so java will create a singleton of Listener.
 		// when I will use spring, I can remove this line.
@@ -469,9 +467,9 @@ public class Utils {
 		int pieceLength = torrentInfo.getPieceLength(pieceIndex);
 		int begin = 0;
 		int blockLength = pieceLength;
-		return BlocksAllocatorImpl.getInstance()
+		return TorrentDownloaders.getAllocatorStore()
 				.updateAllocations(4, blockLength)
-				.flatMap(allocatorState -> BlocksAllocatorImpl.getInstance()
+				.flatMap(allocatorState -> TorrentDownloaders.getAllocatorStore()
 						.createPieceMessage(link.getPeer(), link.getMe(), pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
 				.doOnNext(pieceMessageToSave -> {
 					for (int i = 0; i < blockLength; i++)
@@ -494,7 +492,7 @@ public class Utils {
 												"the pieces that was saved.", pieceIndex, pieceEvent.getReceivedPiece().getIndex()))
 										.map(PieceEvent::getReceivedPiece)
 										.map(PieceMessage::getAllocatedBlock)
-										.flatMap(allocatedBlock -> BlocksAllocatorImpl.getInstance().free(allocatedBlock))
+										.flatMap(allocatedBlock -> TorrentDownloaders.getAllocatorStore().free(allocatedBlock))
 										.map(__ -> new RequestMessage(link.getMe(), link.getPeer(), pieceIndex, begin, blockLength))
 										.flatMap(requestMessage -> fileSystemLink.buildPieceMessage(requestMessage))
 										.flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
@@ -571,7 +569,7 @@ public class Utils {
 
 		// read from the file:
 
-		return BlocksAllocatorImpl.getInstance()
+		return TorrentDownloaders.getAllocatorStore()
 				.createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
 						requestMessage.getIndex(), requestMessage.getBegin(),
 						requestMessage.getBlockLength(), torrentInfo.getPieceLength(requestMessage.getIndex()))
@@ -699,8 +697,8 @@ public class Utils {
 			return blockStartPosition + blockLength;
 		})
 				.flatMap(smallBlock -> {
-					BlocksAllocator instance = BlocksAllocatorImpl.getInstance();
-					return instance.createPieceMessage(null, null, smallBlock.getPieceIndex(), smallBlock.getFrom(), smallBlock.getLength(), pieceLength)
+					return TorrentDownloaders.getAllocatorStore()
+							.createPieceMessage(null, null, smallBlock.getPieceIndex(), smallBlock.getFrom(), smallBlock.getLength(), pieceLength)
 							.doOnNext(pieceMessage -> Assert.assertEquals("I didn't proceed the length as good as I should have.",
 									smallBlock.getLength().longValue(),
 									pieceMessage.getAllocatedBlock().getLength()));

@@ -4,7 +4,7 @@ import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
 import main.algorithms.PeersToPiecesMapper;
 import main.algorithms.PiecesDownloader;
-import main.file.system.allocator.BlocksAllocatorImpl;
+import main.downloader.TorrentDownloaders;
 import main.file.system.FileSystemLink;
 import main.peer.PeerExceptions;
 import main.torrent.status.TorrentStatusAction;
@@ -76,7 +76,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
         return requestBlockFromPosition.flatMap(requestFromPosition ->
                         this.peersToPiecesMapper.peerSupplierFlux(pieceIndex)
                                 .index()
-                                .flatMap(link -> BlocksAllocatorImpl.getInstance()
+                                .flatMap(link -> TorrentDownloaders.getAllocatorStore()
                                                 .createRequestMessage(link.getT2().getMe(), link.getT2().getPeer(),
                                                         pieceIndex, requestFromPosition, requestBlockLength.apply(requestFromPosition),
                                                         torrentInfo.getPieceLength(pieceIndex))
