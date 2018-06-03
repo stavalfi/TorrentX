@@ -9,10 +9,7 @@ import cucumber.api.java.en.When;
 import main.App;
 import main.AppConfig;
 import main.TorrentInfo;
-import main.downloader.PieceEvent;
-import main.downloader.TorrentDownloader;
-import main.downloader.TorrentDownloaders;
-import main.downloader.TorrentPieceStatus;
+import main.downloader.*;
 import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
 import main.file.system.allocator.AllocatedBlock;
@@ -262,14 +259,21 @@ public class MyStepdefs {
 
 	@When("^application create active-torrent for: \"([^\"]*)\",\"([^\"]*)\"$")
 	public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {
-		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-		// delete everything from the last test.
 		Utils.removeEverythingRelatedToLastTest();
+
+		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
 		// this will waitForMessage an activeTorrent object.
 		String downloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-		Utils.createDefaultTorrentDownloader(torrentInfo, downloadPath);
+
+		TorrentDownloaders.getInstance()
+				.createTorrentDownloader(TorrentDownloaderBuilder.builder(torrentInfo)
+						.setToDefaultTorrentStatusStore()
+						.setToDefaultTorrentStatesSideEffects()
+						.setToDefaultSearchPeers()
+						.setToDefaultPeersCommunicatorFlux()
+						.setToDefaultFileSystemLink(downloadPath)
+						.build());
 	}
 
 	@Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
@@ -423,8 +427,6 @@ public class MyStepdefs {
 		List<Integer> expected = piecesCompleted1.block();
 		List<Integer> actual = piecesCompleted2.block();
 		Utils.assertListEqualNotByOrder(expected, actual, Integer::equals);
-
-		Assert.assertEquals(-1, fileSystemLink.minMissingPieceIndex());
 
 		// I must waitForMessage it here because later I need to get the torrentStatusController which was already created here.
 		// If I'm not creating TorrentDownloader object here, I will waitForMessage 2 different torrentStatusController objects.

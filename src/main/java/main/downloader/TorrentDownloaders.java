@@ -82,7 +82,14 @@ public class TorrentDownloaders {
 							torrentStatesSideEffects, peersCommunicatorFlux);
 
 					this.torrentDownloaderList.add(torrentDownloader);
+					return torrentDownloader;
+				});
+	}
 
+	public synchronized TorrentDownloader createTorrentDownloader(TorrentDownloader torrentDownloader) {
+		return findTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash())
+				.orElseGet(() -> {
+					this.torrentDownloaderList.add(torrentDownloader);
 					return torrentDownloader;
 				});
 	}
@@ -119,7 +126,7 @@ public class TorrentDownloaders {
 		SearchPeers searchPeers = new SearchPeers(torrentInfo, store);
 
 		Flux<Link> peersCommunicatorFlux =
-				Flux.merge(getInstance().getListener().getPeers$(torrentInfo), searchPeers.getPeers$())
+				Flux.merge(getListener().getPeers$(torrentInfo), searchPeers.getPeers$())
 						// multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
 						// multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
 						// every time and then I will connect to all the peers again and again...
