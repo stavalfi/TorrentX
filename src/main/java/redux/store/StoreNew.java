@@ -2,6 +2,7 @@ package redux.store;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
@@ -20,23 +21,16 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 	private Flux<Result<STATE_IMPL, ACTION>> results$;
 	private Flux<STATE_IMPL> states$;
 
+	private FluxSink<Request<ACTION>> emitRequestsSink;
 	private BlockingQueue<Request<ACTION>> requestsQueue = new LinkedBlockingQueue<>();
 
 	public StoreNew(Reducer<STATE_IMPL, ACTION> reducer, STATE_IMPL defaultState) {
 		Result<STATE_IMPL, ACTION> initialResult = new Result<>(new Request<>(defaultState.getAction()), defaultState, true);
 
-		this.results$ = Flux.create((FluxSink<Request<ACTION>> sink) -> {
-			while (true) {
-				try {
-					Request<ACTION> request = requestsQueue.take();
-					sink.next(request);
-				} catch (InterruptedException e) {
-					sink.error(e);
-					return;
-				}
-			}
-		}).subscribeOn(Schedulers.elastic())
-				.doOnNext(request -> logger.debug("3: " + request + "\n"))
+		EmitterProcessor<Request<ACTION>> emitRequests = EmitterProcessor.create(Integer.MAX_VALUE);
+		this.emitRequestsSink = emitRequests.sink(FluxSink.OverflowStrategy.BUFFER);
+
+		this.results$ = emitRequests
 				.scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
 					Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
 					if (!result.isNewState()) {
@@ -46,9 +40,8 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 					logger.debug("passed - request: " + request + " new state: " + result.getState() + "\n");
 					return result;
 				})
-				.publish()
-				// start emit only when this.states$ listen so he will get the initial state.
-				.autoConnect(1);
+				.replay()
+				.autoConnect(0);
 
 		this.states$ = this.results$
 				.map(Result::getState)
@@ -57,28 +50,15 @@ public class StoreNew<STATE_IMPL extends State<ACTION>, ACTION> implements Notif
 				.autoConnect(0);
 	}
 
-	private Mono<Result<STATE_IMPL, ACTION>> dispatch2(Request<ACTION> request) {
-		Mono<Result<STATE_IMPL, ACTION>> resultFlux = this.results$
-				.filter(result -> result.getRequest().equals(request))
-				.take(1)
-				.replay(1)
-				.autoConnect(0)
-				.take(1)
-				.single();
-		try {
-			this.requestsQueue.put(request);
-		} catch (InterruptedException e) {
-			return Mono.error(e);
-		}
-		return resultFlux;
+	private Mono<Result<STATE_IMPL, ACTION>> dispatch2(ACTION action) {
+		Request<ACTION> request = new Request<>(action);
+		return dispatch(request);
 	}
 
 	public Mono<STATE_IMPL> dispatch(ACTION action) {
-		return dispatch2(new Request<>(action)).map(Result::getState);
-	}
+		return dispatch2(action)
+				.map(Result::getState);
 
-	public Mono<Result<STATE_IMPL, ACTION>> dispatch(Request<ACTION> request) {
-		return dispatch2(request);
 	}
 
 	public Mono<STATE_IMPL> dispatchAsLongNoCancel(ACTION action, BiPredicate<ACTION, STATE_IMPL> isCanceled) {
