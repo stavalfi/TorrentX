@@ -25,10 +25,6 @@ public interface FileSystemLink {
 
     BitFieldMessage buildBitFieldMessage(Peer from, Peer to);
 
-    int minMissingPieceIndex();
-
-    int maxMissingPieceIndex();
-
     long[] getDownloadedBytesInPieces();
 
     /**

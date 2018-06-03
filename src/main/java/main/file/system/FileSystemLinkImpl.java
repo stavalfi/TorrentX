@@ -86,7 +86,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 				.flatMap(this::writeBlock)
 				.doOnNext(pieceMessage -> logger.trace("finished saving piece-message: " + pieceMessage))
 				// takeUntil will signal the last next signal he received and then he will send complete signal.
-				.takeUntil(pieceEvent -> minMissingPieceIndex() == -1)
+				.takeUntil(pieceEvent -> areAllPiecesSaved())
 				.doOnComplete(() -> store.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS))
 				.publish()
 				.autoConnect(0);
@@ -144,7 +144,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 		return this.savedPiecesFlux;
 	}
 
-	public Mono<FileSystemLink> deleteActiveTorrentOnlyMono() {
+	private Mono<FileSystemLink> deleteActiveTorrentOnlyMono() {
 		return Flux.fromIterable(this.actualFileImplList)
 				.flatMap(ActualFile::closeFileChannel)
 				.collectList()
@@ -154,12 +154,10 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 					if (deletedActiveTorrent)
 						return Mono.just(this);
 					return Mono.error(new Exception("FileSystemLinkImpl object not exist."));
-				});// TODO: uncomment
-//                .flatMap(fileSystemLink -> this.store.dispatch(TorrentStatusAction.REMOVE_TORRENT)
-//                        .map(status -> fileSystemLink));
+				});
 	}
 
-	public Mono<FileSystemLink> deleteFileOnlyMono() {
+	private Mono<FileSystemLink> deleteFileOnlyMono() {
 		return Flux.fromIterable(this.actualFileImplList)
 				.flatMap(ActualFile::closeFileChannel)
 				.collectList()
@@ -168,27 +166,18 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 						String singleFilePath = this.actualFileImplList.get(0).getFilePath();
 						return completelyDeleteFolder(singleFilePath);
 					}
-					// TODO: is this comment good? -> I will delete this file at the next operator.
 					String torrentDirectoryPath = this.downloadPath + this.getName();
 					return completelyDeleteFolder(torrentDirectoryPath);
 				});
 	}
 
-	@Override
-	public synchronized int minMissingPieceIndex() {
+	private boolean areAllPiecesSaved() {
 		for (int i = 0; i < this.getPieces().size(); i++)
 			if (!this.piecesStatus.get(i))
-				return i;
-		return -1;
+				return false;
+		return true;
 	}
 
-	@Override
-	public int maxMissingPieceIndex() {
-		for (int i = this.getPieces().size() - 1; i >= 0; i--)
-			if (!this.piecesStatus.get(i))
-				return i;
-		return -1;
-	}
 
 	@Override
 	public long[] getDownloadedBytesInPieces() {
