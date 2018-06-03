@@ -2,7 +2,6 @@ package redux.store;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
@@ -20,17 +19,22 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 	private FluxSink<Request<ACTION>> actionsSink;
 	private Flux<Result<STATE_IMPL, ACTION>> results$;
 	private Flux<STATE_IMPL> states$;
-
-	private FluxSink<Request<ACTION>> emitRequestsSink;
 	private BlockingQueue<Request<ACTION>> requestsQueue = new LinkedBlockingQueue<>();
 
 	public Store(Reducer<STATE_IMPL, ACTION> reducer, STATE_IMPL defaultState) {
 		Result<STATE_IMPL, ACTION> initialResult = new Result<>(new Request<>(defaultState.getAction()), defaultState, true);
 
-		EmitterProcessor<Request<ACTION>> emitRequests = EmitterProcessor.create(Integer.MAX_VALUE);
-		this.emitRequestsSink = emitRequests.sink(FluxSink.OverflowStrategy.BUFFER);
-
-		this.results$ = emitRequests
+		this.results$ = Flux.create((FluxSink<Request<ACTION>> sink) -> {
+			while (true) {
+				try {
+					Request<ACTION> request = this.requestsQueue.take();
+					sink.next(request);
+				} catch (InterruptedException e) {
+					sink.error(e);
+					return;
+				}
+			}
+		}).subscribeOn(Schedulers.elastic())
 				.scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
 					Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
 					if (!result.isNewState())
@@ -52,7 +56,12 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 	public void dispatchNonBlocking(ACTION action) {
 		Request<ACTION> request = new Request<>(action);
 		logger.debug("getting ready for dispatching request: " + request);
-		this.emitRequestsSink.next(request);
+		try {
+			this.requestsQueue.put(request);
+		} catch (InterruptedException e) {
+			// TODO: do something with this
+			e.printStackTrace();
+		}
 	}
 
 	public Mono<Result<STATE_IMPL, ACTION>> dispatch(Request<ACTION> request) {
@@ -62,7 +71,11 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 				.take(1)
 				.replay()
 				.autoConnect(0);
-		this.emitRequestsSink.next(request);
+		try {
+			this.requestsQueue.put(request);
+		} catch (InterruptedException e) {
+			return Mono.error(e);
+		}
 		return resultFlux.take(1)
 				.single();
 	}
