@@ -19,11 +19,13 @@ import reactor.core.publisher.Mono;
 import redux.store.Store;
 
 // TODO: save the initial status in the mongodb.
+// TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
 public class TorrentDownloaderBuilder {
 	private TorrentInfo torrentInfo;
 	private SearchPeers searchPeers;
 	private Mono<FileSystemLink> fileSystemLink$;
-	private Mono<BittorrentAlgorithm> bittorrentAlgorithm$;
+	private boolean isDefaultBittorrentAlgorithm = false;
+	private BittorrentAlgorithm bittorrentAlgorithm;
 	private Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore;
 	private TorrentStatesSideEffects torrentStatesSideEffects;
 	private SpeedStatistics torrentSpeedStatistics;
@@ -35,6 +37,7 @@ public class TorrentDownloaderBuilder {
 
 	public static TorrentDownloaderBuilder builder(TorrentInfo torrentInfo) {
 		assert torrentInfo != null;
+
 		return new TorrentDownloaderBuilder(torrentInfo);
 	}
 
@@ -52,37 +55,38 @@ public class TorrentDownloaderBuilder {
 
 	public Mono<TorrentDownloader> build() {
 		if (this.fileSystemLink$ == null) {
-			if (this.bittorrentAlgorithm$ == null)
-				return Mono.just(new TorrentDownloader(this.torrentInfo,
-						this.searchPeers,
-						null,
-						null,
-						this.torrentStatusStore,
-						this.torrentSpeedStatistics,
-						this.torrentStatesSideEffects,
-						this.peersCommunicatorFlux));
 			// it can't be that fileSystemLink$==null and bittorrentAlgorithm$!=null
 			// because we need fileSystemLink object to create bittorrentAlgorithm object.
-		}
-		if (this.bittorrentAlgorithm$ == null) {
-			return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
+			assert !this.isDefaultBittorrentAlgorithm;
+			assert this.bittorrentAlgorithm == null;
+
+			return Mono.just(new TorrentDownloader(this.torrentInfo,
 					this.searchPeers,
-					fileSystemLink,
+					null,
 					null,
 					this.torrentStatusStore,
 					this.torrentSpeedStatistics,
 					this.torrentStatesSideEffects,
 					this.peersCommunicatorFlux));
 		}
-		return this.bittorrentAlgorithm$.flatMap(bittorrentAlgorithm ->
-				this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
-						this.searchPeers,
-						fileSystemLink,
-						bittorrentAlgorithm,
-						this.torrentStatusStore,
-						this.torrentSpeedStatistics,
-						this.torrentStatesSideEffects,
-						this.peersCommunicatorFlux)));
+		if (!this.isDefaultBittorrentAlgorithm) {
+			return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
+					this.searchPeers,
+					fileSystemLink,
+					this.bittorrentAlgorithm,
+					this.torrentStatusStore,
+					this.torrentSpeedStatistics,
+					this.torrentStatesSideEffects,
+					this.peersCommunicatorFlux));
+		}
+		return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
+				this.searchPeers,
+				fileSystemLink,
+				BittorrentAlgorithmInitializer.v1(torrentInfo, this.torrentStatusStore, fileSystemLink, this.peersCommunicatorFlux),
+				this.torrentStatusStore,
+				this.torrentSpeedStatistics,
+				this.torrentStatesSideEffects,
+				this.peersCommunicatorFlux));
 	}
 
 	public TorrentDownloaderBuilder setSearchPeers(SearchPeers searchPeers) {
@@ -92,6 +96,7 @@ public class TorrentDownloaderBuilder {
 
 	public TorrentDownloaderBuilder setToDefaultSearchPeers() {
 		assert this.torrentStatusStore != null;
+
 		this.searchPeers = new SearchPeers(this.torrentInfo, this.torrentStatusStore);
 		return this;
 	}
@@ -103,23 +108,21 @@ public class TorrentDownloaderBuilder {
 
 	public TorrentDownloaderBuilder setToDefaultFileSystemLink(String downloadPath) {
 		assert this.torrentStatusStore != null;
+		assert this.peersCommunicatorFlux != null;
+
 		this.fileSystemLink$ = FileSystemLinkImpl.create(torrentInfo, downloadPath, this.torrentStatusStore,
 				this.peersCommunicatorFlux.map(Link::receivePeerMessages)
 						.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux));
 		return this;
 	}
 
-	public TorrentDownloaderBuilder setBittorrentAlgorithm$(Mono<BittorrentAlgorithm> bittorrentAlgorithm$) {
-		this.bittorrentAlgorithm$ = bittorrentAlgorithm$;
+	public TorrentDownloaderBuilder setBittorrentAlgorithm$(BittorrentAlgorithm bittorrentAlgorithm$) {
+		this.bittorrentAlgorithm = bittorrentAlgorithm$;
 		return this;
 	}
 
 	public TorrentDownloaderBuilder setToDefaultBittorrentAlgorithm() {
-		assert this.torrentStatusStore != null;
-		this.bittorrentAlgorithm$ = this.fileSystemLink$.map(fileSystemLink -> BittorrentAlgorithmInitializer.v1(torrentInfo,
-				this.torrentStatusStore,
-				fileSystemLink,
-				peersCommunicatorFlux));
+		this.isDefaultBittorrentAlgorithm = true;
 		return this;
 	}
 
@@ -141,6 +144,7 @@ public class TorrentDownloaderBuilder {
 
 	public TorrentDownloaderBuilder setToDefaultTorrentStatesSideEffects() {
 		assert this.torrentStatusStore != null;
+
 		this.torrentStatesSideEffects = new TorrentStatesSideEffects(this.torrentInfo, this.torrentStatusStore);
 		return this;
 	}
@@ -152,6 +156,7 @@ public class TorrentDownloaderBuilder {
 
 	public TorrentDownloaderBuilder setToDefaultTorrentSpeedStatistics() {
 		assert this.peersCommunicatorFlux != null;
+
 		this.torrentSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(this.torrentInfo,
 				this.peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
 		return this;
@@ -164,6 +169,7 @@ public class TorrentDownloaderBuilder {
 
 	public TorrentDownloaderBuilder setToDefaultPeersCommunicatorFlux() {
 		assert this.searchPeers != null;
+
 		this.peersCommunicatorFlux = Flux.merge(TorrentDownloaders.getListener().getPeers$(this.torrentInfo), this.searchPeers.getPeers$())
 				// multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
 				// multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux

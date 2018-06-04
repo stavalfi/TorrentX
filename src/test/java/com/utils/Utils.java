@@ -3,32 +3,25 @@ package com.utils;
 import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
 import main.TorrentInfo;
-import main.algorithms.BittorrentAlgorithm;
-import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.ActualFileImpl;
-import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
 import main.listener.ListenerAction;
 import main.listener.reducers.ListenerReducer;
 import main.listener.state.tree.ListenerState;
-import main.peer.*;
+import main.peer.Link;
+import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
-import main.statistics.SpeedStatistics;
-import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.reducers.TorrentStatusReducer;
-import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.DownloadState;
 import main.torrent.status.state.tree.PeersState;
 import main.torrent.status.state.tree.TorrentFileSystemState;
 import main.torrent.status.state.tree.TorrentStatusState;
-import main.tracker.TrackerConnection;
-import main.tracker.TrackerProvider;
 import org.junit.Assert;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
@@ -39,7 +32,6 @@ import redux.store.Store;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.*;
@@ -279,150 +271,6 @@ public class Utils {
 				.setRestartListeningSelfResolved(actions.contains(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
 				.setRestartListeningWindUp(actions.contains(ListenerAction.RESTART_LISTENING_WIND_UP))
 				.build();
-	}
-
-	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
-		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				TorrentStatusReducer.defaultTorrentState);
-		return createDefaultTorrentDownloader(torrentInfo, downloadPath,
-				store, new TorrentStatesSideEffects(torrentInfo, store));
-	}
-
-	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
-																   Flux<TrackerConnection> trackerConnectionConnectableFlux) {
-		TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
-		PeersProvider peersProvider = new PeersProvider(torrentInfo);
-
-		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				TorrentStatusReducer.defaultTorrentState);
-		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
-		// TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
-		SearchPeers searchPeers = new SearchPeers(torrentInfo, store, trackerProvider,
-				peersProvider, peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-				.autoConnect(0));
-
-		Flux<Link> peersCommunicatorFlux =
-				Flux.merge(TorrentDownloaders.getInstance().getListener().getPeers$(torrentInfo)
-						// SocketException == When I shutdown the SocketServer after/before
-						// the tests inside Utils::removeEverythingRelatedToTorrent.
-						.onErrorResume(SocketException.class, throwable -> Flux.empty()), searchPeers.getPeers$())
-						// multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-						// multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
-						// every time and then I will connect to all the peers again and again...
-						.publish()
-						.autoConnect(0);
-
-		FileSystemLink fileSystemLink = FileSystemLinkImpl.create(torrentInfo, downloadPath, store,
-				peersCommunicatorFlux.map(Link::receivePeerMessages)
-						.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
-				.block();
-
-		BittorrentAlgorithm bittorrentAlgorithm =
-				BittorrentAlgorithmInitializer.v1(torrentInfo,
-						store,
-						fileSystemLink,
-						peersCommunicatorFlux);
-
-		SpeedStatistics torrentSpeedStatistics =
-				new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
-
-		return TorrentDownloaders.getInstance()
-				.saveTorrentDownloader(torrentInfo,
-						searchPeers,
-						fileSystemLink,
-						bittorrentAlgorithm,
-						store,
-						torrentSpeedStatistics,
-						torrentStatesSideEffects,
-						peersCommunicatorFlux);
-	}
-
-	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath,
-																   Store<TorrentStatusState, TorrentStatusAction> store,
-																   TorrentStatesSideEffects torrentStatesSideEffects) {
-		// TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
-		SearchPeers searchPeers = new SearchPeers(torrentInfo, store);
-
-		Flux<Link> peersCommunicatorFlux =
-				Flux.merge(TorrentDownloaders.getListener().getPeers$(torrentInfo), searchPeers.getPeers$())
-						// multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-						// multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
-						// every time and then I will connect to all the peers again and again...
-						.publish()
-						.autoConnect(0);
-
-		FileSystemLink fileSystemLink = FileSystemLinkImpl.create(torrentInfo, downloadPath, store,
-				peersCommunicatorFlux.map(Link::receivePeerMessages)
-						.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
-				.block();
-
-		BittorrentAlgorithm bittorrentAlgorithm =
-				BittorrentAlgorithmInitializer.v1(torrentInfo,
-						store,
-						fileSystemLink,
-						peersCommunicatorFlux);
-
-		SpeedStatistics torrentSpeedStatistics =
-				new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
-
-		return TorrentDownloaders.getInstance()
-				.saveTorrentDownloader(torrentInfo,
-						searchPeers,
-						fileSystemLink,
-						bittorrentAlgorithm,
-						store,
-						torrentSpeedStatistics,
-						torrentStatesSideEffects,
-						peersCommunicatorFlux);
-	}
-
-	public static TorrentDownloader createCustomTorrentDownloader(TorrentInfo torrentInfo,
-																  Store<TorrentStatusState, TorrentStatusAction> store,
-																  TorrentStatesSideEffects torrentStatesSideEffects,
-																  FileSystemLink fileSystemLink,
-																  Flux<TrackerConnection> trackerConnectionConnectableFlux) {
-		TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
-		PeersProvider peersProvider = new PeersProvider(torrentInfo);
-
-		// TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
-		SearchPeers searchPeers = new SearchPeers(torrentInfo, store, trackerProvider,
-				peersProvider, peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
-				.autoConnect(0));
-
-		Flux<Link> incomingPeers$ = TorrentDownloaders.getListener().getPeers$(torrentInfo)
-				// SocketException == When I shutdown the SocketServer after/before
-				// the tests inside Utils::removeEverythingRelatedToTorrent.
-				.onErrorResume(SocketException.class, throwable -> Flux.empty());
-
-		Flux<Link> peersCommunicatorFlux =
-				Flux.merge(incomingPeers$, searchPeers.getPeers$())
-						// multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-						// multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
-						// every time and then I will connect to all the peers again and again...
-						.publish()
-						.autoConnect(0);
-
-		BittorrentAlgorithm bittorrentAlgorithm =
-				BittorrentAlgorithmInitializer.v1(torrentInfo,
-						store,
-						fileSystemLink,
-						peersCommunicatorFlux);
-
-		SpeedStatistics torrentSpeedStatistics =
-				new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
-
-		return TorrentDownloaders.getInstance()
-				.saveTorrentDownloader(torrentInfo,
-						searchPeers,
-						fileSystemLink,
-						bittorrentAlgorithm,
-						store,
-						torrentSpeedStatistics,
-						torrentStatesSideEffects,
-						peersCommunicatorFlux);
 	}
 
 	public static Mono<SendMessagesNotifications> sendFakeMessage(TorrentInfo torrentInfo, String downloadPath, Link link, PeerMessageType peerMessageType) {

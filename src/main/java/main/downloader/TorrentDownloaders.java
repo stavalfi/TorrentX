@@ -2,9 +2,7 @@ package main.downloader;
 
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
-import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.file.system.FileSystemLink;
-import main.file.system.FileSystemLinkImpl;
 import main.file.system.allocator.AllocatorStore;
 import main.listener.Listener;
 import main.listener.ListenerAction;
@@ -12,12 +10,9 @@ import main.listener.reducers.ListenerReducer;
 import main.listener.side.effects.ListenerSideEffects;
 import main.listener.state.tree.ListenerState;
 import main.peer.Link;
-import main.peer.ReceiveMessagesNotifications;
 import main.peer.SearchPeers;
 import main.statistics.SpeedStatistics;
-import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.TorrentStatusAction;
-import main.torrent.status.reducers.TorrentStatusReducer;
 import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
@@ -110,53 +105,10 @@ public class TorrentDownloaders {
 	}
 
 	public synchronized Optional<TorrentDownloader> findTorrentDownloader(String torrentInfoHash) {
-		return this.torrentDownloaderList
-				.stream()
+		return this.torrentDownloaderList.stream()
 				.filter(torrentDownloader -> torrentDownloader.getTorrentInfo()
 						.getTorrentInfoHash().toLowerCase().equals(torrentInfoHash.toLowerCase()))
 				.findFirst();
-	}
-
-	public static TorrentDownloader createDefaultTorrentDownloader(TorrentInfo torrentInfo, String downloadPath) {
-		// TODO: save the initial status in the mongodb.
-		Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-				TorrentStatusReducer.defaultTorrentState);
-		TorrentStatesSideEffects torrentStatesSideEffects = new TorrentStatesSideEffects(torrentInfo, store);
-		// TODO: remove the block()
-		SearchPeers searchPeers = new SearchPeers(torrentInfo, store);
-
-		Flux<Link> peersCommunicatorFlux =
-				Flux.merge(getListener().getPeers$(torrentInfo), searchPeers.getPeers$())
-						// multiple subscriptions will activate flatMap(__ -> multiple times and it will cause
-						// multiple calls to getPeersCommunicatorFromTrackerFlux which waitForMessage new hot-flux
-						// every time and then I will connect to all the peers again and again...
-						.publish()
-						.autoConnect(0);
-
-		FileSystemLink fileSystemLink = FileSystemLinkImpl.create(torrentInfo, downloadPath, store,
-				peersCommunicatorFlux.map(Link::receivePeerMessages)
-						.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
-				.block();
-
-		BittorrentAlgorithm bittorrentAlgorithm =
-				BittorrentAlgorithmInitializer.v1(torrentInfo,
-						store,
-						fileSystemLink,
-						peersCommunicatorFlux);
-
-		SpeedStatistics torrentSpeedStatistics =
-				new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-						peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
-
-		return TorrentDownloaders.getInstance()
-				.saveTorrentDownloader(torrentInfo,
-						searchPeers,
-						fileSystemLink,
-						bittorrentAlgorithm,
-						store,
-						torrentSpeedStatistics,
-						torrentStatesSideEffects,
-						peersCommunicatorFlux);
 	}
 
 	private TorrentDownloaders() {

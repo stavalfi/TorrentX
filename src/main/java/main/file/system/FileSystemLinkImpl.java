@@ -59,9 +59,6 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 		this.downloadPath = downloadPath;
 		this.piecesStatus = new BitSet(getPieces().size());
 		this.downloadedBytesInPieces = new long[getPieces().size()];
-
-		createFolders(torrentInfo, downloadPath);
-
 		this.actualFileImplList = actualFileList;
 
 		store.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
