@@ -3,8 +3,8 @@ package main.downloader;
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
-import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
+import main.file.system.FileSystemLinkImpl;
 import main.peer.Link;
 import main.peer.ReceiveMessagesNotifications;
 import main.peer.SearchPeers;
@@ -103,10 +103,9 @@ public class TorrentDownloaderBuilder {
 
 	public TorrentDownloaderBuilder setToDefaultFileSystemLink(String downloadPath) {
 		assert this.torrentStatusStore != null;
-		this.fileSystemLink$ = ActiveTorrents.getInstance()
-				.createActiveTorrentMono(torrentInfo, downloadPath, this.torrentStatusStore,
-						this.peersCommunicatorFlux.map(Link::receivePeerMessages)
-								.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux));
+		this.fileSystemLink$ = FileSystemLinkImpl.create(torrentInfo, downloadPath, this.torrentStatusStore,
+				this.peersCommunicatorFlux.map(Link::receivePeerMessages)
+						.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux));
 		return this;
 	}
 

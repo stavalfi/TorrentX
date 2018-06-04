@@ -8,9 +8,9 @@ import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
-import main.file.system.ActiveTorrents;
 import main.file.system.ActualFileImpl;
 import main.file.system.FileSystemLink;
+import main.file.system.FileSystemLinkImpl;
 import main.listener.ListenerAction;
 import main.listener.reducers.ListenerReducer;
 import main.listener.state.tree.ListenerState;
@@ -312,10 +312,9 @@ public class Utils {
 						.publish()
 						.autoConnect(0);
 
-		FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-				.createActiveTorrentMono(torrentInfo, downloadPath, store,
-						peersCommunicatorFlux.map(Link::receivePeerMessages)
-								.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
+		FileSystemLink fileSystemLink = FileSystemLinkImpl.create(torrentInfo, downloadPath, store,
+				peersCommunicatorFlux.map(Link::receivePeerMessages)
+						.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
 				.block();
 
 		BittorrentAlgorithm bittorrentAlgorithm =
@@ -353,10 +352,9 @@ public class Utils {
 						.publish()
 						.autoConnect(0);
 
-		FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-				.createActiveTorrentMono(torrentInfo, downloadPath, store,
-						peersCommunicatorFlux.map(Link::receivePeerMessages)
-								.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
+		FileSystemLink fileSystemLink = FileSystemLinkImpl.create(torrentInfo, downloadPath, store,
+				peersCommunicatorFlux.map(Link::receivePeerMessages)
+						.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
 				.block();
 
 		BittorrentAlgorithm bittorrentAlgorithm =
@@ -393,7 +391,7 @@ public class Utils {
 				peersProvider, peersProvider.getPeersCommunicatorFromTrackerFlux(trackerConnectionConnectableFlux)
 				.autoConnect(0));
 
-		Flux<Link> incomingPeers$ = TorrentDownloaders.getInstance().getListener().getPeers$(torrentInfo)
+		Flux<Link> incomingPeers$ = TorrentDownloaders.getListener().getPeers$(torrentInfo)
 				// SocketException == When I shutdown the SocketServer after/before
 				// the tests inside Utils::removeEverythingRelatedToTorrent.
 				.onErrorResume(SocketException.class, throwable -> Flux.empty());
@@ -458,7 +456,6 @@ public class Utils {
 
 	private static Mono<SendMessagesNotifications> createAndSendFakePieceMessage(TorrentInfo torrentInfo, String downloadPath,
 																				 Link link) {
-		ActiveTorrents activeTorrents = ActiveTorrents.getInstance();
 		int pieceIndex = 3;
 		int pieceLength = torrentInfo.getPieceLength(pieceIndex);
 		int begin = 0;
@@ -475,7 +472,7 @@ public class Utils {
 					ConnectableFlux<PieceMessage> pieceMessageFlux = Flux.just(pieceMessageToSave).publish();
 					Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
 							TorrentStatusReducer.defaultTorrentState);
-					return activeTorrents.createActiveTorrentMono(link.getTorrentInfo(), downloadPath, store, pieceMessageFlux)
+					return FileSystemLinkImpl.create(link.getTorrentInfo(), downloadPath, store, pieceMessageFlux)
 							.flatMap(fileSystemLink -> {
 								Flux<PieceEvent> savedPieces$ = fileSystemLink.savedBlockFlux()
 										.replay()

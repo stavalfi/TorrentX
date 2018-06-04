@@ -69,8 +69,8 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 				.publish()
 				.autoConnect(0);
 
+		// TODO: this status is useless because we don't use ActiveTorrents class
 		store.statesByAction(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)
-				.concatMap(__ -> deleteActiveTorrentOnlyMono())
 				.concatMap(__ -> store.dispatch(TorrentStatusAction.REMOVE_TORRENT_SELF_RESOLVED))
 				.publish()
 				.autoConnect(0);
@@ -153,19 +153,6 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 	@Override
 	public Flux<Integer> savedPieceFlux() {
 		return this.savedPiecesFlux;
-	}
-
-	private Mono<FileSystemLink> deleteActiveTorrentOnlyMono() {
-		return Flux.fromIterable(this.actualFileImplList)
-				.flatMap(ActualFile::closeFileChannel)
-				.collectList()
-				.flatMap(activeTorrentFiles -> {
-					boolean deletedActiveTorrent = ActiveTorrents.getInstance()
-							.deleteActiveTorrentOnly(getTorrentInfoHash());
-					if (deletedActiveTorrent)
-						return Mono.just(this);
-					return Mono.error(new Exception("FileSystemLinkImpl object not exist."));
-				});
 	}
 
 	private Mono<FileSystemLink> deleteFileOnlyMono() {

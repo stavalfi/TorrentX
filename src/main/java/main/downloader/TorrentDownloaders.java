@@ -3,8 +3,8 @@ package main.downloader;
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
-import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
+import main.file.system.FileSystemLinkImpl;
 import main.file.system.allocator.AllocatorStore;
 import main.listener.Listener;
 import main.listener.ListenerAction;
@@ -133,10 +133,9 @@ public class TorrentDownloaders {
 						.publish()
 						.autoConnect(0);
 
-		FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-				.createActiveTorrentMono(torrentInfo, downloadPath, store,
-						peersCommunicatorFlux.map(Link::receivePeerMessages)
-								.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
+		FileSystemLink fileSystemLink = FileSystemLinkImpl.create(torrentInfo, downloadPath, store,
+				peersCommunicatorFlux.map(Link::receivePeerMessages)
+						.flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux))
 				.block();
 
 		BittorrentAlgorithm bittorrentAlgorithm =

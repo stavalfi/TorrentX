@@ -10,7 +10,6 @@ import main.App;
 import main.AppConfig;
 import main.TorrentInfo;
 import main.downloader.*;
-import main.file.system.ActiveTorrents;
 import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
 import main.file.system.allocator.AllocatedBlock;
@@ -283,18 +282,7 @@ public class MyStepdefs {
 	@Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
 	public void activeTorrentExistForTorrent(boolean isActiveTorrentExist, String torrentFileName) throws Throwable {
 		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-		Mono<Optional<FileSystemLink>> activeTorrentMono =
-				ActiveTorrents.getInstance()
-						.findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash());
-
-		StepVerifier.create(activeTorrentMono)
-				.consumeNextWith(activeTorrent -> {
-					String message = "activeTorrent object needs to be present:" + isActiveTorrentExist +
-							", but the opposite is happening.";
-					Assert.assertEquals(message, isActiveTorrentExist, activeTorrent.isPresent());
-				})
-				.verifyComplete();
+		// Note: this status is useless because we don't use ActiveTorrents class so there is no need to test anything.
 	}
 
 	@Then("^files of torrent: \"([^\"]*)\" exist: \"([^\"]*)\" in \"([^\"]*)\"$")
@@ -358,6 +346,7 @@ public class MyStepdefs {
 								.flatMap(__ -> torrentStatusStore.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP));
 					return state$;
 				})
+				.doOnNext(__ -> System.out.println(1))
 				.as(StepVerifier::create)
 				.expectNextCount(1)
 				.verifyComplete();
@@ -400,9 +389,6 @@ public class MyStepdefs {
 						.publish();
 
 		String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-		FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-				.createActiveTorrentMono(torrentInfo, fullDownloadPath, store, allBlocksMessages$)
-				.block();
 
 		TorrentDownloaderBuilder.builder(torrentInfo)
 				.setTorrentStatusStore(store)
@@ -411,7 +397,7 @@ public class MyStepdefs {
 				.build()
 				.map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
 				.doOnNext(torrentDownloader -> {
-					Mono<List<Integer>> piecesCompleted1 = fileSystemLink.savedBlockFlux()
+					Mono<List<Integer>> piecesCompleted1 = torrentDownloader.getFileSystemLink().savedBlockFlux()
 							//.doOnNext(pieceEvent -> System.out.println("block complete:" + pieceEvent))
 							.flatMap(pieceEvent ->
 							{
@@ -429,7 +415,7 @@ public class MyStepdefs {
 							.autoConnect(0)
 							.collectList();
 
-					Mono<List<Integer>> piecesCompleted2 = fileSystemLink.savedPieceFlux()
+					Mono<List<Integer>> piecesCompleted2 = torrentDownloader.getFileSystemLink().savedPieceFlux()
 							.replay()
 							.autoConnect(0)
 							.collectList();
@@ -479,9 +465,6 @@ public class MyStepdefs {
 				.autoConnect(2);
 
 		String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-		FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-				.createActiveTorrentMono(torrentInfo, fullDownloadPath, store, generatedWrittenPieceMessages$)
-				.block();
 
 		TorrentDownloaderBuilder.builder(torrentInfo)
 				.setTorrentStatusStore(store)
@@ -491,11 +474,11 @@ public class MyStepdefs {
 				.map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
 				.doOnNext(torrentDownloader -> {
 					// this.actualCompletedSavedPiecesReadByFS$ will be used in later step.
-					this.actualCompletedSavedPiecesReadByFS$ = fileSystemLink.savedPieceFlux()
+					this.actualCompletedSavedPiecesReadByFS$ = torrentDownloader.getFileSystemLink().savedPieceFlux()
 							.replay()
 							.autoConnect(0);
 
-					Flux.zip(fileSystemLink.savedBlockFlux().map(PieceEvent::getReceivedPiece),
+					Flux.zip(torrentDownloader.getFileSystemLink().savedBlockFlux().map(PieceEvent::getReceivedPiece),
 							generatedWrittenPieceMessages$,
 							(actualPieceFromFSNotifier, expectedPieceMessage) -> {
 								Assert.assertEquals("the FS notifier notified about other block which he saved than the block we expected to save.",
@@ -550,11 +533,10 @@ public class MyStepdefs {
 		Assert.assertEquals("the expected and actual completed pieces indexes are not equal.",
 				fixedCompletedPiecesIndexList, actualCompletedPiecesByFSNotifierSet);
 
-		FileSystemLink fileSystemLinkImplTorrent = ActiveTorrents.getInstance()
-				.findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
-				.filter(Optional::isPresent)
-				.map(Optional::get)
-				.block();
+		FileSystemLink fileSystemLinkImplTorrent = TorrentDownloaders.getInstance()
+				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+				.getFileSystemLink();
 
 		String errorMessage1 = "the piece is not completed but it should be.";
 
