@@ -73,11 +73,11 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .autoConnect(0);
 
         store.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
-                .doOnNext(__ -> System.out.println("file system remove file - 1: " + __))
+                .doOnNext(__ -> logger.debug("file system remove file - 1: " + __))
                 .concatMap(__ -> deleteFileOnlyMono())
-                .doOnNext(__ -> System.out.println("file system remove file - 2: " + __))
+                .doOnNext(__ -> logger.debug("file system remove file - 2: " + __))
                 .concatMap(__ -> store.dispatch(TorrentStatusAction.REMOVE_FILES_SELF_RESOLVED))
-                .doOnNext(__ -> System.out.println("file system remove file - 3: " + __))
+                .doOnNext(__ -> logger.debug("file system remove file - 3: " + __))
                 .publish()
                 .autoConnect(0);
 

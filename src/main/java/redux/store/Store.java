@@ -117,7 +117,9 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 
     @Override
     public Flux<STATE_IMPL> statesByAction(ACTION action) {
+        logger.debug("statesByAction - 0: " + action);
         return states$()
+                .doOnNext(__ -> logger.debug("statesByAction - 1: " + action + " - state: " + __))
                 .filter(stateImpl -> stateImpl.getAction().equals(action));
     }
 

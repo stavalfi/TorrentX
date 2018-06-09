@@ -203,29 +203,39 @@ public class MyStepdefs {
                 .allMatch(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
                         peerFakeRequestResponse.getReceiveMessageType() != null);
 
+        System.out.println("trying to connect to fake peer: " + remoteFakePeerCopyCat);
         Link fakePeer = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
                 .block();
 
+        System.out.println("connected to fake peer: " + remoteFakePeerCopyCat);
+
         Flux<? extends PeerMessage> recordedResponseFlux =
                 Flux.fromIterable(messageToSendList)
+                        .doOnNext(peerMessageType -> System.out.println("start listen to incoming message from type: " + peerMessageType.name()))
                         .flatMap(peerMessageType -> Utils.getSpecificMessageResponseFluxByMessageType(fakePeer, peerMessageType))
+                        .doOnNext(peerMessage -> System.out.println("we received message from fake peer: " + peerMessage))
                         // if we received a piece message, then free it's allocation.
                         .flatMap(peerMessage -> {
-                            if (peerMessage instanceof PieceMessage)
+                            if (peerMessage instanceof PieceMessage) {
+                                System.out.println("the message we received is PieceMessage and we free it's block: " + peerMessage);
                                 return TorrentDownloaders.getAllocatorStore()
                                         .free(((PieceMessage) peerMessage).getAllocatedBlock())
+                                        .doOnNext(__ -> System.out.println("we freed the PieceMessage block and the Allocator state now is: " + __))
                                         .map(allocatorState -> peerMessage);
+                            }
                             return Mono.just(peerMessage);
                         })
                         .replay()
                         // start record incoming messages from fake peer
                         .autoConnect(0);
 
+        System.out.println("start sending messages to fake-peer");
 
         Mono<List<SendMessagesNotifications>> sentMessagesMono = Flux.fromIterable(messageToSendList)
-                .flatMap(peerMessageType -> Utils.sendFakeMessage(torrentInfo,
-                        fullDownloadPath, fakePeer, peerMessageType),
-                        1, 1)
+                .concatMap(peerMessageType ->
+                        Utils.sendFakeMessage(torrentInfo, fullDownloadPath, fakePeer, peerMessageType)
+                                .doOnNext(__ -> System.out.println("send message to fake-peer of type: "
+                                        + peerMessageType.name())))
                 .collectList();
 
         if (expectResponseToEveryRequest)
