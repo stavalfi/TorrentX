@@ -47,6 +47,7 @@ Feature: start/stop/restart listening to new peers and include side-effects in t
     Given initial listen-status - default
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
+    # TODO: there is a bug here which cause blocking
     When listen-status is trying to change to:
       | RESUME_LISTENING_IN_PROGRESS  |
       | RESTART_LISTENING_IN_PROGRESS |
