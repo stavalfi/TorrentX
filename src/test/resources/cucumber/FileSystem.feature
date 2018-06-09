@@ -16,6 +16,7 @@ Feature: create get and delete active torrents
 
   Scenario Outline: we delete torrent files only
     When application create active-torrent for: "<torrent>","<downloadLocation>"
+    # TODO: there is a blocking here which prevent from me to even dispatch windup on remove files
     Then application delete active-torrent: "<torrent>": "false" and file: "true"
     Then files of torrent: "<torrent>" exist: "false" in "<downloadLocation>"
     Then active-torrent exist: "true" for torrent: "<torrent>"
