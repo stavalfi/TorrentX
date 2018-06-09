@@ -272,8 +272,11 @@ public class MyStepdefs {
 
     @When("^application create active-torrent for: \"([^\"]*)\",\"([^\"]*)\"$")
     public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("started @When(\"^application create active-torrent for: \\\"([^\\\"]*)\\\",\\\"([^\\\"]*)\\\"$\")");
+        System.out.println("-------------------------------------------------------------------------");
         Utils.removeEverythingRelatedToLastTest();
-
+        System.out.println("finished clean after last test...");
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         // this will waitForMessage an activeTorrent object.
@@ -290,12 +293,18 @@ public class MyStepdefs {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @When(\"^application create active-torrent for: \\\"([^\\\"]*)\\\",\\\"([^\\\"]*)\\\"$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     @Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
     public void activeTorrentExistForTorrent(boolean isActiveTorrentExist, String torrentFileName) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         // Note: this status is useless because we don't use ActiveTorrents class so there is no need to test anything.
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finsihed @Then(\"^active-torrent exist: \\\"([^\\\"]*)\\\" for torrent: \\\"([^\\\"]*)\\\"$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     @Then("^files of torrent: \"([^\"]*)\" exist: \"([^\"]*)\" in \"([^\"]*)\"$")
@@ -334,6 +343,10 @@ public class MyStepdefs {
             filePathList.stream()
                     .map((String completeFilePath) -> new File(completeFilePath))
                     .forEach(file -> Assert.assertTrue("file exist: " + file.getPath(), !file.exists()));
+
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @Then(\"^files of torrent: \\\"([^\\\"]*)\\\" exist: \\\"([^\\\"]*)\\\" in \\\"([^\\\"]*)\\\"$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     @Then("^application delete active-torrent: \"([^\"]*)\": \"([^\"]*)\" and file: \"([^\"]*)\"$")
@@ -363,6 +376,9 @@ public class MyStepdefs {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @Then(\"^application delete active-torrent: \\\"([^\\\"]*)\\\": \\\"([^\\\"]*)\\\" and file: \\\"([^\\\"]*)\\\"$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     @When("^application save the all the pieces of torrent: \"([^\"]*)\",\"([^\"]*)\"$")
@@ -641,7 +657,12 @@ public class MyStepdefs {
     @Given("^initial torrent-status for torrent: \"([^\"]*)\" in \"([^\"]*)\" is - no side effects:$")
     public void activeTorrentForInWithTheFollowingStatus(String torrentFileName, String downloadLocation,
                                                          List<TorrentStatusAction> torrentStatusActions) throws Throwable {
+
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("started @Given(initial torrent-status for torrent:.... - no side effects)");
+        System.out.println("-------------------------------------------------------------------------");
         Utils.removeEverythingRelatedToLastTest();
+        System.out.println("finished clean the last test data");
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
@@ -658,6 +679,10 @@ public class MyStepdefs {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @Given(initial torrent-status for torrent:.... - no side effects)");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     private TorrentStatusState actualLastStatus = null;
@@ -706,6 +731,10 @@ public class MyStepdefs {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @Then(\"^torrent-status for torrent \\\"([^\\\"]*)\\\" will be with action: \\\"([^\\\"]*)\\\" - no side effects:$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     @Then("^torrent-status for torrent \"([^\"]*)\" will be with action: \"([^\"]*)\":$")
@@ -729,6 +758,10 @@ public class MyStepdefs {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @Then(\"^torrent-status for torrent \\\"([^\\\"]*)\\\" will be with action: \\\"([^\\\"]*)\\\":$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     private Mono<List<SendMessagesNotifications>> requestsFromFakePeerToMeListMono;
@@ -1604,11 +1637,15 @@ public class MyStepdefs {
                 .getTorrentStatusStore();
 
         Flux.fromIterable(changeTorrentStatusActionList)
-                .map(torrentStatusAction -> (Runnable) () -> torrentStatusStore.dispatchNonBlocking(torrentStatusAction))
-                .flatMap(runnable -> Mono.fromRunnable(runnable), changeTorrentStatusActionList.size(),
+                .flatMap(torrentStatusStore::dispatch, changeTorrentStatusActionList.size(),
                         changeTorrentStatusActionList.size())
                 .as(StepVerifier::create)
+                .expectNextCount(changeTorrentStatusActionList.size())
                 .verifyComplete();
+
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @When(\"^torrent-status for torrent \\\"([^\\\"]*)\\\" is trying to change to:$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     @Then("^wait until action is: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
