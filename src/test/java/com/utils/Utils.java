@@ -18,6 +18,7 @@ import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.reducers.TorrentStatusReducer;
+import main.torrent.status.side.effects.TorrentFileSystemStatesSideEffects;
 import main.torrent.status.state.tree.DownloadState;
 import main.torrent.status.state.tree.SearchPeersState;
 import main.torrent.status.state.tree.TorrentFileSystemState;
@@ -320,6 +321,8 @@ public class Utils {
                     ConnectableFlux<PieceMessage> pieceMessageFlux = Flux.just(pieceMessageToSave).publish();
                     Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
                             TorrentStatusReducer.defaultTorrentState);
+                    TorrentFileSystemStatesSideEffects torrentFileSystemStatesSideEffects =
+                            new TorrentFileSystemStatesSideEffects(store);
                     return FileSystemLinkImpl.create(link.getTorrentInfo(), downloadPath, store, pieceMessageFlux)
                             .flatMap(fileSystemLink -> {
                                 Flux<PieceEvent> savedPieces$ = fileSystemLink.savedBlockFlux()
