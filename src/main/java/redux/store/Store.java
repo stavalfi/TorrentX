@@ -16,7 +16,6 @@ import java.util.function.BiPredicate;
 public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier<STATE_IMPL, ACTION> {
     private static Logger logger = LoggerFactory.getLogger(Store.class);
 
-    private FluxSink<Request<ACTION>> actionsSink;
     private Flux<Result<STATE_IMPL, ACTION>> results$;
     private Flux<STATE_IMPL> states$;
     private BlockingQueue<Request<ACTION>> requestsQueue = new LinkedBlockingQueue<>();
@@ -47,10 +46,13 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
                 .autoConnect(0);
 
         this.states$ = this.results$
+                .doOnNext(result -> logger.debug("analyzing result: " + result))
                 .map(Result::getState)
                 .distinctUntilChanged()
+                .doOnNext(state -> logger.debug("new state1: " + state))
                 .replay(1)
-                .autoConnect(0);
+                .autoConnect(0)
+                .doOnNext(state -> logger.debug("new state2: " + state));
     }
 
     public void dispatchNonBlocking(ACTION action) {
@@ -121,6 +123,15 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
         return states$()
                 .doOnNext(__ -> logger.debug("statesByAction - 1: " + action + " - state: " + __))
                 .filter(stateImpl -> stateImpl.getAction().equals(action));
+    }
+
+    public Flux<STATE_IMPL> statesByAction(ACTION action, String transaction) {
+        logger.debug("statesByAction - transaction:" + transaction + " - 0:" + action);
+        return states$()
+                .doOnSubscribe(__ -> logger.debug("statesByAction - transaction:" + transaction + " - 1:" + action))
+                .doOnNext(__ -> logger.debug("statesByAction - transaction:" + transaction + " - 2:" + action + " - state: " + __))
+                .filter(stateImpl -> stateImpl.getAction().equals(action))
+                .doOnNext(__ -> logger.debug("statesByAction - transaction:" + transaction + " - 3:" + action + " - state: " + __));
     }
 
     @Override

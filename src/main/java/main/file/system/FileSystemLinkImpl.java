@@ -26,10 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.OpenOption;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
@@ -61,6 +58,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         this.downloadedBytesInPieces = new long[getPieces().size()];
         this.actualFileImplList = actualFileList;
 
+        String transaction = "file system - " + UUID.randomUUID().toString();
+        System.out.println("file system remove file - transaction: " + transaction);
+
         store.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
                 .concatMap(__ -> store.dispatch(TorrentStatusAction.COMPLETED_DOWNLOADING_SELF_RESOLVED))
                 .publish()
@@ -72,7 +72,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .publish()
                 .autoConnect(0);
 
-        store.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
+        store.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS, transaction)
                 .doOnNext(__ -> logger.debug("file system remove file - 1: " + __))
                 .concatMap(__ -> deleteFileOnlyMono())
                 .doOnNext(__ -> logger.debug("file system remove file - 2: " + __))

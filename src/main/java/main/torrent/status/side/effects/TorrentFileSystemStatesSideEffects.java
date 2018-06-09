@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import redux.store.Store;
 
+import java.util.UUID;
+
 public class TorrentFileSystemStatesSideEffects {
     private static Logger logger = LoggerFactory.getLogger(TorrentFileSystemStatesSideEffects.class);
 
@@ -14,7 +16,9 @@ public class TorrentFileSystemStatesSideEffects {
     private Flux<TorrentStatusState> removeTorrent$;
 
     public TorrentFileSystemStatesSideEffects(Store<TorrentStatusState, TorrentStatusAction> store) {
-        this.removeFiles$ = store.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
+        String transaction = "effects - " + UUID.randomUUID().toString();
+        System.out.println("effects remove file - transaction: " + transaction);
+        this.removeFiles$ = store.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS, transaction)
                 .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
                 .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS))
                 .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS))

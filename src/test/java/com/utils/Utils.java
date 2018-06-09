@@ -70,7 +70,7 @@ public class Utils {
     public static void removeEverythingRelatedToLastTest() {
         TorrentDownloaders.getAllocatorStore()
                 .freeAll()
-                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(2, 1_000_000))
+                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(2, 17_000))
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -102,7 +102,7 @@ public class Utils {
                 .getTorrentDownloadersFlux()
                 .map(TorrentDownloader::getTorrentInfo)
                 .map(TorrentInfo::getTorrentInfoHash)
-                // TODO: incase I get the objects from remote server like mongodb one by one, then this flux will never be over so collectList will never emit next signal.
+                // TODO: in case I get the objects from remote server like mongodb one by one, then this flux will never be over so collectList will never emit next signal.
                 .doOnNext(torrentInfoHash -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentInfoHash))
                 .collectList()
                 .as(StepVerifier::create)

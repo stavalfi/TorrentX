@@ -1670,6 +1670,7 @@ public class MyStepdefs {
     public void startSearchAndReceivePeersFromSearchModuleForTorrent(int numberOfPeers, String torrentFileName) throws
             Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        System.out.println("trying to connect to couple of peers in torrent: " + torrentInfo);
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
