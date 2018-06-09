@@ -469,6 +469,13 @@ public class MyStepdefs {
         // delete everything from the last test.
         Utils.removeEverythingRelatedToLastTest();
 
+        TorrentDownloaders.getAllocatorStore()
+                .freeAll()
+                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(10, 1_000_000))
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         // I only need this object because the constructor of FileSystemLink listen to signals (which I never signal).
@@ -764,7 +771,7 @@ public class MyStepdefs {
         System.out.println("-------------------------------------------------------------------------");
     }
 
-    private Mono<List<SendMessagesNotifications>> requestsFromFakePeerToMeListMono;
+    private Mono<List<SendMessagesNotifications>> requestsFromFakePeerToMeList$;
 
     @Then("^random-fake-peer connect to me for torrent: \"([^\"]*)\" in \"([^\"]*)\" and he request:$")
     public void randomFakePeerConnectToMeForTorrentInAndHeRequest(String torrentFileName, String downloadLocation,
@@ -807,9 +814,11 @@ public class MyStepdefs {
                 .single();
 
         // start listen -> make fake peer connect to me -> send fake messages from fake-peer to me.
-        this.requestsFromFakePeerToMeListMono = TorrentDownloaders.getListenStore()
+        this.requestsFromFakePeerToMeList$ = TorrentDownloaders.getListenStore()
                 .dispatch(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> store.dispatch(TorrentStatusAction.START_UPLOAD_IN_PROGRESS))
+                .flatMap(__ -> TorrentDownloaders.getListenStore().notifyWhen(ListenerAction.START_LISTENING_WIND_UP))
+                .flatMap(__ -> store.notifyWhen(TorrentStatusAction.RESUME_UPLOAD_WIND_UP))
                 .flatMap(__ -> torrentDownloader$)
                 .map(TorrentDownloader::getSearchPeers)
                 .map(SearchPeers::getPeersProvider)
@@ -827,8 +836,7 @@ public class MyStepdefs {
                                 .flatMapMany(allocatedBlockLength -> Flux.fromIterable(peerRequestBlockList)
                                         .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo,
                                                 allocatedBlockLength))))
-                        .concatMap(blockOfPiece -> sendMessagesObject.sendRequestMessage(blockOfPiece.getPieceIndex(),
-                                blockOfPiece.getFrom(), blockOfPiece.getLength())))
+                        .concatMap(blockOfPiece -> sendMessagesObject.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(), blockOfPiece.getLength())))
                 .collectList()
                 .doOnNext(requestList -> Assert.assertEquals("We sent less requests then expected.",
                         peerRequestBlockList.size(), requestList.size()));
@@ -847,7 +855,7 @@ public class MyStepdefs {
                 .single()
                 .cache();
 
-        // I must record this because when I subscribe to this.requestsFromFakePeerToMeListMono,
+        // I must record this because when I subscribe to this.requestsFromFakePeerToMeList$,
         // fake-peer will send me request messages and I response to him **piece messages**
         // which I don't want to lose.
         Flux<PieceMessage> recordedPieceMessageFlux = meToFakePeerLink
@@ -860,7 +868,7 @@ public class MyStepdefs {
 
         // send request massages from fake peer to me and get all the
         // piece messages from me to fake peer and collect them to list.
-        Set<BlockOfPiece> actualBlockFromMeSet = this.requestsFromFakePeerToMeListMono
+        Set<BlockOfPiece> actualBlockFromMeSet = this.requestsFromFakePeerToMeList$
                 .flatMapMany(remoteFakePeerForRequestingPieces -> recordedPieceMessageFlux)
                 .map(pieceMessage -> new BlockOfPiece(pieceMessage.getIndex(), pieceMessage.getBegin(),
                         pieceMessage.getAllocatedBlock().getLength()))

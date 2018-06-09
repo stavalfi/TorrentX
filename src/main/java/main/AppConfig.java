@@ -1,6 +1,6 @@
 package main;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import main.downloader.TorrentDownloaders;
 
 public class AppConfig {
 
@@ -18,9 +18,7 @@ public class AppConfig {
         return "-AZ5750-TpkXttZLfpSH";
     }
 
-    private AtomicInteger freePort = new AtomicInteger(9191);
-
     public int findFreePort() {
-        return this.freePort.getAndIncrement();
+        return TorrentDownloaders.getListener().getTcpPort();
     }
 }

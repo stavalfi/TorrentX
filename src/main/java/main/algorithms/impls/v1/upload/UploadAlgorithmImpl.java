@@ -3,6 +3,7 @@ package main.algorithms.impls.v1.upload;
 import main.TorrentInfo;
 import main.algorithms.UploadAlgorithm;
 import main.downloader.PieceEvent;
+import main.downloader.TorrentPieceStatus;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.torrent.status.TorrentStatusAction;
@@ -11,46 +12,38 @@ import reactor.core.publisher.Flux;
 import redux.store.Store;
 
 public class UploadAlgorithmImpl implements UploadAlgorithm {
-    private TorrentInfo torrentInfo;
-    private Store<TorrentStatusState, TorrentStatusAction> store;
-    private FileSystemLink fileSystemLink;
-    private Flux<Link> peersCommunicatorFlux;
-
-    private Flux<PieceEvent> uploadedBlocksFlux;
+    private Flux<PieceEvent> uploadedBlocks$;
 
     public UploadAlgorithmImpl(TorrentInfo torrentInfo,
-							   Store<TorrentStatusState, TorrentStatusAction> store,
+                               Store<TorrentStatusState, TorrentStatusAction> store,
                                FileSystemLink fileSystemLink,
                                Flux<Link> peersCommunicatorFlux) {
-        this.torrentInfo = torrentInfo;
-        this.store = store;
-        this.fileSystemLink = fileSystemLink;
-        this.peersCommunicatorFlux = peersCommunicatorFlux;
 
-        this.uploadedBlocksFlux = Flux.never();
-        // TODO: uncomment
-//                this.store
-//                .getState$()
-//                .filter(Status::isStartedUpload)
-//                .take(1)
-//                .flatMap(__ -> this.peersCommunicatorFlux)
-//                .flatMap(peersCommunicator ->
-//                        // if getRequestMessageResponseFlux is not running on unique thread, then I will block
-//                        // notifyWhenStartUploading() thread. Watch out.
-//                        peersCommunicator.receivePeerMessages().getRequestMessageResponseFlux()
-//                                .filter(requestMessage -> this.fileSystemLink.havePiece(requestMessage.getIndex()))
-//                                .flatMap(requestMessage -> this.store.getState$()
-//                                        .filter(Status::isUploading)
-//                                        .take(1)
-//                                        .flatMap(PieceMessage -> this.fileSystemLink.buildPieceMessage(requestMessage))
-//                                        .flatMap(pieceMessage -> peersCommunicator.sendMessages().sendPieceMessage(pieceMessage)
-//                                                .map(___ -> new PieceEvent(TorrentPieceStatus.UPLOADING, pieceMessage)))))
-//                .publish()
-//                .autoConnect(0);
+        Flux<TorrentStatusState> startUpload$ = store.statesByAction(TorrentStatusAction.START_UPLOAD_IN_PROGRESS)
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.START_UPLOAD_SELF_RESOLVED))
+                .publish()
+                .autoConnect(0);
+
+        this.uploadedBlocks$ = store.statesByAction(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS)
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_UPLOAD_SELF_RESOLVED))
+                .concatMap(__ -> peersCommunicatorFlux)
+                .flatMap(link -> link.receivePeerMessages().getRequestMessageResponseFlux()
+                        .filter(requestMessage -> fileSystemLink.havePiece(requestMessage.getIndex()))
+                        .concatMap(requestMessage -> store.notifyWhen(TorrentStatusAction.RESUME_UPLOAD_WIND_UP, requestMessage))
+                        .concatMap(requestMessage -> fileSystemLink.buildPieceMessage(requestMessage))
+                        .concatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
+                                .map(___ -> new PieceEvent(TorrentPieceStatus.UPLOADING, pieceMessage))))
+                .publish()
+                .autoConnect(0);
+
+        Flux<TorrentStatusState> pauseUpload$ = store.statesByAction(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS)
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_UPLOAD_SELF_RESOLVED))
+                .publish()
+                .autoConnect(0);
     }
 
     @Override
-    public Flux<PieceEvent> getUploadedBlocksFlux() {
-        return this.uploadedBlocksFlux;
+    public Flux<PieceEvent> getUploadedBlocks$() {
+        return this.uploadedBlocks$;
     }
 }
