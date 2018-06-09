@@ -187,12 +187,17 @@ Feature: remove torrent and files
       | PAUSE_UPLOAD_WIND_UP          |
       | PAUSE_SEARCHING_PEERS_WIND_UP |
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | REMOVE_TORRENT_IN_PROGRESS   |
+      | REMOVE_TORRENT_IN_PROGRESS |
+    When torrent-status for torrent "<torrent>" is trying to change to:
       | REMOVE_TORRENT_SELF_RESOLVED |
-      | PAUSE_DOWNLOAD_IN_PROGRESS   |
+    When torrent-status for torrent "<torrent>" is trying to change to:
+      | PAUSE_DOWNLOAD_IN_PROGRESS |
+    When torrent-status for torrent "<torrent>" is trying to change to:
       | PAUSE_DOWNLOAD_SELF_RESOLVED |
-      | PAUSE_DOWNLOAD_WIND_UP       |
-      | REMOVE_TORRENT_WIND_UP       |
+    When torrent-status for torrent "<torrent>" is trying to change to:
+      | PAUSE_DOWNLOAD_WIND_UP |
+    When torrent-status for torrent "<torrent>" is trying to change to:
+      | REMOVE_TORRENT_WIND_UP |
     Then torrent-status for torrent "<torrent>" will be with action: "REMOVE_TORRENT_WIND_UP" - no side effects:
       | START_DOWNLOAD_WIND_UP        |
       | PAUSE_DOWNLOAD_WIND_UP        |
