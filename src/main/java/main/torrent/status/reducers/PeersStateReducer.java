@@ -1,14 +1,14 @@
 package main.torrent.status.reducers;
 
 import main.torrent.status.TorrentStatusAction;
-import main.torrent.status.state.tree.PeersState;
+import main.torrent.status.state.tree.SearchPeersState;
 import main.torrent.status.state.tree.TorrentStatusState;
 
 import java.util.function.Supplier;
 
 public class PeersStateReducer {
-    public static Supplier<PeersState> defaultPeersStateSupplier = () ->
-            PeersState.PeersStateBuilder.builder()
+    public static Supplier<SearchPeersState> defaultPeersStateSupplier = () ->
+            SearchPeersState.PeersStateBuilder.builder()
                     .setStartedSearchingPeersInProgress(false)
                     .setStartedSearchingPeersSelfResolved(false)
                     .setStartedSearchingPeersWindUp(false)
@@ -20,8 +20,8 @@ public class PeersStateReducer {
                     .setResumeSearchingPeersWindUp(false)
                     .build();
 
-    public PeersState reducer(TorrentStatusState lastState, TorrentStatusAction torrentStatusAction) {
-        PeersState peersState = lastState.getPeersState();
+    public SearchPeersState reducer(TorrentStatusState lastState, TorrentStatusAction torrentStatusAction) {
+        SearchPeersState searchPeersState = lastState.getSearchPeersState();
 
         boolean isCompletedOrInProgress = lastState.getDownloadState().isCompletedDownloadingInProgress() ||
                 lastState.getDownloadState().isCompletedDownloadingWindUp();
@@ -35,56 +35,56 @@ public class PeersStateReducer {
             case START_SEARCHING_PEERS_IN_PROGRESS:
                 if (isCompletedOrInProgress ||
                         isSomethingRemovedOrInRemoveOrInProgress ||
-                        peersState.isStartedSearchingPeersInProgress() ||
-                        peersState.isStartedSearchingPeersWindUp())
-                    return lastState.getPeersState();
-                return PeersState.PeersStateBuilder.builder(peersState)
+                        searchPeersState.isStartedSearchingPeersInProgress() ||
+                        searchPeersState.isStartedSearchingPeersWindUp())
+                    return lastState.getSearchPeersState();
+                return SearchPeersState.PeersStateBuilder.builder(searchPeersState)
                         .setStartedSearchingPeersInProgress(true)
                         .build();
             case START_SEARCHING_PEERS_SELF_RESOLVED:
                 if (isSomethingRemovedOrInRemoveOrInProgress ||
                         isCompletedOrInProgress ||
-                        !peersState.isStartedSearchingPeersInProgress() ||
-                        peersState.isStartedSearchingPeersSelfResolved() ||
-                        peersState.isStartedSearchingPeersWindUp())
-                    return lastState.getPeersState();
-                return PeersState.PeersStateBuilder.builder(peersState)
+                        !searchPeersState.isStartedSearchingPeersInProgress() ||
+                        searchPeersState.isStartedSearchingPeersSelfResolved() ||
+                        searchPeersState.isStartedSearchingPeersWindUp())
+                    return lastState.getSearchPeersState();
+                return SearchPeersState.PeersStateBuilder.builder(searchPeersState)
                         .setStartedSearchingPeersSelfResolved(true)
                         .build();
             case START_SEARCHING_PEERS_WIND_UP:
                 if (isCompletedOrInProgress ||
                         isSomethingRemovedOrInRemoveOrInProgress ||
-                        !peersState.isStartedSearchingPeersInProgress() ||
-                        !peersState.isStartedSearchingPeersSelfResolved() ||
-                        peersState.isStartedSearchingPeersWindUp())
-                    return lastState.getPeersState();
-                return PeersState.PeersStateBuilder.builder(peersState)
+                        !searchPeersState.isStartedSearchingPeersInProgress() ||
+                        !searchPeersState.isStartedSearchingPeersSelfResolved() ||
+                        searchPeersState.isStartedSearchingPeersWindUp())
+                    return lastState.getSearchPeersState();
+                return SearchPeersState.PeersStateBuilder.builder(searchPeersState)
                         .setStartedSearchingPeersInProgress(false)
                         .setStartedSearchingPeersSelfResolved(false)
                         .setStartedSearchingPeersWindUp(true)
                         .build();
             case PAUSE_SEARCHING_PEERS_IN_PROGRESS:
-                if (!peersState.isStartedSearchingPeersWindUp() ||
-                        !peersState.isResumeSearchingPeersWindUp() ||
-                        peersState.isPauseSearchingPeersInProgress() ||
-                        peersState.isPauseSearchingPeersWindUp())
-                    return lastState.getPeersState();
-                return PeersState.PeersStateBuilder.builder(peersState)
+                if (!searchPeersState.isStartedSearchingPeersWindUp() ||
+                        !searchPeersState.isResumeSearchingPeersWindUp() ||
+                        searchPeersState.isPauseSearchingPeersInProgress() ||
+                        searchPeersState.isPauseSearchingPeersWindUp())
+                    return lastState.getSearchPeersState();
+                return SearchPeersState.PeersStateBuilder.builder(searchPeersState)
                         .setPauseSearchingPeersInProgress(true)
                         .build();
             case PAUSE_SEARCHING_PEERS_SELF_RESOLVED:
-                if (!peersState.isPauseSearchingPeersInProgress() ||
-                        peersState.isPauseSearchingPeersSelfResolved() ||
-                        peersState.isPauseSearchingPeersWindUp())
-                    return lastState.getPeersState();
-                return PeersState.PeersStateBuilder.builder(peersState)
+                if (!searchPeersState.isPauseSearchingPeersInProgress() ||
+                        searchPeersState.isPauseSearchingPeersSelfResolved() ||
+                        searchPeersState.isPauseSearchingPeersWindUp())
+                    return lastState.getSearchPeersState();
+                return SearchPeersState.PeersStateBuilder.builder(searchPeersState)
                         .setPauseSearchingPeersSelfResolved(true)
                         .build();
             case PAUSE_SEARCHING_PEERS_WIND_UP:
-                if (!peersState.isPauseSearchingPeersInProgress() ||
-                        peersState.isPauseSearchingPeersWindUp())
-                    return lastState.getPeersState();
-                return PeersState.PeersStateBuilder.builder(peersState)
+                if (!searchPeersState.isPauseSearchingPeersInProgress() ||
+                        searchPeersState.isPauseSearchingPeersWindUp())
+                    return lastState.getSearchPeersState();
+                return SearchPeersState.PeersStateBuilder.builder(searchPeersState)
                         .setPauseSearchingPeersInProgress(false)
                         .setPauseSearchingPeersSelfResolved(false)
                         .setPauseSearchingPeersWindUp(true)
@@ -93,34 +93,34 @@ public class PeersStateReducer {
             case RESUME_SEARCHING_PEERS_IN_PROGRESS:
                 if (isCompletedOrInProgress ||
                         isSomethingRemovedOrInRemoveOrInProgress ||
-                        !peersState.isPauseSearchingPeersWindUp() ||
-                        !peersState.isStartedSearchingPeersWindUp() ||
-                        peersState.isResumeSearchingPeersInProgress() ||
-                        peersState.isResumeSearchingPeersWindUp())
-                    return lastState.getPeersState();
-                return PeersState.PeersStateBuilder.builder(peersState)
+                        !searchPeersState.isPauseSearchingPeersWindUp() ||
+                        !searchPeersState.isStartedSearchingPeersWindUp() ||
+                        searchPeersState.isResumeSearchingPeersInProgress() ||
+                        searchPeersState.isResumeSearchingPeersWindUp())
+                    return lastState.getSearchPeersState();
+                return SearchPeersState.PeersStateBuilder.builder(searchPeersState)
                         .setResumeSearchingPeersInProgress(true)
                         .build();
             case RESUME_SEARCHING_PEERS_SELF_RESOLVED:
                 if (isCompletedOrInProgress ||
                         isSomethingRemovedOrInRemoveOrInProgress ||
-                        !peersState.isPauseSearchingPeersWindUp() ||
-                        !peersState.isResumeSearchingPeersInProgress() ||
-                        peersState.isResumeSearchingPeersSelfResolved() ||
-                        peersState.isResumeSearchingPeersWindUp())
-                    return lastState.getPeersState();
-                return PeersState.PeersStateBuilder.builder(peersState)
+                        !searchPeersState.isPauseSearchingPeersWindUp() ||
+                        !searchPeersState.isResumeSearchingPeersInProgress() ||
+                        searchPeersState.isResumeSearchingPeersSelfResolved() ||
+                        searchPeersState.isResumeSearchingPeersWindUp())
+                    return lastState.getSearchPeersState();
+                return SearchPeersState.PeersStateBuilder.builder(searchPeersState)
                         .setResumeSearchingPeersSelfResolved(true)
                         .build();
             case RESUME_SEARCHING_PEERS_WIND_UP:
                 if (isCompletedOrInProgress ||
                         isSomethingRemovedOrInRemoveOrInProgress ||
-                        !peersState.isPauseSearchingPeersWindUp() ||
-                        !peersState.isResumeSearchingPeersInProgress() ||
-                        !peersState.isResumeSearchingPeersSelfResolved() ||
-                        peersState.isResumeSearchingPeersWindUp())
-                    return lastState.getPeersState();
-                return PeersState.PeersStateBuilder.builder(peersState)
+                        !searchPeersState.isPauseSearchingPeersWindUp() ||
+                        !searchPeersState.isResumeSearchingPeersInProgress() ||
+                        !searchPeersState.isResumeSearchingPeersSelfResolved() ||
+                        searchPeersState.isResumeSearchingPeersWindUp())
+                    return lastState.getSearchPeersState();
+                return SearchPeersState.PeersStateBuilder.builder(searchPeersState)
                         .setResumeSearchingPeersInProgress(false)
                         .setResumeSearchingPeersSelfResolved(false)
                         .setResumeSearchingPeersWindUp(true)
@@ -133,9 +133,9 @@ public class PeersStateReducer {
                         lastState.getTorrentFileSystemState().isFilesRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
-                        !lastState.getPeersState().isPauseSearchingPeersWindUp())
-                    return lastState.getPeersState();
-                return PeersState.PeersStateBuilder.builder(peersState)
+                        !lastState.getSearchPeersState().isPauseSearchingPeersWindUp())
+                    return lastState.getSearchPeersState();
+                return SearchPeersState.PeersStateBuilder.builder(searchPeersState)
                         .setStartedSearchingPeersInProgress(false)
                         .setStartedSearchingPeersSelfResolved(false)
                         .setResumeSearchingPeersInProgress(false)
@@ -148,9 +148,9 @@ public class PeersStateReducer {
                         lastState.getTorrentFileSystemState().isTorrentRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
-                        !lastState.getPeersState().isPauseSearchingPeersWindUp())
-                    return lastState.getPeersState();
-                return PeersState.PeersStateBuilder.builder(peersState)
+                        !lastState.getSearchPeersState().isPauseSearchingPeersWindUp())
+                    return lastState.getSearchPeersState();
+                return SearchPeersState.PeersStateBuilder.builder(searchPeersState)
                         .setStartedSearchingPeersInProgress(false)
                         .setStartedSearchingPeersSelfResolved(false)
                         .setResumeSearchingPeersInProgress(false)
@@ -158,6 +158,6 @@ public class PeersStateReducer {
                         .build();
         }
 
-        return lastState.getPeersState();
+        return lastState.getSearchPeersState();
     }
 }

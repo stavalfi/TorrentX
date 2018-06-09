@@ -77,6 +77,11 @@ public class DownloadState {
         this.isCompletedDownloadingWindUp = isCompletedDownloadingWindUp;
     }
 
+    public boolean isNotInAnyCompleteState() {
+        return !isCompletedDownloadingInProgress() &&
+                !isCompletedDownloadingWindUp();
+    }
+
     public boolean fromAction(TorrentStatusAction torrentStatusAction) {
         switch (torrentStatusAction) {
             case START_DOWNLOAD_IN_PROGRESS:
@@ -405,41 +410,41 @@ public class DownloadState {
         }
     }
 
-	@Override
-	public boolean equals(Object o) {
-		if (this == o) return true;
-		if (o == null || getClass() != o.getClass()) return false;
-		DownloadState that = (DownloadState) o;
-		return isStartDownloadInProgress == that.isStartDownloadInProgress &&
-				isStartDownloadSelfResolved == that.isStartDownloadSelfResolved &&
-				isStartDownloadWindUp == that.isStartDownloadWindUp &&
-				isPauseDownloadInProgress == that.isPauseDownloadInProgress &&
-				isPauseDownloadSelfResolved == that.isPauseDownloadSelfResolved &&
-				isPauseDownloadWindUp == that.isPauseDownloadWindUp &&
-				isResumeDownloadInProgress == that.isResumeDownloadInProgress &&
-				isResumeDownloadSelfResolved == that.isResumeDownloadSelfResolved &&
-				isResumeDownloadWindUp == that.isResumeDownloadWindUp &&
-				isStartUploadInProgress == that.isStartUploadInProgress &&
-				isStartUploadSelfResolved == that.isStartUploadSelfResolved &&
-				isStartUploadWindUp == that.isStartUploadWindUp &&
-				isPauseUploadInProgress == that.isPauseUploadInProgress &&
-				isPauseUploadSelfResolved == that.isPauseUploadSelfResolved &&
-				isPauseUploadWindUp == that.isPauseUploadWindUp &&
-				isResumeUploadInProgress == that.isResumeUploadInProgress &&
-				isResumeUploadSelfResolved == that.isResumeUploadSelfResolved &&
-				isResumeUploadWindUp == that.isResumeUploadWindUp &&
-				isCompletedDownloadingInProgress == that.isCompletedDownloadingInProgress &&
-				isCompletedDownloadingSelfResolved == that.isCompletedDownloadingSelfResolved &&
-				isCompletedDownloadingWindUp == that.isCompletedDownloadingWindUp;
-	}
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        DownloadState that = (DownloadState) o;
+        return isStartDownloadInProgress == that.isStartDownloadInProgress &&
+                isStartDownloadSelfResolved == that.isStartDownloadSelfResolved &&
+                isStartDownloadWindUp == that.isStartDownloadWindUp &&
+                isPauseDownloadInProgress == that.isPauseDownloadInProgress &&
+                isPauseDownloadSelfResolved == that.isPauseDownloadSelfResolved &&
+                isPauseDownloadWindUp == that.isPauseDownloadWindUp &&
+                isResumeDownloadInProgress == that.isResumeDownloadInProgress &&
+                isResumeDownloadSelfResolved == that.isResumeDownloadSelfResolved &&
+                isResumeDownloadWindUp == that.isResumeDownloadWindUp &&
+                isStartUploadInProgress == that.isStartUploadInProgress &&
+                isStartUploadSelfResolved == that.isStartUploadSelfResolved &&
+                isStartUploadWindUp == that.isStartUploadWindUp &&
+                isPauseUploadInProgress == that.isPauseUploadInProgress &&
+                isPauseUploadSelfResolved == that.isPauseUploadSelfResolved &&
+                isPauseUploadWindUp == that.isPauseUploadWindUp &&
+                isResumeUploadInProgress == that.isResumeUploadInProgress &&
+                isResumeUploadSelfResolved == that.isResumeUploadSelfResolved &&
+                isResumeUploadWindUp == that.isResumeUploadWindUp &&
+                isCompletedDownloadingInProgress == that.isCompletedDownloadingInProgress &&
+                isCompletedDownloadingSelfResolved == that.isCompletedDownloadingSelfResolved &&
+                isCompletedDownloadingWindUp == that.isCompletedDownloadingWindUp;
+    }
 
-	@Override
-	public int hashCode() {
+    @Override
+    public int hashCode() {
 
-		return Objects.hash(isStartDownloadInProgress, isStartDownloadSelfResolved, isStartDownloadWindUp, isPauseDownloadInProgress, isPauseDownloadSelfResolved, isPauseDownloadWindUp, isResumeDownloadInProgress, isResumeDownloadSelfResolved, isResumeDownloadWindUp, isStartUploadInProgress, isStartUploadSelfResolved, isStartUploadWindUp, isPauseUploadInProgress, isPauseUploadSelfResolved, isPauseUploadWindUp, isResumeUploadInProgress, isResumeUploadSelfResolved, isResumeUploadWindUp, isCompletedDownloadingInProgress, isCompletedDownloadingSelfResolved, isCompletedDownloadingWindUp);
-	}
+        return Objects.hash(isStartDownloadInProgress, isStartDownloadSelfResolved, isStartDownloadWindUp, isPauseDownloadInProgress, isPauseDownloadSelfResolved, isPauseDownloadWindUp, isResumeDownloadInProgress, isResumeDownloadSelfResolved, isResumeDownloadWindUp, isStartUploadInProgress, isStartUploadSelfResolved, isStartUploadWindUp, isPauseUploadInProgress, isPauseUploadSelfResolved, isPauseUploadWindUp, isResumeUploadInProgress, isResumeUploadSelfResolved, isResumeUploadWindUp, isCompletedDownloadingInProgress, isCompletedDownloadingSelfResolved, isCompletedDownloadingWindUp);
+    }
 
-	@Override
+    @Override
     public String toString() {
         return "DownloadState{" +
                 "isStartDownloadInProgress=" + isStartDownloadInProgress +

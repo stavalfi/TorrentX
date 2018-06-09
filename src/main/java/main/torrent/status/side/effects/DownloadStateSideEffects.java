@@ -32,13 +32,13 @@ public class DownloadStateSideEffects {
 		BiPredicate<TorrentStatusAction, TorrentStatusState> shouldCancelResumeUpload = (torrentStatusAction, torrentStatusState) -> true;
 
 		this.startDownload$ = store.statesByAction(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
-				.concatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.START_DOWNLOAD_WIND_UP, shouldCancelStartDownload))
+				.concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.START_DOWNLOAD_WIND_UP, shouldCancelStartDownload))
 				.concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
 				.publish()
 				.autoConnect(0);
 
 		this.resumeDownload$ = store.statesByAction(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS)
-				.concatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP, shouldCancelResumeDownload))
+				.concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP, shouldCancelResumeDownload))
 				.publish()
 				.autoConnect(0);
 
@@ -50,18 +50,18 @@ public class DownloadStateSideEffects {
 
 		this.completeDownload$ = store.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
 				.concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS))
-				.concatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP, shouldCancelCompleteDownload))
+				.concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP, shouldCancelCompleteDownload))
 				.publish()
 				.autoConnect(0);
 
 		this.startUpload$ = store.statesByAction(TorrentStatusAction.START_UPLOAD_IN_PROGRESS)
-				.concatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.START_UPLOAD_WIND_UP, shouldCancelStartUpload))
+				.concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.START_UPLOAD_WIND_UP, shouldCancelStartUpload))
 				.concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS))
 				.publish()
 				.autoConnect(0);
 
 		this.resumeUpload$ = store.statesByAction(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS)
-				.concatMap(__ -> store.dispatchAsLongNoCancel(TorrentStatusAction.RESUME_UPLOAD_WIND_UP, shouldCancelResumeUpload))
+				.concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.RESUME_UPLOAD_WIND_UP, shouldCancelResumeUpload))
 				.publish()
 				.autoConnect(0);
 

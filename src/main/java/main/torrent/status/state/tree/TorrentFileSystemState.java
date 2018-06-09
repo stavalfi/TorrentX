@@ -27,6 +27,13 @@ public class TorrentFileSystemState {
         this.isFilesRemovedWindUp = isFilesRemovedWindUp;
     }
 
+    public boolean isNotInAnyRemovingState() {
+        return !isFilesRemovedInProgress() &&
+                !isFilesRemovedWindUp() &&
+                !isTorrentRemovedInProgress() &&
+                !isTorrentRemovedWindUp();
+    }
+
     public boolean fromAction(TorrentStatusAction torrentStatusAction) {
         switch (torrentStatusAction) {
             case REMOVE_FILES_IN_PROGRESS:
@@ -70,103 +77,103 @@ public class TorrentFileSystemState {
         return isFilesRemovedWindUp;
     }
 
-	@Override
-	public boolean equals(Object o) {
-		if (this == o) return true;
-		if (o == null || getClass() != o.getClass()) return false;
-		TorrentFileSystemState that = (TorrentFileSystemState) o;
-		return isTorrentRemovedInProgress == that.isTorrentRemovedInProgress &&
-				isTorrentRemovedSelfResolved == that.isTorrentRemovedSelfResolved &&
-				isTorrentRemovedWindUp == that.isTorrentRemovedWindUp &&
-				isFilesRemovedInProgress == that.isFilesRemovedInProgress &&
-				isFilesRemovedSelfResolved == that.isFilesRemovedSelfResolved &&
-				isFilesRemovedWindUp == that.isFilesRemovedWindUp;
-	}
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        TorrentFileSystemState that = (TorrentFileSystemState) o;
+        return isTorrentRemovedInProgress == that.isTorrentRemovedInProgress &&
+                isTorrentRemovedSelfResolved == that.isTorrentRemovedSelfResolved &&
+                isTorrentRemovedWindUp == that.isTorrentRemovedWindUp &&
+                isFilesRemovedInProgress == that.isFilesRemovedInProgress &&
+                isFilesRemovedSelfResolved == that.isFilesRemovedSelfResolved &&
+                isFilesRemovedWindUp == that.isFilesRemovedWindUp;
+    }
 
-	@Override
-	public int hashCode() {
+    @Override
+    public int hashCode() {
 
-		return Objects.hash(isTorrentRemovedInProgress, isTorrentRemovedSelfResolved, isTorrentRemovedWindUp, isFilesRemovedInProgress, isFilesRemovedSelfResolved, isFilesRemovedWindUp);
-	}
+        return Objects.hash(isTorrentRemovedInProgress, isTorrentRemovedSelfResolved, isTorrentRemovedWindUp, isFilesRemovedInProgress, isFilesRemovedSelfResolved, isFilesRemovedWindUp);
+    }
 
-	@Override
-	public String toString() {
-		return "TorrentFileSystemState{" +
-				"isTorrentRemovedInProgress=" + isTorrentRemovedInProgress +
-				", isTorrentRemovedSelfResolved=" + isTorrentRemovedSelfResolved +
-				", isTorrentRemovedWindUp=" + isTorrentRemovedWindUp +
-				", isFilesRemovedInProgress=" + isFilesRemovedInProgress +
-				", isFilesRemovedSelfResolved=" + isFilesRemovedSelfResolved +
-				", isFilesRemovedWindUp=" + isFilesRemovedWindUp +
-				'}';
-	}
+    @Override
+    public String toString() {
+        return "TorrentFileSystemState{" +
+                "isTorrentRemovedInProgress=" + isTorrentRemovedInProgress +
+                ", isTorrentRemovedSelfResolved=" + isTorrentRemovedSelfResolved +
+                ", isTorrentRemovedWindUp=" + isTorrentRemovedWindUp +
+                ", isFilesRemovedInProgress=" + isFilesRemovedInProgress +
+                ", isFilesRemovedSelfResolved=" + isFilesRemovedSelfResolved +
+                ", isFilesRemovedWindUp=" + isFilesRemovedWindUp +
+                '}';
+    }
 
-	public static class TorrentFileSystemStateBuilder {
-		private boolean isTorrentRemovedInProgress;
-		private boolean isTorrentRemovedSelfResolved;
-		private boolean isTorrentRemovedWindUp;
+    public static class TorrentFileSystemStateBuilder {
+        private boolean isTorrentRemovedInProgress;
+        private boolean isTorrentRemovedSelfResolved;
+        private boolean isTorrentRemovedWindUp;
 
-		private boolean isFilesRemovedInProgress;
-		private boolean isFilesRemovedSelfResolved;
-		private boolean isFilesRemovedWindUp;
+        private boolean isFilesRemovedInProgress;
+        private boolean isFilesRemovedSelfResolved;
+        private boolean isFilesRemovedWindUp;
 
-		public static TorrentFileSystemStateBuilder builder(TorrentFileSystemState torrentFileSystemState) {
-			return new TorrentFileSystemStateBuilder(torrentFileSystemState);
-		}
+        public static TorrentFileSystemStateBuilder builder(TorrentFileSystemState torrentFileSystemState) {
+            return new TorrentFileSystemStateBuilder(torrentFileSystemState);
+        }
 
-		public static TorrentFileSystemStateBuilder builder() {
-			return new TorrentFileSystemStateBuilder();
-		}
+        public static TorrentFileSystemStateBuilder builder() {
+            return new TorrentFileSystemStateBuilder();
+        }
 
-		public TorrentFileSystemState build() {
-			return new TorrentFileSystemState(this.isTorrentRemovedInProgress,
-					this.isTorrentRemovedSelfResolved,
-					this.isTorrentRemovedWindUp,
-					this.isFilesRemovedInProgress,
-					this.isFilesRemovedSelfResolved,
-					this.isFilesRemovedWindUp);
-		}
+        public TorrentFileSystemState build() {
+            return new TorrentFileSystemState(this.isTorrentRemovedInProgress,
+                    this.isTorrentRemovedSelfResolved,
+                    this.isTorrentRemovedWindUp,
+                    this.isFilesRemovedInProgress,
+                    this.isFilesRemovedSelfResolved,
+                    this.isFilesRemovedWindUp);
+        }
 
-		private TorrentFileSystemStateBuilder() {
-		}
+        private TorrentFileSystemStateBuilder() {
+        }
 
-		private TorrentFileSystemStateBuilder(TorrentFileSystemState torrentFileSystemState) {
-			this.isTorrentRemovedInProgress = torrentFileSystemState.isTorrentRemovedInProgress;
-			this.isTorrentRemovedSelfResolved = torrentFileSystemState.isTorrentRemovedSelfResolved;
-			this.isTorrentRemovedWindUp = torrentFileSystemState.isTorrentRemovedWindUp;
-			this.isFilesRemovedInProgress = torrentFileSystemState.isFilesRemovedInProgress;
-			this.isFilesRemovedSelfResolved = torrentFileSystemState.isFilesRemovedSelfResolved;
-			this.isFilesRemovedWindUp = torrentFileSystemState.isFilesRemovedWindUp;
-		}
+        private TorrentFileSystemStateBuilder(TorrentFileSystemState torrentFileSystemState) {
+            this.isTorrentRemovedInProgress = torrentFileSystemState.isTorrentRemovedInProgress;
+            this.isTorrentRemovedSelfResolved = torrentFileSystemState.isTorrentRemovedSelfResolved;
+            this.isTorrentRemovedWindUp = torrentFileSystemState.isTorrentRemovedWindUp;
+            this.isFilesRemovedInProgress = torrentFileSystemState.isFilesRemovedInProgress;
+            this.isFilesRemovedSelfResolved = torrentFileSystemState.isFilesRemovedSelfResolved;
+            this.isFilesRemovedWindUp = torrentFileSystemState.isFilesRemovedWindUp;
+        }
 
-		public TorrentFileSystemStateBuilder setTorrentRemovedSelfResolved(boolean torrentRemovedSelfResolved) {
-			isTorrentRemovedSelfResolved = torrentRemovedSelfResolved;
-			return this;
-		}
+        public TorrentFileSystemStateBuilder setTorrentRemovedSelfResolved(boolean torrentRemovedSelfResolved) {
+            isTorrentRemovedSelfResolved = torrentRemovedSelfResolved;
+            return this;
+        }
 
-		public TorrentFileSystemStateBuilder setFilesRemovedSelfResolved(boolean filesRemovedSelfResolved) {
-			isFilesRemovedSelfResolved = filesRemovedSelfResolved;
-			return this;
-		}
+        public TorrentFileSystemStateBuilder setFilesRemovedSelfResolved(boolean filesRemovedSelfResolved) {
+            isFilesRemovedSelfResolved = filesRemovedSelfResolved;
+            return this;
+        }
 
-		public TorrentFileSystemStateBuilder setTorrentRemovedInProgress(boolean torrentRemovedInProgress) {
-			isTorrentRemovedInProgress = torrentRemovedInProgress;
-			return this;
-		}
+        public TorrentFileSystemStateBuilder setTorrentRemovedInProgress(boolean torrentRemovedInProgress) {
+            isTorrentRemovedInProgress = torrentRemovedInProgress;
+            return this;
+        }
 
-		public TorrentFileSystemStateBuilder setTorrentRemovedWindUp(boolean torrentRemovedWindUp) {
-			isTorrentRemovedWindUp = torrentRemovedWindUp;
-			return this;
-		}
+        public TorrentFileSystemStateBuilder setTorrentRemovedWindUp(boolean torrentRemovedWindUp) {
+            isTorrentRemovedWindUp = torrentRemovedWindUp;
+            return this;
+        }
 
-		public TorrentFileSystemStateBuilder setFilesRemovedInProgress(boolean filesRemovedInProgress) {
-			isFilesRemovedInProgress = filesRemovedInProgress;
-			return this;
-		}
+        public TorrentFileSystemStateBuilder setFilesRemovedInProgress(boolean filesRemovedInProgress) {
+            isFilesRemovedInProgress = filesRemovedInProgress;
+            return this;
+        }
 
-		public TorrentFileSystemStateBuilder setFilesRemovedWindUp(boolean filesRemovedWindUp) {
-			isFilesRemovedWindUp = filesRemovedWindUp;
-			return this;
-		}
-	}
+        public TorrentFileSystemStateBuilder setFilesRemovedWindUp(boolean filesRemovedWindUp) {
+            isFilesRemovedWindUp = filesRemovedWindUp;
+            return this;
+        }
+    }
 }

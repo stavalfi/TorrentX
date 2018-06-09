@@ -267,7 +267,7 @@ public class DownloadStateReducer {
                         downloadState.isCompletedDownloadingWindUp() ||
                         !downloadState.isStartDownloadWindUp() ||
                         !downloadState.isPauseDownloadWindUp() ||
-                        !lastState.getPeersState().isPauseSearchingPeersWindUp())
+                        !lastState.getSearchPeersState().isPauseSearchingPeersWindUp())
                     return lastState.getDownloadState();
                 return DownloadState.DownloadStateBuilder.builder(lastState.getDownloadState())
                         .setCompletedDownloadingInProgress(false)
@@ -281,7 +281,7 @@ public class DownloadStateReducer {
                         lastState.getTorrentFileSystemState().isFilesRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
-                        !lastState.getPeersState().isPauseSearchingPeersWindUp())
+                        !lastState.getSearchPeersState().isPauseSearchingPeersWindUp())
                     return lastState.getDownloadState();
                 return DownloadState.DownloadStateBuilder.builder(lastState.getDownloadState())
                         .setCompletedDownloadingInProgress(false)
@@ -303,7 +303,7 @@ public class DownloadStateReducer {
                         lastState.getTorrentFileSystemState().isTorrentRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
-                        !lastState.getPeersState().isPauseSearchingPeersWindUp())
+                        !lastState.getSearchPeersState().isPauseSearchingPeersWindUp())
                     return lastState.getDownloadState();
                 return DownloadState.DownloadStateBuilder.builder(lastState.getDownloadState())
                         .setCompletedDownloadingInProgress(false)

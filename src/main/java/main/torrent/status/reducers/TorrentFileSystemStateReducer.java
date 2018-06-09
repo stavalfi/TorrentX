@@ -42,7 +42,7 @@ public class TorrentFileSystemStateReducer {
                         torrentFileSystemState.isFilesRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
-                        !lastState.getPeersState().isPauseSearchingPeersWindUp())
+                        !lastState.getSearchPeersState().isPauseSearchingPeersWindUp())
                     return torrentFileSystemState;
                 return TorrentFileSystemState.TorrentFileSystemStateBuilder.builder(torrentFileSystemState)
                         .setFilesRemovedInProgress(false)
@@ -70,7 +70,7 @@ public class TorrentFileSystemStateReducer {
                         torrentFileSystemState.isTorrentRemovedWindUp() ||
                         !lastState.getDownloadState().isPauseDownloadWindUp() ||
                         !lastState.getDownloadState().isPauseUploadWindUp() ||
-                        !lastState.getPeersState().isPauseSearchingPeersWindUp())
+                        !lastState.getSearchPeersState().isPauseSearchingPeersWindUp())
                     return torrentFileSystemState;
                 return TorrentFileSystemState.TorrentFileSystemStateBuilder.builder(torrentFileSystemState)
                         .setTorrentRemovedInProgress(false)

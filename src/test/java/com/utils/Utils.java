@@ -19,7 +19,7 @@ import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.reducers.TorrentStatusReducer;
 import main.torrent.status.state.tree.DownloadState;
-import main.torrent.status.state.tree.PeersState;
+import main.torrent.status.state.tree.SearchPeersState;
 import main.torrent.status.state.tree.TorrentFileSystemState;
 import main.torrent.status.state.tree.TorrentStatusState;
 import org.junit.Assert;
@@ -42,549 +42,549 @@ import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
 public class Utils {
-	public static TorrentInfo createTorrentInfo(String torrentFilePath) throws IOException {
-		String torrentFilesPath = "src" + File.separator +
-				"test" + File.separator +
-				"resources" + File.separator +
-				"torrents" + File.separator +
-				torrentFilePath;
-		return new TorrentInfo(torrentFilesPath, TorrentParser.parseTorrent(torrentFilesPath));
-	}
+    public static TorrentInfo createTorrentInfo(String torrentFilePath) throws IOException {
+        String torrentFilesPath = "src" + File.separator +
+                "test" + File.separator +
+                "resources" + File.separator +
+                "torrents" + File.separator +
+                torrentFilePath;
+        return new TorrentInfo(torrentFilesPath, TorrentParser.parseTorrent(torrentFilesPath));
+    }
 
-	private static BiPredicate<ListenerState, ListenerState> isEqualByProperties = (defaultListenState, listenerState) ->
-			defaultListenState.getAction().equals(listenerState.getAction()) &&
-					defaultListenState.isStartedListeningInProgress() == listenerState.isStartedListeningInProgress() &&
-					defaultListenState.isStartedListeningSelfResolved() == listenerState.isStartedListeningSelfResolved() &&
-					defaultListenState.isStartedListeningWindUp() == listenerState.isStartedListeningWindUp() &&
-					defaultListenState.isResumeListeningInProgress() == listenerState.isResumeListeningInProgress() &&
-					defaultListenState.isResumeListeningSelfResolved() == listenerState.isResumeListeningSelfResolved() &&
-					defaultListenState.isResumeListeningWindUp() == listenerState.isResumeListeningWindUp() &&
-					defaultListenState.isPauseListeningInProgress() == listenerState.isPauseListeningInProgress() &&
-					defaultListenState.isPauseListeningSelfResolved() == listenerState.isPauseListeningSelfResolved() &&
-					defaultListenState.isPauseListeningWindUp() == listenerState.isPauseListeningWindUp() &&
-					defaultListenState.isRestartListeningInProgress() == listenerState.isRestartListeningInProgress() &&
-					defaultListenState.isRestartListeningSelfResolved() == listenerState.isRestartListeningSelfResolved() &&
-					defaultListenState.isRestartListeningWindUp() == listenerState.isRestartListeningWindUp();
+    private static BiPredicate<ListenerState, ListenerState> isEqualByProperties = (defaultListenState, listenerState) ->
+            defaultListenState.getAction().equals(listenerState.getAction()) &&
+                    defaultListenState.isStartedListeningInProgress() == listenerState.isStartedListeningInProgress() &&
+                    defaultListenState.isStartedListeningSelfResolved() == listenerState.isStartedListeningSelfResolved() &&
+                    defaultListenState.isStartedListeningWindUp() == listenerState.isStartedListeningWindUp() &&
+                    defaultListenState.isResumeListeningInProgress() == listenerState.isResumeListeningInProgress() &&
+                    defaultListenState.isResumeListeningSelfResolved() == listenerState.isResumeListeningSelfResolved() &&
+                    defaultListenState.isResumeListeningWindUp() == listenerState.isResumeListeningWindUp() &&
+                    defaultListenState.isPauseListeningInProgress() == listenerState.isPauseListeningInProgress() &&
+                    defaultListenState.isPauseListeningSelfResolved() == listenerState.isPauseListeningSelfResolved() &&
+                    defaultListenState.isPauseListeningWindUp() == listenerState.isPauseListeningWindUp() &&
+                    defaultListenState.isRestartListeningInProgress() == listenerState.isRestartListeningInProgress() &&
+                    defaultListenState.isRestartListeningSelfResolved() == listenerState.isRestartListeningSelfResolved() &&
+                    defaultListenState.isRestartListeningWindUp() == listenerState.isRestartListeningWindUp();
 
-	public static void removeEverythingRelatedToLastTest() {
-		TorrentDownloaders.getAllocatorStore()
-				.freeAll()
-				.flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(2, 1_000_000))
-				.as(StepVerifier::create)
-				.expectNextCount(1)
-				.verifyComplete();
+    public static void removeEverythingRelatedToLastTest() {
+        TorrentDownloaders.getAllocatorStore()
+                .freeAll()
+                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(2, 1_000_000))
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
 
-		TorrentDownloaders.getInstance()
-				.getTorrentDownloadersFlux()
-				.filter(torrentDownloader -> torrentDownloader.getStore() != null)
-				.map(TorrentDownloader::getStore)
-				.flatMap(store -> store.dispatch(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
-						.flatMap(__ -> store.dispatch(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)))
-				.defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
-				.as(StepVerifier::create)
-				.expectNextCount(1)
-				.verifyComplete();
+        TorrentDownloaders.getInstance()
+                .getTorrentDownloadersFlux()
+                .filter(torrentDownloader -> torrentDownloader.getTorrentStatusStore() != null)
+                .map(TorrentDownloader::getTorrentStatusStore)
+                .flatMap(store -> store.dispatch(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
+                        .flatMap(__ -> store.dispatch(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)))
+                .defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
 
-		TorrentDownloaders.getInstance()
-				.getTorrentDownloadersFlux()
-				.filter(torrentDownloader -> torrentDownloader.getStore() != null)
-				.filter(torrentDownloader -> torrentDownloader.getTorrentStatesSideEffects() != null)
-				.map(TorrentDownloader::getStore)
-				.flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP, store))
-				.flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
-				.defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
-				.as(StepVerifier::create)
-				.expectNextCount(1)
-				.verifyComplete();
+        TorrentDownloaders.getInstance()
+                .getTorrentDownloadersFlux()
+                .filter(torrentDownloader -> torrentDownloader.getTorrentStatusStore() != null)
+                .filter(torrentDownloader -> torrentDownloader.getTorrentStatesSideEffects() != null)
+                .map(TorrentDownloader::getTorrentStatusStore)
+                .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP, store))
+                .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
+                .defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
 
-		TorrentDownloaders.getInstance()
-				.getTorrentDownloadersFlux()
-				.map(TorrentDownloader::getTorrentInfo)
-				.map(TorrentInfo::getTorrentInfoHash)
-				// TODO: incase I get the objects from remote server like mongodb one by one, then this flux will never be over so collectList will never emit next signal.
-				.doOnNext(torrentInfoHash -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentInfoHash))
-				.collectList()
-				.as(StepVerifier::create)
-				.expectNextCount(1)
-				.verifyComplete();
+        TorrentDownloaders.getInstance()
+                .getTorrentDownloadersFlux()
+                .map(TorrentDownloader::getTorrentInfo)
+                .map(TorrentInfo::getTorrentInfoHash)
+                // TODO: incase I get the objects from remote server like mongodb one by one, then this flux will never be over so collectList will never emit next signal.
+                .doOnNext(torrentInfoHash -> TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentInfoHash))
+                .collectList()
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
 
-		TorrentDownloaders.getListenStore()
-				.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-				.flatMapMany(__ -> TorrentDownloaders.getListenStore().states$())
-				.filter(listenerState -> isEqualByProperties.test(ListenerReducer.defaultListenState, listenerState))
-				.take(1)
-				.as(StepVerifier::create)
-				.expectNextCount(1)
-				.verifyComplete();
+        TorrentDownloaders.getListenStore()
+                .dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
+                .flatMapMany(__ -> TorrentDownloaders.getListenStore().states$())
+                .filter(listenerState -> isEqualByProperties.test(ListenerReducer.defaultListenState, listenerState))
+                .take(1)
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
 
-		// delete download folder from last test
-		Utils.deleteDownloadFolder();
-	}
+        // delete download folder from last test
+        Utils.deleteDownloadFolder();
+    }
 
-	public static void changeListenerState(List<ListenerAction> changesActionList, Store<ListenerState, ListenerAction> listenStore) {
-		Flux.fromIterable(changesActionList)
-				.filter(action -> action.equals(ListenerAction.START_LISTENING_IN_PROGRESS) ||
-						action.equals(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
-						action.equals(ListenerAction.RESUME_LISTENING_IN_PROGRESS) ||
-						action.equals(ListenerAction.RESUME_LISTENING_SELF_RESOLVED) ||
-						action.equals(ListenerAction.PAUSE_LISTENING_IN_PROGRESS) ||
-						action.equals(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED) ||
-						action.equals(ListenerAction.RESTART_LISTENING_IN_PROGRESS) ||
-						action.equals(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
-				.flatMap(action -> {
-					switch (action) {
-						case START_LISTENING_IN_PROGRESS:
-							return listenStore.dispatch(action)
-									.subscribeOn(Schedulers.elastic())
-									.publishOn(Schedulers.elastic())
-									.flatMapMany(__ -> listenStore.states$())
-									.filter(listenerState -> listenerState.isResumeListeningWindUp())
-									.take(1)
-									.single();
-						case START_LISTENING_SELF_RESOLVED:
-							return listenStore.states$()
-									.filter(ListenerState::isStartedListeningInProgress)
-									.take(1)
-									.flatMap(__ -> listenStore.dispatch(action)
-											.subscribeOn(Schedulers.elastic())
-											.publishOn(Schedulers.elastic()))
-									.flatMap(__ -> listenStore.states$())
-									.filter(ListenerState::isResumeListeningWindUp)
-									.take(1)
-									.single();
-						case RESUME_LISTENING_IN_PROGRESS:
-							return listenStore.dispatch(action)
-									.subscribeOn(Schedulers.elastic())
-									.publishOn(Schedulers.elastic())
-									.flatMapMany(__ -> listenStore.states$())
-									.filter(ListenerState::isResumeListeningWindUp)
-									.take(1)
-									.single();
-						case RESUME_LISTENING_SELF_RESOLVED:
-							return listenStore.states$()
-									.filter(ListenerState::isResumeListeningInProgress)
-									.take(1)
-									.flatMap(__ -> listenStore.dispatch(action)
-											.subscribeOn(Schedulers.elastic())
-											.publishOn(Schedulers.elastic()))
-									.flatMap(__ -> listenStore.states$())
-									.filter(ListenerState::isResumeListeningWindUp)
-									.take(1)
-									.single();
-						case PAUSE_LISTENING_IN_PROGRESS:
-							return listenStore.dispatch(action)
-									.subscribeOn(Schedulers.elastic())
-									.publishOn(Schedulers.elastic())
-									.flatMapMany(__ -> listenStore.states$())
-									.filter(ListenerState::isPauseListeningWindUp)
-									.take(1)
-									.single();
-						case PAUSE_LISTENING_SELF_RESOLVED:
-							return listenStore.states$()
-									.filter(ListenerState::isPauseListeningInProgress)
-									.take(1)
-									.flatMap(__ -> listenStore.dispatch(action)
-											.subscribeOn(Schedulers.elastic())
-											.publishOn(Schedulers.elastic()))
-									.flatMap(__ -> listenStore.states$())
-									.filter(ListenerState::isPauseListeningWindUp)
-									.take(1)
-									.single();
-						case RESTART_LISTENING_IN_PROGRESS:
-							return listenStore.dispatch(action)
-									.subscribeOn(Schedulers.elastic())
-									.publishOn(Schedulers.elastic())
-									.flatMapMany(__ -> listenStore.states$())
-									.filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
-									.take(1)
-									.single();
-						case RESTART_LISTENING_SELF_RESOLVED:
-							return listenStore.states$()
-									.filter(ListenerState::isRestartListeningInProgress)
-									.take(1)
-									.flatMap(__ -> listenStore.dispatch(action)
-											.subscribeOn(Schedulers.elastic())
-											.publishOn(Schedulers.elastic()))
-									.flatMap(__ -> listenStore.states$())
-									.filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
-									.take(1)
-									.single();
-						default:
-							return Mono.empty();
-					}
-				}, changesActionList.size())
-				.blockLast();
-	}
+    public static void changeListenerState(List<ListenerAction> changesActionList, Store<ListenerState, ListenerAction> listenStore) {
+        Flux.fromIterable(changesActionList)
+                .filter(action -> action.equals(ListenerAction.START_LISTENING_IN_PROGRESS) ||
+                        action.equals(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
+                        action.equals(ListenerAction.RESUME_LISTENING_IN_PROGRESS) ||
+                        action.equals(ListenerAction.RESUME_LISTENING_SELF_RESOLVED) ||
+                        action.equals(ListenerAction.PAUSE_LISTENING_IN_PROGRESS) ||
+                        action.equals(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED) ||
+                        action.equals(ListenerAction.RESTART_LISTENING_IN_PROGRESS) ||
+                        action.equals(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
+                .flatMap(action -> {
+                    switch (action) {
+                        case START_LISTENING_IN_PROGRESS:
+                            return listenStore.dispatch(action)
+                                    .subscribeOn(Schedulers.elastic())
+                                    .publishOn(Schedulers.elastic())
+                                    .flatMapMany(__ -> listenStore.states$())
+                                    .filter(listenerState -> listenerState.isResumeListeningWindUp())
+                                    .take(1)
+                                    .single();
+                        case START_LISTENING_SELF_RESOLVED:
+                            return listenStore.states$()
+                                    .filter(ListenerState::isStartedListeningInProgress)
+                                    .take(1)
+                                    .flatMap(__ -> listenStore.dispatch(action)
+                                            .subscribeOn(Schedulers.elastic())
+                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.states$())
+                                    .filter(ListenerState::isResumeListeningWindUp)
+                                    .take(1)
+                                    .single();
+                        case RESUME_LISTENING_IN_PROGRESS:
+                            return listenStore.dispatch(action)
+                                    .subscribeOn(Schedulers.elastic())
+                                    .publishOn(Schedulers.elastic())
+                                    .flatMapMany(__ -> listenStore.states$())
+                                    .filter(ListenerState::isResumeListeningWindUp)
+                                    .take(1)
+                                    .single();
+                        case RESUME_LISTENING_SELF_RESOLVED:
+                            return listenStore.states$()
+                                    .filter(ListenerState::isResumeListeningInProgress)
+                                    .take(1)
+                                    .flatMap(__ -> listenStore.dispatch(action)
+                                            .subscribeOn(Schedulers.elastic())
+                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.states$())
+                                    .filter(ListenerState::isResumeListeningWindUp)
+                                    .take(1)
+                                    .single();
+                        case PAUSE_LISTENING_IN_PROGRESS:
+                            return listenStore.dispatch(action)
+                                    .subscribeOn(Schedulers.elastic())
+                                    .publishOn(Schedulers.elastic())
+                                    .flatMapMany(__ -> listenStore.states$())
+                                    .filter(ListenerState::isPauseListeningWindUp)
+                                    .take(1)
+                                    .single();
+                        case PAUSE_LISTENING_SELF_RESOLVED:
+                            return listenStore.states$()
+                                    .filter(ListenerState::isPauseListeningInProgress)
+                                    .take(1)
+                                    .flatMap(__ -> listenStore.dispatch(action)
+                                            .subscribeOn(Schedulers.elastic())
+                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.states$())
+                                    .filter(ListenerState::isPauseListeningWindUp)
+                                    .take(1)
+                                    .single();
+                        case RESTART_LISTENING_IN_PROGRESS:
+                            return listenStore.dispatch(action)
+                                    .subscribeOn(Schedulers.elastic())
+                                    .publishOn(Schedulers.elastic())
+                                    .flatMapMany(__ -> listenStore.states$())
+                                    .filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
+                                    .take(1)
+                                    .single();
+                        case RESTART_LISTENING_SELF_RESOLVED:
+                            return listenStore.states$()
+                                    .filter(ListenerState::isRestartListeningInProgress)
+                                    .take(1)
+                                    .flatMap(__ -> listenStore.dispatch(action)
+                                            .subscribeOn(Schedulers.elastic())
+                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.states$())
+                                    .filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
+                                    .take(1)
+                                    .single();
+                        default:
+                            return Mono.empty();
+                    }
+                }, changesActionList.size())
+                .blockLast();
+    }
 
-	public static TorrentStatusState getTorrentStatusState(TorrentInfo torrentInfo, TorrentStatusAction lastTorrentStatusAction, List<TorrentStatusAction> torrentStatusActions) {
-		DownloadState downloadState = DownloadState.DownloadStateBuilder.builder()
-				.setStartDownloadInProgress(torrentStatusActions.contains(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS))
-				.setStartDownloadWindUp(torrentStatusActions.contains(TorrentStatusAction.START_DOWNLOAD_WIND_UP))
-				.setResumeDownloadInProgress(torrentStatusActions.contains(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
-				.setResumeDownloadWindUp(torrentStatusActions.contains(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
-				.setPauseDownloadInProgress(torrentStatusActions.contains(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS))
-				.setPauseDownloadWindUp(torrentStatusActions.contains(TorrentStatusAction.PAUSE_DOWNLOAD_WIND_UP))
-				.setCompletedDownloadingInProgress(torrentStatusActions.contains(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS))
-				.setCompletedDownloadingWindUp(torrentStatusActions.contains(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP))
-				.setStartUploadInProgress(torrentStatusActions.contains(TorrentStatusAction.START_UPLOAD_IN_PROGRESS))
-				.setStartUploadWindUp(torrentStatusActions.contains(TorrentStatusAction.START_UPLOAD_WIND_UP))
-				.setResumeUploadInProgress(torrentStatusActions.contains(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS))
-				.setResumeUploadWindUp(torrentStatusActions.contains(TorrentStatusAction.RESUME_UPLOAD_WIND_UP))
-				.setPauseUploadInProgress(torrentStatusActions.contains(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS))
-				.setPauseUploadWindUp(torrentStatusActions.contains(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
-				.build();
+    public static TorrentStatusState getTorrentStatusState(TorrentInfo torrentInfo, TorrentStatusAction lastTorrentStatusAction, List<TorrentStatusAction> torrentStatusActions) {
+        DownloadState downloadState = DownloadState.DownloadStateBuilder.builder()
+                .setStartDownloadInProgress(torrentStatusActions.contains(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS))
+                .setStartDownloadWindUp(torrentStatusActions.contains(TorrentStatusAction.START_DOWNLOAD_WIND_UP))
+                .setResumeDownloadInProgress(torrentStatusActions.contains(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
+                .setResumeDownloadWindUp(torrentStatusActions.contains(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
+                .setPauseDownloadInProgress(torrentStatusActions.contains(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS))
+                .setPauseDownloadWindUp(torrentStatusActions.contains(TorrentStatusAction.PAUSE_DOWNLOAD_WIND_UP))
+                .setCompletedDownloadingInProgress(torrentStatusActions.contains(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS))
+                .setCompletedDownloadingWindUp(torrentStatusActions.contains(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP))
+                .setStartUploadInProgress(torrentStatusActions.contains(TorrentStatusAction.START_UPLOAD_IN_PROGRESS))
+                .setStartUploadWindUp(torrentStatusActions.contains(TorrentStatusAction.START_UPLOAD_WIND_UP))
+                .setResumeUploadInProgress(torrentStatusActions.contains(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS))
+                .setResumeUploadWindUp(torrentStatusActions.contains(TorrentStatusAction.RESUME_UPLOAD_WIND_UP))
+                .setPauseUploadInProgress(torrentStatusActions.contains(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS))
+                .setPauseUploadWindUp(torrentStatusActions.contains(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
+                .build();
 
-		PeersState peersState = PeersState.PeersStateBuilder.builder()
-				.setStartedSearchingPeersInProgress(torrentStatusActions.contains(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS))
-				.setStartedSearchingPeersSelfResolved(torrentStatusActions.contains(TorrentStatusAction.START_SEARCHING_PEERS_SELF_RESOLVED))
-				.setStartedSearchingPeersWindUp(torrentStatusActions.contains(TorrentStatusAction.START_SEARCHING_PEERS_WIND_UP))
-				.setPauseSearchingPeersInProgress(torrentStatusActions.contains(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
-				.setPauseSearchingPeersSelfResolved(torrentStatusActions.contains(TorrentStatusAction.PAUSE_SEARCHING_PEERS_SELF_RESOLVED))
-				.setPauseSearchingPeersWindUp(torrentStatusActions.contains(TorrentStatusAction.PAUSE_SEARCHING_PEERS_WIND_UP))
-				.setResumeSearchingPeersInProgress(torrentStatusActions.contains(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS))
-				.setResumeSearchingPeersSelfResolved(torrentStatusActions.contains(TorrentStatusAction.RESUME_SEARCHING_PEERS_SELF_RESOLVED))
-				.setResumeSearchingPeersWindUp(torrentStatusActions.contains(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP))
-				.build();
+        SearchPeersState searchPeersState = SearchPeersState.PeersStateBuilder.builder()
+                .setStartedSearchingPeersInProgress(torrentStatusActions.contains(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS))
+                .setStartedSearchingPeersSelfResolved(torrentStatusActions.contains(TorrentStatusAction.START_SEARCHING_PEERS_SELF_RESOLVED))
+                .setStartedSearchingPeersWindUp(torrentStatusActions.contains(TorrentStatusAction.START_SEARCHING_PEERS_WIND_UP))
+                .setPauseSearchingPeersInProgress(torrentStatusActions.contains(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS))
+                .setPauseSearchingPeersSelfResolved(torrentStatusActions.contains(TorrentStatusAction.PAUSE_SEARCHING_PEERS_SELF_RESOLVED))
+                .setPauseSearchingPeersWindUp(torrentStatusActions.contains(TorrentStatusAction.PAUSE_SEARCHING_PEERS_WIND_UP))
+                .setResumeSearchingPeersInProgress(torrentStatusActions.contains(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS))
+                .setResumeSearchingPeersSelfResolved(torrentStatusActions.contains(TorrentStatusAction.RESUME_SEARCHING_PEERS_SELF_RESOLVED))
+                .setResumeSearchingPeersWindUp(torrentStatusActions.contains(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP))
+                .build();
 
-		TorrentFileSystemState torrentFileSystemState = TorrentFileSystemState.TorrentFileSystemStateBuilder.builder()
-				.setFilesRemovedInProgress(torrentStatusActions.contains(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS))
-				.setFilesRemovedWindUp(torrentStatusActions.contains(TorrentStatusAction.REMOVE_FILES_WIND_UP))
-				.setTorrentRemovedInProgress(torrentStatusActions.contains(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS))
-				.setTorrentRemovedWindUp(torrentStatusActions.contains(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
-				.build();
+        TorrentFileSystemState torrentFileSystemState = TorrentFileSystemState.TorrentFileSystemStateBuilder.builder()
+                .setFilesRemovedInProgress(torrentStatusActions.contains(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS))
+                .setFilesRemovedWindUp(torrentStatusActions.contains(TorrentStatusAction.REMOVE_FILES_WIND_UP))
+                .setTorrentRemovedInProgress(torrentStatusActions.contains(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS))
+                .setTorrentRemovedWindUp(torrentStatusActions.contains(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
+                .build();
 
-		return new TorrentStatusState(null, lastTorrentStatusAction, downloadState, peersState, torrentFileSystemState);
-	}
+        return new TorrentStatusState(null, lastTorrentStatusAction, downloadState, searchPeersState, torrentFileSystemState);
+    }
 
-	public static ListenerState getListenStatusState(ListenerAction lastAction, List<ListenerAction> actions) {
-		return ListenerState.ListenStateBuilder.builder(lastAction)
-				.setStartedListeningInProgress(actions.contains(ListenerAction.START_LISTENING_IN_PROGRESS))
-				.setStartedListeningSelfResolved(actions.contains(ListenerAction.START_LISTENING_SELF_RESOLVED))
-				.setStartedListeningWindUp(actions.contains(ListenerAction.START_LISTENING_WIND_UP))
-				.setResumeListeningInProgress(actions.contains(ListenerAction.RESUME_LISTENING_IN_PROGRESS))
-				.setResumeListeningSelfResolved(actions.contains(ListenerAction.RESUME_LISTENING_SELF_RESOLVED))
-				.setResumeListeningWindUp(actions.contains(ListenerAction.RESUME_LISTENING_WIND_UP))
-				.setPauseListeningInProgress(actions.contains(ListenerAction.PAUSE_LISTENING_IN_PROGRESS))
-				.setPauseListeningSelfResolved(actions.contains(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
-				.setPauseListeningWindUp(actions.contains(ListenerAction.PAUSE_LISTENING_WIND_UP))
-				.setRestartListeningInProgress(actions.contains(ListenerAction.RESTART_LISTENING_IN_PROGRESS))
-				.setRestartListeningSelfResolved(actions.contains(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
-				.setRestartListeningWindUp(actions.contains(ListenerAction.RESTART_LISTENING_WIND_UP))
-				.build();
-	}
+    public static ListenerState getListenStatusState(ListenerAction lastAction, List<ListenerAction> actions) {
+        return ListenerState.ListenStateBuilder.builder(lastAction)
+                .setStartedListeningInProgress(actions.contains(ListenerAction.START_LISTENING_IN_PROGRESS))
+                .setStartedListeningSelfResolved(actions.contains(ListenerAction.START_LISTENING_SELF_RESOLVED))
+                .setStartedListeningWindUp(actions.contains(ListenerAction.START_LISTENING_WIND_UP))
+                .setResumeListeningInProgress(actions.contains(ListenerAction.RESUME_LISTENING_IN_PROGRESS))
+                .setResumeListeningSelfResolved(actions.contains(ListenerAction.RESUME_LISTENING_SELF_RESOLVED))
+                .setResumeListeningWindUp(actions.contains(ListenerAction.RESUME_LISTENING_WIND_UP))
+                .setPauseListeningInProgress(actions.contains(ListenerAction.PAUSE_LISTENING_IN_PROGRESS))
+                .setPauseListeningSelfResolved(actions.contains(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
+                .setPauseListeningWindUp(actions.contains(ListenerAction.PAUSE_LISTENING_WIND_UP))
+                .setRestartListeningInProgress(actions.contains(ListenerAction.RESTART_LISTENING_IN_PROGRESS))
+                .setRestartListeningSelfResolved(actions.contains(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
+                .setRestartListeningWindUp(actions.contains(ListenerAction.RESTART_LISTENING_WIND_UP))
+                .build();
+    }
 
-	public static Mono<SendMessagesNotifications> sendFakeMessage(TorrentInfo torrentInfo, String downloadPath, Link link, PeerMessageType peerMessageType) {
-		switch (peerMessageType) {
-			case HaveMessage:
-				return link.sendMessages().sendHaveMessage(0);
-			case PortMessage:
-				return link.sendMessages().sendPortMessage((short) link.getMe().getPeerPort());
-			case ChokeMessage:
-				return link.sendMessages().sendChokeMessage();
-			case PieceMessage:
-				return createAndSendFakePieceMessage(torrentInfo, downloadPath, link);
-			case CancelMessage:
-				return link.sendMessages().sendCancelMessage(2, 0, 10);
-			case KeepAliveMessage:
-				return link.sendMessages().sendKeepAliveMessage();
-			case RequestMessage:
-				return link.sendMessages().sendRequestMessage(1, 0, 3);
-			case UnchokeMessage:
-				return link.sendMessages().sendUnchokeMessage();
-			case BitFieldMessage:
-				return link.sendMessages().sendBitFieldMessage(BitSet.valueOf(new byte[10]));
-			case InterestedMessage:
-				return link.sendMessages().sendInterestedMessage();
-			case NotInterestedMessage:
-				return link.sendMessages().sendNotInterestedMessage();
-			default:
-				throw new IllegalArgumentException(peerMessageType.toString());
-		}
-	}
+    public static Mono<SendMessagesNotifications> sendFakeMessage(TorrentInfo torrentInfo, String downloadPath, Link link, PeerMessageType peerMessageType) {
+        switch (peerMessageType) {
+            case HaveMessage:
+                return link.sendMessages().sendHaveMessage(0);
+            case PortMessage:
+                return link.sendMessages().sendPortMessage((short) link.getMe().getPeerPort());
+            case ChokeMessage:
+                return link.sendMessages().sendChokeMessage();
+            case PieceMessage:
+                return createAndSendFakePieceMessage(torrentInfo, downloadPath, link);
+            case CancelMessage:
+                return link.sendMessages().sendCancelMessage(2, 0, 10);
+            case KeepAliveMessage:
+                return link.sendMessages().sendKeepAliveMessage();
+            case RequestMessage:
+                return link.sendMessages().sendRequestMessage(1, 0, 3);
+            case UnchokeMessage:
+                return link.sendMessages().sendUnchokeMessage();
+            case BitFieldMessage:
+                return link.sendMessages().sendBitFieldMessage(BitSet.valueOf(new byte[10]));
+            case InterestedMessage:
+                return link.sendMessages().sendInterestedMessage();
+            case NotInterestedMessage:
+                return link.sendMessages().sendNotInterestedMessage();
+            default:
+                throw new IllegalArgumentException(peerMessageType.toString());
+        }
+    }
 
-	private static Mono<SendMessagesNotifications> createAndSendFakePieceMessage(TorrentInfo torrentInfo, String downloadPath,
-																				 Link link) {
-		int pieceIndex = 3;
-		int pieceLength = torrentInfo.getPieceLength(pieceIndex);
-		int begin = 0;
-		int blockLength = pieceLength;
-		return TorrentDownloaders.getAllocatorStore()
-				.updateAllocations(4, blockLength)
-				.flatMap(allocatorState -> TorrentDownloaders.getAllocatorStore()
-						.createPieceMessage(link.getPeer(), link.getMe(), pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
-				.doOnNext(pieceMessageToSave -> {
-					for (int i = 0; i < blockLength; i++)
-						pieceMessageToSave.getAllocatedBlock().getBlock()[i] = 11;
-				})
-				.flatMap(pieceMessageToSave -> {
-					ConnectableFlux<PieceMessage> pieceMessageFlux = Flux.just(pieceMessageToSave).publish();
-					Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-							TorrentStatusReducer.defaultTorrentState);
-					return FileSystemLinkImpl.create(link.getTorrentInfo(), downloadPath, store, pieceMessageFlux)
-							.flatMap(fileSystemLink -> {
-								Flux<PieceEvent> savedPieces$ = fileSystemLink.savedBlockFlux()
-										.replay()
-										.autoConnect(0);
-								pieceMessageFlux.connect();
-								// wait until we saved the piece and then send it to the fake peer.
-								return savedPieces$
-										.doOnNext(pieceEvent -> Assert.assertEquals("the piece I saved is not " +
-												"the pieces that was saved.", pieceIndex, pieceEvent.getReceivedPiece().getIndex()))
-										.map(PieceEvent::getReceivedPiece)
-										.map(PieceMessage::getAllocatedBlock)
-										.flatMap(allocatedBlock -> TorrentDownloaders.getAllocatorStore().free(allocatedBlock))
-										.map(__ -> new RequestMessage(link.getMe(), link.getPeer(), pieceIndex, begin, blockLength))
-										.flatMap(requestMessage -> fileSystemLink.buildPieceMessage(requestMessage))
-										.flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
-												.flatMap(sendMessagesNotifications -> {
-													store.dispatchNonBlocking(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS);
-													store.dispatchNonBlocking(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS);
-													return store.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP)
-															.flatMap(___ -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
-															.map(___ -> sendMessagesNotifications);
-												}))
-										.take(1)
-										.single();
-							});
-				});
-	}
+    private static Mono<SendMessagesNotifications> createAndSendFakePieceMessage(TorrentInfo torrentInfo, String downloadPath,
+                                                                                 Link link) {
+        int pieceIndex = 3;
+        int pieceLength = torrentInfo.getPieceLength(pieceIndex);
+        int begin = 0;
+        int blockLength = pieceLength;
+        return TorrentDownloaders.getAllocatorStore()
+                .updateAllocations(4, blockLength)
+                .flatMap(allocatorState -> TorrentDownloaders.getAllocatorStore()
+                        .createPieceMessage(link.getPeer(), link.getMe(), pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
+                .doOnNext(pieceMessageToSave -> {
+                    for (int i = 0; i < blockLength; i++)
+                        pieceMessageToSave.getAllocatedBlock().getBlock()[i] = 11;
+                })
+                .flatMap(pieceMessageToSave -> {
+                    ConnectableFlux<PieceMessage> pieceMessageFlux = Flux.just(pieceMessageToSave).publish();
+                    Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
+                            TorrentStatusReducer.defaultTorrentState);
+                    return FileSystemLinkImpl.create(link.getTorrentInfo(), downloadPath, store, pieceMessageFlux)
+                            .flatMap(fileSystemLink -> {
+                                Flux<PieceEvent> savedPieces$ = fileSystemLink.savedBlockFlux()
+                                        .replay()
+                                        .autoConnect(0);
+                                pieceMessageFlux.connect();
+                                // wait until we saved the piece and then send it to the fake peer.
+                                return savedPieces$
+                                        .doOnNext(pieceEvent -> Assert.assertEquals("the piece I saved is not " +
+                                                "the pieces that was saved.", pieceIndex, pieceEvent.getReceivedPiece().getIndex()))
+                                        .map(PieceEvent::getReceivedPiece)
+                                        .map(PieceMessage::getAllocatedBlock)
+                                        .flatMap(allocatedBlock -> TorrentDownloaders.getAllocatorStore().free(allocatedBlock))
+                                        .map(__ -> new RequestMessage(link.getMe(), link.getPeer(), pieceIndex, begin, blockLength))
+                                        .flatMap(requestMessage -> fileSystemLink.buildPieceMessage(requestMessage))
+                                        .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
+                                                .flatMap(sendMessagesNotifications -> {
+                                                    store.dispatchNonBlocking(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS);
+                                                    store.dispatchNonBlocking(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS);
+                                                    return store.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP)
+                                                            .flatMap(___ -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
+                                                            .map(___ -> sendMessagesNotifications);
+                                                }))
+                                        .take(1)
+                                        .single();
+                            });
+                });
+    }
 
-	public static Flux<? extends PeerMessage> getSpecificMessageResponseFluxByMessageType(Link link, PeerMessageType peerMessageType) {
-		switch (peerMessageType) {
-			case HaveMessage:
-				return link.receivePeerMessages().getHaveMessageResponseFlux();
-			case PortMessage:
-				return link.receivePeerMessages().getPortMessageResponseFlux();
-			case ChokeMessage:
-				return link.receivePeerMessages().getChokeMessageResponseFlux();
-			case PieceMessage:
-				return link.receivePeerMessages().getPieceMessageResponseFlux();
-			case CancelMessage:
-				return link.receivePeerMessages().getCancelMessageResponseFlux();
-			case KeepAliveMessage:
-				return link.receivePeerMessages().getKeepMessageResponseFlux();
-			case RequestMessage:
-				return link.receivePeerMessages().getRequestMessageResponseFlux();
-			case UnchokeMessage:
-				return link.receivePeerMessages().getUnchokeMessageResponseFlux();
-			case BitFieldMessage:
-				return link.receivePeerMessages().getBitFieldMessageResponseFlux();
-			case InterestedMessage:
-				return link.receivePeerMessages().getInterestedMessageResponseFlux();
-			case NotInterestedMessage:
-				return link.receivePeerMessages().getNotInterestedMessageResponseFlux();
-			case ExtendedMessage:
-				return link.receivePeerMessages().getExtendedMessageResponseFlux();
-			default:
-				throw new IllegalArgumentException(peerMessageType.toString());
-		}
-	}
+    public static Flux<? extends PeerMessage> getSpecificMessageResponseFluxByMessageType(Link link, PeerMessageType peerMessageType) {
+        switch (peerMessageType) {
+            case HaveMessage:
+                return link.receivePeerMessages().getHaveMessageResponseFlux();
+            case PortMessage:
+                return link.receivePeerMessages().getPortMessageResponseFlux();
+            case ChokeMessage:
+                return link.receivePeerMessages().getChokeMessageResponseFlux();
+            case PieceMessage:
+                return link.receivePeerMessages().getPieceMessageResponseFlux();
+            case CancelMessage:
+                return link.receivePeerMessages().getCancelMessageResponseFlux();
+            case KeepAliveMessage:
+                return link.receivePeerMessages().getKeepMessageResponseFlux();
+            case RequestMessage:
+                return link.receivePeerMessages().getRequestMessageResponseFlux();
+            case UnchokeMessage:
+                return link.receivePeerMessages().getUnchokeMessageResponseFlux();
+            case BitFieldMessage:
+                return link.receivePeerMessages().getBitFieldMessageResponseFlux();
+            case InterestedMessage:
+                return link.receivePeerMessages().getInterestedMessageResponseFlux();
+            case NotInterestedMessage:
+                return link.receivePeerMessages().getNotInterestedMessageResponseFlux();
+            case ExtendedMessage:
+                return link.receivePeerMessages().getExtendedMessageResponseFlux();
+            default:
+                throw new IllegalArgumentException(peerMessageType.toString());
+        }
+    }
 
-	public static long folderSize(File directory) {
-		long length = 0;
-		for (File file : Objects.requireNonNull(directory.listFiles())) {
-			if (file.isFile())
-				length += file.length();
-			else
-				length += folderSize(file);
-		}
-		return length;
-	}
+    public static long folderSize(File directory) {
+        long length = 0;
+        for (File file : Objects.requireNonNull(directory.listFiles())) {
+            if (file.isFile())
+                length += file.length();
+            else
+                length += folderSize(file);
+        }
+        return length;
+    }
 
-	public static Mono<PieceMessage> readFromFile(TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
-		List<TorrentFile> fileList = torrentInfo.getFileList();
+    public static Mono<PieceMessage> readFromFile(TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
+        List<TorrentFile> fileList = torrentInfo.getFileList();
 
-		List<ActualFileImpl> actualFileImplList = new ArrayList<>();
-		String fullFilePath = downloadPath;
-		if (!torrentInfo.isSingleFileTorrent())
-			fullFilePath += torrentInfo.getName() + File.separator;
-		long position = 0;
-		for (TorrentFile torrentFile : fileList) {
-			String completeFilePath = torrentFile.getFileDirs()
-					.stream()
-					.collect(Collectors.joining(File.separator, fullFilePath, ""));
-			long from = position;
-			long to = position + torrentFile.getFileLength();
-			position = to;
+        List<ActualFileImpl> actualFileImplList = new ArrayList<>();
+        String fullFilePath = downloadPath;
+        if (!torrentInfo.isSingleFileTorrent())
+            fullFilePath += torrentInfo.getName() + File.separator;
+        long position = 0;
+        for (TorrentFile torrentFile : fileList) {
+            String completeFilePath = torrentFile.getFileDirs()
+                    .stream()
+                    .collect(Collectors.joining(File.separator, fullFilePath, ""));
+            long from = position;
+            long to = position + torrentFile.getFileLength();
+            position = to;
 
-			ActualFileImpl actualFileImpl = new ActualFileImpl(completeFilePath, from, to, null);
-			actualFileImplList.add(actualFileImpl);
-		}
+            ActualFileImpl actualFileImpl = new ActualFileImpl(completeFilePath, from, to, null);
+            actualFileImplList.add(actualFileImpl);
+        }
 
-		// read from the file:
+        // read from the file:
 
-		return TorrentDownloaders.getAllocatorStore()
-				.createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
-						requestMessage.getIndex(), requestMessage.getBegin(),
-						requestMessage.getBlockLength(), torrentInfo.getPieceLength(requestMessage.getIndex()))
-				.flatMap(pieceMessage -> {
-					long from = torrentInfo.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
-					long to = from + requestMessage.getBlockLength();
+        return TorrentDownloaders.getAllocatorStore()
+                .createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
+                        requestMessage.getIndex(), requestMessage.getBegin(),
+                        requestMessage.getBlockLength(), torrentInfo.getPieceLength(requestMessage.getIndex()))
+                .flatMap(pieceMessage -> {
+                    long from = torrentInfo.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
+                    long to = from + requestMessage.getBlockLength();
 
-					int resultFreeIndex = 0;
-					long amountOfBytesOfFileWeCovered = 0;
-					for (ActualFileImpl actualFileImpl : actualFileImplList) {
-						if (actualFileImpl.getFrom() <= from && from <= actualFileImpl.getTo()) {
+                    int resultFreeIndex = 0;
+                    long amountOfBytesOfFileWeCovered = 0;
+                    for (ActualFileImpl actualFileImpl : actualFileImplList) {
+                        if (actualFileImpl.getFrom() <= from && from <= actualFileImpl.getTo()) {
 
-							OpenOption[] options = {StandardOpenOption.READ};
-							SeekableByteChannel seekableByteChannel = null;
-							try {
-								seekableByteChannel = Files.newByteChannel(Paths.get(actualFileImpl.getFilePath()), options);
-							} catch (IOException e) {
-								return Mono.error(e);
-							}
+                            OpenOption[] options = {StandardOpenOption.READ};
+                            SeekableByteChannel seekableByteChannel = null;
+                            try {
+                                seekableByteChannel = Files.newByteChannel(Paths.get(actualFileImpl.getFilePath()), options);
+                            } catch (IOException e) {
+                                return Mono.error(e);
+                            }
 
-							long fromWhereToReadInThisFile = from - amountOfBytesOfFileWeCovered;
-							try {
-								seekableByteChannel.position(fromWhereToReadInThisFile);
-							} catch (IOException e) {
-								return Mono.error(e);
-							}
+                            long fromWhereToReadInThisFile = from - amountOfBytesOfFileWeCovered;
+                            try {
+                                seekableByteChannel.position(fromWhereToReadInThisFile);
+                            } catch (IOException e) {
+                                return Mono.error(e);
+                            }
 
-							// to,from are taken from the requestMessage message object so "to-from" must be valid integer.
-							int howMuchToReadFromThisFile = (int) Math.min(actualFileImpl.getTo() - from, to - from);
-							ByteBuffer block = ByteBuffer.allocate(howMuchToReadFromThisFile);
-							try {
-								seekableByteChannel.read(block);
-							} catch (IOException e) {
-								return Mono.error(e);
-							}
+                            // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
+                            int howMuchToReadFromThisFile = (int) Math.min(actualFileImpl.getTo() - from, to - from);
+                            ByteBuffer block = ByteBuffer.allocate(howMuchToReadFromThisFile);
+                            try {
+                                seekableByteChannel.read(block);
+                            } catch (IOException e) {
+                                return Mono.error(e);
+                            }
 
-							for (byte aTempResult : block.array())
-								pieceMessage.getAllocatedBlock().getBlock()[resultFreeIndex++] = aTempResult;
-							from += howMuchToReadFromThisFile;
+                            for (byte aTempResult : block.array())
+                                pieceMessage.getAllocatedBlock().getBlock()[resultFreeIndex++] = aTempResult;
+                            from += howMuchToReadFromThisFile;
 
-							try {
-								seekableByteChannel.close();
-							} catch (IOException e) {
-								return Mono.error(e);
-							}
-						}
-						if (from == to)
-							return Mono.just(pieceMessage);
-						amountOfBytesOfFileWeCovered = actualFileImpl.getTo();
-					}
-					return Mono.error(new Exception("we shouldn't be here! never!"));
-				});
-	}
+                            try {
+                                seekableByteChannel.close();
+                            } catch (IOException e) {
+                                return Mono.error(e);
+                            }
+                        }
+                        if (from == to)
+                            return Mono.just(pieceMessage);
+                        amountOfBytesOfFileWeCovered = actualFileImpl.getTo();
+                    }
+                    return Mono.error(new Exception("we shouldn't be here! never!"));
+                });
+    }
 
-	public static void deleteDownloadFolder() {
-		try {
-			File file = new File(System.getProperty("user.dir") + File.separator + "torrents-test");
-			if (file.exists()) {
-				deleteDirectory(file);
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
+    public static void deleteDownloadFolder() {
+        try {
+            File file = new File(System.getProperty("user.dir") + File.separator + "torrents-test");
+            if (file.exists()) {
+                deleteDirectory(file);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
-	private static void deleteDirectory(File directoryToBeDeleted) throws IOException {
-		Files.walkFileTree(directoryToBeDeleted.toPath(), new HashSet<>(), Integer.MAX_VALUE, new FileVisitor<Path>() {
-			@Override
-			public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-					throws IOException {
-				return FileVisitResult.CONTINUE;
-			}
+    private static void deleteDirectory(File directoryToBeDeleted) throws IOException {
+        Files.walkFileTree(directoryToBeDeleted.toPath(), new HashSet<>(), Integer.MAX_VALUE, new FileVisitor<Path>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+                    throws IOException {
+                return FileVisitResult.CONTINUE;
+            }
 
-			@Override
-			public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-					throws IOException {
-				Files.delete(file);
-				return FileVisitResult.CONTINUE;
-			}
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                    throws IOException {
+                Files.delete(file);
+                return FileVisitResult.CONTINUE;
+            }
 
-			@Override
-			public FileVisitResult visitFileFailed(Path file, IOException exc)
-					throws IOException {
-				return FileVisitResult.CONTINUE;
-			}
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException exc)
+                    throws IOException {
+                return FileVisitResult.CONTINUE;
+            }
 
-			@Override
-			public FileVisitResult postVisitDirectory(Path dir, IOException exc)
-					throws IOException {
-				Files.delete(dir);
-				return FileVisitResult.CONTINUE;
-			}
-		});
-	}
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc)
+                    throws IOException {
+                Files.delete(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+    }
 
-	public static Flux<PieceMessage> createRandomPieceMessages(TorrentInfo torrentInfo,
-															   Semaphore semaphore,
-															   BlockOfPiece blockOfPiece,
-															   int allocatedBlockLength) {
-		int pieceIndex = blockOfPiece.getPieceIndex();
-		int pieceLength = torrentInfo.getPieceLength(pieceIndex);
+    public static Flux<PieceMessage> createRandomPieceMessages(TorrentInfo torrentInfo,
+                                                               Semaphore semaphore,
+                                                               BlockOfPiece blockOfPiece,
+                                                               int allocatedBlockLength) {
+        int pieceIndex = blockOfPiece.getPieceIndex();
+        int pieceLength = torrentInfo.getPieceLength(pieceIndex);
 
-		int begin = Math.min(blockOfPiece.getFrom(), pieceLength - 1);
-		// calculate what is the over all size of all blocks I'm going to create.
-		int totalBlockLength = begin + blockOfPiece.getLength() > pieceLength ?
-				pieceLength - begin :
-				blockOfPiece.getLength() - begin;
+        int begin = Math.min(blockOfPiece.getFrom(), pieceLength - 1);
+        // calculate what is the over all size of all blocks I'm going to create.
+        int totalBlockLength = begin + blockOfPiece.getLength() > pieceLength ?
+                pieceLength - begin :
+                blockOfPiece.getLength() - begin;
 
-		// here I will use allocatedBlockLength to split totalBlockLength to small blocks:
-		return Flux.<BlockOfPiece, Integer>generate(() -> begin, (blockStartPosition, sink) -> {
-			if (blockStartPosition >= totalBlockLength) {
-				sink.complete();
-				return blockStartPosition;
-			}
+        // here I will use allocatedBlockLength to split totalBlockLength to small blocks:
+        return Flux.<BlockOfPiece, Integer>generate(() -> begin, (blockStartPosition, sink) -> {
+            if (blockStartPosition >= totalBlockLength) {
+                sink.complete();
+                return blockStartPosition;
+            }
 
-			try {
-				semaphore.acquire();// wait until downstream finish working on the last signal.
-			} catch (InterruptedException e) {
-				sink.error(e);
-			}
+            try {
+                semaphore.acquire();// wait until downstream finish working on the last signal.
+            } catch (InterruptedException e) {
+                sink.error(e);
+            }
 
-			int blockLength = Math.min(allocatedBlockLength, totalBlockLength - blockStartPosition);
-			sink.next(new BlockOfPiece(pieceIndex, blockStartPosition, blockLength));
+            int blockLength = Math.min(allocatedBlockLength, totalBlockLength - blockStartPosition);
+            sink.next(new BlockOfPiece(pieceIndex, blockStartPosition, blockLength));
 
-			return blockStartPosition + blockLength;
-		})
-				.flatMap(smallBlock -> {
-					return TorrentDownloaders.getAllocatorStore()
-							.createPieceMessage(null, null, smallBlock.getPieceIndex(), smallBlock.getFrom(), smallBlock.getLength(), pieceLength)
-							.doOnNext(pieceMessage -> Assert.assertEquals("I didn't proceed the length as good as I should have.",
-									smallBlock.getLength().longValue(),
-									pieceMessage.getAllocatedBlock().getLength()));
-				})
-				.doOnNext(pieceMessage -> {
-					for (int i = 0; i < pieceMessage.getAllocatedBlock().getLength(); i++)
-						pieceMessage.getAllocatedBlock().getBlock()[i] = (byte) i;
-				});
-	}
+            return blockStartPosition + blockLength;
+        })
+                .flatMap(smallBlock -> {
+                    return TorrentDownloaders.getAllocatorStore()
+                            .createPieceMessage(null, null, smallBlock.getPieceIndex(), smallBlock.getFrom(), smallBlock.getLength(), pieceLength)
+                            .doOnNext(pieceMessage -> Assert.assertEquals("I didn't proceed the length as good as I should have.",
+                                    smallBlock.getLength().longValue(),
+                                    pieceMessage.getAllocatedBlock().getLength()));
+                })
+                .doOnNext(pieceMessage -> {
+                    for (int i = 0; i < pieceMessage.getAllocatedBlock().getLength(); i++)
+                        pieceMessage.getAllocatedBlock().getBlock()[i] = (byte) i;
+                });
+    }
 
-	public static BlockOfPiece fixBlockOfPiece(BlockOfPiece blockOfPiece, TorrentInfo torrentInfo, int allocatedBlockLength) {
-		int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
-				blockOfPiece.getPieceIndex() :
-				torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
+    public static BlockOfPiece fixBlockOfPiece(BlockOfPiece blockOfPiece, TorrentInfo torrentInfo, int allocatedBlockLength) {
+        int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
+                blockOfPiece.getPieceIndex() :
+                torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
 
-		int pieceLength = torrentInfo.getPieceLength(pieceIndex);
+        int pieceLength = torrentInfo.getPieceLength(pieceIndex);
 
-		// replace the nulls and the "-1"s:
-		int fixedFrom = blockOfPiece.getFrom() == null ?
-				pieceLength - 1 :
-				blockOfPiece.getFrom().equals(-1) ? allocatedBlockLength - 1 : blockOfPiece.getFrom();
-		int fixedBlockLength = blockOfPiece.getLength() == null ?
-				pieceLength :
-				blockOfPiece.getLength().equals(-1) ? allocatedBlockLength : blockOfPiece.getLength();
+        // replace the nulls and the "-1"s:
+        int fixedFrom = blockOfPiece.getFrom() == null ?
+                pieceLength - 1 :
+                blockOfPiece.getFrom().equals(-1) ? allocatedBlockLength - 1 : blockOfPiece.getFrom();
+        int fixedBlockLength = blockOfPiece.getLength() == null ?
+                pieceLength :
+                blockOfPiece.getLength().equals(-1) ? allocatedBlockLength : blockOfPiece.getLength();
 
-		return new BlockOfPiece(pieceIndex, fixedFrom, fixedBlockLength);
-	}
+        return new BlockOfPiece(pieceIndex, fixedFrom, fixedBlockLength);
+    }
 
-	public static <T, U> void assertListEqualNotByOrder(List<T> expected, List<U> actual, BiPredicate<T, U> areElementsEqual) {
-		Assert.assertTrue(expected.stream().allMatch(t1 -> {
-			boolean b = actual.stream()
-					.anyMatch(t2 -> areElementsEqual.test(t1, t2));
-			if (!b)
-				System.out.println(t1 + " -  expected is not inside actual.");
-			return b;
-		}));
-		Assert.assertTrue(actual.stream().allMatch(t2 -> {
-			boolean b = expected.stream()
-					.anyMatch(t1 -> areElementsEqual.test(t1, t2));
-			if (!b)
-				System.out.println(t2 + " -  actual is not inside expected.");
-			return b;
-		}));
-	}
+    public static <T, U> void assertListEqualNotByOrder(List<T> expected, List<U> actual, BiPredicate<T, U> areElementsEqual) {
+        Assert.assertTrue(expected.stream().allMatch(t1 -> {
+            boolean b = actual.stream()
+                    .anyMatch(t2 -> areElementsEqual.test(t1, t2));
+            if (!b)
+                System.out.println(t1 + " -  expected is not inside actual.");
+            return b;
+        }));
+        Assert.assertTrue(actual.stream().allMatch(t2 -> {
+            boolean b = expected.stream()
+                    .anyMatch(t1 -> areElementsEqual.test(t1, t2));
+            if (!b)
+                System.out.println(t2 + " -  actual is not inside expected.");
+            return b;
+        }));
+    }
 }

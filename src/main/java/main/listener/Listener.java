@@ -184,6 +184,7 @@ public class Listener {
 	}
 
 	public Flux<Link> getPeers$(TorrentInfo torrentInfo) {
+		// TODO: we need to complete this flux when the torrent is removed. need to add test for it.
 		return this.resumeListen$.publishOn(Schedulers.elastic())
 				.filter(link -> link.getTorrentInfo().equals(torrentInfo));
 	}

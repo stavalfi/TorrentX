@@ -2,7 +2,7 @@ package main.torrent.status.reducers;
 
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.DownloadState;
-import main.torrent.status.state.tree.PeersState;
+import main.torrent.status.state.tree.SearchPeersState;
 import main.torrent.status.state.tree.TorrentFileSystemState;
 import main.torrent.status.state.tree.TorrentStatusState;
 import redux.reducer.Reducer;
@@ -24,16 +24,16 @@ public class TorrentStatusReducer implements Reducer<TorrentStatusState, Torrent
 	public Result<TorrentStatusState, TorrentStatusAction> reducer(TorrentStatusState lastState, Request<TorrentStatusAction> request) {
 
 		DownloadState downloadState = this.downloadStateReducer.reducer(lastState, request.getAction());
-		PeersState peersState = this.peersStateReducer.reducer(lastState, request.getAction());
+		SearchPeersState searchPeersState = this.peersStateReducer.reducer(lastState, request.getAction());
 		TorrentFileSystemState torrentFileSystemState = this.torrentFileSystemStateReducer.reducer(lastState, request.getAction());
 		if (lastState.getDownloadState().equals(downloadState) &&
-				lastState.getPeersState().equals(peersState) &&
+				lastState.getSearchPeersState().equals(searchPeersState) &&
 				lastState.getTorrentFileSystemState().equals(torrentFileSystemState))
 			return new Result<>(request, lastState, false);
 		TorrentStatusState newState = new TorrentStatusState(request.getId(),
 				request.getAction(),
 				downloadState,
-				peersState,
+                searchPeersState,
 				torrentFileSystemState);
 		return new Result<>(request, newState, true);
 	}

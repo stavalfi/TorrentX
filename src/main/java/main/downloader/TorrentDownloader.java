@@ -18,7 +18,7 @@ public class TorrentDownloader {
 	private SearchPeers searchPeers;
 	private FileSystemLink fileSystemLink;
 	private BittorrentAlgorithm bittorrentAlgorithm;
-	private Store<TorrentStatusState, TorrentStatusAction> store;
+	private Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore;
 	private TorrentStatesSideEffects torrentStatesSideEffects;
 	private SpeedStatistics torrentSpeedStatistics;
 	private Flux<Link> peersCommunicatorFlux;
@@ -27,7 +27,7 @@ public class TorrentDownloader {
 							 SearchPeers searchPeers,
 							 FileSystemLink fileSystemLink,
 							 BittorrentAlgorithm bittorrentAlgorithm,
-							 Store<TorrentStatusState, TorrentStatusAction> store,
+							 Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
 							 SpeedStatistics torrentSpeedStatistics,
 							 TorrentStatesSideEffects torrentStatesSideEffects,
 							 Flux<Link> peersCommunicatorFlux) {
@@ -35,7 +35,7 @@ public class TorrentDownloader {
 		this.searchPeers = searchPeers;
 		this.fileSystemLink = fileSystemLink;
 		this.bittorrentAlgorithm = bittorrentAlgorithm;
-		this.store = store;
+		this.torrentStatusStore = torrentStatusStore;
 		this.torrentSpeedStatistics = torrentSpeedStatistics;
 		this.torrentStatesSideEffects = torrentStatesSideEffects;
 		this.peersCommunicatorFlux = peersCommunicatorFlux;
@@ -49,8 +49,8 @@ public class TorrentDownloader {
 		return bittorrentAlgorithm;
 	}
 
-	public Store<TorrentStatusState, TorrentStatusAction> getStore() {
-		return store;
+	public Store<TorrentStatusState, TorrentStatusAction> getTorrentStatusStore() {
+		return torrentStatusStore;
 	}
 
 	public FileSystemLink getFileSystemLink() {

@@ -9,14 +9,14 @@ public class TorrentStatesSideEffects {
     private TorrentInfo torrentInfo;
 
     private DownloadStateSideEffects downloadStateSideEffects;
-    private PeersStateSideEffects peersStateSideEffects;
+    private SearchPeersStateSideEffects searchPeersStateSideEffects;
     private TorrentFileSystemStatesSideEffects torrentFileSystemStatesSideEffects;
 
     public TorrentStatesSideEffects(TorrentInfo torrentInfo,
 									Store<TorrentStatusState, TorrentStatusAction> store) {
         this.torrentInfo = torrentInfo;
         this.downloadStateSideEffects = new DownloadStateSideEffects(torrentInfo, store);
-        this.peersStateSideEffects = new PeersStateSideEffects(torrentInfo, store);
+        this.searchPeersStateSideEffects = new SearchPeersStateSideEffects(torrentInfo, store);
         this.torrentFileSystemStatesSideEffects = new TorrentFileSystemStatesSideEffects(store);
     }
 
@@ -28,8 +28,8 @@ public class TorrentStatesSideEffects {
         return downloadStateSideEffects;
     }
 
-    public PeersStateSideEffects getPeersStateSideEffects() {
-        return peersStateSideEffects;
+    public SearchPeersStateSideEffects getSearchPeersStateSideEffects() {
+        return searchPeersStateSideEffects;
     }
 
     public TorrentFileSystemStatesSideEffects getTorrentFileSystemStatesSideEffects() {

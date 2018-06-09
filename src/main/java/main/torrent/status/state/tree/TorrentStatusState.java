@@ -5,23 +5,23 @@ import redux.state.State;
 
 public class TorrentStatusState extends State<TorrentStatusAction> {
     private DownloadState downloadState;
-    private PeersState peersState;
+    private SearchPeersState searchPeersState;
     private TorrentFileSystemState torrentFileSystemState;
 
     public TorrentStatusState(String id,
                               TorrentStatusAction action,
                               DownloadState downloadState,
-                              PeersState peersState,
+                              SearchPeersState searchPeersState,
                               TorrentFileSystemState torrentFileSystemState) {
         super(id, action);
         this.downloadState = downloadState;
-        this.peersState = peersState;
+        this.searchPeersState = searchPeersState;
         this.torrentFileSystemState = torrentFileSystemState;
     }
 
     public boolean fromAction(TorrentStatusAction torrentStatusAction) {
         return this.downloadState.fromAction(torrentStatusAction) ||
-                this.peersState.fromAction(torrentStatusAction) ||
+                this.searchPeersState.fromAction(torrentStatusAction) ||
                 this.torrentFileSystemState.fromAction(torrentStatusAction);
     }
 
@@ -29,8 +29,8 @@ public class TorrentStatusState extends State<TorrentStatusAction> {
         return downloadState;
     }
 
-    public PeersState getPeersState() {
-        return peersState;
+    public SearchPeersState getSearchPeersState() {
+        return searchPeersState;
     }
 
     public TorrentFileSystemState getTorrentFileSystemState() {
@@ -41,7 +41,7 @@ public class TorrentStatusState extends State<TorrentStatusAction> {
     public String toString() {
         return "TorrentStatusState{" + super.toString() +
                 "downloadState=" + downloadState +
-                ", peersState=" + peersState +
+                ", searchPeersState=" + searchPeersState +
                 ", torrentFileSystemState=" + torrentFileSystemState +
                 "} ";
     }
