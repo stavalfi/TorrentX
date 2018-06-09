@@ -349,24 +349,25 @@ Feature: start/stop downloading/uploading
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test    |
 
-  Scenario Outline: (14) pause download -> complete download
-    Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is - no side effects:
-      | PAUSE_UPLOAD_WIND_UP              |
-      | START_DOWNLOAD_WIND_UP            |
-      | PAUSE_DOWNLOAD_WIND_UP            |
-      | PAUSE_SEARCHING_PEERS_WIND_UP     |
-      | COMPLETED_DOWNLOADING_IN_PROGRESS |
-    When torrent-status for torrent "<torrent>" is trying to change to:
-      | COMPLETED_DOWNLOADING_SELF_RESOLVED |
-    When torrent-status for torrent "<torrent>" is trying to change to:
-      | COMPLETED_DOWNLOADING_WIND_UP |
-    Then torrent-status for torrent "<torrent>" will be with action: "COMPLETED_DOWNLOADING_WIND_UP" - no side effects:
-      | PAUSE_UPLOAD_WIND_UP          |
-      | START_DOWNLOAD_WIND_UP        |
-      | PAUSE_DOWNLOAD_WIND_UP        |
-      | PAUSE_SEARCHING_PEERS_WIND_UP |
-      | COMPLETED_DOWNLOADING_WIND_UP |
+    #TODO: bug - doesn't pass sometimes - https://github.com/UniversityFinalProjects/TorrentX/issues/33
+Scenario Outline: (14) pause download -> complete download
+  Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is - no side effects:
+    | PAUSE_UPLOAD_WIND_UP              |
+    | START_DOWNLOAD_WIND_UP            |
+    | PAUSE_DOWNLOAD_WIND_UP            |
+    | PAUSE_SEARCHING_PEERS_WIND_UP     |
+    | COMPLETED_DOWNLOADING_IN_PROGRESS |
+  When torrent-status for torrent "<torrent>" is trying to change to:
+    | COMPLETED_DOWNLOADING_SELF_RESOLVED |
+  When torrent-status for torrent "<torrent>" is trying to change to:
+    | COMPLETED_DOWNLOADING_WIND_UP |
+  Then torrent-status for torrent "<torrent>" will be with action: "COMPLETED_DOWNLOADING_WIND_UP" - no side effects:
+    | PAUSE_UPLOAD_WIND_UP          |
+    | START_DOWNLOAD_WIND_UP        |
+    | PAUSE_DOWNLOAD_WIND_UP        |
+    | PAUSE_SEARCHING_PEERS_WIND_UP |
+    | COMPLETED_DOWNLOADING_WIND_UP |
 
-    Examples:
-      | torrent                       | downloadLocation |
-      | torrent-file-example1.torrent | torrents-test    |
+  Examples:
+    | torrent                       | downloadLocation |
+    | torrent-file-example1.torrent | torrents-test    |
