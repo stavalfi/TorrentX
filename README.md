@@ -43,4 +43,4 @@ So many measurement and analytical studies have published suggestions for differ
 2. Enter the project's folder: `cd TorrentX`
 3. Build: `mvn package`
 4. Enter the project's target folder: `cd target`
-5. run the jar: `comming soon..`
+5. run the jar
