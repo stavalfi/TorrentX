@@ -1,4 +1,4 @@
-package main.file.system;
+package main.file.system.exceptions;
 
 public class PieceNotDownloadedYetException extends Exception {
     public PieceNotDownloadedYetException(int pieceIndex) {

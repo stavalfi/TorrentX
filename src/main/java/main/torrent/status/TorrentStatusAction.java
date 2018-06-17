@@ -1,0 +1,86 @@
+package main.torrent.status;
+
+public enum TorrentStatusAction {
+    INITIALIZE,
+
+    START_DOWNLOAD_IN_PROGRESS,
+    START_DOWNLOAD_SELF_RESOLVED,
+    START_DOWNLOAD_WIND_UP,
+
+    PAUSE_DOWNLOAD_IN_PROGRESS,
+    PAUSE_DOWNLOAD_SELF_RESOLVED,
+    PAUSE_DOWNLOAD_WIND_UP,
+
+    RESUME_DOWNLOAD_IN_PROGRESS,
+    RESUME_DOWNLOAD_SELF_RESOLVED,
+    RESUME_DOWNLOAD_WIND_UP,
+
+    START_UPLOAD_IN_PROGRESS,
+    START_UPLOAD_SELF_RESOLVED,
+    START_UPLOAD_WIND_UP,
+
+    PAUSE_UPLOAD_IN_PROGRESS,
+    PAUSE_UPLOAD_SELF_RESOLVED,
+    PAUSE_UPLOAD_WIND_UP,
+
+    RESUME_UPLOAD_IN_PROGRESS,
+    RESUME_UPLOAD_SELF_RESOLVED,
+    RESUME_UPLOAD_WIND_UP,
+
+    COMPLETED_DOWNLOADING_IN_PROGRESS,
+    COMPLETED_DOWNLOADING_SELF_RESOLVED,
+    COMPLETED_DOWNLOADING_WIND_UP,
+
+    REMOVE_TORRENT_IN_PROGRESS,
+    REMOVE_TORRENT_SELF_RESOLVED,
+    REMOVE_TORRENT_WIND_UP,
+
+    REMOVE_FILES_IN_PROGRESS,
+    REMOVE_FILES_SELF_RESOLVED,
+    REMOVE_FILES_WIND_UP,
+
+    START_SEARCHING_PEERS_IN_PROGRESS,
+    START_SEARCHING_PEERS_SELF_RESOLVED,
+    START_SEARCHING_PEERS_WIND_UP,
+
+    PAUSE_SEARCHING_PEERS_IN_PROGRESS,
+    PAUSE_SEARCHING_PEERS_SELF_RESOLVED,
+    PAUSE_SEARCHING_PEERS_WIND_UP,
+
+    RESUME_SEARCHING_PEERS_IN_PROGRESS,
+    RESUME_SEARCHING_PEERS_SELF_RESOLVED,
+    RESUME_SEARCHING_PEERS_WIND_UP;
+
+    public static TorrentStatusAction getCorrespondingIsProgressAction(TorrentStatusAction torrentStatusAction) {
+        switch (torrentStatusAction) {
+            case START_SEARCHING_PEERS_WIND_UP:
+                return TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS;
+            case PAUSE_SEARCHING_PEERS_WIND_UP:
+                return TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS;
+            case RESUME_SEARCHING_PEERS_WIND_UP:
+                return TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS;
+
+            case REMOVE_FILES_WIND_UP:
+                return TorrentStatusAction.REMOVE_FILES_IN_PROGRESS;
+            case REMOVE_TORRENT_WIND_UP:
+                return TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS;
+
+            case START_DOWNLOAD_WIND_UP:
+                return TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS;
+            case PAUSE_DOWNLOAD_WIND_UP:
+                return TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS;
+            case RESUME_DOWNLOAD_WIND_UP:
+                return TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS;
+            case START_UPLOAD_WIND_UP:
+                return TorrentStatusAction.START_UPLOAD_IN_PROGRESS;
+            case PAUSE_UPLOAD_WIND_UP:
+                return TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS;
+            case RESUME_UPLOAD_WIND_UP:
+                return TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS;
+            case COMPLETED_DOWNLOADING_WIND_UP:
+                return TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS;
+        }
+        return null;
+    }
+}
+

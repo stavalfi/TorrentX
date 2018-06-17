@@ -2,7 +2,7 @@ package main.statistics;
 
 import main.App;
 import main.TorrentInfo;
-import main.file.system.AllocatedBlock;
+import main.file.system.allocator.AllocatedBlock;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
 import reactor.core.publisher.Flux;

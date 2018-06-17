@@ -3,11 +3,17 @@ package main;
 import christophedetroyer.torrent.TorrentParser;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
+import main.downloader.TorrentDownloaderBuilder;
 import main.downloader.TorrentDownloaders;
 import main.peer.Link;
+import main.peer.PeersProvider;
 import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.RequestMessage;
-import main.torrent.status.StatusType;
+import main.tracker.TrackerConnection;
+import main.tracker.TrackerProvider;
+import org.reactivestreams.Subscription;
+import reactor.core.CoreSubscriber;
+import reactor.core.publisher.Flux;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -26,7 +32,33 @@ public class App {
 
 
     public static void f5() throws IOException, InterruptedException {
-        System.out.println(getTorrentInfo());
+        TorrentInfo torrentInfo = getTorrentInfo();
+        System.out.println(torrentInfo);
+        TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
+        PeersProvider peersProvider = new PeersProvider(torrentInfo);
+        Flux<TrackerConnection> trackerConnectionFlux = trackerProvider.connectToTrackersFlux();
+        peersProvider.connectToPeers$(trackerConnectionFlux)
+                .subscribe(new CoreSubscriber<Link>() {
+                    @Override
+                    public void onSubscribe(Subscription s) {
+                        System.out.println("subscribed");
+                    }
+
+                    @Override
+                    public void onNext(Link link) {
+                        System.out.println(link);
+                    }
+
+                    @Override
+                    public void onError(Throwable throwable) {
+                        throwable.printStackTrace();
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        System.out.println("completed");
+                    }
+                });
     }
 
     private static SeekableByteChannel createFile(String filePathToCreate) throws IOException {
@@ -46,8 +78,9 @@ public class App {
     }
 
     private static void f4() throws IOException {
-        TorrentDownloader torrentDownloader = TorrentDownloaders
-                .createDefaultTorrentDownloader(getTorrentInfo(), downloadPath);
+        TorrentDownloader torrentDownloader = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), downloadPath)
+                .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
+                .block();
 
         torrentDownloader.getPeersCommunicatorFlux()
                 .map(Link::sendMessages)
@@ -65,14 +98,14 @@ public class App {
                         ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
-        torrentDownloader.getStatusChanger()
-                .changeState(StatusType.START_DOWNLOAD)
-                .publishOn(Schedulers.elastic())
-                .block();
-        torrentDownloader.getStatusChanger()
-                .changeState(StatusType.START_UPLOAD)
-                .publishOn(Schedulers.elastic())
-                .block();
+//        torrentDownloader.getTorrentStatusStore()
+//                .dispatch(TorrentStatusAction.START_DOWNLOAD)
+//                .publishOn(Schedulers.elastic())
+//                .block();
+//        torrentDownloader.getTorrentStatusStore()
+//                .dispatch(TorrentStatusAction.START_UPLOAD)
+//                .publishOn(Schedulers.elastic())
+//                .block();
     }
 
     public static void main(String[] args) throws Exception {
@@ -86,7 +119,7 @@ public class App {
                 "main" + File.separator +
                 "resources" + File.separator +
                 "torrents" + File.separator +
-                "torrent-file-example1.torrent";
+                "tor.torrent";
         return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
     }
 }

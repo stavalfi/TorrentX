@@ -25,10 +25,6 @@ public interface FileSystemLink {
 
     BitFieldMessage buildBitFieldMessage(Peer from, Peer to);
 
-    int minMissingPieceIndex();
-
-    int maxMissingPieceIndex();
-
     long[] getDownloadedBytesInPieces();
 
     /**
@@ -44,12 +40,4 @@ public interface FileSystemLink {
     Flux<PieceEvent> savedBlockFlux();
 
     Flux<Integer> savedPieceFlux();
-
-    Mono<FileSystemLink> deleteActiveTorrentOnlyMono();
-
-    Mono<FileSystemLink> deleteFileOnlyMono();
-
-    Mono<FileSystemLink> getNotifyWhenActiveTorrentDeleted();
-
-    Mono<FileSystemLink> getNotifyWhenFilesDeleted();
 }

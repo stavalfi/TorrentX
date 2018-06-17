@@ -1,6 +1,6 @@
 Feature: allocate and free blocks from multiple threads
 
-  Scenario Outline: we create a piece-message with valid parameters
+  Scenario Outline: (1) we create a piece-message with valid parameters
     Given allocator for "5" blocks with "17000" bytes each
     When we create the following piece-messages from "5" threads for torrent: "<torrent>":
       | pieceIndex | from | length |
@@ -21,7 +21,7 @@ Feature: allocate and free blocks from multiple threads
       | torrent                       |
       | torrent-file-example1.torrent |
 
-  Scenario Outline: we create a piece-message with invalid parameters
+  Scenario Outline: (2) we create a piece-message with invalid parameters
     Given allocator for "9" blocks with "17000" bytes each
     When we create the following piece-messages from "1" threads for torrent: "<torrent>":
       | pieceIndex | from | length |
@@ -56,7 +56,7 @@ Feature: allocate and free blocks from multiple threads
       # don't replace this torrent. I'm counting on the piece length of each piece.
       | torrent-file-example1.torrent |
 
-  Scenario Outline: we create a piece-message with valid parameters while the allocated-block-length is bigger than the last piece
+  Scenario Outline: (3) we create a piece-message with valid parameters while the allocated-block-length is bigger than the last piece
     Given allocator for "1" blocks with allocated-block-length which is bigger than piece: "-1" for torrent: "<torrent>":
     When we create the following piece-messages from "5" threads for torrent: "<torrent>":
       | pieceIndex | from | length |
@@ -71,7 +71,7 @@ Feature: allocate and free blocks from multiple threads
       | torrent                       |
       | torrent-file-example1.torrent |
 
-  Scenario Outline: we create a piece-message with valid parameters while the allocated-block-length is bigger than the first piece
+  Scenario Outline: (4) we create a piece-message with valid parameters while the allocated-block-length is bigger than the first piece
     # piece length = 524288 , last piece length = 65536
     Given allocator for "9" blocks with "524289" bytes each
 
@@ -147,7 +147,7 @@ Feature: allocate and free blocks from multiple threads
       | torrent-file-example1.torrent |
 
 
-  Scenario Outline: we create a request-message with valid parameters
+  Scenario Outline: (5) we create a request-message with valid parameters
     Given allocator for "5" blocks with "17000" bytes each
     When we create the following request-messages from "5" threads for torrent: "<torrent>":
       | pieceIndex | from | length |
@@ -168,7 +168,7 @@ Feature: allocate and free blocks from multiple threads
       | torrent                       |
       | torrent-file-example1.torrent |
 
-  Scenario Outline: we create a request-message with invalid parameters
+  Scenario Outline: (6) we create a request-message with invalid parameters
     Given allocator for "8" blocks with "17000" bytes each
     When we create the following request-messages from "1" threads for torrent: "<torrent>":
       | pieceIndex | from | length |
@@ -202,7 +202,7 @@ Feature: allocate and free blocks from multiple threads
       | torrent                       |
       | torrent-file-example1.torrent |
 
-  Scenario Outline: we create a piece-message with valid parameters and free the allocations
+  Scenario Outline: (7) we create a piece-message with valid parameters and free the allocations
     Given allocator for "5" blocks with "17000" bytes each
     When we create the following piece-messages from "5" threads for torrent: "<torrent>":
       | pieceIndex | from | length |
@@ -223,7 +223,7 @@ Feature: allocate and free blocks from multiple threads
       | torrent                       |
       | torrent-file-example1.torrent |
 
-  Scenario Outline: we don't create any piece-message and free all the allocations
+  Scenario Outline: (8) we don't create any piece-message and free all the allocations
     Given allocator for "5" blocks with "17000" bytes each
     When we create the following piece-messages from "5" threads for torrent: "<torrent>":
       | pieceIndex | from | length |
@@ -237,7 +237,7 @@ Feature: allocate and free blocks from multiple threads
       | torrent                       |
       | torrent-file-example1.torrent |
 
-  Scenario Outline: we create a piece-message with valid parameters and free all the allocations
+  Scenario Outline: (9) we create a piece-message with valid parameters and free all the allocations
     Given allocator for "5" blocks with "17000" bytes each
     When we create the following piece-messages from "5" threads for torrent: "<torrent>":
       | pieceIndex | from | length |

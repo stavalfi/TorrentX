@@ -1,4 +1,4 @@
-package main.file.system;
+package main.file.system.allocator;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;

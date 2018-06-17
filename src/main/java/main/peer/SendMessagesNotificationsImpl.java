@@ -2,7 +2,7 @@ package main.peer;
 
 import main.App;
 import main.TorrentInfo;
-import main.file.system.BlocksAllocatorImpl;
+import main.downloader.TorrentDownloaders;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
@@ -49,14 +49,14 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     @Override
     public Mono<SendMessagesNotifications> sendPieceMessage(PieceMessage pieceMessage) {
         return send(pieceMessage)
-                .flatMap(pieceEvent -> BlocksAllocatorImpl.getInstance()
+                .flatMap(pieceEvent -> TorrentDownloaders.getAllocatorStore()
                         .free(pieceMessage.getAllocatedBlock())
                         .map(__ -> pieceEvent))
-                .doOnError(throwable -> BlocksAllocatorImpl.getInstance()
+                .doOnError(throwable -> TorrentDownloaders.getAllocatorStore()
                         .free(pieceMessage.getAllocatedBlock())
                         .publishOn(Schedulers.elastic())
                         .block())
-                .doOnCancel(() -> BlocksAllocatorImpl.getInstance()
+                .doOnCancel(() -> TorrentDownloaders.getAllocatorStore()
                         .free(pieceMessage.getAllocatedBlock())
                         .publishOn(Schedulers.elastic())
                         .block())
@@ -111,7 +111,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     @Override
     public Mono<SendMessagesNotifications> sendRequestMessage(int index, int begin, int blockLength) {
         int pieceLength = this.torrentInfo.getPieceLength(index);
-        return BlocksAllocatorImpl.getInstance()
+        return TorrentDownloaders.getAllocatorStore()
                 .createRequestMessage(this.getMe(), this.getPeer(), index, begin, blockLength, pieceLength)
                 .flatMap(this::send);
     }

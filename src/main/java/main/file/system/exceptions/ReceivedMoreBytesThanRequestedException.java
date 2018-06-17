@@ -1,4 +1,4 @@
-package main.file.system;
+package main.file.system.exceptions;
 
 import main.peer.peerMessages.PieceMessage;
 

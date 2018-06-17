@@ -4,13 +4,14 @@ import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
 import main.algorithms.PeersToPiecesMapper;
 import main.algorithms.PiecesDownloader;
-import main.file.system.BlocksAllocatorImpl;
+import main.downloader.TorrentDownloaders;
 import main.file.system.FileSystemLink;
 import main.peer.PeerExceptions;
-import main.torrent.status.Status;
-import main.torrent.status.StatusChanger;
+import main.torrent.status.TorrentStatusAction;
+import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import redux.store.Store;
 
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
@@ -18,7 +19,7 @@ import java.util.function.Function;
 
 public class PiecesDownloaderImpl implements PiecesDownloader {
     private TorrentInfo torrentInfo;
-    private StatusChanger statusChanger;
+    private Store<TorrentStatusState, TorrentStatusAction> store;
     private PeersToPiecesMapper peersToPiecesMapper;
     private FileSystemLink fileSystemLink;
     private BlockDownloader blockDownloader;
@@ -26,19 +27,20 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
     private Flux<Integer> downloadedPiecesFlux;
 
     public PiecesDownloaderImpl(TorrentInfo torrentInfo,
-                                StatusChanger statusChanger,
+								Store<TorrentStatusState, TorrentStatusAction> store,
                                 FileSystemLink fileSystemLink,
                                 PeersToPiecesMapper peersToPiecesMapper,
                                 BlockDownloader blockDownloader) {
         this.torrentInfo = torrentInfo;
-        this.statusChanger = statusChanger;
+        this.store = store;
         this.peersToPiecesMapper = peersToPiecesMapper;
         this.fileSystemLink = fileSystemLink;
         this.blockDownloader = blockDownloader;
 
         // TODO: note: if we ask for notification AFTER the download started, we will lose the notification.
-        downloadedPiecesFlux = statusChanger.getState$()
-                .filter(Status::isStartedDownload)
+        downloadedPiecesFlux = store.states$()
+                // TODO: uncomment
+                //.filter(TorrentStatusState::isStartedDownload)
                 .take(1)
                 .flatMap(__ -> this.peersToPiecesMapper.getAvailablePiecesFlux())
                 .flatMap(pieceIndex -> downloadPieceMono(pieceIndex)
@@ -74,7 +76,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
         return requestBlockFromPosition.flatMap(requestFromPosition ->
                         this.peersToPiecesMapper.peerSupplierFlux(pieceIndex)
                                 .index()
-                                .flatMap(link -> BlocksAllocatorImpl.getInstance()
+                                .flatMap(link -> TorrentDownloaders.getAllocatorStore()
                                                 .createRequestMessage(link.getT2().getMe(), link.getT2().getPeer(),
                                                         pieceIndex, requestFromPosition, requestBlockLength.apply(requestFromPosition),
                                                         torrentInfo.getPieceLength(pieceIndex))

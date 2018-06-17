@@ -19,7 +19,7 @@ Feature: download blocks from fake-peer
 #
 #    Examples:
 #      | torrent                       | downloadLocation |
-#      | torrent-file-example1.torrent | torrents-test   |
+#      | torrent-file-example1.torrent | torrents-test    |
 #
 #
 #  Scenario Outline: download the last blocks from a valid fake-peer

@@ -2,17 +2,21 @@ package main.algorithms.impls;
 
 import main.TorrentInfo;
 import main.algorithms.*;
-import main.algorithms.impls.v1.download.*;
+import main.algorithms.impls.v1.download.BlockDownloaderImpl;
+import main.algorithms.impls.v1.download.PeersToPiecesMapperImpl;
+import main.algorithms.impls.v1.download.PiecesDownloaderImpl;
 import main.algorithms.impls.v1.notification.NotifyAboutCompletedPieceAlgorithmImpl;
 import main.algorithms.impls.v1.upload.UploadAlgorithmImpl;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
-import main.torrent.status.StatusChanger;
+import main.torrent.status.TorrentStatusAction;
+import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
+import redux.store.Store;
 
 public class BittorrentAlgorithmInitializer {
     public static BittorrentAlgorithm v1(TorrentInfo torrentInfo,
-                                         StatusChanger statusChanger,
+										 Store<TorrentStatusState, TorrentStatusAction> store,
                                          FileSystemLink fileSystemLink,
                                          Flux<Link> peersCommunicatorFlux) {
         Flux<Link> recordedPeerFlux = peersCommunicatorFlux
@@ -24,12 +28,12 @@ public class BittorrentAlgorithmInitializer {
 
         NotifyAboutCompletedPieceAlgorithm notifyAboutCompletedPieceAlgorithm =
                 new NotifyAboutCompletedPieceAlgorithmImpl(torrentInfo,
-                        statusChanger,
+                        store,
                         fileSystemLink,
                         recordedPeerFlux);
 
         UploadAlgorithm uploadAlgorithm = new UploadAlgorithmImpl(torrentInfo,
-                statusChanger,
+                store,
                 fileSystemLink,
                 peersCommunicatorFlux);
 
@@ -39,7 +43,7 @@ public class BittorrentAlgorithmInitializer {
 
         BlockDownloader blockDownloader = new BlockDownloaderImpl(torrentInfo, fileSystemLink);
 
-        PiecesDownloader piecesDownloader = new PiecesDownloaderImpl(torrentInfo, statusChanger,
+        PiecesDownloader piecesDownloader = new PiecesDownloaderImpl(torrentInfo, store,
                 fileSystemLink, peersToPiecesMapper, blockDownloader);
 
         DownloadAlgorithm downloadAlgorithm = new DownloadAlgorithm(piecesDownloader, blockDownloader, peersToPiecesMapper);

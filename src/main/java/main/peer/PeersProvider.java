@@ -10,7 +10,6 @@ import main.tracker.TrackerConnection;
 import main.tracker.response.AnnounceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
@@ -73,6 +72,7 @@ public class PeersProvider {
                 sink.error(e);
             }
         }).subscribeOn(App.MyScheduler)
+                .doOnNext(link -> logger.info("connected to peer successfully: " + link))
                 .doOnError(PeerExceptions.communicationErrors, throwable -> logger.debug("error signal: (the application failed to connect to a peer." +
                         " the application will try to connect to the next available peer).\n" +
                         "peer: " + peer.toString() + "\n" +
@@ -81,17 +81,16 @@ public class PeersProvider {
                 .onErrorResume(PeerExceptions.communicationErrors, error -> Mono.empty());
     }
 
-    public Flux<Peer> getPeersFromTrackerFlux(TrackerConnection trackerConnection) {
-        return trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), AppConfig.getInstance().getMyListeningPort())
+    public Flux<Peer> connectToPeers$(TrackerConnection trackerConnection) {
+        return trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), AppConfig.getInstance().findFreePort())
                 .flatMapMany(AnnounceResponse::getPeersFlux);
     }
 
-    public ConnectableFlux<Link> getPeersCommunicatorFromTrackerFlux(Flux<TrackerConnection> trackerConnectionFlux) {
+    public Flux<Link> connectToPeers$(Flux<TrackerConnection> trackerConnectionFlux) {
         return trackerConnectionFlux
-                .flatMap(trackerConnection -> getPeersFromTrackerFlux(trackerConnection))
+                .flatMap(trackerConnection -> connectToPeers$(trackerConnection))
                 .distinct()
-                .flatMap((Peer peer) -> connectToPeerMono(peer))
-                .publish();
+                .flatMap((Peer peer) -> connectToPeerMono(peer));
     }
 
     public TorrentInfo getTorrentInfo() {

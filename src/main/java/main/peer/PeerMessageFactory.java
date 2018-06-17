@@ -1,7 +1,7 @@
 package main.peer;
 
 import main.TorrentInfo;
-import main.file.system.BlocksAllocatorImpl;
+import main.downloader.TorrentDownloaders;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Mono;
 
@@ -70,7 +70,7 @@ public class PeerMessageFactory {
             return Mono.error(e);
         }
         int blockLength = messagePayloadLength - 8;// 8 == 'index' length in bytes + 'begin' length in bytes
-        PieceMessage result = BlocksAllocatorImpl.getInstance()
+        PieceMessage result = TorrentDownloaders.getAllocatorStore()
                 .createPieceMessage(from, to, index, begin, blockLength, pieceLength)
                 .flatMap(pieceMessage -> {
                     try {
@@ -98,7 +98,7 @@ public class PeerMessageFactory {
         int begin = wrap.getInt();
         int blockLength = wrap.getInt();
 
-        return BlocksAllocatorImpl.getInstance()
+        return TorrentDownloaders.getAllocatorStore()
                 .createRequestMessage(from, to, index, begin, blockLength,
                         torrentInfo.getPieceLength(index));
     }

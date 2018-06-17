@@ -9,19 +9,23 @@ import cucumber.api.java.en.When;
 import main.App;
 import main.AppConfig;
 import main.TorrentInfo;
-import main.downloader.PieceEvent;
-import main.downloader.TorrentDownloader;
-import main.downloader.TorrentDownloaders;
-import main.downloader.TorrentPieceStatus;
-import main.file.system.*;
+import main.downloader.*;
+import main.file.system.FileSystemLink;
+import main.file.system.FileSystemLinkImpl;
+import main.file.system.allocator.AllocatedBlock;
+import main.file.system.allocator.AllocatorState;
+import main.listener.ListenerAction;
+import main.listener.reducers.ListenerReducer;
+import main.listener.state.tree.ListenerState;
 import main.peer.*;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
-import main.torrent.status.Status;
-import main.torrent.status.StatusChanger;
-import main.torrent.status.StatusType;
+import main.torrent.status.TorrentStatusAction;
+import main.torrent.status.reducers.TorrentStatusReducer;
+import main.torrent.status.side.effects.TorrentStatesSideEffects;
+import main.torrent.status.state.tree.TorrentStatusState;
 import main.tracker.Tracker;
 import main.tracker.TrackerConnection;
 import main.tracker.TrackerExceptions;
@@ -29,19 +33,24 @@ import main.tracker.TrackerProvider;
 import main.tracker.response.TrackerResponse;
 import org.junit.Assert;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
+import reactor.util.function.Tuple2;
+import redux.store.Store;
 
 import java.io.File;
+import java.security.InvalidParameterException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
+import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -49,6 +58,7 @@ import java.util.stream.Stream;
 import static org.mockito.Mockito.mock;
 
 public class MyStepdefs {
+    private static Logger logger = LoggerFactory.getLogger(MyStepdefs.class);
 
     static {
         Hooks.onErrorDropped(throwable -> {
@@ -118,7 +128,8 @@ public class MyStepdefs {
         TrackerProvider trackerProvider = new TrackerProvider(this.torrentInfo);
 
         Flux<TrackerResponse> actualTrackerResponseFlux = trackerProvider.connectToTrackersFlux()
-                .autoConnect()
+                .publish()
+                .autoConnect(1)
                 .flatMap(trackerConnection ->
                         Flux.fromIterable(messages)
                                 .filter(fakeMessage -> fakeMessage.getTrackerRequestType() != TrackerRequestType.Connect)
@@ -127,7 +138,7 @@ public class MyStepdefs {
                                     switch (messageWeNeedToSend.getTrackerRequestType()) {
                                         case Announce:
                                             return trackerConnection.announceMono(this.torrentInfo.getTorrentInfoHash(),
-                                                    AppConfig.getInstance().getMyListeningPort());
+                                                    AppConfig.getInstance().findFreePort());
                                         case Scrape:
                                             return trackerConnection.scrapeMono(Collections.singletonList(this.torrentInfo.getTorrentInfoHash()));
                                         default:
@@ -158,10 +169,11 @@ public class MyStepdefs {
     }
 
     @Then("^application send to \\[peer ip: \"([^\"]*)\", peer port: \"([^\"]*)\"] and receive the following messages for torrent: \"([^\"]*)\",\"([^\"]*)\":$")
-    public void applicationSendToPeerIpPeerPortAndReceiveTheFollowingMessagesForTorrent(String peerIp, int peerPort, String torrentFileName,
+    public void applicationSendToPeerIpPeerPortAndReceiveTheFollowingMessagesForTorrent(String peerIp, int peerPort,
+                                                                                        String torrentFileName,
                                                                                         String downloadLocation,
                                                                                         List<PeerFakeRequestResponse> peerFakeRequestResponses) throws Throwable {
-        Utils.removeEverythingRelatedToLastTest();
+//        Utils.removeEverythingRelatedToLastTest();
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
@@ -191,29 +203,39 @@ public class MyStepdefs {
                 .allMatch(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
                         peerFakeRequestResponse.getReceiveMessageType() != null);
 
+        System.out.println("trying to connect to fake peer: " + remoteFakePeerCopyCat);
         Link fakePeer = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
                 .block();
 
+        System.out.println("connected to fake peer: " + remoteFakePeerCopyCat);
+
         Flux<? extends PeerMessage> recordedResponseFlux =
                 Flux.fromIterable(messageToSendList)
+                        .doOnNext(peerMessageType -> System.out.println("start listen to incoming message from type: " + peerMessageType.name()))
                         .flatMap(peerMessageType -> Utils.getSpecificMessageResponseFluxByMessageType(fakePeer, peerMessageType))
+                        .doOnNext(peerMessage -> System.out.println("we received message from fake peer: " + peerMessage))
                         // if we received a piece message, then free it's allocation.
                         .flatMap(peerMessage -> {
-                            if (peerMessage instanceof PieceMessage)
-                                return BlocksAllocatorImpl.getInstance()
+                            if (peerMessage instanceof PieceMessage) {
+                                System.out.println("the message we received is PieceMessage and we free it's block: " + peerMessage);
+                                return TorrentDownloaders.getAllocatorStore()
                                         .free(((PieceMessage) peerMessage).getAllocatedBlock())
+                                        .doOnNext(__ -> System.out.println("we freed the PieceMessage block and the Allocator state now is: " + __))
                                         .map(allocatorState -> peerMessage);
+                            }
                             return Mono.just(peerMessage);
                         })
                         .replay()
                         // start record incoming messages from fake peer
                         .autoConnect(0);
 
+        System.out.println("start sending messages to fake-peer");
 
         Mono<List<SendMessagesNotifications>> sentMessagesMono = Flux.fromIterable(messageToSendList)
-                .flatMap(peerMessageType -> Utils.sendFakeMessage(torrentInfo,
-                        fullDownloadPath, fakePeer, peerMessageType),
-                        1, 1)
+                .concatMap(peerMessageType ->
+                        Utils.sendFakeMessage(torrentInfo, fullDownloadPath, fakePeer, peerMessageType)
+                                .doOnNext(__ -> System.out.println("send message to fake-peer of type: "
+                                        + peerMessageType.name())))
                 .collectList();
 
         if (expectResponseToEveryRequest)
@@ -248,89 +270,41 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
     }
 
-    @Then("^application request for a random block of a random piece from all peers in torrent: \"([^\"]*)\"$")
-    public void applicationRequestForARandomBlockOfARandomPieceFromAllPeersInTorrent(String torrentFileName) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-    }
-
-    @Then("^application receive at list one random block of a random piece in torrent: \"([^\"]*)\"$")
-    public void applicationReceiveAtListOneRandomBlockOfARandomPieceInTorrent(String torrentFileName) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
-                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get();
-
-        int requestBlockSize = 16_384;
-
-        Function<BitFieldMessage, List<Integer>> getCompletedPieces = bitFieldMessage -> {
-            List<Integer> completedPieces = new ArrayList<>();
-            int completedPieceIndex = bitFieldMessage.getPiecesStatus().nextSetBit(0);
-            while (completedPieceIndex != -1) {
-                completedPieces.add(completedPieceIndex);
-                completedPieceIndex++;
-            }
-            return completedPieces;
-        };
-
-        Mono<PieceMessage> receiveSinglePieceMono =
-                torrentDownloader.getPeersCommunicatorFlux()
-                        .replay()
-                        .autoConnect(0)
-                        .flatMap(peersCommunicator -> peersCommunicator.sendMessages()
-                                .sendInterestedMessage()
-                                .map(sendPeerMessages -> peersCommunicator))
-                        .flatMap(peersCommunicator ->
-                                peersCommunicator.receivePeerMessages()
-                                        .getBitFieldMessageResponseFlux()
-                                        .map(bitFieldMessage -> getCompletedPieces.apply(bitFieldMessage))
-                                        .flatMap(Flux::fromIterable)
-                                        .take(5)
-                                        .flatMap(completedPieceIndex ->
-                                                peersCommunicator.sendMessages()
-                                                        .sendRequestMessage(completedPieceIndex, 0, requestBlockSize)
-                                                        .map(sendPeerMessages -> peersCommunicator)))
-                        .flatMap(peersCommunicator ->
-                                peersCommunicator.receivePeerMessages()
-                                        .getPieceMessageResponseFlux()
-                                        .doOnNext(pieceMessage -> peersCommunicator.closeConnection()))
-                        .take(1)
-                        .single();
-
-        torrentDownloader.getStatusChanger().changeState(StatusType.START_UPLOAD).block();
-
-        StepVerifier.create(receiveSinglePieceMono)
-                .expectNextCount(1)
-                .verifyComplete();
-    }
-
     @When("^application create active-torrent for: \"([^\"]*)\",\"([^\"]*)\"$")
     public void applicationCreateActiveTorrentFor(String torrentFileName, String downloadLocation) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-        // delete everything from the last test.
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("started @When(\"^application create active-torrent for: \\\"([^\\\"]*)\\\",\\\"([^\\\"]*)\\\"$\")");
+        System.out.println("-------------------------------------------------------------------------");
         Utils.removeEverythingRelatedToLastTest();
+        System.out.println("finished clean after last test...");
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         // this will waitForMessage an activeTorrent object.
         String downloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-        Utils.createDefaultTorrentDownloader(torrentInfo, downloadPath);
+
+        TorrentDownloaderBuilder.builder(torrentInfo)
+                .setToDefaultTorrentStatusStore()
+                .setToDefaultTorrentStatesSideEffects()
+                .setToDefaultSearchPeers()
+                .setToDefaultPeersCommunicatorFlux()
+                .setToDefaultFileSystemLink(downloadPath)
+                .build()
+                .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @When(\"^application create active-torrent for: \\\"([^\\\"]*)\\\",\\\"([^\\\"]*)\\\"$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     @Then("^active-torrent exist: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
     public void activeTorrentExistForTorrent(boolean isActiveTorrentExist, String torrentFileName) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-        Mono<Optional<FileSystemLink>> activeTorrentMono =
-                ActiveTorrents.getInstance()
-                        .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash());
-
-        StepVerifier.create(activeTorrentMono)
-                .consumeNextWith(activeTorrent -> {
-                    String message = "activeTorrent object needs to be present:" + isActiveTorrentExist +
-                            ", but the opposite is happening.";
-                    Assert.assertEquals(message, isActiveTorrentExist, activeTorrent.isPresent());
-                })
-                .verifyComplete();
+        // Note: this status is useless because we don't use ActiveTorrents class so there is no need to test anything.
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finsihed @Then(\"^active-torrent exist: \\\"([^\\\"]*)\\\" for torrent: \\\"([^\\\"]*)\\\"$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     @Then("^files of torrent: \"([^\"]*)\" exist: \"([^\"]*)\" in \"([^\"]*)\"$")
@@ -369,6 +343,10 @@ public class MyStepdefs {
             filePathList.stream()
                     .map((String completeFilePath) -> new File(completeFilePath))
                     .forEach(file -> Assert.assertTrue("file exist: " + file.getPath(), !file.exists()));
+
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @Then(\"^files of torrent: \\\"([^\\\"]*)\\\" exist: \\\"([^\\\"]*)\\\" in \\\"([^\\\"]*)\\\"$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     @Then("^application delete active-torrent: \"([^\"]*)\": \"([^\"]*)\" and file: \"([^\"]*)\"$")
@@ -376,23 +354,31 @@ public class MyStepdefs {
                                                       boolean deleteTorrentFiles) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        FileSystemLink fileSystemLink = TorrentDownloaders.getInstance()
+        Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get()
-                .getFileSystemLink();
+                .map(TorrentDownloader::getTorrentStatusStore)
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
-        Mono<FileSystemLink> deletionTaskMono;
-        if (deleteTorrentFiles && deleteActiveTorrent)
-            deletionTaskMono = fileSystemLink.deleteFileOnlyMono()
-                    .flatMap(activeTorrent -> activeTorrent.deleteActiveTorrentOnlyMono());
-        else if (deleteTorrentFiles)
-            deletionTaskMono = fileSystemLink.deleteFileOnlyMono();
-        else // deleteActiveTorrent == true
-            deletionTaskMono = fileSystemLink.deleteActiveTorrentOnlyMono();
-
-        StepVerifier.create(deletionTaskMono)
+        torrentStatusStore.latestState$()
+                .as(state$ -> {
+                    if (deleteTorrentFiles)
+                        return state$.flatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS))
+                                .flatMap(__ -> torrentStatusStore.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP));
+                    return state$;
+                })
+                .as(state$ -> {
+                    if (deleteActiveTorrent)
+                        return state$.flatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS))
+                                .flatMap(__ -> torrentStatusStore.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP));
+                    return state$;
+                })
+                .doOnNext(__ -> System.out.println(1))
+                .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @Then(\"^application delete active-torrent: \\\"([^\\\"]*)\\\": \\\"([^\\\"]*)\\\" and file: \\\"([^\\\"]*)\\\"$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
     @When("^application save the all the pieces of torrent: \"([^\"]*)\",\"([^\"]*)\"$")
@@ -401,15 +387,17 @@ public class MyStepdefs {
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        BlocksAllocatorImpl.getInstance()
+        TorrentDownloaders.getAllocatorStore()
                 .updateAllocations(10, 1_000_000)
                 .block();
 
-        StatusChanger statusChanger = new StatusChanger(Utils.createDefaultFalseStatus());
+        Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
+                TorrentStatusReducer.defaultTorrentState);
+        TorrentStatesSideEffects sideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
-        int amountOfAllocatedBlocks = BlocksAllocatorImpl.getInstance()
-                .getLatestState$()
+        int amountOfAllocatedBlocks = TorrentDownloaders.getAllocatorStore()
+                .latestState$()
                 .map(AllocatorState::getAmountOfBlocks)
                 .block();
 
@@ -418,8 +406,8 @@ public class MyStepdefs {
         Semaphore semaphore = new Semaphore(1, true);
 
         ConnectableFlux<PieceMessage> allBlocksMessages$ =
-                BlocksAllocatorImpl.getInstance()
-                        .getLatestState$()
+                TorrentDownloaders.getAllocatorStore()
+                        .latestState$()
                         .map(AllocatorState::getBlockLength)
                         .flatMapMany(allocatedBlockLength -> Flux.range(0, torrentInfo.getPieces().size())
                                 .map(pieceIndex -> new BlockOfPiece(pieceIndex, 0, null))
@@ -430,53 +418,46 @@ public class MyStepdefs {
                         .publish();
 
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-        FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, fullDownloadPath, statusChanger, allBlocksMessages$)
-                .block();
 
-        Mono<List<Integer>> piecesCompleted1 = fileSystemLink.savedBlockFlux()
-                //.doOnNext(pieceEvent -> System.out.println("block complete:" + pieceEvent))
-                .flatMap(pieceEvent ->
-                {
-                    AllocatedBlock allocatedBlock = pieceEvent.getReceivedPiece().getAllocatedBlock();
-                    return BlocksAllocatorImpl.getInstance()
-                            .free(allocatedBlock)
-                            .map(allocatorState -> pieceEvent);
+        TorrentDownloaderBuilder.builder(torrentInfo)
+                .setTorrentStatusStore(store)
+                .setTorrentStatesSideEffects(sideEffects)
+                .setFileSystemLink$(FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, store, allBlocksMessages$))
+                .build()
+                .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+                .doOnNext(torrentDownloader -> {
+                    Mono<List<Integer>> piecesCompleted1 = torrentDownloader.getFileSystemLink().savedBlockFlux()
+                            //.doOnNext(pieceEvent -> System.out.println("block complete:" + pieceEvent))
+                            .flatMap(pieceEvent ->
+                            {
+                                AllocatedBlock allocatedBlock = pieceEvent.getReceivedPiece().getAllocatedBlock();
+                                return TorrentDownloaders.getAllocatorStore()
+                                        .free(allocatedBlock)
+                                        .map(allocatorState -> pieceEvent);
+                            })
+                            .doOnNext(pieceEvent -> semaphore.release())
+                            .filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
+                            .map(PieceEvent::getReceivedPiece)
+                            .map(PieceMessage::getIndex)
+                            .doOnNext(pieceIndex -> System.out.println("saved piece index: " + pieceIndex))
+                            .replay()
+                            .autoConnect(0)
+                            .collectList();
+
+                    Mono<List<Integer>> piecesCompleted2 = torrentDownloader.getFileSystemLink().savedPieceFlux()
+                            .replay()
+                            .autoConnect(0)
+                            .collectList();
+
+                    allBlocksMessages$.connect();
+
+                    List<Integer> expected = piecesCompleted1.block();
+                    List<Integer> actual = piecesCompleted2.block();
+                    Utils.assertListEqualNotByOrder(expected, actual, Integer::equals);
                 })
-                .doOnNext(pieceEvent -> semaphore.release())
-                .filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
-                .map(PieceEvent::getReceivedPiece)
-                .map(PieceMessage::getIndex)
-                .doOnNext(pieceIndex -> System.out.println("saved piece index: " + pieceIndex))
-                .replay()
-                .autoConnect(0)
-                .collectList();
-
-        Mono<List<Integer>> piecesCompleted2 = fileSystemLink.savedPieceFlux()
-                .replay()
-                .autoConnect(0)
-                .collectList();
-
-        allBlocksMessages$.connect();
-
-        List<Integer> expected = piecesCompleted1.block();
-        List<Integer> actual = piecesCompleted2.block();
-        Utils.assertListEqualNotByOrder(expected, actual, Integer::equals);
-
-        Assert.assertEquals(-1, fileSystemLink.minMissingPieceIndex());
-
-        // I must waitForMessage it here because later I need to get the torrentStatusController which was already created here.
-        // If I'm not creating TorrentDownloader object here, I will waitForMessage 2 different torrentStatusController objects.
-        TorrentDownloaders.getInstance()
-                .createTorrentDownloader(torrentInfo,
-                        fileSystemLink,
-                        null,
-                        statusChanger,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
     }
 
     private Flux<Integer> actualCompletedSavedPiecesReadByFS$ = null;
@@ -487,17 +468,27 @@ public class MyStepdefs {
                                                                           List<BlockOfPiece> blockList) throws Throwable {
         // delete everything from the last test.
         Utils.removeEverythingRelatedToLastTest();
-        this.actualCompletedSavedPiecesReadByFS$ = null;
+
+        TorrentDownloaders.getAllocatorStore()
+                .freeAll()
+                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(10, 1_000_000))
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        StatusChanger statusChanger = new StatusChanger(Utils.createDefaultFalseStatus());
+        // I only need this object because the constructor of FileSystemLink listen to signals (which I never signal).
+        Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
+                TorrentStatusReducer.defaultTorrentState);
+        // I need this object for the cleanup after this test so I can wait until all the files were actually removed.
+        TorrentStatesSideEffects sideEffects = new TorrentStatesSideEffects(torrentInfo, store);
 
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
         Semaphore semaphore = new Semaphore(1, true);
 
-        Flux<PieceMessage> generatedWrittenPieceMessages$ = BlocksAllocatorImpl.getInstance()
-                .getLatestState$()
+        Flux<PieceMessage> generatedWrittenPieceMessages$ = TorrentDownloaders.getAllocatorStore()
+                .latestState$()
                 .publishOn(Schedulers.elastic())
                 .map(AllocatorState::getBlockLength)
                 .flatMapMany(allocatedBlockLength -> Flux.fromIterable(blockList)
@@ -510,61 +501,58 @@ public class MyStepdefs {
                 .autoConnect(2);
 
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-        FileSystemLink fileSystemLink = ActiveTorrents.getInstance()
-                .createActiveTorrentMono(torrentInfo, fullDownloadPath, statusChanger, generatedWrittenPieceMessages$)
-                .block();
+
+        Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.builder(torrentInfo)
+                .setTorrentStatusStore(store)
+                .setTorrentStatesSideEffects(sideEffects)
+                .setToDefaultSearchPeers()
+                .setToDefaultPeersCommunicatorFlux()
+                .setFileSystemLink$(FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, store, generatedWrittenPieceMessages$))
+                .build()
+                .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+                .cache();
 
         // this.actualCompletedSavedPiecesReadByFS$ will be used in later step.
-        this.actualCompletedSavedPiecesReadByFS$ = fileSystemLink.savedPieceFlux()
+        this.actualCompletedSavedPiecesReadByFS$ = torrentDownloader$
+                .map(TorrentDownloader::getFileSystemLink)
+                .flatMapMany(FileSystemLink::savedPieceFlux)
                 .replay()
                 .autoConnect(0);
 
-        Flux.zip(fileSystemLink.savedBlockFlux().map(PieceEvent::getReceivedPiece),
-                generatedWrittenPieceMessages$,
-                (actualPieceFromFSNotifier, expectedPieceMessage) -> {
-                    Assert.assertEquals("the FS notifier notified about other block which he saved than the block we expected to save.",
-                            expectedPieceMessage, actualPieceFromFSNotifier);
-                    return expectedPieceMessage;
-                })
+        Flux<PieceMessage> customPieces$ = torrentDownloader$
+                .map(TorrentDownloader::getFileSystemLink)
+                .flatMapMany(FileSystemLink::savedBlockFlux)
+                .map(PieceEvent::getReceivedPiece);
+
+        Flux.zip(customPieces$, generatedWrittenPieceMessages$)
+                .doOnNext(pieces -> Assert.assertEquals("the FS notifier notified about other block which" +
+                        " he saved than the block we expected to save.", pieces.getT1(), pieces.getT2()))
+                .map(Tuple2::getT1)
                 .doOnNext(pieceMessage -> System.out.println("saved from: " + pieceMessage.getBegin() +
                         ", length: " + pieceMessage.getAllocatedBlock().getLength()))
-                .flatMap(expectedPieceMessage -> BlocksAllocatorImpl.getInstance()
-                        .createRequestMessage(null, null, expectedPieceMessage.getIndex(),
-                                expectedPieceMessage.getBegin(),
-                                expectedPieceMessage.getAllocatedBlock().getLength(),
-                                torrentInfo.getPieceLength(expectedPieceMessage.getIndex()))
+                .concatMap(pieceMessage -> TorrentDownloaders.getAllocatorStore()
+                        .createRequestMessage(null, null, pieceMessage.getIndex(),
+                                pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength(),
+                                torrentInfo.getPieceLength(pieceMessage.getIndex()))
                         .flatMap(requestMessage -> Utils.readFromFile(torrentInfo, fullDownloadPath, requestMessage)
-                                .doOnNext(actualPieceMessage -> {
-                                    System.out.println(
-                                            "assert actualPieceFromFS: " +
-                                                    "saved from: " + actualPieceMessage.getBegin() +
-                                                    ", length: " + actualPieceMessage.getAllocatedBlock().getLength() +
-                                                    " <----> generatedPieceMessage: " +
-                                                    "saved from: " + expectedPieceMessage.getBegin() +
-                                                    ", length: " + expectedPieceMessage.getAllocatedBlock().getLength());
-                                    Assert.assertEquals("the pieces we read from filesystem are not equal to the pieces we tried to save to the filesystem.",
-                                            expectedPieceMessage.getAllocatedBlock(), actualPieceMessage.getAllocatedBlock());
-                                })
+                                .doOnNext(actualPieceMessage -> System.out.println("assert actualPieceFromFS: " +
+                                        "saved from: " + actualPieceMessage.getBegin() +
+                                        ", length: " + actualPieceMessage.getAllocatedBlock().getLength() +
+                                        " <----> generatedPieceMessage: " +
+                                        "saved from: " + pieceMessage.getBegin() +
+                                        ", length: " + pieceMessage.getAllocatedBlock().getLength()))
+                                .doOnNext(actualPieceMessage -> Assert.assertEquals("the pieces we read from filesystem " +
+                                                "are not equal to the pieces we tried to save to the filesystem.",
+                                        pieceMessage.getAllocatedBlock(), actualPieceMessage.getAllocatedBlock()))
                                 // free the write and read blocks.
-                                .flatMap(actualPieceMessage -> BlocksAllocatorImpl.getInstance().free(actualPieceMessage.getAllocatedBlock()))
-                                .flatMap(__ -> BlocksAllocatorImpl.getInstance().free(expectedPieceMessage.getAllocatedBlock()))))
+                                .flatMap(actualPieceMessage -> TorrentDownloaders.getAllocatorStore().free(actualPieceMessage.getAllocatedBlock()))
+                                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().free(pieceMessage.getAllocatedBlock()))))
                 // tell upstream that we freed the buffer and he can give us one more signal (if he have any left)
                 .doOnNext(__ -> semaphore.release())
                 .collectList()
-                .block();
-
-        // I must waitForMessage it here because later I need to get the torrentStatusController which was already created here.
-        // If I'm not creating TorrentDownloader object here, I will waitForMessage 2 different torrentStatusController objects.
-        TorrentDownloaders.getInstance()
-                .createTorrentDownloader(torrentInfo,
-                        fileSystemLink,
-                        null,
-                        statusChanger,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
     }
 
     @Then("^the only completed pieces are - for torrent: \"([^\"]*)\":$")
@@ -583,11 +571,10 @@ public class MyStepdefs {
         Assert.assertEquals("the expected and actual completed pieces indexes are not equal.",
                 fixedCompletedPiecesIndexList, actualCompletedPiecesByFSNotifierSet);
 
-        FileSystemLink fileSystemLinkImplTorrent = ActiveTorrents.getInstance()
-                .findActiveTorrentByHashMono(torrentInfo.getTorrentInfoHash())
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .block();
+        FileSystemLink fileSystemLinkImplTorrent = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+                .getFileSystemLink();
 
         String errorMessage1 = "the piece is not completed but it should be.";
 
@@ -619,202 +606,185 @@ public class MyStepdefs {
 
         // we won't download anything but we still need to specify a path to download to.
         String DEFAULT_DOWNLOAD_LOCATION = System.getProperty("user.dir") + File.separator + "torrents-test/";
-        TorrentDownloader torrentDownloader = Utils.createDefaultTorrentDownloader(torrentInfo, DEFAULT_DOWNLOAD_LOCATION);
 
-        // consume new peers and new responses from 1.5 seconds.
-        // filter distinct peers from the responses, and assert
-        // that both the list of peers are equal.
+        TorrentDownloaderBuilder.buildDefault(torrentInfo, DEFAULT_DOWNLOAD_LOCATION)
+                .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+                .doOnNext(torrentDownloader -> {
+                    // consume new peers and new responses from 1.5 seconds.
+                    // filter distinct peers from the responses, and assert
+                    // that both the list of peers are equal.
 
-        Flux<Peer> connectedPeersFlux = torrentDownloader.getPeersCommunicatorFlux()
-                .map(Link::getPeer)
-                .timeout(Duration.ofMillis(1500))
-                .buffer(Duration.ofMillis(1500))
-                .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
-                .take(3)
-                .flatMap(Flux::fromIterable)
-                .sort();
+                    Flux<Peer> connectedPeersFlux = torrentDownloader.getPeersCommunicatorFlux()
+                            .map(Link::getPeer)
+                            .timeout(Duration.ofMillis(1500))
+                            .buffer(Duration.ofMillis(1500))
+                            .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
+                            .take(3)
+                            .flatMap(Flux::fromIterable)
+                            .sort();
 
-        Flux<Peer> peersFromResponsesMono = torrentDownloader.getPeersCommunicatorFlux()
-                .map(Link::receivePeerMessages)
-                .flatMap(ReceiveMessagesNotifications::getPeerMessageResponseFlux)
-                .map(PeerMessage::getFrom)
-                .distinct()
-                .timeout(Duration.ofMillis(1500))
-                .buffer(Duration.ofMillis(1500))
-                .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
-                .take(2)
-                .flatMap(Flux::fromIterable)
-                .sort()
-                // I'm going to get this peers again AFTER:
-                // torrentDownloader.getStatusChanger().start();
-                .replay()
-                .autoConnect();
+                    Flux<Peer> peersFromResponsesMono = torrentDownloader.getPeersCommunicatorFlux()
+                            .map(Link::receivePeerMessages)
+                            .flatMap(ReceiveMessagesNotifications::getPeerMessageResponseFlux)
+                            .map(PeerMessage::getFrom)
+                            .distinct()
+                            .timeout(Duration.ofMillis(1500))
+                            .buffer(Duration.ofMillis(1500))
+                            .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
+                            .take(2)
+                            .flatMap(Flux::fromIterable)
+                            .sort()
+                            // I'm going to get this peers again AFTER:
+                            // torrentDownloader.getTorrentStatusStore().start();
+                            .replay()
+                            .autoConnect();
 
-        // for recording all the peers without blocking the main thread.
-        peersFromResponsesMono.subscribe();
+                    // for recording all the peers without blocking the main thread.
+                    peersFromResponsesMono.subscribe();
 
-        torrentDownloader.getStatusChanger().changeState(StatusType.START_DOWNLOAD).block();
-        torrentDownloader.getStatusChanger().changeState(StatusType.START_UPLOAD).block();
 
-        List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
-        List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
+                    torrentDownloader.getTorrentStatusStore().dispatch(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS).block();
 
-        peersFromResponses.stream()
-                .filter(peer -> connectedPeers.contains(peer))
-                .findFirst()
-                .ifPresent(peer -> Assert.fail("We received from the following peer" +
-                        " messages but he doesn't exist in the connected peers flux: " + peer));
+                    List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
+                    List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
 
-        // delete everything from the last test.
+                    peersFromResponses.stream()
+                            .filter(connectedPeers::contains)
+                            .findFirst()
+                            .ifPresent(peer -> Assert.fail("We received from the following peer" +
+                                    " messages but he doesn't exist in the connected peers flux: " + peer));
+                })
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+
         Utils.removeEverythingRelatedToLastTest();
     }
 
-    @Given("^initial torrent-status for torrent: \"([^\"]*)\" in \"([^\"]*)\" is:$")
+    @Given("^initial torrent-status for torrent: \"([^\"]*)\" in \"([^\"]*)\" is - no side effects:$")
     public void activeTorrentForInWithTheFollowingStatus(String torrentFileName, String downloadLocation,
-                                                         Map<StatusType, Boolean> initialTorrentStatusTypeMap) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+                                                         List<TorrentStatusAction> torrentStatusActions) throws Throwable {
 
-        // delete everything from the last test.
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("started @Given(initial torrent-status for torrent:.... - no side effects)");
+        System.out.println("-------------------------------------------------------------------------");
         Utils.removeEverythingRelatedToLastTest();
+        System.out.println("finished clean the last test data");
 
-        Status initialStatus = new Status(
-                initialTorrentStatusTypeMap.get(StatusType.START_DOWNLOAD),
-                initialTorrentStatusTypeMap.get(StatusType.START_UPLOAD),
-                initialTorrentStatusTypeMap.get(StatusType.REMOVE_TORRENT),
-                initialTorrentStatusTypeMap.get(StatusType.REMOVE_FILES),
-                initialTorrentStatusTypeMap.get(StatusType.RESUME_UPLOAD),
-                initialTorrentStatusTypeMap.get(StatusType.RESUME_DOWNLOAD),
-                initialTorrentStatusTypeMap.get(StatusType.COMPLETED_DOWNLOADING),
-                initialTorrentStatusTypeMap.get(StatusType.START_LISTENING_TO_INCOMING_PEERS),
-                initialTorrentStatusTypeMap.get(StatusType.RESUME_LISTENING_TO_INCOMING_PEERS),
-                initialTorrentStatusTypeMap.get(StatusType.START_SEARCHING_PEERS),
-                initialTorrentStatusTypeMap.get(StatusType.RESUME_SEARCHING_PEERS));
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
-                .createTorrentDownloader(torrentInfo,
-                        null,
-                        null,
-                        new StatusChanger(initialStatus),
-                        null,
-                        null,
-                        null,
-                        null,
-                        null);
+        // clean from the last test.
+        TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentInfo.getTorrentInfoHash());
+
+        TorrentStatusState torrentStatusState = Utils.getTorrentStatusState(torrentInfo, TorrentStatusAction.INITIALIZE, torrentStatusActions);
+        Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(), torrentStatusState);
+
+        TorrentDownloaderBuilder.builder(torrentInfo)
+                .setTorrentStatusStore(torrentStatusStore)
+                .build()
+                .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @Given(initial torrent-status for torrent:.... - no side effects)");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
-    private Status actualLastStatus = null;
+    private TorrentStatusState actualLastStatus = null;
 
-    @When("^torrent-status for torrent \"([^\"]*)\" is trying to change to:$")
+    @When("^torrent-status for torrent \"([^\"]*)\" is trying to change to - no side effects:$")
     public void torrentStatusForIsTryingToChangeTo(String torrentFileName,
-                                                   List<StatusType> changeStatusTypeList) throws Throwable {
-        // remove every state from the last test.
-        this.actualLastStatus = null;
-
+                                                   List<TorrentStatusAction> changeTorrentStatusActionList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-        StatusChanger statusChanger = TorrentDownloaders.getInstance()
+        Store<TorrentStatusState, TorrentStatusAction> store = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get()
-                .getStatusChanger();
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+                .getTorrentStatusStore();
 
-        changeStatusTypeList.forEach(torrentStatusType -> {
-            switch (torrentStatusType) {
-                case START_DOWNLOAD:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.START_DOWNLOAD).block();
-                    break;
-                case START_UPLOAD:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.START_UPLOAD).block();
-                    break;
-                case PAUSE_DOWNLOAD:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.PAUSE_DOWNLOAD).block();
-                    break;
-                case RESUME_DOWNLOAD:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.RESUME_DOWNLOAD).block();
-                    break;
-                case PAUSE_UPLOAD:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.PAUSE_UPLOAD).block();
-                    break;
-                case RESUME_UPLOAD:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.RESUME_UPLOAD).block();
-                    break;
-                case COMPLETED_DOWNLOADING:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.COMPLETED_DOWNLOADING).block();
-                    break;
-                case REMOVE_TORRENT:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.REMOVE_TORRENT).block();
-                    break;
-                case REMOVE_FILES:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.REMOVE_FILES).block();
-                    break;
-                case START_LISTENING_TO_INCOMING_PEERS:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.START_LISTENING_TO_INCOMING_PEERS).block();
-                    break;
-                case RESUME_LISTENING_TO_INCOMING_PEERS:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.RESUME_LISTENING_TO_INCOMING_PEERS).block();
-                    break;
-                case PAUSE_LISTENING_TO_INCOMING_PEERS:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.PAUSE_LISTENING_TO_INCOMING_PEERS).block();
-                    break;
-                case START_SEARCHING_PEERS:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.START_SEARCHING_PEERS).block();
-                    break;
-                case RESUME_SEARCHING_PEERS:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.RESUME_SEARCHING_PEERS).block();
-                    break;
-                case PAUSE_SEARCHING_PEERS:
-                    this.actualLastStatus = statusChanger.changeState(StatusType.PAUSE_SEARCHING_PEERS).block();
-                    break;
-            }
-        });
+        this.actualLastStatus = Flux.fromIterable(changeTorrentStatusActionList)
+                .flatMap(store::dispatch, changeTorrentStatusActionList.size(), changeTorrentStatusActionList.size())
+                .blockLast();
     }
 
-    @Then("^torrent-status for torrent \"([^\"]*)\" will be:$")
-    public void torrentStatusForWillBe(String torrentFileName,
-                                       List<StatusType> expectedStatusTypeList) throws Throwable {
+    @Then("^torrent-status for torrent \"([^\"]*)\" will be with action: \"([^\"]*)\" - no side effects:$")
+    public void torrentStatusForWillBeWithoutSideEffects(String torrentFileName, TorrentStatusAction lastTorrentStatusAction,
+                                                         List<TorrentStatusAction> expectedTorrentStatusActionList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-        StatusChanger statusChanger = TorrentDownloaders.getInstance()
+        Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get()
-                .getStatusChanger();
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+                .getTorrentStatusStore();
 
-        Status expectedFinalStatus = new Status(
-                expectedStatusTypeList.contains(StatusType.START_DOWNLOAD),
-                expectedStatusTypeList.contains(StatusType.START_UPLOAD),
-                expectedStatusTypeList.contains(StatusType.REMOVE_TORRENT),
-                expectedStatusTypeList.contains(StatusType.REMOVE_FILES),
-                expectedStatusTypeList.contains(StatusType.RESUME_UPLOAD),
-                expectedStatusTypeList.contains(StatusType.RESUME_DOWNLOAD),
-                expectedStatusTypeList.contains(StatusType.COMPLETED_DOWNLOADING),
-                expectedStatusTypeList.contains(StatusType.START_LISTENING_TO_INCOMING_PEERS),
-                expectedStatusTypeList.contains(StatusType.RESUME_LISTENING_TO_INCOMING_PEERS),
-                expectedStatusTypeList.contains(StatusType.START_SEARCHING_PEERS),
-                expectedStatusTypeList.contains(StatusType.RESUME_SEARCHING_PEERS));
+        TorrentStatusState expectedState = Utils.getTorrentStatusState(torrentInfo, lastTorrentStatusAction, expectedTorrentStatusActionList);
 
-        // test with the status we received from the "last-status-mono"
-        Assert.assertEquals(expectedFinalStatus, statusChanger.getLatestState$().block());
         // test with the actual last status we received in the last time we tried to change the status
-        if (this.actualLastStatus != null)
-            Assert.assertEquals(expectedFinalStatus, this.actualLastStatus);
-        this.actualLastStatus = null;
+        if (this.actualLastStatus != null) {
+            Assert.assertEquals(expectedState.getAction(), this.actualLastStatus.getAction());
+            Assert.assertEquals(expectedState.getDownloadState(), this.actualLastStatus.getDownloadState());
+            Assert.assertEquals(expectedState.getTorrentFileSystemState(), this.actualLastStatus.getTorrentFileSystemState());
+            Assert.assertEquals(expectedState.getSearchPeersState(), this.actualLastStatus.getSearchPeersState());
+            this.actualLastStatus = null;
+        }
+
+        torrentStatusStore.latestState$()
+                .doOnNext(torrentStatusState -> {
+                    Assert.assertEquals(expectedState.getAction(), torrentStatusState.getAction());
+                    Assert.assertEquals(expectedState.getDownloadState(), torrentStatusState.getDownloadState());
+                    Assert.assertEquals(expectedState.getTorrentFileSystemState(), torrentStatusState.getTorrentFileSystemState());
+                    Assert.assertEquals(expectedState.getSearchPeersState(), torrentStatusState.getSearchPeersState());
+                })
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @Then(\"^torrent-status for torrent \\\"([^\\\"]*)\\\" will be with action: \\\"([^\\\"]*)\\\" - no side effects:$\")");
+        System.out.println("-------------------------------------------------------------------------");
     }
 
-    private Mono<Link> meToFakePeerLink;
-    private Mono<List<SendMessagesNotifications>> requestsFromFakePeerToMeListMono;
+    @Then("^torrent-status for torrent \"([^\"]*)\" will be with action: \"([^\"]*)\":$")
+    public void torrentStatusForWillBe(String torrentFileName, TorrentStatusAction lastTorrentStatusAction,
+                                       List<TorrentStatusAction> expectedTorrentStatusActionList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        TorrentStatusState expectedState = Utils.getTorrentStatusState(torrentInfo, lastTorrentStatusAction, expectedTorrentStatusActionList);
+
+        TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+                .getTorrentStatusStore()
+                .latestState$()
+                .doOnNext(torrentStatusState -> {
+                    Assert.assertEquals(expectedState.getAction(), torrentStatusState.getAction());
+                    Assert.assertEquals(expectedState.getDownloadState(), torrentStatusState.getDownloadState());
+                    Assert.assertEquals(expectedState.getTorrentFileSystemState(), torrentStatusState.getTorrentFileSystemState());
+                    Assert.assertEquals(expectedState.getSearchPeersState(), torrentStatusState.getSearchPeersState());
+                })
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @Then(\"^torrent-status for torrent \\\"([^\\\"]*)\\\" will be with action: \\\"([^\\\"]*)\\\":$\")");
+        System.out.println("-------------------------------------------------------------------------");
+    }
+
+    private Mono<List<SendMessagesNotifications>> requestsFromFakePeerToMeList$;
 
     @Then("^random-fake-peer connect to me for torrent: \"([^\"]*)\" in \"([^\"]*)\" and he request:$")
     public void randomFakePeerConnectToMeForTorrentInAndHeRequest(String torrentFileName, String downloadLocation,
                                                                   List<BlockOfPiece> peerRequestBlockList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        // The last step created FileSystemLinkImpl object which listen to custom
+        // The last step created FileSystemLinkImpl object which listener to custom
         // peerResponsesFlux. So I can't expect it to react to the original peerResponsesFlux.
         // Also the last test created torrentStatusController object.
-        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+        FileSystemLink fileSystemLink = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get();
-
-        StatusChanger statusChanger = torrentDownloader.getStatusChanger();
-
-        FileSystemLink fileSystemLink = torrentDownloader.getFileSystemLink();
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+                .getFileSystemLink();
 
         // this flux is empty because if not, the application will get the peers from
         // them and then it will connect to all those peers and then those peers will
@@ -825,51 +795,51 @@ public class MyStepdefs {
         TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentInfo.getTorrentInfoHash());
 
         // represent this application TorrentDownloader. (not the fake-peer TorrentDownloader).
-        TorrentDownloader torrentDownloaderNew =
-                Utils.createCustomTorrentDownloader(torrentInfo, statusChanger,
-                        fileSystemLink, trackerConnectionFlux);
-
-        // the fake-peer will connect to me.
-        Peer me = new Peer("localhost", AppConfig.getInstance().getMyListeningPort());
-
-        this.meToFakePeerLink = torrentDownloaderNew.getPeersCommunicatorFlux()
-                .replay()
+        Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
+                TorrentStatusReducer.defaultTorrentState);
+        TrackerProvider trackerProvider = Mockito.mock(TrackerProvider.class);
+        Mockito.when(trackerProvider.connectToTrackersFlux()).thenReturn(trackerConnectionFlux);
+        Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.builder(torrentInfo)
+                .setTorrentStatusStore(store)
+                .setToDefaultTorrentStatesSideEffects()
+                .setSearchPeers(new SearchPeers(torrentInfo, store, trackerProvider, new PeersProvider(torrentInfo)))
+                .setToDefaultPeersCommunicatorFlux()
+                .setToDefaultBittorrentAlgorithm()
+                .setFileSystemLink$(Mono.just(fileSystemLink))
+                .build()
+                .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+                .flux()
+                .replay(1)
                 .autoConnect(0)
-                .take(1)
                 .single();
 
-        // my application start listening for new peers.
-        statusChanger.changeState(StatusType.START_LISTENING_TO_INCOMING_PEERS).block();
-
-        // listen for incoming request messages and response to them.
-        statusChanger.changeState(StatusType.START_UPLOAD).block();
-
-        // wait until the app will start listen for new incoming peers
-        // and wait until torrent-status signal "RESUME_LISTENING_TO_INCOMING_PEERS".
-        Thread.sleep(500);
-
-        Link fakePeerToMeLink = new PeersProvider(torrentInfo)
-                // fake-peer connect to me.
-                .connectToPeerMono(me)
-                .block();
-
-        this.requestsFromFakePeerToMeListMono = fakePeerToMeLink.sendMessages()
-                .sendInterestedMessage()
-                .flatMapMany(__ -> BlocksAllocatorImpl.getInstance()
-                        .getLatestState$()
-                        .map(AllocatorState::getBlockLength)
-                        .flatMapMany(allocatedBlockLength ->
+        // start listen -> make fake peer connect to me -> send fake messages from fake-peer to me.
+        this.requestsFromFakePeerToMeList$ = TorrentDownloaders.getListenStore()
+                .dispatch(ListenerAction.START_LISTENING_IN_PROGRESS)
+                .flatMap(__ -> store.dispatch(TorrentStatusAction.START_UPLOAD_IN_PROGRESS))
+                .flatMap(__ -> TorrentDownloaders.getListenStore().notifyWhen(ListenerAction.START_LISTENING_WIND_UP))
+                .flatMap(__ -> store.notifyWhen(TorrentStatusAction.RESUME_UPLOAD_WIND_UP))
+                .flatMap(__ -> torrentDownloader$)
+                .map(TorrentDownloader::getSearchPeers)
+                .map(SearchPeers::getPeersProvider)
+                .flatMap(peersProvider -> {
+                    // the fake-peer will connect to me.
+                    Peer me = new Peer("localhost", AppConfig.getInstance().findFreePort());
+                    return peersProvider.connectToPeerMono(me);
+                })
+                .map(fakePeerToMeLink -> fakePeerToMeLink.sendMessages())
+                .flatMapMany(sendMessagesObject -> sendMessagesObject.sendInterestedMessage()
+                        .flatMapMany(__ -> TorrentDownloaders.getAllocatorStore()
+                                .latestState$()
+                                .map(AllocatorState::getBlockLength)
                                 // sendMessage all requests from fake peer to me.
-                                Flux.fromIterable(peerRequestBlockList)
-                                        .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength))))
-                .flatMap(blockOfPiece -> fakePeerToMeLink.sendMessages()
-                        .sendRequestMessage(blockOfPiece.getPieceIndex(),
-                                blockOfPiece.getFrom(), blockOfPiece.getLength()))
+                                .flatMapMany(allocatedBlockLength -> Flux.fromIterable(peerRequestBlockList)
+                                        .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo,
+                                                allocatedBlockLength))))
+                        .concatMap(blockOfPiece -> sendMessagesObject.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(), blockOfPiece.getLength())))
                 .collectList()
-                .doOnNext(requestList -> {
-                    Assert.assertEquals("We sent less requests then expected.",
-                            peerRequestBlockList.size(), requestList.size());
-                });
+                .doOnNext(requestList -> Assert.assertEquals("We sent less requests then expected.",
+                        peerRequestBlockList.size(), requestList.size()));
     }
 
     @Then("^we assert that for torrent: \"([^\"]*)\", we gave the following pieces to the random-fake-peer:$")
@@ -878,12 +848,17 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get();
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
-        // I must record this because when I subscribe to this.requestsFromFakePeerToMeListMono,
+        Mono<Link> meToFakePeerLink = torrentDownloader.getPeersCommunicatorFlux()
+                .take(1)
+                .single()
+                .cache();
+
+        // I must record this because when I subscribe to this.requestsFromFakePeerToMeList$,
         // fake-peer will send me request messages and I response to him **piece messages**
         // which I don't want to lose.
-        Flux<PieceMessage> recordedPieceMessageFlux = this.meToFakePeerLink
+        Flux<PieceMessage> recordedPieceMessageFlux = meToFakePeerLink
                 .map(Link::sendMessages)
                 .flatMapMany(SendMessagesNotifications::sentPeerMessagesFlux)
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
@@ -893,7 +868,7 @@ public class MyStepdefs {
 
         // send request massages from fake peer to me and get all the
         // piece messages from me to fake peer and collect them to list.
-        Set<BlockOfPiece> actualBlockFromMeSet = this.requestsFromFakePeerToMeListMono
+        Set<BlockOfPiece> actualBlockFromMeSet = this.requestsFromFakePeerToMeList$
                 .flatMapMany(remoteFakePeerForRequestingPieces -> recordedPieceMessageFlux)
                 .map(pieceMessage -> new BlockOfPiece(pieceMessage.getIndex(), pieceMessage.getBegin(),
                         pieceMessage.getAllocatedBlock().getLength()))
@@ -901,8 +876,8 @@ public class MyStepdefs {
                 .collect(Collectors.toSet())
                 .block();
 
-        Set<BlockOfPiece> expectedBlockFromMeSet = BlocksAllocatorImpl.getInstance()
-                .getLatestState$()
+        Set<BlockOfPiece> expectedBlockFromMeSet = TorrentDownloaders.getAllocatorStore()
+                .latestState$()
                 .map(AllocatorState::getBlockLength)
                 .flatMapMany(allocatedBlockLength ->
                         Flux.fromIterable(expectedBlockFromMeList)
@@ -913,11 +888,15 @@ public class MyStepdefs {
         // assert that both the list are equal.
         Assert.assertEquals(expectedBlockFromMeSet, actualBlockFromMeSet);
 
-        meToFakePeerLink.subscribe(Link::closeConnection);
+        meToFakePeerLink.doOnNext(Link::closeConnection)
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
 
         Utils.removeEverythingRelatedToLastTest();
     }
 
+    // TODO: is this step in used?
     @Given("^torrent: \"([^\"]*)\",\"([^\"]*)\"$")
     public void torrent(String torrentFileName, String downloadLocation) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
@@ -936,9 +915,25 @@ public class MyStepdefs {
         this.recordedFakePeersToMeLinks$ = null;
         this.actualSavedBlocks$ = null;
 
-        Flux<TrackerConnection> trackers$ = Flux.empty();
-        Utils.createDefaultTorrentDownloader(torrentInfo,
-                System.getProperty("user.dir") + File.separator + downloadLocation + File.separator, trackers$);
+        Flux<TrackerConnection> trackers$ = Flux.<TrackerConnection>empty();
+        String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
+
+        Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
+                TorrentStatusReducer.defaultTorrentState);
+        TrackerProvider trackerProvider = Mockito.mock(TrackerProvider.class);
+        Mockito.when(trackerProvider.connectToTrackersFlux()).thenReturn(trackers$);
+        // TODO: check that I didn't miss anything
+        TorrentDownloaderBuilder.builder(torrentInfo)
+                .setTorrentStatusStore(torrentStatusStore)
+                .setToDefaultTorrentStatesSideEffects()
+                .setSearchPeers(new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider, new PeersProvider(torrentInfo)))
+                .setToDefaultPeersCommunicatorFlux()
+                .setToDefaultFileSystemLink(fullDownloadPath)
+                .build()
+                .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
     }
 
     private Flux<Link> recordedMeToFakePeersLinks$;
@@ -953,7 +948,7 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get();
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
         this.recordedMeToFakePeersLinks$ = torrentDownloader.getPeersCommunicatorFlux()
                 // send interested message to the fake-peer.
@@ -962,7 +957,7 @@ public class MyStepdefs {
                 .replay()
                 .autoConnect(0);
 
-        Peer me = new Peer("localhost", AppConfig.getInstance().getMyListeningPort());
+        Peer me = new Peer("localhost", AppConfig.getInstance().findFreePort());
         Peer fakePeer = new Peer("localhost", fakePeerPort);
 
         // build a bitfield message so I can send it to my app and also
@@ -994,7 +989,7 @@ public class MyStepdefs {
 //		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 //		TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
 //				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-//				.get();
+//				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 //
 //		// all fake peers connect to me. In this test there must be only one fake-peer.
 //		this.recordedFakePeersToMeLinks$ = Flux.fromIterable(this.fakePeersToMeLinkMap.entrySet())
@@ -1081,7 +1076,8 @@ public class MyStepdefs {
     }
 
     @Then("^fake-peer on port \"([^\"]*)\" choke me: \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
-    public void fakePeerOnPortChokeMeForTorrent(Integer fakePeerPort, boolean isChoking, String torrentFileName) throws Throwable {
+    public void fakePeerOnPortChokeMeForTorrent(Integer fakePeerPort, boolean isChoking, String torrentFileName) throws
+            Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         this.recordedFakePeersToMeLinks$.filter(remoteFakePeer -> remoteFakePeer.getMe().getPeerPort() == fakePeerPort)
@@ -1100,7 +1096,7 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get();
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
         this.availablePieces$ = torrentDownloader.getBittorrentAlgorithm()
                 .getDownloadAlgorithm()
@@ -1114,7 +1110,7 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .get();
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
         List<Integer> actualAvailablePiecesList = this.availablePieces$.collectList()
                 .block(Duration.ofMillis(500));
@@ -1137,7 +1133,8 @@ public class MyStepdefs {
     }
 
     @When("^application request available peers for piece: \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
-    public void applicationRequestAvailablePeersForPieceForTorrent(int pieceIndex, String torrentFileName) throws Throwable {
+    public void applicationRequestAvailablePeersForPieceForTorrent(int pieceIndex, String torrentFileName) throws
+            Throwable {
 
     }
 
@@ -1160,7 +1157,8 @@ public class MyStepdefs {
     }
 
     @Then("^application receive none available fake-peers for piece: \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
-    public void applicationReceiveNoneAvailableFakePeersForPieceForTorrent(int pieceIndex, String torrentFileName) throws Throwable {
+    public void applicationReceiveNoneAvailableFakePeersForPieceForTorrent(int pieceIndex, String torrentFileName) throws
+            Throwable {
 
     }
 
@@ -1170,9 +1168,10 @@ public class MyStepdefs {
     }
 
     @Then("^application download the following pieces - concurrent piece's downloads: \"([^\"]*)\" - for torrent: \"([^\"]*)\":$")
-    public void applicationDownloadTheFollowingPiecesConcurrentPieceSDownloadsForTorrent(int concurrentPieceDownloads,
-                                                                                         String torrentFileName,
-                                                                                         List<Integer> piecesToDownloadList) throws Throwable {
+    public void applicationDownloadTheFollowingPiecesConcurrentPieceSDownloadsForTorrent(
+            int concurrentPieceDownloads,
+            String torrentFileName,
+            List<Integer> piecesToDownloadList) throws Throwable {
 
     }
 
@@ -1189,15 +1188,18 @@ public class MyStepdefs {
     }
 
     @And("^the saved-pieces-flux send complete signal - for torrent: \"([^\"]*)\",\"([^\"]*)\"$")
-    public void theSavedPiecesFluxSendCompleteSignalForTorrent(String torrentFileName, String downloadLocation) throws Throwable {
+    public void theSavedPiecesFluxSendCompleteSignalForTorrent(String torrentFileName, String downloadLocation) throws
+            Throwable {
     }
 
     @And("^the saved-blocks-flux send  complete signal - for torrent: \"([^\"]*)\",\"([^\"]*)\"$")
-    public void theSavedBlocksFluxSendCompleteSignalForTorrent(String torrentFileName, String downloadLocation) throws Throwable {
+    public void theSavedBlocksFluxSendCompleteSignalForTorrent(String torrentFileName, String downloadLocation) throws
+            Throwable {
     }
 
     @Then("^torrent-status change: \"([^\"]*)\" and notify only about the changes - for torrent \"([^\"]*)\":$")
-    public void torrentStatusChangeAndNotifyOnlyAboutTheChangesForTorrent(StatusType statusTypeChanging, String torrentFileName) throws Throwable {
+    public void torrentStatusChangeAndNotifyOnlyAboutTheChangesForTorrent(TorrentStatusAction
+                                                                                  torrentStatusActionChanging, String torrentFileName) throws Throwable {
 
     }
 
@@ -1206,9 +1208,7 @@ public class MyStepdefs {
     public void allocatorForBlocksWithBytesEach(int amountOfBlocksToAllocate, int blockLength) throws Throwable {
         Utils.removeEverythingRelatedToLastTest();
 
-        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
-
-        blocksAllocator.updateAllocations(amountOfBlocksToAllocate, blockLength)
+        TorrentDownloaders.getAllocatorStore().updateAllocations(amountOfBlocksToAllocate, blockLength)
                 .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getAmountOfBlocks()))
                 .doOnNext(allocatorState -> Assert.assertEquals(blockLength, allocatorState.getBlockLength()))
                 .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getAllocatedBlocks().length))
@@ -1224,17 +1224,16 @@ public class MyStepdefs {
     }
 
     @Given("^allocator for \"([^\"]*)\" blocks with allocated-block-length which is bigger than piece: \"([^\"]*)\" for torrent: \"([^\"]*)\":$")
-    public void allocatorForBlocksWithAllocatedBlockLengthWhichIsBiggerThanPieceForTorrent(int amountOfBlocksToAllocate,
-                                                                                           int pieceIndex,
-                                                                                           String torrentFileName) throws Throwable {
+    public void allocatorForBlocksWithAllocatedBlockLengthWhichIsBiggerThanPieceForTorrent(
+            int amountOfBlocksToAllocate,
+            int pieceIndex,
+            String torrentFileName) throws Throwable {
         Utils.removeEverythingRelatedToLastTest();
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         int pieceLength = torrentInfo.getPieceLength(pieceIndex);
 
-        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
-
-        blocksAllocator.updateAllocations(amountOfBlocksToAllocate, pieceLength)
+        TorrentDownloaders.getAllocatorStore().updateAllocations(amountOfBlocksToAllocate, pieceLength)
                 .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getAmountOfBlocks()))
                 .doOnNext(allocatorState -> Assert.assertEquals(pieceLength, allocatorState.getBlockLength()))
                 .doOnNext(allocatorState -> Assert.assertEquals(amountOfBlocksToAllocate, allocatorState.getAllocatedBlocks().length))
@@ -1249,21 +1248,6 @@ public class MyStepdefs {
                 .verifyComplete();
     }
 
-    @When("^the application free the following blocks:$")
-    public void theApplicationFreeTheFollowingBlocks(List<Integer> allocationToFreeList) throws Throwable {
-        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
-
-        blocksAllocator.getLatestState$()
-                .flatMapMany(allocatorState -> Flux.fromIterable(allocationToFreeList)
-                        .flatMap(index -> blocksAllocator.free(allocatorState.getAllocatedBlocks()[index])
-                                .doOnNext(newState -> Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(index)))
-                                .doOnNext(newState -> Assert.assertTrue(newState.getFreeBlocksStatus().get(index)))))
-                .as(StepVerifier::create)
-                .expectNextCount(allocationToFreeList.size())
-                .verifyComplete();
-    }
-
-    private Flux<AllocatorState> allocatorStateFlux;
     private List<PieceMessage> actualPieceMessageList;
 
 
@@ -1272,13 +1256,11 @@ public class MyStepdefs {
                                                                        List<BlockOfPiece> blockOfPieceList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
-
-        this.allocatorStateFlux = blocksAllocator.getState$()
+        Flux<AllocatorState> allocatorStateFlux = TorrentDownloaders.getAllocatorStore().states$()
                 .replay(blockOfPieceList.size())
                 .autoConnect(0);
 
-        this.actualPieceMessageList = blocksAllocator.getLatestState$()
+        this.actualPieceMessageList = TorrentDownloaders.getAllocatorStore().latestState$()
                 .map(AllocatorState::getBlockLength)
                 .flatMapMany(allocatedBlockLength ->
                         Flux.fromIterable(blockOfPieceList)
@@ -1295,13 +1277,26 @@ public class MyStepdefs {
                             Integer from = blockOfPiece.getFrom();
                             Integer length = blockOfPiece.getLength();
                             int pieceLength = torrentInfo.getPieceLength(pieceIndex);
-                            return blocksAllocator.createPieceMessage(null, null, pieceIndex, from, length, pieceLength)
+                            return TorrentDownloaders.getAllocatorStore()
+                                    .createPieceMessage(null, null, pieceIndex, from, length, pieceLength)
                                     .subscribeOn(Schedulers.elastic());
                         }
                         , threadsAmount)
                 .doOnNext(pieceMessage -> System.out.println("created the following pieceMessage: " + pieceMessage))
                 .collectList()
                 .block();
+
+//		// check that the states during the allocations are valid:
+//
+//		Flux.zip(allocatorStateFlux, Flux.fromIterable(this.actualPieceMessageList),
+//				(allocatorState, pieceMessage) -> {
+//					int blockIndex = pieceMessage.getAllocatedBlock().getBlockIndex();
+//					Assert.assertEquals(allocatorState.getAllocatedBlocks()[blockIndex], pieceMessage.getAllocatedBlock());
+//					Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(blockIndex));
+//					return pieceMessage;
+//				}).as(StepVerifier::create)
+//				.expectNextCount(blockOfPieceList.size())
+//				.verifyComplete();
     }
 
     @Then("^we created the following piece-messages for torrent: \"([^\"]*)\":$")
@@ -1309,9 +1304,8 @@ public class MyStepdefs {
                                                              List<BlockOfPiece> blockOfPieceList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
-
-        List<BlockOfPiece> expectedPieceMessageList = blocksAllocator.getLatestState$()
+        List<BlockOfPiece> expectedPieceMessageList = TorrentDownloaders.getAllocatorStore()
+                .latestState$()
                 .map(AllocatorState::getBlockLength)
                 .flatMapMany(allocatedBlockLength ->
                         Flux.fromIterable(blockOfPieceList)
@@ -1325,30 +1319,17 @@ public class MyStepdefs {
                 .collect(Collectors.toList());
 
         Utils.assertListEqualNotByOrder(expectedPieceMessageList, actualBlockOfPieceList, BlockOfPiece::equals);
-
-        // check that the states during the allocations are valid:
-
-        Flux.zip(allocatorStateFlux, Flux.fromIterable(this.actualPieceMessageList),
-                (allocatorState, pieceMessage) -> {
-                    int blockIndex = pieceMessage.getAllocatedBlock().getBlockIndex();
-                    Assert.assertEquals(allocatorState.getAllocatedBlocks()[blockIndex], pieceMessage.getAllocatedBlock());
-                    Assert.assertFalse(allocatorState.getFreeBlocksStatus().get(blockIndex));
-                    return pieceMessage;
-                }).as(StepVerifier::create)
-                .expectNextCount(blockOfPieceList.size())
-                .verifyComplete();
     }
 
     private List<RequestMessage> actualRequestMessageList;
 
     @When("^we create the following request-messages from \"([^\"]*)\" threads for torrent: \"([^\"]*)\":$")
-    public void weCreateTheFollowingRequestMessagesFromThreadsForTorrent(int threadsAmount, String torrentFileName,
+    public void weCreateTheFollowingRequestMessagesFromThreadsForTorrent(int threadsAmount, String
+            torrentFileName,
                                                                          List<BlockOfPiece> blockOfPieceList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
-
-        this.actualRequestMessageList = blocksAllocator.getLatestState$()
+        this.actualRequestMessageList = TorrentDownloaders.getAllocatorStore().latestState$()
                 .map(AllocatorState::getBlockLength)
                 .flatMapMany(allocatedBlockLength ->
                         Flux.fromIterable(blockOfPieceList)
@@ -1358,7 +1339,8 @@ public class MyStepdefs {
                     Integer from = blockOfPiece.getFrom();
                     Integer length = blockOfPiece.getLength();
                     int pieceLength = torrentInfo.getPieceLength(pieceIndex);
-                    return blocksAllocator.createRequestMessage(null, null, pieceIndex, from, length, pieceLength)
+                    return TorrentDownloaders.getAllocatorStore()
+                            .createRequestMessage(null, null, pieceIndex, from, length, pieceLength)
                             .subscribeOn(Schedulers.elastic());
                 }, threadsAmount)
                 .collectList()
@@ -1370,9 +1352,7 @@ public class MyStepdefs {
                                                                List<BlockOfPiece> blockOfPieceList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
-
-        List<BlockOfPiece> expectedPieceMessageList = blocksAllocator.getLatestState$()
+        List<BlockOfPiece> expectedPieceMessageList = TorrentDownloaders.getAllocatorStore().latestState$()
                 .map(AllocatorState::getBlockLength)
                 .flatMapMany(allocatedBlockLength ->
                         Flux.fromIterable(blockOfPieceList)
@@ -1390,8 +1370,8 @@ public class MyStepdefs {
 
     @Then("^the allocator have \"([^\"]*)\" used blocks$")
     public void theAllocatorHaveUsedBlocks(int expectedUsedBlocksAmount) throws Throwable {
-        BlocksAllocatorImpl.getInstance()
-                .getLatestState$()
+        TorrentDownloaders.getAllocatorStore()
+                .latestState$()
                 .doOnNext(allocatorState -> {
                     int actualUsedBlocksAmount = 0;
                     for (int i = 0; i < allocatorState.getAmountOfBlocks(); i++)
@@ -1405,8 +1385,8 @@ public class MyStepdefs {
 
     @Then("^the allocator have \"([^\"]*)\" free blocks$")
     public void theAllocatorHaveFreeBlocks(int expectedFreeBlocksAmount) throws Throwable {
-        BlocksAllocatorImpl.getInstance()
-                .getLatestState$()
+        TorrentDownloaders.getAllocatorStore()
+                .latestState$()
                 .doOnNext(allocatorState -> {
                     int actualUsedBlocksAmount = 0;
                     for (int i = 0; i < allocatorState.getAmountOfBlocks(); i++)
@@ -1422,9 +1402,8 @@ public class MyStepdefs {
     public void weFreeTheFollowingPieceMessagesForTorrent(String torrentFileName,
                                                           List<BlockOfPiece> blockOfPieceList) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
 
-        blocksAllocator.getLatestState$()
+        TorrentDownloaders.getAllocatorStore().latestState$()
                 .map(AllocatorState::getBlockLength)
                 .flatMapMany(allocatedBlockLength ->
                         Flux.fromIterable(blockOfPieceList)
@@ -1434,7 +1413,7 @@ public class MyStepdefs {
                         .filter(pieceMessage -> pieceMessage.getBegin() == blockOfPiece.getFrom())
                         .filter(pieceMessage -> pieceMessage.getAllocatedBlock().getLength() == blockOfPiece.getLength())
                         .single())
-                .flatMap(pieceMessage -> blocksAllocator.free(pieceMessage.getAllocatedBlock())
+                .flatMap(pieceMessage -> TorrentDownloaders.getAllocatorStore().free(pieceMessage.getAllocatedBlock())
                         .map(allocatorState -> allocatorState.getFreeBlocksStatus().get(pieceMessage.getAllocatedBlock().getBlockIndex()))
                         .doOnNext(isAllocationFreed ->
                                 Assert.assertTrue("allocation wasn't freed: " + pieceMessage, isAllocationFreed)))
@@ -1447,17 +1426,312 @@ public class MyStepdefs {
     public void weFreeAllPieceMessagesForTorrent(String torrentFileName) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        BlocksAllocator blocksAllocator = BlocksAllocatorImpl.getInstance();
-
-        blocksAllocator.freeAll()
+        TorrentDownloaders.getAllocatorStore()
+                .freeAll()
                 .doOnNext(allocatorState ->
                         IntStream.range(0, allocatorState.getAmountOfBlocks())
                                 .forEach(index -> Assert.assertTrue("we freed all blocks but" +
-                                                " this index is not freed: " + index,
+                                                " this index is not freed: " + index + " in state: " + allocatorState,
                                         allocatorState.getFreeBlocksStatus().get(index))))
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
     }
-}
 
+    @Given("^initial torrent-status for torrent: \"([^\"]*)\" in \"([^\"]*)\" with default initial state$")
+    public void initialTorrentStatusForTorrentInWithDefaultInitialState(String torrentFileName,
+                                                                        String downloadLocation) throws Throwable {
+        Utils.removeEverythingRelatedToLastTest();
+
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
+        TorrentDownloaderBuilder.buildDefault(torrentInfo, fullDownloadPath)
+                .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @Given("^initial listen-status - default$")
+    public void initialListenStatus() throws Throwable {
+        Utils.removeEverythingRelatedToLastTest();
+    }
+
+
+    @Given("^initial listen-status - without dispaching anything - default$")
+    public void initialListenStatusWithoutDispachingAnythingDefault() throws Throwable {
+    }
+
+    @When("^listen-status is trying to change to:$")
+    public void listenStatusIsTryingToChangeTo(List<ListenerAction> changesActionList) throws Throwable {
+        Utils.changeListenerState(changesActionList, TorrentDownloaders.getListenStore());
+    }
+
+    @Then("^listen-status will change to: \"([^\"]*)\":$")
+    public void listenStatusWillBeWithAction(ListenerAction lastAction, List<ListenerAction> expectedActionList) throws
+            Throwable {
+        ListenerState expectedState = Utils.getListenStatusState(lastAction, expectedActionList);
+
+        TorrentDownloaders.getListenStore()
+                .latestState$()
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.getAction(), actualState.getAction()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningInProgress(), actualState.isStartedListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningSelfResolved(), actualState.isStartedListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningWindUp(), actualState.isStartedListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningInProgress(), actualState.isResumeListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningSelfResolved(), actualState.isResumeListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningWindUp(), actualState.isResumeListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningInProgress(), actualState.isPauseListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningSelfResolved(), actualState.isPauseListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningWindUp(), actualState.isPauseListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningInProgress(), actualState.isRestartListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningSelfResolved(), actualState.isRestartListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningWindUp(), actualState.isRestartListeningWindUp()))
+                .block();
+
+        Utils.removeEverythingRelatedToLastTest();
+    }
+
+    private Store<ListenerState, ListenerAction> listenStore;
+
+    @Given("^initial listen-status - no side effects:$")
+    public void initialListenStatusNoSideEffects(List<ListenerAction> initialStateByActionList) throws Throwable {
+        Utils.removeEverythingRelatedToLastTest();
+
+        ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
+        this.listenStore = new Store<>(new ListenerReducer(), initialState);
+    }
+
+    @Given("^initial listen-status - without dispaching anything - no side effects:$")
+    public void initialListenStatusWithoutDispachingAnythingNoSideEffects
+            (List<ListenerAction> initialStateByActionList) throws Throwable {
+        ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
+        this.listenStore = new Store<>(new ListenerReducer(), initialState);
+    }
+
+    @When("^listen-status is trying to change to - no side effects:$")
+    public void listenStatusIsTryingToChangeToNoSideEffects(List<ListenerAction> changesActionList) throws
+            Throwable {
+        Flux.fromIterable(changesActionList)
+                .flatMap(listenerAction -> this.listenStore.dispatch(listenerAction).publishOn(Schedulers.elastic()),
+                        changesActionList.size())
+                .blockLast();
+    }
+
+    @When("^listen-status is trying to change \"([^\"]*)\" when it can and also - no side effects:$")
+    public void listenStatusIsTryingToChangeWhenItCanAndAlsoNoSideEffects(ListenerAction listenerAction,
+                                                                          List<ListenerAction> changesActionList) throws Throwable {
+        BiPredicate<ListenerAction, ListenerState> isInitialized = (desiredChange, listenerState) ->
+                ListenerReducer.defaultListenState.getAction().equals(listenerState.getAction()) &&
+                        ListenerReducer.defaultListenState.isStartedListeningInProgress() == listenerState.isStartedListeningInProgress() &&
+                        ListenerReducer.defaultListenState.isStartedListeningSelfResolved() == listenerState.isStartedListeningSelfResolved() &&
+                        ListenerReducer.defaultListenState.isStartedListeningWindUp() == listenerState.isStartedListeningWindUp() &&
+                        ListenerReducer.defaultListenState.isResumeListeningInProgress() == listenerState.isResumeListeningInProgress() &&
+                        ListenerReducer.defaultListenState.isResumeListeningSelfResolved() == listenerState.isResumeListeningSelfResolved() &&
+                        ListenerReducer.defaultListenState.isResumeListeningWindUp() == listenerState.isResumeListeningWindUp() &&
+                        ListenerReducer.defaultListenState.isPauseListeningInProgress() == listenerState.isPauseListeningInProgress() &&
+                        ListenerReducer.defaultListenState.isPauseListeningSelfResolved() == listenerState.isPauseListeningSelfResolved() &&
+                        ListenerReducer.defaultListenState.isPauseListeningWindUp() == listenerState.isPauseListeningWindUp() &&
+                        ListenerReducer.defaultListenState.isRestartListeningInProgress() == listenerState.isRestartListeningInProgress() &&
+                        ListenerReducer.defaultListenState.isRestartListeningSelfResolved() == listenerState.isRestartListeningSelfResolved() &&
+                        ListenerReducer.defaultListenState.isRestartListeningWindUp() == listenerState.isRestartListeningWindUp();
+
+        BiPredicate<ListenerAction, ListenerState> isRestartedOrRestarting = (desiredChange, listenerState) ->
+                listenerState.fromAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS) ||
+                        listenerState.fromAction(ListenerAction.RESTART_LISTENING_WIND_UP);
+
+        BiPredicate<ListenerAction, ListenerState> isCorrespondingIsProgressCanceled = (desiredChange, listenerState) ->
+                !listenerState.fromAction(ListenerAction.getCorrespondingIsProgressAction(desiredChange));
+
+        BiPredicate<ListenerAction, ListenerState> didWeAlreadySucceed = (desiredChange, listenerState) ->
+                listenerState.fromAction(desiredChange);
+
+        BiPredicate<ListenerAction, ListenerState> isCanceled = isInitialized.or(isRestartedOrRestarting)
+                .or(didWeAlreadySucceed).or(isCorrespondingIsProgressCanceled)
+                .negate();
+
+        Mono<List<ListenerState>> changeTo$ = Flux.fromIterable(changesActionList)
+                .flatMap(action -> this.listenStore.dispatch(action).publishOn(Schedulers.elastic()),
+                        changesActionList.size())
+                .collectList();
+
+        Flux.merge(this.listenStore.tryDispatchUntil(listenerAction, isCanceled).publishOn(Schedulers.elastic())
+                        .defaultIfEmpty(ListenerReducer.defaultListenState),
+                changeTo$.publishOn(Schedulers.elastic()))
+                .blockLast();
+    }
+
+    @Then("^listen-status will change to: \"([^\"]*)\" - no side effects:$")
+    public void listenStatusWillChangeToNoSideEffects(ListenerAction
+                                                              lastAction, List<ListenerAction> expectedActionList) throws Throwable {
+        ListenerState expectedState = Utils.getListenStatusState(lastAction, expectedActionList);
+        this.listenStore.latestState$()
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.getAction(), actualState.getAction()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningInProgress(), actualState.isStartedListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningSelfResolved(), actualState.isStartedListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isStartedListeningWindUp(), actualState.isStartedListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningInProgress(), actualState.isResumeListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningSelfResolved(), actualState.isResumeListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isResumeListeningWindUp(), actualState.isResumeListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningInProgress(), actualState.isPauseListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningSelfResolved(), actualState.isPauseListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isPauseListeningWindUp(), actualState.isPauseListeningWindUp()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningInProgress(), actualState.isRestartListeningInProgress()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningSelfResolved(), actualState.isRestartListeningSelfResolved()))
+                .doOnNext(actualState -> Assert.assertEquals(expectedState.isRestartListeningWindUp(), actualState.isRestartListeningWindUp()))
+                .block();
+
+        Utils.removeEverythingRelatedToLastTest();
+    }
+
+    @When("^fake-peer on port \"([^\"]*)\" try to connect for torrent \"([^\"]*)\", he receive the following error: \"([^\"]*)\"$")
+    public void fakePeerOnPortTryToConnectForTorrentHeReceiveTheFollowingError(String fakePeerPort, String
+            torrentFileName,
+                                                                               String exceptionType) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        Throwable throwable;
+        switch (exceptionType) {
+            case "TimeoutException":
+                throwable = new TimeoutException();
+                break;
+            default:
+                throw new InvalidParameterException("the given exception type is not supported in this test case");
+        }
+
+        Peer App = new Peer("localhost", TorrentDownloaders.getListener().getTcpPort());
+        Mono<Link> publisher = new PeersProvider(torrentInfo).connectToPeerMono(App)
+                .doOnNext(Link::closeConnection);
+        if (PeerExceptions.peerNotResponding.test(throwable))
+            StepVerifier.create(publisher)
+                    .verifyComplete();
+        else
+            StepVerifier.create(publisher)
+                    .expectError(throwable.getClass())
+                    .verify();
+
+
+    }
+
+    @When("^fake-peer on port \"([^\"]*)\" try to connect for torrent \"([^\"]*)\", he succeed$")
+    public void fakePeerOnPortTryToConnectForTorrentHeSucceed(String fakePeerPort, String torrentFileName) throws
+            Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        Flux<Link> linkFlux = TorrentDownloaders.getListener()
+                .getPeers$(torrentInfo)
+                .replay()
+                .autoConnect(0);
+
+        Peer App = new Peer("localhost", TorrentDownloaders.getListener().getTcpPort());
+        Mono<Link> publisher = new PeersProvider(torrentInfo).connectToPeerMono(App)
+                .doOnNext(Link::closeConnection);
+        StepVerifier.create(publisher)
+                .expectNextCount(1)
+                .verifyComplete();
+
+        StepVerifier.create(linkFlux.take(1))
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @When("^torrent-status for torrent \"([^\"]*)\" is trying to change to:$")
+    public void torrentStatusForTorrentIsTryingToChangeTo(String torrentFileName,
+                                                          List<TorrentStatusAction> changeTorrentStatusActionList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+                .getTorrentStatusStore();
+
+        Flux.fromIterable(changeTorrentStatusActionList)
+                .flatMap(torrentStatusStore::dispatch, changeTorrentStatusActionList.size(),
+                        changeTorrentStatusActionList.size())
+                .as(StepVerifier::create)
+                .expectNextCount(changeTorrentStatusActionList.size())
+                .verifyComplete();
+
+        System.out.println("-------------------------------------------------------------------------");
+        System.out.println("finished @When(\"^torrent-status for torrent \\\"([^\\\"]*)\\\" is trying to change to:$\")");
+        System.out.println("-------------------------------------------------------------------------");
+    }
+
+    @Then("^wait until action is: \"([^\"]*)\" for torrent: \"([^\"]*)\"$")
+    public void waitUntilActionIsForTorrent(TorrentStatusAction torrentStatusAction, String torrentFileName) throws
+            Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+                .getTorrentStatusStore()
+                .states$()
+                .doOnNext(torrentStatusState -> System.out.println(torrentStatusState))
+                .takeUntil(torrentStatusState -> torrentStatusState.fromAction(torrentStatusAction))
+                .last()
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @Then("^start search and receive \"([^\"]*)\" peers from search-module for torrent: \"([^\"]*)\"$")
+    public void startSearchAndReceivePeersFromSearchModuleForTorrent(int numberOfPeers, String torrentFileName) throws
+            Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        System.out.println("trying to connect to couple of peers in torrent: " + torrentInfo);
+        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
+
+        torrentDownloader.getSearchPeers()
+                .getPeers$()
+                .take(numberOfPeers)
+                .doOnSubscribe(__ -> torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS))
+                .as(StepVerifier::create)
+                .expectNextCount(numberOfPeers)
+                .verifyComplete();
+
+    }
+
+    @Then("^wait until state contain the following for torrent: \"([^\"]*)\":$")
+    public void waitUntilStateContainTheFollowingForTorrent(String torrentFileName,
+                                                            List<TorrentStatusAction> actionsToWaitFor) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+                .getTorrentStatusStore()
+                .states$()
+                .takeUntil(torrentStatusState -> actionsToWaitFor.stream().allMatch(torrentStatusState::fromAction))
+                .last()
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @Then("^torrent-status for torrent \"([^\"]*)\" will be:$")
+    public void torrentStatusForWillBe(String torrentFileName,
+                                       List<TorrentStatusAction> expectedTorrentStatusActionList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        TorrentStatusState expectedState = Utils.getTorrentStatusState(torrentInfo,
+                // the action is not apart of the test because I can't know what it will be.
+                // so I randomly choose TorrentStatusAction.INITIALIZE.
+                TorrentStatusAction.INITIALIZE, expectedTorrentStatusActionList);
+
+        TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+                .getTorrentStatusStore()
+                .latestState$()
+                .doOnNext(torrentStatusState -> {
+                    Assert.assertEquals(expectedState.getDownloadState(), torrentStatusState.getDownloadState());
+                    Assert.assertEquals(expectedState.getTorrentFileSystemState(), torrentStatusState.getTorrentFileSystemState());
+                    Assert.assertEquals(expectedState.getSearchPeersState(), torrentStatusState.getSearchPeersState());
+                })
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+}
