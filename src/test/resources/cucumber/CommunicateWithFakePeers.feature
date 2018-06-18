@@ -7,38 +7,38 @@ Feature: connect to a fake peers and communicate with them
 
     Then application send to [peer ip: "localhost", peer port: "8983"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
       | sendMessageType | receiveMessageType | errorSignalType |
-      | PieceMessage    | PieceMessage       |                 |
-      | RequestMessage  | RequestMessage     |                 |
-
-    Then application send to [peer ip: "localhost", peer port: "8980"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
-      | sendMessageType | receiveMessageType | errorSignalType |
-      | BitFieldMessage | BitFieldMessage    |                 |
-      | CancelMessage   | CancelMessage      |                 |
-
-    Then application send to [peer ip: "localhost", peer port: "8981"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
-      | sendMessageType   | receiveMessageType | errorSignalType |
-      | HaveMessage       | HaveMessage        |                 |
-      | InterestedMessage | InterestedMessage  |                 |
-
-    Then application send to [peer ip: "localhost", peer port: "8982"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
-      | sendMessageType      | receiveMessageType   | errorSignalType |
-      | KeepAliveMessage     | KeepAliveMessage     |                 |
-      | NotInterestedMessage | NotInterestedMessage |                 |
-
-    Then application send to [peer ip: "localhost", peer port: "8984"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
-      | sendMessageType | receiveMessageType | errorSignalType |
-      | UnchokeMessage  | UnchokeMessage     |                 |
-      | PortMessage     | PortMessage        |                 |
-
-    Then application send to [peer ip: "localhost", peer port: "8985"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
-      | sendMessageType | receiveMessageType | errorSignalType |
-      | PieceMessage    | PieceMessage       |                 |
-      | PieceMessage    | PieceMessage       |                 |
+#      | PieceMessage    | RequestMessage       |                 |
+      | RequestMessage  | PieceMessage     |                 |
 #
-    Then application send to [peer ip: "localhost", peer port: "8986"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
-      | sendMessageType | receiveMessageType | errorSignalType |
-      | RequestMessage  | RequestMessage     |                 |
-      | RequestMessage  | RequestMessage     |                 |
+#    Then application send to [peer ip: "localhost", peer port: "8980"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+#      | sendMessageType | receiveMessageType | errorSignalType |
+#      | BitFieldMessage | BitFieldMessage    |                 |
+#      | CancelMessage   | CancelMessage      |                 |
+#
+#    Then application send to [peer ip: "localhost", peer port: "8981"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+#      | sendMessageType   | receiveMessageType | errorSignalType |
+#      | HaveMessage       | HaveMessage        |                 |
+#      | InterestedMessage | InterestedMessage  |                 |
+#
+#    Then application send to [peer ip: "localhost", peer port: "8982"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+#      | sendMessageType      | receiveMessageType   | errorSignalType |
+#      | KeepAliveMessage     | KeepAliveMessage     |                 |
+#      | NotInterestedMessage | NotInterestedMessage |                 |
+#
+#    Then application send to [peer ip: "localhost", peer port: "8984"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+#      | sendMessageType | receiveMessageType | errorSignalType |
+#      | UnchokeMessage  | UnchokeMessage     |                 |
+#      | PortMessage     | PortMessage        |                 |
+#
+#    Then application send to [peer ip: "localhost", peer port: "8985"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+#      | sendMessageType | receiveMessageType | errorSignalType |
+#      | PieceMessage    | PieceMessage       |                 |
+#      | PieceMessage    | PieceMessage       |                 |
+##
+#    Then application send to [peer ip: "localhost", peer port: "8986"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+#      | sendMessageType | receiveMessageType | errorSignalType |
+#      | RequestMessage  | RequestMessage     |                 |
+#      | RequestMessage  | RequestMessage     |                 |
 
     Examples:
       | torrent                                   | downloadLocation |

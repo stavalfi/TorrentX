@@ -59,7 +59,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         this.actualFileImplList = actualFileList;
 
         String transaction = "file system - " + UUID.randomUUID().toString();
-        System.out.println("file system remove file - transaction: " + transaction);
+//        System.out.println("file system remove file - transaction: " + transaction);
 
         store.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
                 .concatMap(__ -> store.dispatch(TorrentStatusAction.COMPLETED_DOWNLOADING_SELF_RESOLVED))
@@ -73,16 +73,17 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .autoConnect(0);
 
         store.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS, transaction)
-                .doOnNext(__ -> logger.debug("file system remove file - 1: " + __))
+                .doOnNext(__ -> logger.trace("file system remove file - 1: " + __))
                 .concatMap(__ -> deleteFileOnlyMono())
-                .doOnNext(__ -> logger.debug("file system remove file - 2: " + __))
+                .doOnNext(__ -> logger.trace("file system remove file - 2: " + __))
                 .concatMap(__ -> store.dispatch(TorrentStatusAction.REMOVE_FILES_SELF_RESOLVED))
-                .doOnNext(__ -> logger.debug("file system remove file - 3: " + __))
+                .doOnNext(__ -> logger.trace("file system remove file - 3: " + __))
                 .publish()
                 .autoConnect(0);
 
         this.savedBlocksFlux = store.latestState$()
                 .map(torrentStatusState -> torrentStatusState.fromAction(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP))
+                .publishOn(Schedulers.elastic())
                 .flatMapMany(isCompletedDownloading -> {
                     if (isCompletedDownloading) {
                         this.piecesStatus.set(0, torrentInfo.getPieces().size());
@@ -92,7 +93,6 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 })
                 .doOnNext(pieceMessage -> logger.trace("start saving piece-message: " + pieceMessage))
                 // If I won't switch thread then I will block redux thread.
-                .publishOn(Schedulers.parallel())
                 .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
                 .flatMap(this::writeBlock)
                 .doOnNext(pieceMessage -> logger.trace("finished saving piece-message: " + pieceMessage))

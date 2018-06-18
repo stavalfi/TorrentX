@@ -1,19 +1,7 @@
 package main;
 
 import christophedetroyer.torrent.TorrentParser;
-import main.downloader.PieceEvent;
-import main.downloader.TorrentDownloader;
-import main.downloader.TorrentDownloaderBuilder;
-import main.downloader.TorrentDownloaders;
-import main.peer.Link;
-import main.peer.PeersProvider;
-import main.peer.SendMessagesNotifications;
-import main.peer.peerMessages.RequestMessage;
-import main.tracker.TrackerConnection;
-import main.tracker.TrackerProvider;
-import org.reactivestreams.Subscription;
-import reactor.core.CoreSubscriber;
-import reactor.core.publisher.Flux;
+import reactor.core.publisher.Hooks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -21,45 +9,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
-import java.nio.file.Files;
-import java.nio.file.OpenOption;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.HashSet;
 
 public class App {
     public static Scheduler MyScheduler = Schedulers.elastic();
     private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test" + File.separator;
-
-
-    public static void f5() throws IOException, InterruptedException {
-        TorrentInfo torrentInfo = getTorrentInfo();
-        System.out.println(torrentInfo);
-        TrackerProvider trackerProvider = new TrackerProvider(torrentInfo);
-        PeersProvider peersProvider = new PeersProvider(torrentInfo);
-        Flux<TrackerConnection> trackerConnectionFlux = trackerProvider.connectToTrackersFlux();
-        peersProvider.connectToPeers$(trackerConnectionFlux)
-                .subscribe(new CoreSubscriber<Link>() {
-                    @Override
-                    public void onSubscribe(Subscription s) {
-                        System.out.println("subscribed");
-                    }
-
-                    @Override
-                    public void onNext(Link link) {
-                        System.out.println(link);
-                    }
-
-                    @Override
-                    public void onError(Throwable throwable) {
-                        throwable.printStackTrace();
-                    }
-
-                    @Override
-                    public void onComplete() {
-                        System.out.println("completed");
-                    }
-                });
-    }
 
     private static SeekableByteChannel createFile(String filePathToCreate) throws IOException {
         OpenOption[] options = {
@@ -77,41 +33,90 @@ public class App {
         return seekableByteChannel;
     }
 
-    private static void f4() throws IOException {
-        TorrentDownloader torrentDownloader = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), downloadPath)
-                .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
-                .block();
+    private static void f5() throws IOException {
+//        Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), downloadPath)
+//                .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
+//                .cache();
 
-        torrentDownloader.getPeersCommunicatorFlux()
-                .map(Link::sendMessages)
-                .flatMap(SendMessagesNotifications::sentPeerMessagesFlux)
-                .filter(peerMessage -> peerMessage instanceof RequestMessage)
-                .cast(RequestMessage.class)
-                .map(requestMessage -> "request: index: " + requestMessage.getIndex() +
-                        ", begin: " + requestMessage.getBegin() + ", from: " + requestMessage.getTo())
-                .subscribe(System.out::println, Throwable::printStackTrace);
+//        torrentDownloader$.flatMapMany(TorrentDownloader::getPeersCommunicatorFlux)
+//                .map(Link::receivePeerMessages)
+//                .flatMap(ReceiveMessagesNotifications::getPeerMessageResponseFlux)
+//                .subscribe(x -> System.out.println(x));
 
-        torrentDownloader.getFileSystemLink()
-                .savedBlockFlux()
-                .map(PieceEvent::getReceivedPiece)
-                .map(pieceMessage -> "received: index: " + pieceMessage.getIndex() +
-                        ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
-                .subscribe(System.out::println, Throwable::printStackTrace);
+//        torrentDownloader.getPeersCommunicatorFlux()
+//                .map(Link::sendMessages)
+//                .flatMap(SendMessagesNotifications::sentPeerMessagesFlux)
+//                .filter(peerMessage -> peerMessage instanceof RequestMessage)
+//                .cast(RequestMessage.class)
+//                .map(requestMessage -> "request: index: " + requestMessage.getIndex() +
+//                        ", begin: " + requestMessage.getBegin() + ", from: " + requestMessage.getTo())
+//                .subscribe(System.out::println, Throwable::printStackTrace);
+//
+//        torrentDownloader.getFileSystemLink()
+//                .savedBlockFlux()
+//                .map(PieceEvent::getReceivedPiece)
+//                .map(pieceMessage -> "received: index: " + pieceMessage.getIndex() +
+//                        ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
+//                .subscribe(System.out::println, Throwable::printStackTrace);
 
-//        torrentDownloader.getTorrentStatusStore()
-//                .dispatch(TorrentStatusAction.START_DOWNLOAD)
-//                .publishOn(Schedulers.elastic())
+//        torrentDownloader$.map(TorrentDownloader::getTorrentStatusStore)
+//                .doOnNext(torrentStatusStore ->
+//                        torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.START_UPLOAD_IN_PROGRESS))
+//                .doOnNext(torrentStatusStore ->
+//                        torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS))
+//                .map(__ -> TorrentDownloaders.getListenStore())
+//                .doOnNext(listenerStore ->
+//                        listenerStore.dispatchNonBlocking(ListenerAction.START_LISTENING_IN_PROGRESS))
 //                .block();
-//        torrentDownloader.getTorrentStatusStore()
-//                .dispatch(TorrentStatusAction.START_UPLOAD)
-//                .publishOn(Schedulers.elastic())
-//                .block();
+
     }
 
     public static void main(String[] args) throws Exception {
-        //Hooks.onOperatorDebug();
+        deleteDownloadFolder();
+        Hooks.onOperatorDebug();
         f5();
         Thread.sleep(1000 * 1000);
+    }
+
+    public static void deleteDownloadFolder() {
+        try {
+            File file = new File(System.getProperty("user.dir") + File.separator + "torrents-test");
+            if (file.exists()) {
+                deleteDirectory(file);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void deleteDirectory(File directoryToBeDeleted) throws IOException {
+        Files.walkFileTree(directoryToBeDeleted.toPath(), new HashSet<>(), Integer.MAX_VALUE, new FileVisitor<Path>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+                    throws IOException {
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                    throws IOException {
+                Files.delete(file);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException exc)
+                    throws IOException {
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc)
+                    throws IOException {
+                Files.delete(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     private static TorrentInfo getTorrentInfo() throws IOException {

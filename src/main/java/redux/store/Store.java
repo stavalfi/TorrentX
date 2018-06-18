@@ -27,6 +27,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
             while (true) {
                 try {
                     Request<ACTION> request = this.requestsQueue.take();
+                    logger.trace("start inspecting request: " + request + "\n");
                     sink.next(request);
                 } catch (InterruptedException e) {
                     sink.error(e);
@@ -37,27 +38,37 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
                 .scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
                     Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
                     if (!result.isNewState())
-                        logger.debug("ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
+                        logger.trace("ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
                     else
-                        logger.debug("passed - request: " + request + " new state: " + result.getState() + "\n");
+                        logger.trace("passed - request: " + request + " new state: " + result.getState() + "\n");
                     return result;
                 })
                 .replay()
                 .autoConnect(0);
 
         this.states$ = this.results$
-                .doOnNext(result -> logger.debug("analyzing result: " + result))
+                .doOnNext(result -> logger.trace("analyzing result: " + result))
                 .map(Result::getState)
                 .distinctUntilChanged()
-                .doOnNext(state -> logger.debug("new state1: " + state))
+                .doOnNext(state -> logger.trace("new state1: " + state))
                 .replay(1)
                 .autoConnect(0)
-                .doOnNext(state -> logger.debug("new state2: " + state));
+                .doOnNext(state -> logger.trace("new state2: " + state));
     }
 
     public void dispatchNonBlocking(ACTION action) {
         Request<ACTION> request = new Request<>(action);
-        logger.debug("getting ready for dispatching request: " + request);
+        logger.trace("getting ready for dispatching request: " + request);
+        try {
+            this.requestsQueue.put(request);
+        } catch (InterruptedException e) {
+            // TODO: do something with this
+            e.printStackTrace();
+        }
+    }
+
+    public void dispatchNonBlocking(Request<ACTION> request) {
+        logger.trace("getting ready for dispatching request: " + request);
         try {
             this.requestsQueue.put(request);
         } catch (InterruptedException e) {
@@ -67,7 +78,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
     }
 
     public Mono<Result<STATE_IMPL, ACTION>> dispatch(Request<ACTION> request) {
-        logger.debug("getting ready for dispatching request: " + request);
+        logger.trace("getting ready for dispatching request: " + request);
         Flux<Result<STATE_IMPL, ACTION>> resultFlux = this.results$
                 .filter(result -> result.getRequest().equals(request))
                 .take(1)
@@ -119,19 +130,19 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 
     @Override
     public Flux<STATE_IMPL> statesByAction(ACTION action) {
-        logger.debug("statesByAction - 0: " + action);
+        logger.trace("statesByAction - 0: " + action);
         return states$()
-                .doOnNext(__ -> logger.debug("statesByAction - 1: " + action + " - state: " + __))
+                .doOnNext(__ -> logger.trace("statesByAction - 1: " + action + " - state: " + __))
                 .filter(stateImpl -> stateImpl.getAction().equals(action));
     }
 
     public Flux<STATE_IMPL> statesByAction(ACTION action, String transaction) {
-        logger.debug("statesByAction - transaction:" + transaction + " - 0:" + action);
+        logger.trace("statesByAction - transaction:" + transaction + " - 0:" + action);
         return states$()
-                .doOnSubscribe(__ -> logger.debug("statesByAction - transaction:" + transaction + " - 1:" + action))
-                .doOnNext(__ -> logger.debug("statesByAction - transaction:" + transaction + " - 2:" + action + " - state: " + __))
+                .doOnSubscribe(__ -> logger.trace("statesByAction - transaction:" + transaction + " - 1:" + action))
+                .doOnNext(__ -> logger.trace("statesByAction - transaction:" + transaction + " - 2:" + action + " - state: " + __))
                 .filter(stateImpl -> stateImpl.getAction().equals(action))
-                .doOnNext(__ -> logger.debug("statesByAction - transaction:" + transaction + " - 3:" + action + " - state: " + __));
+                .doOnNext(__ -> logger.trace("statesByAction - transaction:" + transaction + " - 3:" + action + " - state: " + __));
     }
 
     @Override

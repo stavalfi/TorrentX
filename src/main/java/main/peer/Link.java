@@ -2,7 +2,6 @@ package main.peer;
 
 import main.TorrentInfo;
 import main.statistics.SpeedStatistics;
-import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -21,6 +20,7 @@ public class Link {
     private ReceiveMessagesNotifications receiveMessagesNotifications;
     private SpeedStatistics peerSpeedStatistics;
 
+    // TODO: remove this copy consturctor - it is in use in in tests.
     public Link(Link link) {
         this(link.torrentInfo, link.peer, link.peerSocket,
                 link.dataInputStream, link.dataOutputStream);
@@ -46,9 +46,10 @@ public class Link {
         this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(torrentInfo, this.me,
                 this.peer, this.peerCurrentStatus, dataInputStream);
 
-        this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-                this.receiveMessagesNotifications.getPeerMessageResponseFlux(),
-                this.sendMessages.sentPeerMessagesFlux());
+        // TODO: uncomment
+//        this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
+//                this.receiveMessagesNotifications.getPeerMessageResponseFlux(),
+//                this.sendMessages.sentPeerMessagesFlux());
     }
 
     public Peer getPeer() {

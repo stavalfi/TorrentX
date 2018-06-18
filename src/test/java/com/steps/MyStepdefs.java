@@ -67,8 +67,7 @@ public class MyStepdefs {
         // active debug mode in reactor
         Hooks.onOperatorDebug();
 
-        // delete download folder from last test
-        Utils.deleteDownloadFolder();
+        Utils.removeEverythingRelatedToLastTest();
     }
 
     private TorrentInfo torrentInfo = mock(TorrentInfo.class);
@@ -169,100 +168,184 @@ public class MyStepdefs {
     }
 
     @Then("^application send to \\[peer ip: \"([^\"]*)\", peer port: \"([^\"]*)\"] and receive the following messages for torrent: \"([^\"]*)\",\"([^\"]*)\":$")
-    public void applicationSendToPeerIpPeerPortAndReceiveTheFollowingMessagesForTorrent(String peerIp, int peerPort,
+    public void applicationSendToPeerIpPeerPortAndReceiveTheFollowingMessagesForTorrent(String fakePeerIp,
+                                                                                        int fakePeerPort,
                                                                                         String torrentFileName,
                                                                                         String downloadLocation,
                                                                                         List<PeerFakeRequestResponse> peerFakeRequestResponses) throws Throwable {
-//        Utils.removeEverythingRelatedToLastTest();
+        Utils.removeEverythingRelatedToLastTest();
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
 
-        RemoteFakePeerCopyCat remoteFakePeerCopyCat = new RemoteFakePeerCopyCat(torrentInfo, new Peer(peerIp, peerPort));
-        remoteFakePeerCopyCat.listen();
+        Peer app = new Peer("localhost", TorrentDownloaders.getListener().getTcpPort());
+        Peer fakePeer = new Peer(fakePeerIp, fakePeerPort);
+        String fullDownloadPathForFakePeer = System.getProperty("user.dir") +
+                File.separator + "fake-peer-download-folder" + File.separator;
 
-        PeersProvider peersProvider = new PeersProvider(torrentInfo);
+        // create a torrent downloader and a torrent file and save
+        // a complete piece in it so we can send it to fake peer.
+        int pieceIndex = 3;
+        int pieceLength = torrentInfo.getPieceLength(pieceIndex);
+        int begin = 0;
+        int blockLength = pieceLength;
+        Flux<PieceMessage> fakePieceMessageToSave$ = TorrentDownloaders.getAllocatorStore()
+                .updateAllocations(4, blockLength)
+                .flatMap(allocatorState -> TorrentDownloaders.getAllocatorStore()
+                        .createPieceMessage(fakePeer, app, pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
+                .doOnNext(pieceMessageToSave -> {
+                    for (int i = 0; i < blockLength; i++)
+                        pieceMessageToSave.getAllocatedBlock().getBlock()[i] = 11;
+                })
+                .flux();
 
+        Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
+                TorrentStatusReducer.defaultTorrentState);
+
+        Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(torrentInfo,
+                fullDownloadPath,
+                torrentStatusStore,
+                fakePieceMessageToSave$);
+
+        // I'm using this object to send pieceMessages and Request messages to the real app.
+        Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder
+                .builder(torrentInfo)
+                .setTorrentStatusStore(torrentStatusStore)
+                .setToDefaultSearchPeers()
+                .setToDefaultTorrentStatesSideEffects()
+                .setToDefaultPeersCommunicatorFlux()
+                .setFileSystemLink$(fileSystemLink$)
+                .build()
+                .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+                .cache();
+
+        logger.debug("app listen to incoming connection of the fake peer: " + fakePeer);
+        Mono<Link> meToFakePeerLink$ = TorrentDownloaders.getListener()
+                .getPeers$(torrentInfo)
+                .take(1)
+                .single()
+                .cache();
+
+        // recorded incoming messages to the app from fake-peer:
         List<PeerMessageType> messageToSendList = peerFakeRequestResponses.stream()
                 .map(PeerFakeRequestResponse::getSendMessageType)
                 .collect(Collectors.toList());
-
-        // check if we expect an error signal.
-        Optional<ErrorSignalType> errorSignalTypeOptional = peerFakeRequestResponses.stream()
-                .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() != null)
-                .map(PeerFakeRequestResponse::getErrorSignalType)
-                .findAny();
-
-        // check if we expect a complete signal
-        Optional<PeerFakeRequestResponse> completeSignalOptional = peerFakeRequestResponses.stream()
-                .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
-                        peerFakeRequestResponse.getReceiveMessageType() == null)
-                .findAny();
-
-        boolean expectResponseToEveryRequest = peerFakeRequestResponses.stream()
-                .allMatch(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
-                        peerFakeRequestResponse.getReceiveMessageType() != null);
-
-        System.out.println("trying to connect to fake peer: " + remoteFakePeerCopyCat);
-        Link fakePeer = peersProvider.connectToPeerMono(remoteFakePeerCopyCat)
-                .block();
-
-        System.out.println("connected to fake peer: " + remoteFakePeerCopyCat);
-
-        Flux<? extends PeerMessage> recordedResponseFlux =
+        Flux<? extends PeerMessage> recordedResponses$ =
                 Flux.fromIterable(messageToSendList)
-                        .doOnNext(peerMessageType -> System.out.println("start listen to incoming message from type: " + peerMessageType.name()))
-                        .flatMap(peerMessageType -> Utils.getSpecificMessageResponseFluxByMessageType(fakePeer, peerMessageType))
-                        .doOnNext(peerMessage -> System.out.println("we received message from fake peer: " + peerMessage))
+                        .doOnNext(peerMessageType -> logger.debug("start listen to incoming message from type: " + peerMessageType.name()))
+                        .flatMap(peerMessageType ->
+                                        meToFakePeerLink$.flatMapMany(link ->
+                                                Utils.getSpecificMessageResponseFluxByMessageType(link, peerMessageType))
+                                , messageToSendList.size())
+                        .doOnNext(peerMessage -> logger.debug("App received message from fake peer: " + peerMessage))
                         // if we received a piece message, then free it's allocation.
-                        .flatMap(peerMessage -> {
+                        .concatMap(peerMessage -> {
                             if (peerMessage instanceof PieceMessage) {
-                                System.out.println("the message we received is PieceMessage and we free it's block: " + peerMessage);
+                                logger.debug("the message we received is PieceMessage and we free it's block: " + peerMessage);
                                 return TorrentDownloaders.getAllocatorStore()
                                         .free(((PieceMessage) peerMessage).getAllocatedBlock())
-                                        .doOnNext(__ -> System.out.println("we freed the PieceMessage block and the Allocator state now is: " + __))
+                                        .doOnNext(__ -> logger.debug("App freed the PieceMessage block and the Allocator state now is: " + __))
                                         .map(allocatorState -> peerMessage);
                             }
                             return Mono.just(peerMessage);
                         })
-                        .replay()
+                        .replay(messageToSendList.size())
                         // start record incoming messages from fake peer
                         .autoConnect(0);
 
-        System.out.println("start sending messages to fake-peer");
 
-        Mono<List<SendMessagesNotifications>> sentMessagesMono = Flux.fromIterable(messageToSendList)
-                .concatMap(peerMessageType ->
-                        Utils.sendFakeMessage(torrentInfo, fullDownloadPath, fakePeer, peerMessageType)
-                                .doOnNext(__ -> System.out.println("send message to fake-peer of type: "
-                                        + peerMessageType.name())))
-                .collectList();
+        // GENERAL NOTE: we need to see that the fake-peer actually listen to
+        // incoming messages before the app send to him messages.
 
-        if (expectResponseToEveryRequest)
-            StepVerifier.create(sentMessagesMono
-                    .flatMapMany(peersCommunicator -> recordedResponseFlux)
-                    .take(messageToSendList.size()))
-                    .expectNextCount(messageToSendList.size())
-                    .verifyComplete();
+        logger.debug("fake peer: " + fakePeer + " is trying to connect to the app.");
+        TorrentDownloaders.getListenStore()
+                .dispatch(ListenerAction.START_LISTENING_IN_PROGRESS)
+                .flatMap(__ -> TorrentDownloaders.getListenStore().notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP))
+                // I need to add this torrent to the list of
+                // my torrents before a peer connect to me about this torrent.
+                .flatMap(__ -> torrentDownloader$)
+                .map(__ -> new PeersProvider(torrentInfo))
+                .flatMap(peersProvider -> peersProvider.connectToPeerMono(app))
+                .map(link -> new RemoteFakePeerCopy2(link, fullDownloadPathForFakePeer))
+                .doOnNext(remoteFakePeerCopy2 -> logger.debug("start sending messages to fake-peer"))
+                .flatMap(remoteFakePeerCopy2 -> Flux.fromIterable(messageToSendList)
+                        .concatMap(peerMessageType -> torrentDownloader$.map(TorrentDownloader::getFileSystemLink)
+                                .flatMap(fileSystemLink -> meToFakePeerLink$.flatMap(meToFakePeerLink ->
+                                        Utils.sendFakeMessage(torrentInfo, fullDownloadPath, meToFakePeerLink, peerMessageType,
+                                                fileSystemLink, pieceIndex, begin, blockLength, pieceLength))))
+                        .collectList()
+                        .map(List::size)
+                        .doOnNext(actualAmountOfSentMessages -> Assert.assertEquals("we didn't send to the fake-peer all the messages.",
+                                messageToSendList.size(), actualAmountOfSentMessages.longValue()))
+                        .flatMapMany(__ -> recordedResponses$)
+                        .map(PeerMessage::getClass)
+                        .doOnNext(actualPeerMessageType -> {
+                            // if I received something from fake-peer then I expect
+                            // to receive it so I check it he gave me the right message.
+                            Optional<? extends Class<? extends PeerMessage>> responseFromFakePeer = peerFakeRequestResponses.stream()
+                                    .map(PeerFakeRequestResponse::getReceiveMessageType)
+                                    .filter(Optional::isPresent)
+                                    .map(Optional::get)
+                                    .map(PeerMessageType::getSignal)
+                                    .filter(actualPeerMessageType::equals)
+                                    .findFirst();
+                            Assert.assertTrue("I received a message which I didn't expect to receive from fake-peer.",
+                                    responseFromFakePeer.isPresent());
+                        })
+                        .take(messageToSendList.size())
+                        .collectList()
+                        .doOnNext(actualReceivedMessagesList -> Assert.assertEquals("we didn't receive all the messages from fake-peer.",
+                                messageToSendList.size(), actualReceivedMessagesList.size()))
 
-        errorSignalTypeOptional.map(ErrorSignalType::getErrorSignal)
-                .ifPresent(errorSignalType ->
-                        StepVerifier.create(sentMessagesMono
-                                .flatMapMany(peersCommunicator -> recordedResponseFlux)
-                                .take(messageToSendList.size() - 1))
-                                .expectNextCount(messageToSendList.size() - 1)
-                                .expectError(errorSignalType)
-                                .verify());
+                        .map(__ -> remoteFakePeerCopy2))
+                .doOnNext(remoteFakePeerCopy2 -> logger.debug("clean up fake-peer resources."))
+                .doOnNext(RemoteFakePeerCopy2::dispose)
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
 
-        completeSignalOptional.map(PeerFakeRequestResponse::getSendMessageType)
-                .ifPresent(errorSignalType1 ->
-                        StepVerifier.create(sentMessagesMono
-                                .flatMapMany(peersCommunicator -> recordedResponseFlux)
-                                .take(messageToSendList.size() - 1))
-                                .expectNextCount(messageToSendList.size() - 1)
-                                .verifyComplete());
+//        if (expectResponseToEveryRequest)
+//        StepVerifier.create(sentMessagesMono
+//                .flatMapMany(peersCommunicator -> recordedResponseFlux)
+//                .take(messageToSendList.size()))
+//                .expectNextCount(messageToSendList.size())
+//                .verifyComplete();
 
-        remoteFakePeerCopyCat.shutdown();
+//        // check if we expect an error signal.
+//        Optional<ErrorSignalType> errorSignalTypeOptional = peerFakeRequestResponses.stream()
+//                .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() != null)
+//                .map(PeerFakeRequestResponse::getErrorSignalType)
+//                .findAny();
+//
+//        // check if we expect a complete signal
+//        Optional<PeerFakeRequestResponse> completeSignalOptional = peerFakeRequestResponses.stream()
+//                .filter(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
+//                        peerFakeRequestResponse.getReceiveMessageType() == null)
+//                .findAny();
+//
+//        boolean expectResponseToEveryRequest = peerFakeRequestResponses.stream()
+//                .allMatch(peerFakeRequestResponse -> peerFakeRequestResponse.getErrorSignalType() == null &&
+//                        peerFakeRequestResponse.getReceiveMessageType() != null);
+
+//        errorSignalTypeOptional.map(ErrorSignalType::getErrorSignal)
+//                .ifPresent(errorSignalType ->
+//                        StepVerifier.create(sentMessagesMono
+//                                .flatMapMany(peersCommunicator -> recordedResponseFlux)
+//                                .take(messageToSendList.size() - 1))
+//                                .expectNextCount(messageToSendList.size() - 1)
+//                                .expectError(errorSignalType)
+//                                .verify());
+//
+//        completeSignalOptional.map(PeerFakeRequestResponse::getSendMessageType)
+//                .ifPresent(errorSignalType1 ->
+//                        StepVerifier.create(sentMessagesMono
+//                                .flatMapMany(peersCommunicator -> recordedResponseFlux)
+//                                .take(messageToSendList.size() - 1))
+//                                .expectNextCount(messageToSendList.size() - 1)
+//                                .verifyComplete());
+
+        logger.debug("start clean up test resources.");
+        Utils.removeEverythingRelatedToLastTest();
     }
 
     @Then("^application interested in all peers for torrent: \"([^\"]*)\"$")
@@ -600,65 +683,65 @@ public class MyStepdefs {
 
     @Then("^application connect to all peers and assert that we connected to them - for torrent: \"([^\"]*)\"$")
     public void applicationConnectToAllPeersAndAssertThatWeConnectedToThemForTorrent(String torrentFileName) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-        Utils.removeEverythingRelatedToLastTest();
-
-        // we won't download anything but we still need to specify a path to download to.
-        String DEFAULT_DOWNLOAD_LOCATION = System.getProperty("user.dir") + File.separator + "torrents-test/";
-
-        TorrentDownloaderBuilder.buildDefault(torrentInfo, DEFAULT_DOWNLOAD_LOCATION)
-                .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
-                .doOnNext(torrentDownloader -> {
-                    // consume new peers and new responses from 1.5 seconds.
-                    // filter distinct peers from the responses, and assert
-                    // that both the list of peers are equal.
-
-                    Flux<Peer> connectedPeersFlux = torrentDownloader.getPeersCommunicatorFlux()
-                            .map(Link::getPeer)
-                            .timeout(Duration.ofMillis(1500))
-                            .buffer(Duration.ofMillis(1500))
-                            .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
-                            .take(3)
-                            .flatMap(Flux::fromIterable)
-                            .sort();
-
-                    Flux<Peer> peersFromResponsesMono = torrentDownloader.getPeersCommunicatorFlux()
-                            .map(Link::receivePeerMessages)
-                            .flatMap(ReceiveMessagesNotifications::getPeerMessageResponseFlux)
-                            .map(PeerMessage::getFrom)
-                            .distinct()
-                            .timeout(Duration.ofMillis(1500))
-                            .buffer(Duration.ofMillis(1500))
-                            .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
-                            .take(2)
-                            .flatMap(Flux::fromIterable)
-                            .sort()
-                            // I'm going to get this peers again AFTER:
-                            // torrentDownloader.getTorrentStatusStore().start();
-                            .replay()
-                            .autoConnect();
-
-                    // for recording all the peers without blocking the main thread.
-                    peersFromResponsesMono.subscribe();
-
-
-                    torrentDownloader.getTorrentStatusStore().dispatch(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS).block();
-
-                    List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
-                    List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
-
-                    peersFromResponses.stream()
-                            .filter(connectedPeers::contains)
-                            .findFirst()
-                            .ifPresent(peer -> Assert.fail("We received from the following peer" +
-                                    " messages but he doesn't exist in the connected peers flux: " + peer));
-                })
-                .as(StepVerifier::create)
-                .expectNextCount(1)
-                .verifyComplete();
-
-        Utils.removeEverythingRelatedToLastTest();
+//        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+//
+//        Utils.removeEverythingRelatedToLastTest();
+//
+//        // we won't download anything but we still need to specify a path to download to.
+//        String DEFAULT_DOWNLOAD_LOCATION = System.getProperty("user.dir") + File.separator + "torrents-test/";
+//
+//        TorrentDownloaderBuilder.buildDefault(torrentInfo, DEFAULT_DOWNLOAD_LOCATION)
+//                .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+//                .doOnNext(torrentDownloader -> {
+//                    // consume new peers and new responses from 1.5 seconds.
+//                    // filter distinct peers from the responses, and assert
+//                    // that both the list of peers are equal.
+//
+//                    Flux<Peer> connectedPeersFlux = torrentDownloader.getPeersCommunicatorFlux()
+//                            .map(Link::getPeer)
+//                            .timeout(Duration.ofMillis(1500))
+//                            .buffer(Duration.ofMillis(1500))
+//                            .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
+//                            .take(3)
+//                            .flatMap(Flux::fromIterable)
+//                            .sort();
+//
+//                    Flux<Peer> peersFromResponsesMono = torrentDownloader.getPeersCommunicatorFlux()
+//                            .map(Link::receivePeerMessages)
+//                            .flatMap(ReceiveMessagesNotifications::getPeerMessageResponseFlux)
+//                            .map(PeerMessage::getFrom)
+//                            .distinct()
+//                            .timeout(Duration.ofMillis(1500))
+//                            .buffer(Duration.ofMillis(1500))
+//                            .onErrorResume(TimeoutException.class, throwable -> Flux.empty())
+//                            .take(2)
+//                            .flatMap(Flux::fromIterable)
+//                            .sort()
+//                            // I'm going to get this peers again AFTER:
+//                            // torrentDownloader.getTorrentStatusStore().start();
+//                            .replay()
+//                            .autoConnect();
+//
+//                    // for recording all the peers without blocking the main thread.
+//                    peersFromResponsesMono.subscribe();
+//
+//
+//                    torrentDownloader.getTorrentStatusStore().dispatch(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS).block();
+//
+//                    List<Peer> connectedPeers = connectedPeersFlux.collectList().block();
+//                    List<Peer> peersFromResponses = peersFromResponsesMono.collectList().block();
+//
+//                    peersFromResponses.stream()
+//                            .filter(connectedPeers::contains)
+//                            .findFirst()
+//                            .ifPresent(peer -> Assert.fail("We received from the following peer" +
+//                                    " messages but he doesn't exist in the connected peers flux: " + peer));
+//                })
+//                .as(StepVerifier::create)
+//                .expectNextCount(1)
+//                .verifyComplete();
+//
+//        Utils.removeEverythingRelatedToLastTest();
     }
 
     @Given("^initial torrent-status for torrent: \"([^\"]*)\" in \"([^\"]*)\" is - no side effects:$")
@@ -1369,16 +1452,17 @@ public class MyStepdefs {
     }
 
     @Then("^the allocator have \"([^\"]*)\" used blocks$")
-    public void theAllocatorHaveUsedBlocks(int expectedUsedBlocksAmount) throws Throwable {
+    public void theAllocatorHaveUsedBlocks(long expectedUsedBlocksAmount) throws Throwable {
         TorrentDownloaders.getAllocatorStore()
                 .latestState$()
                 .doOnNext(allocatorState -> {
-                    int actualUsedBlocksAmount = 0;
-                    for (int i = 0; i < allocatorState.getAmountOfBlocks(); i++)
-                        if (!allocatorState.getFreeBlocksStatus().get(i))
-                            actualUsedBlocksAmount++;
+                    long actualUsedBlocksAmount = IntStream.range(0, allocatorState.getAmountOfBlocks())
+                            .filter(index -> !allocatorState.getFreeBlocksStatus().get(index))
+                            .count();
+
                     Assert.assertEquals(expectedUsedBlocksAmount, actualUsedBlocksAmount);
-                }).as(StepVerifier::create)
+                })
+                .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
     }

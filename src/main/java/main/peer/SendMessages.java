@@ -1,10 +1,10 @@
 package main.peer;
 
-import main.App;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -39,7 +39,7 @@ public class SendMessages {
                 this.closeConnectionMethod.run();
                 monoSink.error(e);
             }
-        }).subscribeOn(App.MyScheduler);
+        }).subscribeOn(Schedulers.parallel());
     }
 
     public Mono<SendMessages> send(PieceMessage pieceMessage) {
@@ -64,6 +64,6 @@ public class SendMessages {
                 this.closeConnectionMethod.run();
                 monoSink.error(e);
             }
-        }).subscribeOn(App.MyScheduler);
+        }).subscribeOn(Schedulers.parallel());
     }
 }

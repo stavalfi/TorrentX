@@ -37,7 +37,7 @@ public class RemoteFakePeerCopyCat extends Peer {
         try {
             this.listenToPeerConnection = new ServerSocket(this.getPeerPort());
         } catch (IOException e) {
-            //e.printStackTrace();
+            e.printStackTrace();
         }
     }
 
@@ -69,7 +69,7 @@ public class RemoteFakePeerCopyCat extends Peer {
             try {
                 peerConnection.close();
             } catch (IOException e) {
-//                e.printStackTrace();
+                e.printStackTrace();
             }
         });
         if (!this.closeEverything) {
@@ -102,7 +102,7 @@ public class RemoteFakePeerCopyCat extends Peer {
         try {
             this.listenToPeerConnection.close();
         } catch (IOException e) {
-            //e.printStackTrace();
+            e.printStackTrace();
         }
         this.peerConnections.forEach(socket -> {
             try {
@@ -111,7 +111,7 @@ public class RemoteFakePeerCopyCat extends Peer {
                 // I don't want to print errors from this class.
                 // a possible error can be if a peer is closing
                 // the connection with This Fake peer.
-                // e.printStackTrace();
+                 e.printStackTrace();
             }
         });
     }

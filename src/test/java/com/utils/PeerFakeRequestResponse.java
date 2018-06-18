@@ -1,5 +1,7 @@
 package com.utils;
 
+import java.util.Optional;
+
 public class PeerFakeRequestResponse {
     private final PeerMessageType sendMessageType;
     private final PeerMessageType receiveMessageType;
@@ -11,15 +13,15 @@ public class PeerFakeRequestResponse {
         this.errorSignalType = errorSignalType;
     }
 
-    public ErrorSignalType getErrorSignalType() {
-        return errorSignalType;
+    public Optional<ErrorSignalType> getErrorSignalType() {
+        return Optional.ofNullable(this.errorSignalType);
     }
 
     public PeerMessageType getSendMessageType() {
-        return sendMessageType;
+        return this.sendMessageType;
     }
 
-    public PeerMessageType getReceiveMessageType() {
-        return receiveMessageType;
+    public Optional<PeerMessageType> getReceiveMessageType() {
+        return Optional.ofNullable(this.receiveMessageType);
     }
 }

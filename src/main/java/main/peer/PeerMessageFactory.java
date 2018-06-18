@@ -13,7 +13,10 @@ import java.util.Objects;
 
 // TODO: implement visitor.
 public class PeerMessageFactory {
-    public static Mono<? extends PeerMessage> waitForMessage(TorrentInfo torrentInfo, Peer from, Peer to, DataInputStream dataInputStream) {
+    public static Mono<? extends PeerMessage> waitForMessage(TorrentInfo torrentInfo,
+                                                             Peer from,
+                                                             Peer to,
+                                                             DataInputStream dataInputStream) {
         // lengthOfTheRestOfData == messageLength == how much do we need to read more
         int lengthOfTheRestOfData;
         try {
@@ -21,6 +24,9 @@ public class PeerMessageFactory {
         } catch (IOException e) {
             return Mono.error(e);
         }
+        boolean amIApp = to.getPeerPort() == TorrentDownloaders.getListener().getTcpPort();
+        String whoAmI = amIApp ? "App" : "Fake-peer";
+        System.out.println(whoAmI + " start received message from: " + from + " to: " + to);
 
         if (lengthOfTheRestOfData == 0) {
             byte keepAliveMessageId = 10;
@@ -33,7 +39,9 @@ public class PeerMessageFactory {
         } catch (IOException e) {
             return Mono.error(e);
         }
-
+        System.out.println(whoAmI + " start received message-id: " + messageId +
+                "==" + PeerMessageId.fromValue(messageId) + " from: " +
+                from + " to: " + to);
         int messagePayloadLength = lengthOfTheRestOfData - 1;
 
         if (messageId == PeerMessageId.pieceMessage.getMessageId())
@@ -51,6 +59,9 @@ public class PeerMessageFactory {
                     messagePayloadByteArray);
 
         PeerMessage peerMessage = createMessage(torrentInfo, from, to, messageId, messagePayloadByteArray);
+        System.out.println(whoAmI + " end received message-id: " + messageId +
+                "==" + PeerMessageId.fromValue(messageId) + " from: " +
+                from + " to: " + to);
         return Mono.just(peerMessage);
     }
 
@@ -70,26 +81,31 @@ public class PeerMessageFactory {
             return Mono.error(e);
         }
         int blockLength = messagePayloadLength - 8;// 8 == 'index' length in bytes + 'begin' length in bytes
-        PieceMessage result = TorrentDownloaders.getAllocatorStore()
+
+        return TorrentDownloaders.getAllocatorStore()
                 .createPieceMessage(from, to, index, begin, blockLength, pieceLength)
                 .flatMap(pieceMessage -> {
                     try {
-                        dataInputStream.readFully(pieceMessage.getAllocatedBlock().getBlock(),
-                                pieceMessage.getAllocatedBlock().getOffset(),
-                                pieceMessage.getAllocatedBlock().getLength());
+                        byte[] block = pieceMessage.getAllocatedBlock().getBlock();
+                        int offset = pieceMessage.getAllocatedBlock().getOffset();
+                        int length = pieceMessage.getAllocatedBlock().getLength();
+                        dataInputStream.readFully(block, offset, length);
                         return Mono.just(pieceMessage);
                     } catch (IOException e) {
                         return Mono.error(e);
                     }
-                    // TODO: remove the block() operator. we have a bug because
-                    // if we remove the block(), than sometimes I can't
-                    // readFully anything. Its like someone is reading
-                    // while I read.
-                }).block();
-        return Mono.just(result);
+                })
+                // TODO: remove the block() operator. we have a bug because
+                // if we remove the block(), than sometimes I can't
+                // readFully anything. Its like someone is reading
+                // while I read.
+                ;
     }
 
-    public static Mono<? extends PeerMessage> createRequestMessage(TorrentInfo torrentInfo, Peer from, Peer to, byte messageId,
+    public static Mono<? extends PeerMessage> createRequestMessage(TorrentInfo torrentInfo,
+                                                                   Peer from,
+                                                                   Peer to,
+                                                                   byte messageId,
                                                                    byte[] payload) {
         assert messageId == PeerMessageId.requestMessage.getMessageId();
 

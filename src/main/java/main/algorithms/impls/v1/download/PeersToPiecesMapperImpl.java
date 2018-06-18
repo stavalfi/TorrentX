@@ -4,9 +4,7 @@ import main.algorithms.PeersToPiecesMapper;
 import main.peer.Link;
 import reactor.core.publisher.Flux;
 
-import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.List;
 
 public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
     // from outside
@@ -23,28 +21,28 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
         this.linkFlux = linkFlux;
         this.updatedPieceState = updatedPieceState;
 
-        Flux<Integer> piecesFromHaveMessageFlux =
-                this.linkFlux.map(link -> link.receivePeerMessages())
-                        .flatMap(receivePeerMessages -> receivePeerMessages.getHaveMessageResponseFlux())
-                        .map(haveMessage -> haveMessage.getPieceIndex());
-
-        Flux<Integer> piecesFromBitFieldMessageFlux =
-                this.linkFlux.flatMap(link ->
-                        link.receivePeerMessages()
-                                .getBitFieldMessageResponseFlux()
-                                .map(bitFieldMessage -> bitFieldMessage.getPiecesStatus())
-                                .flatMap(peerPieceStatus -> {
-                                    List<Integer> pieceList = new ArrayList<>();
-                                    for (int i = 0; i < link.getTorrentInfo().getPieces().size(); i++)
-                                        if (peerPieceStatus.get(i))
-                                            pieceList.add(i);
-                                    return Flux.fromIterable(pieceList);
-                                }));
-
-        this.availablePiecesFlux =
-                Flux.merge(piecesFromHaveMessageFlux, piecesFromBitFieldMessageFlux)
-                        .distinct()
-                        .filter(pieceIndex -> !this.updatedPieceState.get(pieceIndex));
+//        Flux<Integer> piecesFromHaveMessageFlux =
+//                this.linkFlux.map(link -> link.receivePeerMessages())
+//                        .flatMap(receivePeerMessages -> receivePeerMessages.getHaveMessageResponseFlux())
+//                        .map(haveMessage -> haveMessage.getPieceIndex());
+//
+//        Flux<Integer> piecesFromBitFieldMessageFlux =
+//                this.linkFlux.flatMap(link ->
+//                        link.receivePeerMessages()
+//                                .getBitFieldMessageResponseFlux()
+//                                .map(bitFieldMessage -> bitFieldMessage.getPiecesStatus())
+//                                .flatMap(peerPieceStatus -> {
+//                                    List<Integer> pieceList = new ArrayList<>();
+//                                    for (int i = 0; i < link.getTorrentInfo().getPieces().size(); i++)
+//                                        if (peerPieceStatus.get(i))
+//                                            pieceList.add(i);
+//                                    return Flux.fromIterable(pieceList);
+//                                }));
+//
+//        this.availablePiecesFlux =
+//                Flux.merge(piecesFromHaveMessageFlux, piecesFromBitFieldMessageFlux)
+//                        .distinct()
+//                        .filter(pieceIndex -> !this.updatedPieceState.get(pieceIndex));
     }
 
     @Override

@@ -3,16 +3,20 @@ package main.peer;
 import main.App;
 import main.TorrentInfo;
 import main.downloader.TorrentDownloaders;
+import main.file.system.allocator.AllocatorStore;
 import main.peer.peerMessages.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.DataOutputStream;
 import java.util.BitSet;
 
 class SendMessagesNotificationsImpl implements SendMessagesNotifications {
+    private static Logger logger = LoggerFactory.getLogger(SendMessagesNotificationsImpl.class);
+
     private TorrentInfo torrentInfo;
     private Peer me;
     private Peer peer;
@@ -39,6 +43,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
 
     private Mono<SendMessagesNotifications> send(PeerMessage peerMessage) {
         return peerMessage.sendMessage(this.sendMessages)
+                .doOnNext(__ -> logger.debug("sent message to peer: " + peerMessage))
                 .map(sendMessages -> (SendMessagesNotifications) this)
                 .doOnNext(peersCommunicator -> {
                     if (this.sentMessagesFluxSink != null)
@@ -46,21 +51,21 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
                 });
     }
 
+    // TODO: remove this getter. this object is for internal use only by this class.
+    public SendMessages getSendMessages() {
+        return sendMessages;
+    }
+
     @Override
     public Mono<SendMessagesNotifications> sendPieceMessage(PieceMessage pieceMessage) {
+        AllocatorStore allocatorStore = TorrentDownloaders.getAllocatorStore();
         return send(pieceMessage)
-                .flatMap(pieceEvent -> TorrentDownloaders.getAllocatorStore()
-                        .free(pieceMessage.getAllocatedBlock())
-                        .map(__ -> pieceEvent))
-                .doOnError(throwable -> TorrentDownloaders.getAllocatorStore()
-                        .free(pieceMessage.getAllocatedBlock())
-                        .publishOn(Schedulers.elastic())
-                        .block())
-                .doOnCancel(() -> TorrentDownloaders.getAllocatorStore()
-                        .free(pieceMessage.getAllocatedBlock())
-                        .publishOn(Schedulers.elastic())
-                        .block())
-                .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(pieceMessage.getIndex()));
+                .map(__ -> allocatorStore)
+                .doOnNext(__ -> allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
+                .doOnError(throwable -> allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
+                .doOnCancel(() -> allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
+                .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(pieceMessage.getIndex()))
+                .map(__ -> this);
     }
 
     @Override
