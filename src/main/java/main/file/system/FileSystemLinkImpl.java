@@ -97,13 +97,16 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     return peerResponsesFlux;
                 })
                 .doOnNext(pieceMessage -> logger.trace("start saving piece-message: " + pieceMessage))
-                // If I won't switch thread then I will block redux thread.
+                // If I won't switch thread then I will block Redux thread.
                 .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
                 .flatMap(this::writeBlock)
                 .doOnNext(pieceMessage -> logger.trace("finished saving piece-message: " + pieceMessage))
                 // takeUntil will signal the last next signal he received and then he will send complete signal.
+                .doOnNext(pieceEvent -> {
+                    if(areAllPiecesSaved())
+                        store.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS);
+                })
                 .takeUntil(pieceEvent -> areAllPiecesSaved())
-                .doOnComplete(() -> store.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS))
                 .publish()
                 .autoConnect(0);
 
