@@ -5,6 +5,8 @@ import main.downloader.TorrentDownloaderBuilder;
 import main.downloader.TorrentDownloaders;
 import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
+import main.file.system.allocator.AllocatorReducer;
+import main.file.system.allocator.AllocatorStore;
 import main.peer.Link;
 import main.peer.peerMessages.*;
 import main.torrent.status.TorrentStatusAction;
@@ -22,8 +24,11 @@ public class RemoteFakePeerCopy2 {
     private static Logger logger = LoggerFactory.getLogger(RemoteFakePeerCopy2.class);
     private Link link;
     private Mono<TorrentDownloader> torrentDownloader$;
+    private AllocatorStore allocatorStore;
 
     public RemoteFakePeerCopy2(Link link, String fakePeerTorrentDownloadPath) {
+        this.allocatorStore = new AllocatorStore(new Store<>(new AllocatorReducer(),
+                AllocatorReducer.defaultAllocatorState, "Test-Fake-Peer-" + link.getMe().getPeerPort() + "Allocator-Store"));
         this.link = link;
         int pieceIndex = 3;
         int pieceLength = link.getTorrentInfo().getPieceLength(pieceIndex);
@@ -56,7 +61,7 @@ public class RemoteFakePeerCopy2 {
             return link.sendMessages().sendRequestMessage(pieceMessage.getIndex(),
                     pieceMessage.getBegin(),
                     pieceMessage.getAllocatedBlock().getLength())
-                    .flatMap(__ -> TorrentDownloaders.getAllocatorStore().free(pieceMessage.getAllocatedBlock()))
+                    .flatMap(__ -> this.allocatorStore.free(pieceMessage.getAllocatedBlock()))
                     .map(__ -> peerMessage);
         }
         if (peerMessage instanceof RequestMessage) {
@@ -115,9 +120,8 @@ public class RemoteFakePeerCopy2 {
     }
 
     private Mono<TorrentDownloader> createTorrentDownloader(Link link, String fakePeerTorrentDownloadPath, int pieceIndex, int begin, int blockLength) {
-        Flux<PieceMessage> fakePieceMessageToSave$ = TorrentDownloaders.getAllocatorStore()
-                .updateAllocations(4, blockLength)
-                .flatMap(allocatorState -> TorrentDownloaders.getAllocatorStore()
+        Flux<PieceMessage> fakePieceMessageToSave$ = this.allocatorStore.updateAllocations(4, blockLength)
+                .flatMap(allocatorState -> this.allocatorStore
                         .createPieceMessage(link.getPeer(), link.getMe(), pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
                 .doOnNext(pieceMessageToSave -> {
                     for (int i = 0; i < blockLength; i++)
@@ -126,10 +130,12 @@ public class RemoteFakePeerCopy2 {
                 .flux();
 
         Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentState);
+                TorrentStatusReducer.defaultTorrentState, "Test-Fake-Peer-TorrentStatus-Store");
 
         Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(link.getTorrentInfo(),
                 fakePeerTorrentDownloadPath,
+                new AllocatorStore(new Store<>(new AllocatorReducer(),
+                        AllocatorReducer.defaultAllocatorState, "Test-Fake-Peer-Allocator-Store")),
                 torrentStatusStore,
                 fakePieceMessageToSave$);
 
@@ -141,10 +147,12 @@ public class RemoteFakePeerCopy2 {
                 .setToDefaultTorrentStatesSideEffects()
                 .setToDefaultPeersCommunicatorFlux()
                 .setFileSystemLink$(fileSystemLink$)
+                .setAllocatorStore(this.allocatorStore)
                 .build();
     }
 
     public void dispose() {
+        //TODO: we also need to free resources from this.allocatorStore.
         this.link.closeConnection();
         // it is important to remove all files before I
         // try to remove the main folder for the fake-peer.

@@ -1,6 +1,7 @@
 package main.peer;
 
 import main.TorrentInfo;
+import main.file.system.allocator.AllocatorStore;
 import main.statistics.SpeedStatistics;
 
 import java.io.DataInputStream;
@@ -19,17 +20,20 @@ public class Link {
     private SendMessagesNotifications sendMessages;
     private ReceiveMessagesNotifications receiveMessagesNotifications;
     private SpeedStatistics peerSpeedStatistics;
+    private AllocatorStore allocatorStore;
 
     // TODO: remove this copy consturctor - it is in use in in tests.
     public Link(Link link) {
-        this(link.torrentInfo, link.peer, link.peerSocket,
+        this(link.allocatorStore,link.torrentInfo, link.peer, link.peerSocket,
                 link.dataInputStream, link.dataOutputStream);
     }
 
-    public Link(TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
+    public Link(AllocatorStore allocatorStore,
+                TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
                 DataInputStream dataInputStream,
                 DataOutputStream dataOutputStream) {
         assert peerSocket != null;
+        this.allocatorStore=allocatorStore;
         this.peer = peer;
         this.peerSocket = peerSocket;
         this.dataInputStream = dataInputStream;
@@ -38,12 +42,13 @@ public class Link {
         this.me = new Peer("localhost", peerSocket.getLocalPort());
 
         this.peerCurrentStatus = new PeerCurrentStatus(torrentInfo.getPieces().size());
-        this.sendMessages = new SendMessagesNotificationsImpl(this.torrentInfo,
+        this.sendMessages = new SendMessagesNotificationsImpl(this.allocatorStore,
+                this.torrentInfo,
                 this.me, this.peer,
                 this.peerCurrentStatus,
                 this::closeConnection,
                 dataOutputStream);
-        this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(torrentInfo, this.me,
+        this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(this.allocatorStore,torrentInfo, this.me,
                 this.peer, this.peerCurrentStatus, dataInputStream);
 
         // TODO: uncomment

@@ -4,6 +4,7 @@ import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.file.system.FileSystemLink;
+import main.file.system.allocator.AllocatorStore;
 import main.peer.Link;
 import main.peer.SearchPeers;
 import main.statistics.SpeedStatistics;
@@ -28,6 +29,7 @@ public class TorrentDownloaderBuilder {
     private TorrentStatesSideEffects torrentStatesSideEffects;
     private SpeedStatistics torrentSpeedStatistics;
     private Flux<Link> peersCommunicatorFlux;
+    private AllocatorStore allocatorStore;
 
     private TorrentDownloaderBuilder(TorrentInfo torrentInfo) {
         this.torrentInfo = torrentInfo;
@@ -39,9 +41,9 @@ public class TorrentDownloaderBuilder {
         return new TorrentDownloaderBuilder(torrentInfo);
     }
 
-    public static Mono<TorrentDownloader> buildDefault(TorrentInfo torrentInfo, String downloadPath) {
+    public static Mono<TorrentDownloader> buildDefault(TorrentInfo torrentInfo, String downloadPath,String identifer) {
         return builder(torrentInfo)
-                .setToDefaultTorrentStatusStore()
+                .setToDefaultTorrentStatusStore(identifer)
                 .setToDefaultTorrentStatesSideEffects()
                 .setToDefaultSearchPeers()
                 .setToDefaultPeersCommunicatorFlux()
@@ -52,6 +54,8 @@ public class TorrentDownloaderBuilder {
     }
 
     public Mono<TorrentDownloader> build() {
+        if(this.allocatorStore==null)
+            this.allocatorStore=TorrentDownloaders.getAllocatorStore();
         if (this.fileSystemLink$ == null) {
             // it can't be that fileSystemLink$==null and bittorrentAlgorithm$!=null
             // because we need fileSystemLink object to create bittorrentAlgorithm object.
@@ -80,11 +84,15 @@ public class TorrentDownloaderBuilder {
         return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
                 this.searchPeers,
                 fileSystemLink,
-                BittorrentAlgorithmInitializer.v1(torrentInfo, this.torrentStatusStore, fileSystemLink, this.peersCommunicatorFlux),
+                BittorrentAlgorithmInitializer.v1(this.allocatorStore,torrentInfo, this.torrentStatusStore, fileSystemLink, this.peersCommunicatorFlux),
                 this.torrentStatusStore,
                 this.torrentSpeedStatistics,
                 this.torrentStatesSideEffects,
                 this.peersCommunicatorFlux));
+    }
+    public TorrentDownloaderBuilder setAllocatorStore(AllocatorStore allocatorStore) {
+        this.allocatorStore = allocatorStore;
+        return this;
     }
 
     public TorrentDownloaderBuilder setSearchPeers(SearchPeers searchPeers) {
@@ -95,7 +103,7 @@ public class TorrentDownloaderBuilder {
     public TorrentDownloaderBuilder setToDefaultSearchPeers() {
         assert this.torrentStatusStore != null;
 
-        this.searchPeers = new SearchPeers(this.torrentInfo, this.torrentStatusStore);
+        this.searchPeers = new SearchPeers(this.allocatorStore,this.torrentInfo, this.torrentStatusStore);
         return this;
     }
 
@@ -130,9 +138,9 @@ public class TorrentDownloaderBuilder {
         return this;
     }
 
-    public TorrentDownloaderBuilder setToDefaultTorrentStatusStore() {
+    public TorrentDownloaderBuilder setToDefaultTorrentStatusStore(String identifer) {
         this.torrentStatusStore = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentState);
+                TorrentStatusReducer.defaultTorrentState,identifer);
         return this;
     }
 

@@ -79,7 +79,8 @@ public class RemoteFakePeerCopyCat extends Peer {
             return;
         Peer fromPeer = new Peer("localhost", peerConnection.getPort());
         while (!this.closeEverything) {
-            PeerMessage peerMessage = PeerMessageFactory.waitForMessage(this.torrentInfo, fromPeer, this, dataInputStream)
+            // TODO: we need to send new AllocatorStore.
+            PeerMessage peerMessage = PeerMessageFactory.waitForMessage(TorrentDownloaders.getAllocatorStore(),this.torrentInfo, fromPeer, this, dataInputStream)
                     .publishOn(Schedulers.elastic())
                     .block();
             if (receivedMessagesAmount == 2)

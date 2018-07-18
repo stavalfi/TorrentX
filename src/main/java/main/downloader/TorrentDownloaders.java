@@ -3,6 +3,7 @@ package main.downloader;
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.file.system.FileSystemLink;
+import main.file.system.allocator.AllocatorReducer;
 import main.file.system.allocator.AllocatorStore;
 import main.listener.Listener;
 import main.listener.ListenerAction;
@@ -24,16 +25,17 @@ import java.util.Optional;
 
 public class TorrentDownloaders {
 
-	private static AllocatorStore allocatorStore = new AllocatorStore();
+	private static AllocatorStore allocatorStore = new AllocatorStore(new Store<>(new AllocatorReducer(),
+            AllocatorReducer.defaultAllocatorState,"App-Allocator-Store"));
 
 	public static AllocatorStore getAllocatorStore() {
 		return allocatorStore;
 	}
 
 	private static Store<ListenerState, ListenerAction> listenStore = new Store<>(new ListenerReducer(),
-			ListenerReducer.defaultListenState);
+			ListenerReducer.defaultListenState,"App-Listener-Store");
 
-	private static Listener listener = new Listener();
+	private static Listener listener = new Listener(allocatorStore);
 
 	private static ListenerSideEffects listenerSideEffects = new ListenerSideEffects(listenStore);
 

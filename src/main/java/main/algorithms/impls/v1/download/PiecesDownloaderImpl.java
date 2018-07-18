@@ -6,6 +6,7 @@ import main.algorithms.PeersToPiecesMapper;
 import main.algorithms.PiecesDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.FileSystemLink;
+import main.file.system.allocator.AllocatorStore;
 import main.peer.PeerExceptions;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
@@ -25,12 +26,16 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
     private BlockDownloader blockDownloader;
 
     private Flux<Integer> downloadedPiecesFlux;
+    private AllocatorStore allocatorStore;
 
-    public PiecesDownloaderImpl(TorrentInfo torrentInfo,
-								Store<TorrentStatusState, TorrentStatusAction> store,
+    public PiecesDownloaderImpl(AllocatorStore allocatorStore,
+                                TorrentInfo torrentInfo,
+                                Store<TorrentStatusState,
+                                        TorrentStatusAction> store,
                                 FileSystemLink fileSystemLink,
                                 PeersToPiecesMapper peersToPiecesMapper,
                                 BlockDownloader blockDownloader) {
+        this.allocatorStore = allocatorStore;
         this.torrentInfo = torrentInfo;
         this.store = store;
         this.peersToPiecesMapper = peersToPiecesMapper;
@@ -76,10 +81,9 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
         return requestBlockFromPosition.flatMap(requestFromPosition ->
                         this.peersToPiecesMapper.peerSupplierFlux(pieceIndex)
                                 .index()
-                                .flatMap(link -> TorrentDownloaders.getAllocatorStore()
-                                                .createRequestMessage(link.getT2().getMe(), link.getT2().getPeer(),
-                                                        pieceIndex, requestFromPosition, requestBlockLength.apply(requestFromPosition),
-                                                        torrentInfo.getPieceLength(pieceIndex))
+                                .flatMap(link -> this.allocatorStore.createRequestMessage(link.getT2().getMe(), link.getT2().getPeer(),
+                                        pieceIndex, requestFromPosition, requestBlockLength.apply(requestFromPosition),
+                                        torrentInfo.getPieceLength(pieceIndex))
                                                 .flatMap(requestMessage -> {
                                                     // System.out.println("trying to download piece: " + pieceIndex + ", begin: " + requestFromPosition + ", from: (" + link.getT1() + ") " + link.getT2().getPeer());
                                                     return this.blockDownloader.downloadBlock(link.getT2(), requestMessage)

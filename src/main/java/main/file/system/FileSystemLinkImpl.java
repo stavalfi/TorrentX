@@ -5,6 +5,7 @@ import main.TorrentInfo;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloaders;
 import main.downloader.TorrentPieceStatus;
+import main.file.system.allocator.AllocatorStore;
 import main.file.system.exceptions.PieceNotDownloadedYetException;
 import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
@@ -33,12 +34,13 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private static Logger logger = LoggerFactory.getLogger(FileSystemLinkImpl.class);
 
     public static Mono<FileSystemLink> create(TorrentInfo torrentInfo, String downloadPath,
-                                              Store<TorrentStatusState, TorrentStatusAction> store,
+                                              AllocatorStore allocatorStore,
+                                              Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
                                               Flux<PieceMessage> peerResponsesFlux) {
         return Mono.just(torrentInfo)
                 .doOnNext(__ -> createFolders(torrentInfo, downloadPath))
                 .flatMap(__ -> createActiveTorrentFileList(torrentInfo, downloadPath))
-                .map(actualFileList -> new FileSystemLinkImpl(torrentInfo, downloadPath, actualFileList, store, peerResponsesFlux));
+                .map(actualFileList -> new FileSystemLinkImpl(torrentInfo, downloadPath, actualFileList, allocatorStore, torrentStatusStore, peerResponsesFlux));
     }
 
     private final List<ActualFile> actualFileImplList;
@@ -47,12 +49,15 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private final String downloadPath;
     private Flux<Integer> savedPiecesFlux;
     private Flux<PieceEvent> savedBlocksFlux;
+    private AllocatorStore allocatorStore;
 
     private FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
                                List<ActualFile> actualFileList,
+                               AllocatorStore allocatorStore,
                                Store<TorrentStatusState, TorrentStatusAction> store,
                                Flux<PieceMessage> peerResponsesFlux) {
         super(torrentInfo);
+        this.allocatorStore = allocatorStore;
         this.downloadPath = downloadPath;
         this.piecesStatus = new BitSet(getPieces().size());
         this.downloadedBytesInPieces = new long[getPieces().size()];
@@ -189,10 +194,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
         int pieceLength = super.getPieceLength(requestMessage.getIndex());
 
-        return TorrentDownloaders.getAllocatorStore()
-                .createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
-                        requestMessage.getIndex(), requestMessage.getBegin(),
-                        requestMessage.getBlockLength(), pieceLength)
+        return this.allocatorStore.createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
+                requestMessage.getIndex(), requestMessage.getBegin(),
+                requestMessage.getBlockLength(), pieceLength)
                 .flatMap(pieceMessage -> {
                     long from = super.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
                     long to = from + requestMessage.getBlockLength();

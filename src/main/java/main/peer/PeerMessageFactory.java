@@ -2,6 +2,7 @@ package main.peer;
 
 import main.TorrentInfo;
 import main.downloader.TorrentDownloaders;
+import main.file.system.allocator.AllocatorStore;
 import main.peer.peerMessages.*;
 import reactor.core.publisher.Mono;
 
@@ -13,7 +14,8 @@ import java.util.Objects;
 
 // TODO: implement visitor.
 public class PeerMessageFactory {
-    public static Mono<? extends PeerMessage> waitForMessage(TorrentInfo torrentInfo,
+    public static Mono<? extends PeerMessage> waitForMessage(AllocatorStore allocatorStore,
+                                                             TorrentInfo torrentInfo,
                                                              Peer from,
                                                              Peer to,
                                                              DataInputStream dataInputStream) {
@@ -45,7 +47,7 @@ public class PeerMessageFactory {
         int messagePayloadLength = lengthOfTheRestOfData - 1;
 
         if (messageId == PeerMessageId.pieceMessage.getMessageId())
-            return createPieceMessage(torrentInfo, from, to, messagePayloadLength, dataInputStream);
+            return createPieceMessage(allocatorStore, torrentInfo, from, to, messagePayloadLength, dataInputStream);
 
         byte[] messagePayloadByteArray = new byte[messagePayloadLength];
         try {
@@ -55,7 +57,7 @@ public class PeerMessageFactory {
         }
 
         if (messageId == PeerMessageId.requestMessage.getMessageId())
-            return createRequestMessage(torrentInfo, from, to, messageId,
+            return createRequestMessage(allocatorStore, torrentInfo, from, to, messageId,
                     messagePayloadByteArray);
 
         PeerMessage peerMessage = createMessage(torrentInfo, from, to, messageId, messagePayloadByteArray);
@@ -65,7 +67,7 @@ public class PeerMessageFactory {
         return Mono.just(peerMessage);
     }
 
-    public static Mono<? extends PeerMessage> createPieceMessage(TorrentInfo torrentInfo, Peer from, Peer to,
+    public static Mono<? extends PeerMessage> createPieceMessage(AllocatorStore allocatorStore, TorrentInfo torrentInfo, Peer from, Peer to,
                                                                  int messagePayloadLength, DataInputStream dataInputStream) {
         int index;
         try {
@@ -82,8 +84,7 @@ public class PeerMessageFactory {
         }
         int blockLength = messagePayloadLength - 8;// 8 == 'index' length in bytes + 'begin' length in bytes
 
-        return TorrentDownloaders.getAllocatorStore()
-                .createPieceMessage(from, to, index, begin, blockLength, pieceLength)
+        return allocatorStore.createPieceMessage(from, to, index, begin, blockLength, pieceLength)
                 .flatMap(pieceMessage -> {
                     try {
                         byte[] block = pieceMessage.getAllocatedBlock().getBlock();
@@ -102,7 +103,8 @@ public class PeerMessageFactory {
                 ;
     }
 
-    public static Mono<? extends PeerMessage> createRequestMessage(TorrentInfo torrentInfo,
+    public static Mono<? extends PeerMessage> createRequestMessage(AllocatorStore allocatorStore,
+                                                                   TorrentInfo torrentInfo,
                                                                    Peer from,
                                                                    Peer to,
                                                                    byte messageId,
@@ -114,9 +116,8 @@ public class PeerMessageFactory {
         int begin = wrap.getInt();
         int blockLength = wrap.getInt();
 
-        return TorrentDownloaders.getAllocatorStore()
-                .createRequestMessage(from, to, index, begin, blockLength,
-                        torrentInfo.getPieceLength(index));
+        return allocatorStore.createRequestMessage(from, to, index, begin, blockLength,
+                torrentInfo.getPieceLength(index));
     }
 
     public static PeerMessage createMessage(TorrentInfo torrentInfo, Peer from, Peer to, byte messageId,

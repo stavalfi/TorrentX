@@ -5,6 +5,7 @@ import main.HexByteConverter;
 import main.TorrentInfo;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
+import main.file.system.allocator.AllocatorStore;
 import main.listener.state.tree.ListenerState;
 import main.peer.BadTorrentInfoHashHandShakeException;
 import main.peer.Link;
@@ -36,8 +37,10 @@ public class Listener {
     private Flux<Link> resumeListen$;
     private Flux<ListenerState> pauseListen$;
     private Flux<ListenerState> restartListener$;
+    private AllocatorStore allocatorStore;
 
-    public Listener() {
+    public Listener(AllocatorStore allocatorStore) {
+        this.allocatorStore=allocatorStore;
         Store<ListenerState, ListenerAction> listenerStore = TorrentDownloaders.getListenStore();
 
         Supplier<Mono<ServerSocket>> serverSocketSupplier = () -> {
@@ -171,7 +174,7 @@ public class Listener {
         }
         // all went well, I accept this connection.
         Peer peer = new Peer(peerSocket.getInetAddress().getHostAddress(), peerSocket.getPort());
-        return Mono.just(new Link(torrentInfo.get(), peer, peerSocket, peerDataInputStream, peerDataOutputStream));
+        return Mono.just(new Link(this.allocatorStore,torrentInfo.get(), peer, peerSocket, peerDataInputStream, peerDataOutputStream));
     }
 
     private Optional<TorrentInfo> haveThisTorrent(String receivedTorrentInfoHash) {

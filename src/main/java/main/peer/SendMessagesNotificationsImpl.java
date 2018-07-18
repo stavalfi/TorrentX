@@ -24,12 +24,15 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     private FluxSink<PeerMessage> sentMessagesFluxSink;
     private PeerCurrentStatus peerCurrentStatus;
     private SendMessages sendMessages;
+    private AllocatorStore allocatorStore;
 
-    SendMessagesNotificationsImpl(TorrentInfo torrentInfo,
+    SendMessagesNotificationsImpl(AllocatorStore allocatorStore,
+                                  TorrentInfo torrentInfo,
                                   Peer me, Peer peer,
                                   PeerCurrentStatus peerCurrentStatus,
                                   Runnable closeConnectionMethod,
                                   DataOutputStream peerDataOutputStream) {
+        this.allocatorStore=allocatorStore;
         this.torrentInfo = torrentInfo;
         this.me = me;
         this.peer = peer;
@@ -58,12 +61,11 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
 
     @Override
     public Mono<SendMessagesNotifications> sendPieceMessage(PieceMessage pieceMessage) {
-        AllocatorStore allocatorStore = TorrentDownloaders.getAllocatorStore();
         return send(pieceMessage)
-                .map(__ -> allocatorStore)
-                .doOnNext(__ -> allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
-                .doOnError(throwable -> allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
-                .doOnCancel(() -> allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
+                .map(__ -> this.allocatorStore)
+                .doOnNext(__ -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
+                .doOnError(throwable -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
+                .doOnCancel(() -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
                 .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(pieceMessage.getIndex()))
                 .map(__ -> this);
     }
@@ -116,8 +118,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     @Override
     public Mono<SendMessagesNotifications> sendRequestMessage(int index, int begin, int blockLength) {
         int pieceLength = this.torrentInfo.getPieceLength(index);
-        return TorrentDownloaders.getAllocatorStore()
-                .createRequestMessage(this.getMe(), this.getPeer(), index, begin, blockLength, pieceLength)
+        return this.allocatorStore.createRequestMessage(this.getMe(), this.getPeer(), index, begin, blockLength, pieceLength)
                 .flatMap(this::send);
     }
 

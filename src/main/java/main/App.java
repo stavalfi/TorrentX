@@ -12,6 +12,10 @@ import java.nio.channels.SeekableByteChannel;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashSet;
+import java.util.List;
+import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.function.Supplier;
 
 public class App {
     public static Scheduler MyScheduler = Schedulers.elastic();
@@ -71,7 +75,8 @@ public class App {
 
     }
 
-    public static void main(String[] args) throws Exception {
+
+    public void main(String[] args) throws Exception {
         deleteDownloadFolder();
         Hooks.onOperatorDebug();
         f5();

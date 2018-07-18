@@ -4,6 +4,7 @@ import main.App;
 import main.AppConfig;
 import main.HexByteConverter;
 import main.TorrentInfo;
+import main.file.system.allocator.AllocatorStore;
 import main.peer.peerMessages.HandShake;
 import main.tracker.BadResponseException;
 import main.tracker.TrackerConnection;
@@ -24,9 +25,11 @@ public class PeersProvider {
     private static Logger logger = LoggerFactory.getLogger(PeersProvider.class);
 
     private TorrentInfo torrentInfo;
+    private AllocatorStore allocatorStore;
 
-    public PeersProvider(TorrentInfo torrentInfo) {
+    public PeersProvider(AllocatorStore allocatorStore, TorrentInfo torrentInfo) {
         this.torrentInfo = torrentInfo;
+        this.allocatorStore=allocatorStore;
     }
 
     public Mono<Link> connectToPeerMono(Peer peer) {
@@ -59,7 +62,7 @@ public class PeersProvider {
                             " with the wrong torrent-info-hash: " + receivedTorrentInfoHash));
                 } else {
                     // all went well, I accept this connection.
-                    Link link = new Link(this.torrentInfo, peer, peerSocket, receiveMessages, sendMessages);
+                    Link link = new Link(this.allocatorStore,this.torrentInfo, peer, peerSocket, receiveMessages, sendMessages);
                     sink.success(link);
                 }
             } catch (IOException e) {

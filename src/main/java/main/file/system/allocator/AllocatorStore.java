@@ -13,8 +13,11 @@ import redux.store.Store;
 
 public class AllocatorStore {
 
-    private Store<AllocatorState, AllocatorAction> allocatorStore = new Store<>(new AllocatorReducer(),
-            AllocatorReducer.defaultAllocatorState);
+    private Store<AllocatorState, AllocatorAction> allocatorStore;
+
+    public AllocatorStore(Store<AllocatorState, AllocatorAction> allocatorStore){
+        this.allocatorStore=allocatorStore;
+    }
 
     public Mono<AllocatorState> updateAllocations(int amountOfBlocks, int blockLength) {
         UpdateAllocationArrayRequest request = new UpdateAllocationArrayRequest(amountOfBlocks, blockLength);

@@ -1,6 +1,7 @@
 package main.peer;
 
 import main.TorrentInfo;
+import main.file.system.allocator.AllocatorStore;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import main.tracker.TrackerProvider;
@@ -17,8 +18,8 @@ public class SearchPeers {
     private PeersProvider peersProvider;
     private Flux<Link> peers$;
 
-    public SearchPeers(TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store) {
-        this(torrentInfo, store, new TrackerProvider(torrentInfo), new PeersProvider(torrentInfo));
+    public SearchPeers(AllocatorStore allocatorStore,TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store) {
+        this(torrentInfo, store, new TrackerProvider(torrentInfo), new PeersProvider(allocatorStore,torrentInfo));
     }
 
     public SearchPeers(TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store,

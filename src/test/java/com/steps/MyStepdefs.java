@@ -200,10 +200,11 @@ public class MyStepdefs {
                 .flux();
 
         Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentState);
+                TorrentStatusReducer.defaultTorrentState,"Test-App-TorrentStatus-Store");
 
         Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(torrentInfo,
                 fullDownloadPath,
+                TorrentDownloaders.getAllocatorStore(),
                 torrentStatusStore,
                 fakePieceMessageToSave$);
 
@@ -264,7 +265,7 @@ public class MyStepdefs {
                 // I need to add this torrent to the list of
                 // my torrents before a peer connect to me about this torrent.
                 .flatMap(__ -> torrentDownloader$)
-                .map(__ -> new PeersProvider(torrentInfo))
+                .map(__ -> new PeersProvider(TorrentDownloaders.getAllocatorStore(),torrentInfo))
                 .flatMap(peersProvider -> peersProvider.connectToPeerMono(app))
                 .map(link -> new RemoteFakePeerCopy2(link, fullDownloadPathForFakePeer))
                 .doOnNext(remoteFakePeerCopy2 -> logger.debug("start sending messages to fake-peer"))
@@ -366,7 +367,7 @@ public class MyStepdefs {
         String downloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
 
         TorrentDownloaderBuilder.builder(torrentInfo)
-                .setToDefaultTorrentStatusStore()
+                .setToDefaultTorrentStatusStore("Test-App-TorrentStatus-Store")
                 .setToDefaultTorrentStatesSideEffects()
                 .setToDefaultSearchPeers()
                 .setToDefaultPeersCommunicatorFlux()
@@ -474,9 +475,9 @@ public class MyStepdefs {
                 .updateAllocations(10, 1_000_000)
                 .block();
 
-        Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentState);
-        TorrentStatesSideEffects sideEffects = new TorrentStatesSideEffects(torrentInfo, store);
+        Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
+                TorrentStatusReducer.defaultTorrentState,"Test-App-TorrentStatus-Store");
+        TorrentStatesSideEffects sideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
 
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
         int amountOfAllocatedBlocks = TorrentDownloaders.getAllocatorStore()
@@ -503,9 +504,9 @@ public class MyStepdefs {
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
 
         TorrentDownloaderBuilder.builder(torrentInfo)
-                .setTorrentStatusStore(store)
+                .setTorrentStatusStore(torrentStatusStore)
                 .setTorrentStatesSideEffects(sideEffects)
-                .setFileSystemLink$(FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, store, allBlocksMessages$))
+                .setFileSystemLink$(FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, TorrentDownloaders.getAllocatorStore(),torrentStatusStore, allBlocksMessages$))
                 .build()
                 .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
                 .doOnNext(torrentDownloader -> {
@@ -562,10 +563,10 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         // I only need this object because the constructor of FileSystemLink listen to signals (which I never signal).
-        Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentState);
+        Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
+                TorrentStatusReducer.defaultTorrentState,"Test-App-TorrentStatus-Store");
         // I need this object for the cleanup after this test so I can wait until all the files were actually removed.
-        TorrentStatesSideEffects sideEffects = new TorrentStatesSideEffects(torrentInfo, store);
+        TorrentStatesSideEffects sideEffects = new TorrentStatesSideEffects(torrentInfo, torrentStatusStore);
 
         // release new next signal only when we finish working on the last one and only after we cleaned it's buffer.
         Semaphore semaphore = new Semaphore(1, true);
@@ -586,11 +587,11 @@ public class MyStepdefs {
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
 
         Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.builder(torrentInfo)
-                .setTorrentStatusStore(store)
+                .setTorrentStatusStore(torrentStatusStore)
                 .setTorrentStatesSideEffects(sideEffects)
                 .setToDefaultSearchPeers()
                 .setToDefaultPeersCommunicatorFlux()
-                .setFileSystemLink$(FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, store, generatedWrittenPieceMessages$))
+                .setFileSystemLink$(FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, TorrentDownloaders.getAllocatorStore(),torrentStatusStore, generatedWrittenPieceMessages$))
                 .build()
                 .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
                 .cache();
@@ -760,7 +761,8 @@ public class MyStepdefs {
         TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentInfo.getTorrentInfoHash());
 
         TorrentStatusState torrentStatusState = Utils.getTorrentStatusState(torrentInfo, TorrentStatusAction.INITIALIZE, torrentStatusActions);
-        Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(), torrentStatusState);
+        Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore =
+                new Store<>(new TorrentStatusReducer(), torrentStatusState,"Test-App-TorrentStatus-Store");
 
         TorrentDownloaderBuilder.builder(torrentInfo)
                 .setTorrentStatusStore(torrentStatusStore)
@@ -879,13 +881,13 @@ public class MyStepdefs {
 
         // represent this application TorrentDownloader. (not the fake-peer TorrentDownloader).
         Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentState);
+                TorrentStatusReducer.defaultTorrentState,"Test-App-TorrentStatus-Store");
         TrackerProvider trackerProvider = Mockito.mock(TrackerProvider.class);
         Mockito.when(trackerProvider.connectToTrackersFlux()).thenReturn(trackerConnectionFlux);
         Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.builder(torrentInfo)
                 .setTorrentStatusStore(store)
                 .setToDefaultTorrentStatesSideEffects()
-                .setSearchPeers(new SearchPeers(torrentInfo, store, trackerProvider, new PeersProvider(torrentInfo)))
+                .setSearchPeers(new SearchPeers(torrentInfo, store, trackerProvider, new PeersProvider(TorrentDownloaders.getAllocatorStore(),torrentInfo)))
                 .setToDefaultPeersCommunicatorFlux()
                 .setToDefaultBittorrentAlgorithm()
                 .setFileSystemLink$(Mono.just(fileSystemLink))
@@ -1002,14 +1004,14 @@ public class MyStepdefs {
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
 
         Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentState);
+                TorrentStatusReducer.defaultTorrentState,"Test-App-TorrentStatus-Store");
         TrackerProvider trackerProvider = Mockito.mock(TrackerProvider.class);
         Mockito.when(trackerProvider.connectToTrackersFlux()).thenReturn(trackers$);
         // TODO: check that I didn't miss anything
         TorrentDownloaderBuilder.builder(torrentInfo)
                 .setTorrentStatusStore(torrentStatusStore)
                 .setToDefaultTorrentStatesSideEffects()
-                .setSearchPeers(new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider, new PeersProvider(torrentInfo)))
+                .setSearchPeers(new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider, new PeersProvider(TorrentDownloaders.getAllocatorStore(),torrentInfo)))
                 .setToDefaultPeersCommunicatorFlux()
                 .setToDefaultFileSystemLink(fullDownloadPath)
                 .build()
@@ -1052,7 +1054,7 @@ public class MyStepdefs {
                         torrentInfo.getPieces().size() + completedPieceIndex)
                 .forEach(completedPieceIndex -> bitSet.set(completedPieceIndex));
 
-        Mono<RemoteFakePeer> fakePeerToMeLink$ = new PeersProvider(torrentInfo)
+        Mono<RemoteFakePeer> fakePeerToMeLink$ = new PeersProvider(TorrentDownloaders.getAllocatorStore(),torrentInfo)
                 .connectToPeerMono(me)
                 .map(link -> new RemoteFakePeer(link, fakePeerType))
                 .flatMap(remoteFakePeer -> remoteFakePeer.sendMessages().sendBitFieldMessage(bitSet)
@@ -1529,7 +1531,7 @@ public class MyStepdefs {
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-        TorrentDownloaderBuilder.buildDefault(torrentInfo, fullDownloadPath)
+        TorrentDownloaderBuilder.buildDefault(torrentInfo, fullDownloadPath,"Test-App-TorrentStatus-Store")
                 .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
                 .as(StepVerifier::create)
                 .expectNextCount(1)
@@ -1583,14 +1585,14 @@ public class MyStepdefs {
         Utils.removeEverythingRelatedToLastTest();
 
         ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
-        this.listenStore = new Store<>(new ListenerReducer(), initialState);
+        this.listenStore = new Store<>(new ListenerReducer(), initialState,"Test-App-TorrentStatus-Store-No-Side-Effects");
     }
 
     @Given("^initial listen-status - without dispaching anything - no side effects:$")
     public void initialListenStatusWithoutDispachingAnythingNoSideEffects
             (List<ListenerAction> initialStateByActionList) throws Throwable {
         ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
-        this.listenStore = new Store<>(new ListenerReducer(), initialState);
+        this.listenStore = new Store<>(new ListenerReducer(), initialState,"Test-App-TorrentStatus-Store-No-Side-Effects");
     }
 
     @When("^listen-status is trying to change to - no side effects:$")
@@ -1684,7 +1686,7 @@ public class MyStepdefs {
         }
 
         Peer App = new Peer("localhost", TorrentDownloaders.getListener().getTcpPort());
-        Mono<Link> publisher = new PeersProvider(torrentInfo).connectToPeerMono(App)
+        Mono<Link> publisher = new PeersProvider(TorrentDownloaders.getAllocatorStore(),torrentInfo).connectToPeerMono(App)
                 .doOnNext(Link::closeConnection);
         if (PeerExceptions.peerNotResponding.test(throwable))
             StepVerifier.create(publisher)
@@ -1707,7 +1709,7 @@ public class MyStepdefs {
                 .autoConnect(0);
 
         Peer App = new Peer("localhost", TorrentDownloaders.getListener().getTcpPort());
-        Mono<Link> publisher = new PeersProvider(torrentInfo).connectToPeerMono(App)
+        Mono<Link> publisher = new PeersProvider(TorrentDownloaders.getAllocatorStore(),torrentInfo).connectToPeerMono(App)
                 .doOnNext(Link::closeConnection);
         StepVerifier.create(publisher)
                 .expectNextCount(1)

@@ -2,6 +2,7 @@ package main.peer;
 
 import main.TorrentInfo;
 import main.downloader.TorrentDownloaders;
+import main.file.system.allocator.AllocatorStore;
 import main.peer.peerMessages.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +31,8 @@ class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
 
     private PeerCurrentStatus peerCurrentStatus;
 
-    public ReceiveMessagesNotificationsImpl(TorrentInfo torrentInfo, Peer me, Peer peer,
+    public ReceiveMessagesNotificationsImpl(AllocatorStore allocatorStore,
+                                            TorrentInfo torrentInfo, Peer me, Peer peer,
                                             PeerCurrentStatus peerCurrentStatus, DataInputStream dataInputStream) {
         this.peerCurrentStatus = peerCurrentStatus;
 
@@ -39,7 +41,7 @@ class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
 
         this.peerMessageResponseFlux = Flux.generate(synchronousSink -> synchronousSink.next(0))
                 .publishOn(Schedulers.newSingle(whoAmI + "-RECEIVE-PEER-MESSAGES"))
-                .concatMap(__ -> PeerMessageFactory.waitForMessage(torrentInfo, peer, me, dataInputStream))
+                .concatMap(__ -> PeerMessageFactory.waitForMessage(allocatorStore, torrentInfo, peer, me, dataInputStream))
                 .doOnNext(peerMessage -> logger.debug(whoAmI + " received new message1: " + peerMessage))
                 //.onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                 // there are multiple subscribers to this source (every specific peer-message flux).

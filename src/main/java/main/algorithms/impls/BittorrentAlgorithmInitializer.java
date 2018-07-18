@@ -8,6 +8,7 @@ import main.algorithms.impls.v1.download.PiecesDownloaderImpl;
 import main.algorithms.impls.v1.notification.NotifyAboutCompletedPieceAlgorithmImpl;
 import main.algorithms.impls.v1.upload.UploadAlgorithmImpl;
 import main.file.system.FileSystemLink;
+import main.file.system.allocator.AllocatorStore;
 import main.peer.Link;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
@@ -15,8 +16,9 @@ import reactor.core.publisher.Flux;
 import redux.store.Store;
 
 public class BittorrentAlgorithmInitializer {
-    public static BittorrentAlgorithm v1(TorrentInfo torrentInfo,
-										 Store<TorrentStatusState, TorrentStatusAction> store,
+    public static BittorrentAlgorithm v1(AllocatorStore allocatorStore,
+                                         TorrentInfo torrentInfo,
+                                         Store<TorrentStatusState, TorrentStatusAction> store,
                                          FileSystemLink fileSystemLink,
                                          Flux<Link> peersCommunicatorFlux) {
         Flux<Link> recordedPeerFlux = peersCommunicatorFlux
@@ -43,7 +45,8 @@ public class BittorrentAlgorithmInitializer {
 
         BlockDownloader blockDownloader = new BlockDownloaderImpl(torrentInfo, fileSystemLink);
 
-        PiecesDownloader piecesDownloader = new PiecesDownloaderImpl(torrentInfo, store,
+        PiecesDownloader piecesDownloader = new PiecesDownloaderImpl(allocatorStore,
+                torrentInfo, store,
                 fileSystemLink, peersToPiecesMapper, blockDownloader);
 
         DownloadAlgorithm downloadAlgorithm = new DownloadAlgorithm(piecesDownloader, blockDownloader, peersToPiecesMapper);
