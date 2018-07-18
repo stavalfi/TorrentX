@@ -30,7 +30,7 @@ public class RemoteFakePeerCopy2 {
         int begin = 0;
         int blockLength = pieceLength;
 
-        this.torrentDownloader$ = createTorrentDownloader(link, fakePeerTorrentDownloadPath, pieceIndex, begin, blockLength);
+        this.torrentDownloader$ = createTorrentDownloader(link, fakePeerTorrentDownloadPath, pieceIndex, begin, blockLength).cache();
 
         link.receivePeerMessages()
                 .getPeerMessageResponseFlux()
