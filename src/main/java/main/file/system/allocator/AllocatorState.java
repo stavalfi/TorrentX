@@ -44,25 +44,6 @@ public class AllocatorState extends State<AllocatorAction> {
 	}
 
 	@Override
-	public boolean equals(Object o) {
-		if (this == o) return true;
-		if (!(o instanceof AllocatorState)) return false;
-		AllocatorState that = (AllocatorState) o;
-		return getBlockLength() == that.getBlockLength() &&
-				getAmountOfBlocks() == that.getAmountOfBlocks() &&
-				Objects.equals(getFreeBlocksStatus(), that.getFreeBlocksStatus()) &&
-				Arrays.equals(getAllocatedBlocks(), that.getAllocatedBlocks());
-	}
-
-	@Override
-	public int hashCode() {
-
-		int result = Objects.hash(getBlockLength(), getAmountOfBlocks(), getFreeBlocksStatus());
-		result = 31 * result + Arrays.hashCode(getAllocatedBlocks());
-		return result;
-	}
-
-	@Override
 	public String toString() {
 		return "AllocatorState{" + super.toString() +
 				"blockLength=" + blockLength +

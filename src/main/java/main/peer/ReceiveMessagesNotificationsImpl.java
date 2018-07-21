@@ -7,6 +7,7 @@ import main.peer.peerMessages.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
@@ -39,9 +40,10 @@ class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
         boolean amIApp = me.getPeerPort() == TorrentDownloaders.getListener().getTcpPort();
         String whoAmI = amIApp ? "App" : "Fake-peer";
 
+        Scheduler scheduler = Schedulers.newSingle(whoAmI + "-RECEIVE-PEER-MESSAGES");
         this.peerMessageResponseFlux = Flux.generate(synchronousSink -> synchronousSink.next(0))
-                .publishOn(Schedulers.newSingle(whoAmI + "-RECEIVE-PEER-MESSAGES"))
-                .concatMap(__ -> PeerMessageFactory.waitForMessage(allocatorStore, torrentInfo, peer, me, dataInputStream))
+                .publishOn(scheduler)
+                .concatMap(__ -> PeerMessageFactory.waitForMessage(allocatorStore,scheduler, torrentInfo, peer, me, dataInputStream))
                 .doOnNext(peerMessage -> logger.debug(whoAmI + " received new message1: " + peerMessage))
                 //.onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                 // there are multiple subscribers to this source (every specific peer-message flux).

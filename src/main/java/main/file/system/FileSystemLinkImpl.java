@@ -54,7 +54,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
                                List<ActualFile> actualFileList,
                                AllocatorStore allocatorStore,
-                               Store<TorrentStatusState, TorrentStatusAction> store,
+                               Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
                                Flux<PieceMessage> peerResponsesFlux) {
         super(torrentInfo);
         this.allocatorStore = allocatorStore;
@@ -63,30 +63,24 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         this.downloadedBytesInPieces = new long[getPieces().size()];
         this.actualFileImplList = actualFileList;
 
-        String transaction = "file system - " + UUID.randomUUID().toString();
-//        System.out.println("file system remove file - transaction: " + transaction);
-
-        store.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.COMPLETED_DOWNLOADING_SELF_RESOLVED))
+        torrentStatusStore.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
+                .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.COMPLETED_DOWNLOADING_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
         // TODO: this status is useless because we don't use ActiveTorrents class
-        store.statesByAction(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.REMOVE_TORRENT_SELF_RESOLVED))
+        torrentStatusStore.statesByAction(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)
+                .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_TORRENT_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
-        store.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS, transaction)
-                .doOnNext(__ -> logger.trace("file system remove file - 1: " + __))
+        torrentStatusStore.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
                 .concatMap(__ -> deleteFileOnlyMono())
-                .doOnNext(__ -> logger.trace("file system remove file - 2: " + __))
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.REMOVE_FILES_SELF_RESOLVED))
-                .doOnNext(__ -> logger.trace("file system remove file - 3: " + __))
+                .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_FILES_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
-        this.savedBlocksFlux = store.latestState$()
+        this.savedBlocksFlux = torrentStatusStore.latestState$()
                 .map(torrentStatusState -> torrentStatusState.fromAction(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP))
                 .publishOn(Schedulers.elastic())
                 .flatMapMany(isCompletedDownloading -> {
@@ -103,8 +97,8 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .doOnNext(pieceMessage -> logger.trace("finished saving piece-message: " + pieceMessage))
                 // takeUntil will signal the last next signal he received and then he will send complete signal.
                 .doOnNext(pieceEvent -> {
-                    if(areAllPiecesSaved())
-                        store.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS);
+                    if (areAllPiecesSaved())
+                        torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS);
                 })
                 .takeUntil(pieceEvent -> areAllPiecesSaved())
                 .publish()
@@ -197,9 +191,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
         int pieceLength = super.getPieceLength(requestMessage.getIndex());
 
-        return this.allocatorStore.createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
-                requestMessage.getIndex(), requestMessage.getBegin(),
-                requestMessage.getBlockLength(), pieceLength)
+        return this.allocatorStore.createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(), requestMessage.getIndex(), requestMessage.getBegin(), requestMessage.getBlockLength(), pieceLength)
                 .flatMap(pieceMessage -> {
                     long from = super.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
                     long to = from + requestMessage.getBlockLength();

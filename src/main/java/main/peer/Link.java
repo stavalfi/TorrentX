@@ -57,6 +57,10 @@ public class Link {
 //                this.sendMessages.sentPeerMessagesFlux());
     }
 
+    public AllocatorStore getAllocatorStore() {
+        return allocatorStore;
+    }
+
     public Peer getPeer() {
         return peer;
     }

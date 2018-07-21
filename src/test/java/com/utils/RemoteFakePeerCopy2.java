@@ -15,6 +15,7 @@ import main.torrent.status.state.tree.TorrentStatusState;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -24,13 +25,13 @@ public class RemoteFakePeerCopy2 {
     private static Logger logger = LoggerFactory.getLogger(RemoteFakePeerCopy2.class);
     private Link link;
     private Mono<TorrentDownloader> torrentDownloader$;
-    private AllocatorStore allocatorStore;
+    private Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore;
 
     public RemoteFakePeerCopy2(Link link, String fakePeerTorrentDownloadPath) {
-        this.allocatorStore = new AllocatorStore(new Store<>(new AllocatorReducer(),
-                AllocatorReducer.defaultAllocatorState, "Test-Fake-Peer-" + link.getMe().getPeerPort() + "Allocator-Store"));
+        this.torrentStatusStore = new Store<>(new TorrentStatusReducer(),
+                TorrentStatusReducer.defaultTorrentState, "Test-Fake-Peer-" + link.getMe().getPeerPort() + "-TorrentStatus-Store");
         this.link = link;
-        int pieceIndex = 3;
+        int pieceIndex = 1; // the app will ask for this piece so we save this piece. because this reason - don't change it.
         int pieceLength = link.getTorrentInfo().getPieceLength(pieceIndex);
         int begin = 0;
         int blockLength = pieceLength;
@@ -55,18 +56,18 @@ public class RemoteFakePeerCopy2 {
                 .autoConnect(0);
     }
 
-    private Publisher<? extends PeerMessage> responseToApp(Link link, PeerMessage peerMessage) {
+    private Mono<? extends PeerMessage> responseToApp(Link link, PeerMessage peerMessage) {
         if (peerMessage instanceof PieceMessage) {
             PieceMessage pieceMessage = (PieceMessage) peerMessage;
             return link.sendMessages().sendRequestMessage(pieceMessage.getIndex(),
                     pieceMessage.getBegin(),
                     pieceMessage.getAllocatedBlock().getLength())
-                    .flatMap(__ -> this.allocatorStore.free(pieceMessage.getAllocatedBlock()))
+                    .flatMap(__ -> this.link.getAllocatorStore().free(pieceMessage.getAllocatedBlock()))
                     .map(__ -> peerMessage);
         }
         if (peerMessage instanceof RequestMessage) {
             RequestMessage requestMessage = (RequestMessage) peerMessage;
-            return torrentDownloader$.map(TorrentDownloader::getFileSystemLink)
+            return torrentDownloader$.map(torrentDownloader -> torrentDownloader.getFileSystemLink())
                     .flatMap(fileSystemLink -> fileSystemLink.buildPieceMessage(requestMessage))
                     .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage))
                     .map(__ -> peerMessage);
@@ -120,35 +121,46 @@ public class RemoteFakePeerCopy2 {
     }
 
     private Mono<TorrentDownloader> createTorrentDownloader(Link link, String fakePeerTorrentDownloadPath, int pieceIndex, int begin, int blockLength) {
-        Flux<PieceMessage> fakePieceMessageToSave$ = this.allocatorStore.updateAllocations(4, blockLength)
-                .flatMap(allocatorState -> this.allocatorStore
+        ConnectableFlux<PieceMessage> fakePieceMessageToSave$ = this.torrentStatusStore.dispatch(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
+                .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.START_DOWNLOAD_SELF_RESOLVED))
+                .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.START_DOWNLOAD_WIND_UP))
+                .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
+                .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_SELF_RESOLVED))
+                .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
+                .flatMap(__ -> this.link.getAllocatorStore().updateAllocations(4, blockLength))
+                .flatMap(allocatorState -> this.link.getAllocatorStore()
                         .createPieceMessage(link.getPeer(), link.getMe(), pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
                 .doOnNext(pieceMessageToSave -> {
                     for (int i = 0; i < blockLength; i++)
                         pieceMessageToSave.getAllocatedBlock().getBlock()[i] = 11;
                 })
-                .flux();
+                .flux()
+                .publish();
 
-        Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentState, "Test-Fake-Peer-TorrentStatus-Store");
+        Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(link.getTorrentInfo(), fakePeerTorrentDownloadPath,
+                this.link.getAllocatorStore(), this.torrentStatusStore, fakePieceMessageToSave$)
+                .cache();
 
-        Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(link.getTorrentInfo(),
-                fakePeerTorrentDownloadPath,
-                new AllocatorStore(new Store<>(new AllocatorReducer(),
-                        AllocatorReducer.defaultAllocatorState, "Test-Fake-Peer-Allocator-Store")),
-                torrentStatusStore,
-                fakePieceMessageToSave$);
+        Mono<Integer> pieceSaved$ = fileSystemLink$.flatMapMany(fileSystemLink -> fileSystemLink.savedPieceFlux())
+                .filter(savedPieceIndex -> savedPieceIndex.equals(pieceIndex))
+                .replay(1)
+                .autoConnect(0)
+                .take(1)
+                .single();
+        fakePieceMessageToSave$.connect(); // let the FS receive the piece I gave him.
 
-        // I'm using this object to send pieceMessages and Request messages to the real app.
-        return TorrentDownloaderBuilder
-                .builder(link.getTorrentInfo())
-                .setTorrentStatusStore(torrentStatusStore)
-                .setToDefaultSearchPeers()
-                .setToDefaultTorrentStatesSideEffects()
-                .setToDefaultPeersCommunicatorFlux()
-                .setFileSystemLink$(fileSystemLink$)
-                .setAllocatorStore(this.allocatorStore)
-                .build();
+        // wait until the piece we gave to the FS is saved.
+        return pieceSaved$.flatMap(__ ->
+                // I'm using this object to send pieceMessages and Request messages to the real app.
+                TorrentDownloaderBuilder.builder(link.getTorrentInfo())
+                        .setTorrentStatusStore(this.torrentStatusStore)
+                        .setToDefaultSearchPeers()
+                        .setToDefaultTorrentStatesSideEffects()
+                        .setToDefaultPeersCommunicatorFlux()
+                        .setFileSystemLink$(fileSystemLink$)
+                        .setAllocatorStore(this.link.getAllocatorStore())
+                        .setToDefaultBittorrentAlgorithm()
+                        .build());
     }
 
     public void dispose() {
@@ -156,16 +168,10 @@ public class RemoteFakePeerCopy2 {
         this.link.closeConnection();
         // it is important to remove all files before I
         // try to remove the main folder for the fake-peer.
-        this.torrentDownloader$.map(TorrentDownloader::getTorrentStatusStore)
-                .flatMap(store -> store.dispatch(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
-                        .flatMap(__ -> store.dispatch(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)))
-                .defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
-                .as(StepVerifier::create)
-                .expectNextCount(1)
-                .verifyComplete();
+        this.torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS);
+        this.torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS);
 
-        this.torrentDownloader$.map(TorrentDownloader::getTorrentStatusStore)
-                .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP, store))
+        this.torrentStatusStore.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP, this.torrentStatusStore)
                 .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
                 .defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
                 .as(StepVerifier::create)
