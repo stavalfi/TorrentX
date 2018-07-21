@@ -267,7 +267,7 @@ public class MyStepdefs {
                 .map(PeerFakeRequestResponse::getSendMessageType)
                 .collect(Collectors.toList());
         logger.debug("fake peer: " + fakePeer + " is trying to connect to the app.");
-        Mono<RemoteFakePeerCopy2> fakePeerToApp$ = TorrentDownloaders.getListenStore()
+        Mono<RemoteFakePeerCopyCat> fakePeerToApp$ = TorrentDownloaders.getListenStore()
                 .dispatch(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> TorrentDownloaders.getListenStore().notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP))
                 // I need to add this torrent to the list of
@@ -276,12 +276,12 @@ public class MyStepdefs {
                 .map(__ -> new PeersProvider(new AllocatorStore(new Store<>(new AllocatorReducer(),
                         AllocatorReducer.defaultAllocatorState, "Test-Fake-Peer-" + fakePeerPort + "-Allocator-Store")), torrentInfo))
                 .flatMap(peersProvider -> peersProvider.connectToPeerMono(app))
-                .map(link -> new RemoteFakePeerCopy2(link, fullDownloadPathForFakePeer))
+                .map(link -> new RemoteFakePeerCopyCat(link, fullDownloadPathForFakePeer))
                 .cache();
 
         Mono<?> fakePeerResponses$ = fakePeerToApp$
-                .doOnNext(remoteFakePeerCopy2 -> logger.debug("start sending messages to fake-peer"))
-                .flatMap(remoteFakePeerCopy2 -> Flux.fromIterable(messageToSendList)
+                .doOnNext(remoteFakePeerCopyCat -> logger.debug("start sending messages to fake-peer"))
+                .flatMap(remoteFakePeerCopyCat -> Flux.fromIterable(messageToSendList)
                         .concatMap(peerMessageType -> torrentDownloader$.map(TorrentDownloader::getFileSystemLink)
                                 .flatMap(fileSystemLink -> meToFakePeerLink$.flatMap(meToFakePeerLink ->
                                         Utils.sendFakeMessage(torrentInfo, fullDownloadPath, meToFakePeerLink, peerMessageType,
@@ -308,7 +308,8 @@ public class MyStepdefs {
                         .take(messageToSendList.size())
                         .collectList()
                         .doOnNext(actualReceivedMessagesList -> Assert.assertEquals("we didn't receive all the messages from fake-peer.",
-                                messageToSendList.size(), actualReceivedMessagesList.size())));
+                                messageToSendList.size(), actualReceivedMessagesList.size())))
+                .timeout(Duration.ofSeconds(10));
 
         if (peerFakeRequestResponses.size() == 3 && peerFakeRequestResponses.get(2).getErrorSignalType().isPresent())
             StepVerifier.create(fakePeerResponses$)
@@ -319,8 +320,8 @@ public class MyStepdefs {
                     .expectNextCount(1)
                     .verifyComplete();
 
-        fakePeerToApp$.doOnNext(remoteFakePeerCopy2 -> logger.debug("clean up fake-peer resources."))
-                .doOnNext(RemoteFakePeerCopy2::dispose)
+        fakePeerToApp$.doOnNext(remoteFakePeerCopyCat -> logger.debug("clean up fake-peer resources."))
+                .doOnNext(RemoteFakePeerCopyCat::dispose)
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();

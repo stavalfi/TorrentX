@@ -35,16 +35,6 @@ import java.util.stream.Collectors;
 public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private static Logger logger = LoggerFactory.getLogger(FileSystemLinkImpl.class);
 
-    public static Mono<FileSystemLink> create(TorrentInfo torrentInfo, String downloadPath,
-                                              AllocatorStore allocatorStore,
-                                              Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
-                                              Flux<PieceMessage> peerResponsesFlux) {
-        return Mono.just(torrentInfo)
-                .doOnNext(__ -> createFolders(torrentInfo, downloadPath))
-                .flatMap(__ -> createActiveTorrentFileList(torrentInfo, downloadPath))
-                .map(actualFileList -> new FileSystemLinkImpl(torrentInfo, downloadPath, actualFileList, allocatorStore, torrentStatusStore, peerResponsesFlux));
-    }
-
     private final List<ActualFile> actualFileImplList;
     private final BitSet piecesStatus;
     private final long[] downloadedBytesInPieces;
@@ -117,6 +107,16 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .distinct()
                 .publish()
                 .autoConnect(0);
+    }
+
+    public static Mono<FileSystemLink> create(TorrentInfo torrentInfo, String downloadPath,
+                                              AllocatorStore allocatorStore,
+                                              Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
+                                              Flux<PieceMessage> peerResponsesFlux) {
+        return Mono.just(torrentInfo)
+                .doOnNext(__ -> createFolders(torrentInfo, downloadPath))
+                .flatMap(__ -> createActiveTorrentFileList(torrentInfo, downloadPath))
+                .map(actualFileList -> new FileSystemLinkImpl(torrentInfo, downloadPath, actualFileList, allocatorStore, torrentStatusStore, peerResponsesFlux));
     }
 
     @Override
