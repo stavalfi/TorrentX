@@ -86,9 +86,10 @@ public class RemoteFakePeerCopy2 {
                 .index()
                 .doOnNext(peerMessage -> logger.debug("RemoteFakePeerCopy2 received new message from app: " + peerMessage))
                 .flatMap(peerMessage -> {
-                    if (peerMessage.getT1() == 2)
-                        blockThread(2000);
-                    if (peerMessage.getT1() == 3) {
+                    // the index start from zero.
+                    if (peerMessage.getT1() == 1)
+                        blockThread(0 * 1000);
+                    if (peerMessage.getT1() == 2) {
                         link.closeConnection();
                         return Mono.empty();
                     }
