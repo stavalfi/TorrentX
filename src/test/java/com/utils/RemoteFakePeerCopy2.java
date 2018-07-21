@@ -36,7 +36,50 @@ public class RemoteFakePeerCopy2 {
         int begin = 0;
         int blockLength = pieceLength;
 
-        this.torrentDownloader$ = createTorrentDownloader(link, fakePeerTorrentDownloadPath, pieceIndex, begin, blockLength).cache();
+        ConnectableFlux<PieceMessage> fakePieceMessageToSave$ = this.torrentStatusStore.dispatch(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
+                .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.START_DOWNLOAD_SELF_RESOLVED))
+                .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.START_DOWNLOAD_WIND_UP))
+                .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
+                .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_SELF_RESOLVED))
+                .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
+                .flatMap(__ -> this.link.getAllocatorStore().updateAllocations(4, blockLength))
+                .flatMap(allocatorState -> this.link.getAllocatorStore()
+                        .createPieceMessage(link.getPeer(), link.getMe(), pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
+                .doOnNext(pieceMessageToSave -> {
+                    for (int i = 0; i < blockLength; i++)
+                        pieceMessageToSave.getAllocatedBlock().getBlock()[i] = 11;
+                })
+                .flux()
+                .publish();
+
+        Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(link.getTorrentInfo(), fakePeerTorrentDownloadPath, this.link.getAllocatorStore(), this.torrentStatusStore, fakePieceMessageToSave$)
+                .cache();
+
+        Mono<Integer> pieceSaved$ = fileSystemLink$.flatMapMany(fileSystemLink -> fileSystemLink.savedPieceFlux())
+                .filter(savedPieceIndex -> savedPieceIndex.equals(pieceIndex))
+                .replay(1)
+                .autoConnect(0)
+                .take(1)
+                .single();
+        fakePieceMessageToSave$.connect(); // let the FS receive the piece I gave him.
+
+        // wait until the piece we gave to the FS is saved.
+        this.torrentDownloader$ = pieceSaved$.flatMap(__ ->
+                // I'm using this object to send pieceMessages and Request messages to the real app.
+                TorrentDownloaderBuilder.builder(link.getTorrentInfo())
+                        .setTorrentStatusStore(this.torrentStatusStore)
+                        .setToDefaultSearchPeers()
+                        .setToDefaultTorrentStatesSideEffects()
+                        .setToDefaultPeersCommunicatorFlux()
+                        .setFileSystemLink$(fileSystemLink$)
+                        .setAllocatorStore(this.link.getAllocatorStore())
+                        .setToDefaultBittorrentAlgorithm()
+                        .build())
+                .cache();
+
+        StepVerifier.create(this.torrentDownloader$)
+                .expectNextCount(1)
+                .verifyComplete();
 
         link.receivePeerMessages()
                 .getPeerMessageResponseFlux()
@@ -67,7 +110,7 @@ public class RemoteFakePeerCopy2 {
         }
         if (peerMessage instanceof RequestMessage) {
             RequestMessage requestMessage = (RequestMessage) peerMessage;
-            return torrentDownloader$.map(torrentDownloader -> torrentDownloader.getFileSystemLink())
+            return torrentDownloader$.map(TorrentDownloader::getFileSystemLink)
                     .flatMap(fileSystemLink -> fileSystemLink.buildPieceMessage(requestMessage))
                     .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage))
                     .map(__ -> peerMessage);
