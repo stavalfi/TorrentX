@@ -190,6 +190,7 @@ public class MyStepdefs {
         int pieceIndex = 3;
         int pieceLength = torrentInfo.getPieceLength(pieceIndex);
         int begin = 0;
+        @SuppressWarnings("UnnecessaryLocalVariable")
         int blockLength = pieceLength;
         Flux<PieceMessage> fakePieceMessageToSave$ = TorrentDownloaders.getAllocatorStore()
                 .updateAllocations(4, blockLength)
@@ -662,7 +663,7 @@ public class MyStepdefs {
     }
 
     @Then("^application connect to all peers and assert that we connected to them - for torrent: \"([^\"]*)\"$")
-    public void applicationConnectToAllPeersAndAssertThatWeConnectedToThemForTorrent(String torrentFileName) throws Throwable {
+    public void applicationConnectToAllPeersAndAssertThatWeConnectedToThemForTorrent(String torrentFileName) {
 //        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 //
 //        Utils.removeEverythingRelatedToLastTest();
@@ -983,7 +984,7 @@ public class MyStepdefs {
         this.recordedFakePeersToMeLinks$ = null;
         this.actualSavedBlocks$ = null;
 
-        Flux<TrackerConnection> trackers$ = Flux.<TrackerConnection>empty();
+        Flux<TrackerConnection> trackers$ = Flux.empty();
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
 
         Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
@@ -1043,6 +1044,7 @@ public class MyStepdefs {
                 .flatMap(remoteFakePeer -> remoteFakePeer.sendMessages().sendBitFieldMessage(bitSet)
                         .map(sendPeerMessages -> remoteFakePeer));
 
+        //noinspection UnassignedFluxMonoInstance
         this.fakePeersToMeLinkMap.put(fakePeerPort, fakePeerToMeLink$);
     }
 
@@ -1050,7 +1052,7 @@ public class MyStepdefs {
 
     @When("^application request the following blocks from him - for torrent: \"([^\"]*)\":$")
     public void applicationRequestTheFollowingBlocksFromHimForTorrent(String torrentFileName,
-                                                                      List<BlockOfPiece> peerRequestBlockList) throws Throwable {
+                                                                      List<BlockOfPiece> peerRequestBlockList) {
         // at this point, we already started listening for incoming links from the fake-peers.
 
         // TODO: un comment this.
@@ -1100,7 +1102,7 @@ public class MyStepdefs {
 
     @Then("^application receive the following blocks from him - for torrent: \"([^\"]*)\":$")
     public void applicationReceiveTheFollowingBlocksFromHimForTorrent(String torrentFileName,
-                                                                      List<BlockOfPiece> expectedBlockFromFakePeerList) throws Throwable {
+                                                                      List<BlockOfPiece> expectedBlockFromFakePeerList) {
         // TODO: un comment this.
 //		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 //
@@ -1148,13 +1150,12 @@ public class MyStepdefs {
             Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
+        //noinspection UnassignedFluxMonoInstance
         this.recordedFakePeersToMeLinks$.filter(remoteFakePeer -> remoteFakePeer.getMe().getPeerPort() == fakePeerPort)
                 .flatMap(remoteFakePeer -> (isChoking ?
                         remoteFakePeer.sendMessages().sendChokeMessage() :
                         remoteFakePeer.sendMessages().sendUnchokeMessage())
                         .map(sendPeerMessages -> remoteFakePeer));
-
-
     }
 
     private Flux<Integer> availablePieces$;
@@ -1190,48 +1191,46 @@ public class MyStepdefs {
     public void fakePeerOnPortNotifyOnMoreCompletedPiecesUsingForTorrent(int fakePeerPort,
                                                                          String peerMessageType,
                                                                          String torrentFileName,
-                                                                         List<Integer> fakePeerNotifyOnCompletedPieceList) throws Throwable {
+                                                                         List<Integer> fakePeerNotifyOnCompletedPieceList) {
 
     }
 
     @Then("^application receive the following extra available pieces - for torrent: \"([^\"]*)\":$")
     public void applicationReceiveTheFollowingExtraAvailablePiecesForTorrent(String torrentFileName,
-                                                                             List<Integer> expectedAvailablePiecesList) throws Throwable {
+                                                                             List<Integer> expectedAvailablePiecesList) {
 
     }
 
     @When("^application request available peers for piece: \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
-    public void applicationRequestAvailablePeersForPieceForTorrent(int pieceIndex, String torrentFileName) throws
-            Throwable {
+    public void applicationRequestAvailablePeersForPieceForTorrent(int pieceIndex, String torrentFileName) {
 
     }
 
     @Then("^application receive the following available fake-peers for piece: \"([^\"]*)\" - for torrent: \"([^\"]*)\":$")
     public void applicationReceiveTheFollowingAvailableFakePeersForPieceForTorrent(int pieceIndex,
                                                                                    String torrentFileName,
-                                                                                   List<Integer> expectedAvailableFakePeerPortList) throws Throwable {
+                                                                                   List<Integer> expectedAvailableFakePeerPortList) {
     }
 
     @Then("^application receive the following extra available fake-peers for piece: \"([^\"]*)\" - for torrent: \"([^\"]*)\":$")
     public void applicationReceiveTheFollowingExtraAvailablePeersForPieceForTorrent(int pieceIndex,
                                                                                     String torrentFileName,
-                                                                                    List<Integer> expectedAvailableFakePeerPortList) throws Throwable {
+                                                                                    List<Integer> expectedAvailableFakePeerPortList) {
 
     }
 
     @Then("^application receive none extra available pieces - for torrent: \"([^\"]*)\"$")
-    public void applicationReceiveNoneExtraAvailablePiecesForTorrent(String torrentFileName) throws Throwable {
+    public void applicationReceiveNoneExtraAvailablePiecesForTorrent(String torrentFileName) {
 
     }
 
     @Then("^application receive none available fake-peers for piece: \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
-    public void applicationReceiveNoneAvailableFakePeersForPieceForTorrent(int pieceIndex, String torrentFileName) throws
-            Throwable {
+    public void applicationReceiveNoneAvailableFakePeersForPieceForTorrent(int pieceIndex, String torrentFileName) {
 
     }
 
     @Then("^application receive the none available pieces - for torrent: \"([^\"]*)\"$")
-    public void applicationReceiveTheNoneAvailablePiecesForTorrent(String torrentFileName) throws Throwable {
+    public void applicationReceiveTheNoneAvailablePiecesForTorrent(String torrentFileName) {
 
     }
 
@@ -1239,41 +1238,39 @@ public class MyStepdefs {
     public void applicationDownloadTheFollowingPiecesConcurrentPieceSDownloadsForTorrent(
             int concurrentPieceDownloads,
             String torrentFileName,
-            List<Integer> piecesToDownloadList) throws Throwable {
+            List<Integer> piecesToDownloadList) {
 
     }
 
     @Then("^application downloaded the following pieces - for torrent: \"([^\"]*)\":$")
     public void applicationDownloadedTheFollowingPiecesForTorrent(String torrentFileName,
-                                                                  List<Integer> piecesDownloadedList) throws Throwable {
+                                                                  List<Integer> piecesDownloadedList) {
 
     }
 
     @Then("^application couldn't downloaded the following pieces - for torrent: \"([^\"]*)\":$")
     public void applicationCloudnTDownloadedTheFollowingPiecesForTorrent(String torrentFileName,
-                                                                         List<Integer> piecesNotDownloadedList) throws Throwable {
+                                                                         List<Integer> piecesNotDownloadedList) {
 
     }
 
     @And("^the saved-pieces-flux send complete signal - for torrent: \"([^\"]*)\",\"([^\"]*)\"$")
-    public void theSavedPiecesFluxSendCompleteSignalForTorrent(String torrentFileName, String downloadLocation) throws
-            Throwable {
+    public void theSavedPiecesFluxSendCompleteSignalForTorrent(String torrentFileName, String downloadLocation) {
     }
 
     @And("^the saved-blocks-flux send  complete signal - for torrent: \"([^\"]*)\",\"([^\"]*)\"$")
-    public void theSavedBlocksFluxSendCompleteSignalForTorrent(String torrentFileName, String downloadLocation) throws
-            Throwable {
+    public void theSavedBlocksFluxSendCompleteSignalForTorrent(String torrentFileName, String downloadLocation) {
     }
 
     @Then("^torrent-status change: \"([^\"]*)\" and notify only about the changes - for torrent \"([^\"]*)\":$")
     public void torrentStatusChangeAndNotifyOnlyAboutTheChangesForTorrent(TorrentStatusAction
-                                                                                  torrentStatusActionChanging, String torrentFileName) throws Throwable {
+                                                                                  torrentStatusActionChanging, String torrentFileName) {
 
     }
 
 
     @Given("^allocator for \"([^\"]*)\" blocks with \"([^\"]*)\" bytes each$")
-    public void allocatorForBlocksWithBytesEach(int amountOfBlocksToAllocate, int blockLength) throws Throwable {
+    public void allocatorForBlocksWithBytesEach(int amountOfBlocksToAllocate, int blockLength) {
         Utils.removeEverythingRelatedToLastTest();
 
         TorrentDownloaders.getAllocatorStore().updateAllocations(amountOfBlocksToAllocate, blockLength)
@@ -1437,7 +1434,7 @@ public class MyStepdefs {
     }
 
     @Then("^the allocator have \"([^\"]*)\" used blocks$")
-    public void theAllocatorHaveUsedBlocks(long expectedUsedBlocksAmount) throws Throwable {
+    public void theAllocatorHaveUsedBlocks(long expectedUsedBlocksAmount) {
         TorrentDownloaders.getAllocatorStore()
                 .latestState$()
                 .doOnNext(allocatorState -> {
@@ -1453,7 +1450,7 @@ public class MyStepdefs {
     }
 
     @Then("^the allocator have \"([^\"]*)\" free blocks$")
-    public void theAllocatorHaveFreeBlocks(int expectedFreeBlocksAmount) throws Throwable {
+    public void theAllocatorHaveFreeBlocks(int expectedFreeBlocksAmount) {
         TorrentDownloaders.getAllocatorStore()
                 .latestState$()
                 .doOnNext(allocatorState -> {
@@ -1522,23 +1519,22 @@ public class MyStepdefs {
     }
 
     @Given("^initial listen-status - default$")
-    public void initialListenStatus() throws Throwable {
+    public void initialListenStatus() {
         Utils.removeEverythingRelatedToLastTest();
     }
 
 
     @Given("^initial listen-status - without dispaching anything - default$")
-    public void initialListenStatusWithoutDispachingAnythingDefault() throws Throwable {
+    public void initialListenStatusWithoutDispachingAnythingDefault() {
     }
 
     @When("^listen-status is trying to change to:$")
-    public void listenStatusIsTryingToChangeTo(List<ListenerAction> changesActionList) throws Throwable {
+    public void listenStatusIsTryingToChangeTo(List<ListenerAction> changesActionList) {
         Utils.changeListenerState(changesActionList, TorrentDownloaders.getListenStore());
     }
 
     @Then("^listen-status will change to: \"([^\"]*)\":$")
-    public void listenStatusWillBeWithAction(ListenerAction lastAction, List<ListenerAction> expectedActionList) throws
-            Throwable {
+    public void listenStatusWillBeWithAction(ListenerAction lastAction, List<ListenerAction> expectedActionList) {
         ListenerState expectedState = Utils.getListenStatusState(lastAction, expectedActionList);
 
         TorrentDownloaders.getListenStore()
@@ -1564,7 +1560,7 @@ public class MyStepdefs {
     private Store<ListenerState, ListenerAction> listenStore;
 
     @Given("^initial listen-status - no side effects:$")
-    public void initialListenStatusNoSideEffects(List<ListenerAction> initialStateByActionList) throws Throwable {
+    public void initialListenStatusNoSideEffects(List<ListenerAction> initialStateByActionList) {
         Utils.removeEverythingRelatedToLastTest();
 
         ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
@@ -1573,14 +1569,13 @@ public class MyStepdefs {
 
     @Given("^initial listen-status - without dispaching anything - no side effects:$")
     public void initialListenStatusWithoutDispachingAnythingNoSideEffects
-            (List<ListenerAction> initialStateByActionList) throws Throwable {
+            (List<ListenerAction> initialStateByActionList) {
         ListenerState initialState = Utils.getListenStatusState(ListenerAction.INITIALIZE, initialStateByActionList);
         this.listenStore = new Store<>(new ListenerReducer(), initialState, "Test-App-TorrentStatus-Store-No-Side-Effects");
     }
 
     @When("^listen-status is trying to change to - no side effects:$")
-    public void listenStatusIsTryingToChangeToNoSideEffects(List<ListenerAction> changesActionList) throws
-            Throwable {
+    public void listenStatusIsTryingToChangeToNoSideEffects(List<ListenerAction> changesActionList) {
         Flux.fromIterable(changesActionList)
                 .flatMap(listenerAction -> this.listenStore.dispatch(listenerAction).publishOn(Schedulers.elastic()),
                         changesActionList.size())
@@ -1589,7 +1584,7 @@ public class MyStepdefs {
 
     @When("^listen-status is trying to change \"([^\"]*)\" when it can and also - no side effects:$")
     public void listenStatusIsTryingToChangeWhenItCanAndAlsoNoSideEffects(ListenerAction listenerAction,
-                                                                          List<ListenerAction> changesActionList) throws Throwable {
+                                                                          List<ListenerAction> changesActionList) {
         BiPredicate<ListenerAction, ListenerState> isInitialized = (desiredChange, listenerState) ->
                 ListenerReducer.defaultListenState.getAction().equals(listenerState.getAction()) &&
                         ListenerReducer.defaultListenState.isStartedListeningInProgress() == listenerState.isStartedListeningInProgress() &&
@@ -1632,7 +1627,7 @@ public class MyStepdefs {
 
     @Then("^listen-status will change to: \"([^\"]*)\" - no side effects:$")
     public void listenStatusWillChangeToNoSideEffects(ListenerAction
-                                                              lastAction, List<ListenerAction> expectedActionList) throws Throwable {
+                                                              lastAction, List<ListenerAction> expectedActionList) {
         ListenerState expectedState = Utils.getListenStatusState(lastAction, expectedActionList);
         this.listenStore.latestState$()
                 .doOnNext(actualState -> Assert.assertEquals(expectedState.getAction(), actualState.getAction()))

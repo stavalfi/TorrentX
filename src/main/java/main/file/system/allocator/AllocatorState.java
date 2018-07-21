@@ -5,7 +5,6 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Objects;
 
 public class AllocatorState extends State<AllocatorAction> {
 	private int blockLength;

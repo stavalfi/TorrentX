@@ -2,7 +2,6 @@ package main.peer;
 
 import main.App;
 import main.TorrentInfo;
-import main.downloader.TorrentDownloaders;
 import main.file.system.allocator.AllocatorStore;
 import main.peer.peerMessages.*;
 import org.slf4j.Logger;

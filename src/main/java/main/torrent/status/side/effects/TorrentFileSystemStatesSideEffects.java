@@ -7,8 +7,6 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import redux.store.Store;
 
-import java.util.UUID;
-
 public class TorrentFileSystemStatesSideEffects {
     private static Logger logger = LoggerFactory.getLogger(TorrentFileSystemStatesSideEffects.class);
 

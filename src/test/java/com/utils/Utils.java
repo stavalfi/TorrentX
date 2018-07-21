@@ -451,8 +451,7 @@ public class Utils {
     private static void deleteDirectory(File directoryToBeDeleted) throws IOException {
         Files.walkFileTree(directoryToBeDeleted.toPath(), new HashSet<>(), Integer.MAX_VALUE, new FileVisitor<Path>() {
             @Override
-            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-                    throws IOException {
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                 return FileVisitResult.CONTINUE;
             }
 
@@ -464,8 +463,7 @@ public class Utils {
             }
 
             @Override
-            public FileVisitResult visitFileFailed(Path file, IOException exc)
-                    throws IOException {
+            public FileVisitResult visitFileFailed(Path file, IOException exc) {
                 return FileVisitResult.CONTINUE;
             }
 

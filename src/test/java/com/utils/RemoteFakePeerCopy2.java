@@ -2,21 +2,16 @@ package com.utils;
 
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaderBuilder;
-import main.downloader.TorrentDownloaders;
 import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
-import main.file.system.allocator.AllocatorReducer;
-import main.file.system.allocator.AllocatorStore;
 import main.peer.Link;
 import main.peer.peerMessages.*;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.reducers.TorrentStatusReducer;
 import main.torrent.status.state.tree.TorrentStatusState;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.ConnectableFlux;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import redux.store.Store;
@@ -34,6 +29,7 @@ public class RemoteFakePeerCopy2 {
         int pieceIndex = 1; // the app will ask for this piece so we save this piece. because this reason - don't change it.
         int pieceLength = link.getTorrentInfo().getPieceLength(pieceIndex);
         int begin = 0;
+        @SuppressWarnings("UnnecessaryLocalVariable")
         int blockLength = pieceLength;
 
         ConnectableFlux<PieceMessage> fakePieceMessageToSave$ = this.torrentStatusStore.dispatch(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
@@ -81,6 +77,7 @@ public class RemoteFakePeerCopy2 {
                 .expectNextCount(1)
                 .verifyComplete();
 
+        //noinspection UnassignedFluxMonoInstance
         link.receivePeerMessages()
                 .getPeerMessageResponseFlux()
                 .index()

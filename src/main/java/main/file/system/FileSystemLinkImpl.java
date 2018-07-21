@@ -3,7 +3,6 @@ package main.file.system;
 import christophedetroyer.torrent.TorrentFile;
 import main.TorrentInfo;
 import main.downloader.PieceEvent;
-import main.downloader.TorrentDownloaders;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.allocator.AllocatorStore;
 import main.file.system.exceptions.PieceNotDownloadedYetException;
@@ -27,7 +26,10 @@ import java.nio.file.Files;
 import java.nio.file.OpenOption;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.List;
 import java.util.stream.Collectors;
 
 public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
@@ -50,6 +52,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private Flux<Integer> savedPiecesFlux;
     private Flux<PieceEvent> savedBlocksFlux;
     private AllocatorStore allocatorStore;
+    private Flux<TorrentStatusState> completeDownload$;
+    private Flux<TorrentStatusState> removeTorrent$;
+    private Flux<TorrentStatusState> removeFiles$;
 
     private FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
                                List<ActualFile> actualFileList,
@@ -63,18 +68,18 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         this.downloadedBytesInPieces = new long[getPieces().size()];
         this.actualFileImplList = actualFileList;
 
-        torrentStatusStore.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
+        this.completeDownload$ = torrentStatusStore.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
                 .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.COMPLETED_DOWNLOADING_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
         // TODO: this status is useless because we don't use ActiveTorrents class
-        torrentStatusStore.statesByAction(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)
+        this.removeTorrent$ = torrentStatusStore.statesByAction(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)
                 .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_TORRENT_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
-        torrentStatusStore.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
+        this.removeFiles$ = torrentStatusStore.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
                 .concatMap(__ -> deleteFileOnlyMono())
                 .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_FILES_SELF_RESOLVED))
                 .publish()
@@ -224,7 +229,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
             // I already have the received block. I don't need it.
             return Mono.empty();
 
-        return Mono.<PieceEvent>create(sink -> {
+        return Mono.create(sink -> {
             long from = super.getPieceStartPosition(pieceMessage.getIndex()) + pieceMessage.getBegin();
             long to = from + pieceMessage.getAllocatedBlock().getLength();
 
@@ -350,5 +355,17 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
             }
         }
         Files.delete(directoryToBeDeleted.toPath());
+    }
+
+    public Flux<TorrentStatusState> getCompleteDownload$() {
+        return completeDownload$;
+    }
+
+    public Flux<TorrentStatusState> getRemoveTorrent$() {
+        return removeTorrent$;
+    }
+
+    public Flux<TorrentStatusState> getRemoveFiles$() {
+        return removeFiles$;
     }
 }

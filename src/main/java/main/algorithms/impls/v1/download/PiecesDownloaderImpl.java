@@ -4,7 +4,6 @@ import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
 import main.algorithms.PeersToPiecesMapper;
 import main.algorithms.PiecesDownloader;
-import main.downloader.TorrentDownloaders;
 import main.file.system.FileSystemLink;
 import main.file.system.allocator.AllocatorStore;
 import main.peer.PeerExceptions;
@@ -27,6 +26,9 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
 
     private Flux<Integer> downloadedPiecesFlux;
     private AllocatorStore allocatorStore;
+    private Flux<TorrentStatusState> startDownload$;
+    private Flux<TorrentStatusState> resumeDownload;
+    private Flux<TorrentStatusState> pauseDownload;
 
     public PiecesDownloaderImpl(AllocatorStore allocatorStore,
                                 TorrentInfo torrentInfo,
@@ -57,17 +59,17 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
                 .publish()
                 .autoConnect(0);
 
-        this.store.statesByAction(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
+        this.startDownload$ = this.store.statesByAction(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
                 .concatMap(__ -> this.store.dispatch(TorrentStatusAction.START_DOWNLOAD_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
-        this.store.statesByAction(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS)
+        this.resumeDownload = this.store.statesByAction(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS)
                 .concatMap(__ -> this.store.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
 
-        this.store.statesByAction(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS)
+        this.pauseDownload = this.store.statesByAction(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS)
                 .concatMap(__ -> this.store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
@@ -79,7 +81,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
         System.out.println("start downloading piece: " + pieceIndex);
         final int REQUEST_BLOCK_SIZE = 16_384;
         // TODO remove the cast to integer.
-        int pieceLength = (int) this.torrentInfo.getPieceLength(pieceIndex);
+        int pieceLength = this.torrentInfo.getPieceLength(pieceIndex);
 
         Function<Integer, Integer> requestBlockLength = requestFrom ->
                 Math.min(REQUEST_BLOCK_SIZE, pieceLength - requestFrom);
@@ -130,4 +132,15 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
         return this.downloadedPiecesFlux;
     }
 
+    public Flux<TorrentStatusState> getStartDownload$() {
+        return startDownload$;
+    }
+
+    public Flux<TorrentStatusState> getResumeDownload() {
+        return resumeDownload;
+    }
+
+    public Flux<TorrentStatusState> getPauseDownload() {
+        return pauseDownload;
+    }
 }

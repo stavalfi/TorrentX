@@ -10,12 +10,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.HashSet;
-import java.util.List;
-import java.util.function.Function;
-import java.util.function.IntFunction;
-import java.util.function.Supplier;
 
 public class App {
     public static Scheduler MyScheduler = Schedulers.elastic();
@@ -37,7 +31,7 @@ public class App {
         return seekableByteChannel;
     }
 
-    private static void f5() throws IOException {
+    private static void f5() {
 //        Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), downloadPath)
 //                .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
 //                .cache();
@@ -77,52 +71,50 @@ public class App {
 
 
     public void main(String[] args) throws Exception {
-        deleteDownloadFolder();
+//        deleteDownloadFolder();
         Hooks.onOperatorDebug();
         f5();
         Thread.sleep(1000 * 1000);
     }
 
-    public static void deleteDownloadFolder() {
-        try {
-            File file = new File(System.getProperty("user.dir") + File.separator + "torrents-test");
-            if (file.exists()) {
-                deleteDirectory(file);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+//    public static void deleteDownloadFolder() {
+//        try {
+//            File file = new File(System.getProperty("user.dir") + File.separator + "torrents-test");
+//            if (file.exists()) {
+//                deleteDirectory(file);
+//            }
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//    }
 
-    private static void deleteDirectory(File directoryToBeDeleted) throws IOException {
-        Files.walkFileTree(directoryToBeDeleted.toPath(), new HashSet<>(), Integer.MAX_VALUE, new FileVisitor<Path>() {
-            @Override
-            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-                    throws IOException {
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-                    throws IOException {
-                Files.delete(file);
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult visitFileFailed(Path file, IOException exc)
-                    throws IOException {
-                return FileVisitResult.CONTINUE;
-            }
-
-            @Override
-            public FileVisitResult postVisitDirectory(Path dir, IOException exc)
-                    throws IOException {
-                Files.delete(dir);
-                return FileVisitResult.CONTINUE;
-            }
-        });
-    }
+//    private static void deleteDirectory(File directoryToBeDeleted) throws IOException {
+//        Files.walkFileTree(directoryToBeDeleted.toPath(), new HashSet<>(), Integer.MAX_VALUE, new FileVisitor<Path>() {
+//            @Override
+//            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+//                return FileVisitResult.CONTINUE;
+//            }
+//
+//            @Override
+//            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+//                    throws IOException {
+//                Files.delete(file);
+//                return FileVisitResult.CONTINUE;
+//            }
+//
+//            @Override
+//            public FileVisitResult visitFileFailed(Path file, IOException exc) {
+//                return FileVisitResult.CONTINUE;
+//            }
+//
+//            @Override
+//            public FileVisitResult postVisitDirectory(Path dir, IOException exc)
+//                    throws IOException {
+//                Files.delete(dir);
+//                return FileVisitResult.CONTINUE;
+//            }
+//        });
+//    }
 
     private static TorrentInfo getTorrentInfo() throws IOException {
         String torrentFilePath = "src" + File.separator +
