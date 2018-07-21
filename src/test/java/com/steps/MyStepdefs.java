@@ -554,14 +554,12 @@ public class MyStepdefs {
 
         Flux<PieceMessage> generatedWrittenPieceMessages$ = TorrentDownloaders.getAllocatorStore()
                 .latestState$()
-                .publishOn(Schedulers.elastic())
                 .map(AllocatorState::getBlockLength)
                 .flatMapMany(allocatedBlockLength -> Flux.fromIterable(blockList)
                         .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength))
                         .doOnNext(blockOfPiece -> System.out.println("start saving: " + blockOfPiece))
                         .flatMap((BlockOfPiece blockOfPiece) ->
                                 Utils.createRandomPieceMessages(torrentInfo, semaphore, blockOfPiece, allocatedBlockLength)))
-                .publishOn(App.MyScheduler)
                 .publish()
                 .autoConnect(2);
 
@@ -1621,8 +1619,7 @@ public class MyStepdefs {
                 .collectList();
 
         Flux.merge(this.listenStore.tryDispatchUntil(listenerAction, isCanceled).publishOn(Schedulers.elastic())
-                        .defaultIfEmpty(ListenerReducer.defaultListenState),
-                changeTo$.publishOn(Schedulers.elastic()))
+                        .defaultIfEmpty(ListenerReducer.defaultListenState), changeTo$.publishOn(Schedulers.elastic()))
                 .blockLast();
     }
 

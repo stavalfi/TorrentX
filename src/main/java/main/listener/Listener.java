@@ -74,8 +74,8 @@ public class Listener {
                                 .map(__ -> serverSocket))
                 .doOnNext(serverSocket -> logger.info("resume listening to incoming peers under port: " + getTcpPort()))
                 .concatMap(serverSocket -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, serverSocket))
-                .publishOn(Schedulers.elastic())
                 .concatMap(this::acceptPeersLinks)
+                .publishOn(Schedulers.elastic())
                 .concatMap(link -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, link))
                 .doOnError(throwable -> logger.error("fatal error while accepting peer connection or in server-socket object", throwable))
                 .onErrorResume(PeerExceptions.communicationErrors,
@@ -126,9 +126,10 @@ public class Listener {
             }
         });
 
-        return peersSocket.concatMap(peerSocket -> acceptPeerConnection(peerSocket)
-                .doOnNext(link -> logger.info("new peer connected to me successfully: " + link))
-                .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty()));
+        return peersSocket.subscribeOn(Schedulers.newSingle("LISTENER"))
+                .concatMap(peerSocket -> acceptPeerConnection(peerSocket)
+                        .doOnNext(link -> logger.info("new peer connected to me successfully: " + link))
+                        .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty()));
     }
 
     private Mono<Link> acceptPeerConnection(Socket peerSocket) {
@@ -190,7 +191,7 @@ public class Listener {
 
     public Flux<Link> getPeers$(TorrentInfo torrentInfo) {
         // TODO: we need to complete this flux when the torrent is removed. need to add test for it.
-        return this.resumeListen$.publishOn(Schedulers.elastic())
+        return this.resumeListen$
                 .filter(link -> link.getTorrentInfo().equals(torrentInfo));
     }
 

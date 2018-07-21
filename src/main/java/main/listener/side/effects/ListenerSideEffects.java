@@ -79,18 +79,18 @@ public class ListenerSideEffects {
     }
 
     public Flux<ListenerState> getStartListen$() {
-        return startListen$.publishOn(Schedulers.elastic());
+        return startListen$;
     }
 
     public Flux<ListenerState> getResumeListen$() {
-        return resumeListen$.publishOn(Schedulers.elastic());
+        return resumeListen$;
     }
 
     public Flux<ListenerState> getPauseListen$() {
-        return pauseListen$.publishOn(Schedulers.elastic());
+        return pauseListen$;
     }
 
     public Flux<ListenerState> getRestartListen$() {
-        return restartListen$.publishOn(Schedulers.elastic());
+        return restartListen$;
     }
 }

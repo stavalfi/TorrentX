@@ -27,7 +27,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
 
         this.uploadedBlocks$ = store.statesByAction(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS)
                 .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_UPLOAD_SELF_RESOLVED))
-                .publishOn(Schedulers.elastic())
+                .publishOn(Schedulers.newSingle("PEERS-RECEIVER-FOR-TORRENT-" + torrentInfo.getName()))
                 .concatMap(__ -> peersCommunicatorFlux)
                 .flatMap(link -> link.receivePeerMessages().getRequestMessageResponseFlux()
                         .filter(requestMessage -> fileSystemLink.havePiece(requestMessage.getIndex()))

@@ -123,8 +123,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 
     @Override
     public Flux<STATE_IMPL> states$() {
-        return this.states$
-                .publishOn(Schedulers.elastic());
+        return this.states$;
     }
 
     @Override
