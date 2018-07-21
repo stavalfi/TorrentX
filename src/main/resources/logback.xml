@@ -3,7 +3,7 @@
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>
-                %d{HH:mm:ss.SSSSS} [%thread] %-5level - %msg%n\n
+                %d{HH:mm:ss.SSSS} [%thread] %-5level - %msg%n\n
             </pattern>
         </encoder>
     </appender>
@@ -14,7 +14,7 @@
         <suffixPattern>TorrentX: %logger %msg</suffixPattern>
     </appender>
 
-    <root level="DEBUG">
+    <root level="INFO">
         <appender-ref ref="STDOUT"/>
         <!--<appender-ref ref="PAPERTRAIL"/>-->
     </root>
