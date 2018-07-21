@@ -845,10 +845,9 @@ public class MyStepdefs {
         // The last step created FileSystemLinkImpl object which listener to custom
         // peerResponsesFlux. So I can't expect it to react to the original peerResponsesFlux.
         // Also the last test created torrentStatusController object.
-        FileSystemLink fileSystemLink = TorrentDownloaders.getInstance()
+        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
-                .getFileSystemLink();
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
         // this flux is empty because if not, the application will get the peers from
         // them and then it will connect to all those peers and then those peers will
@@ -859,19 +858,17 @@ public class MyStepdefs {
         TorrentDownloaders.getInstance().deleteTorrentDownloader(torrentInfo.getTorrentInfoHash());
 
         // represent this application TorrentDownloader. (not the fake-peer TorrentDownloader).
-        Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                TorrentStatusReducer.defaultTorrentState, "Test-App-TorrentStatus-Store");
         TrackerProvider trackerProvider = Mockito.mock(TrackerProvider.class);
         Mockito.when(trackerProvider.connectToTrackersFlux()).thenReturn(trackerConnectionFlux);
         Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.builder(torrentInfo)
-                .setTorrentStatusStore(store)
+                .setTorrentStatusStore(torrentDownloader.getTorrentStatusStore())
                 .setToDefaultTorrentStatesSideEffects()
-                .setSearchPeers(new SearchPeers(torrentInfo, store, trackerProvider, new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo)))
+                .setSearchPeers(new SearchPeers(torrentInfo, torrentDownloader.getTorrentStatusStore(), trackerProvider, new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo)))
                 .setToDefaultPeersCommunicatorFlux()
                 .setToDefaultBittorrentAlgorithm()
-                .setFileSystemLink$(Mono.just(fileSystemLink))
+                .setFileSystemLink$(Mono.just(torrentDownloader.getFileSystemLink()))
                 .build()
-                .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
+                .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
                 .flux()
                 .replay(1)
                 .autoConnect(0)
@@ -880,9 +877,9 @@ public class MyStepdefs {
         // start listen -> make fake peer connect to me -> send fake messages from fake-peer to me.
         this.requestsFromFakePeerToMeList$ = TorrentDownloaders.getListenStore()
                 .dispatch(ListenerAction.START_LISTENING_IN_PROGRESS)
-                .flatMap(__ -> store.dispatch(TorrentStatusAction.START_UPLOAD_IN_PROGRESS))
+                .flatMap(__ -> torrentDownloader.getTorrentStatusStore().dispatch(TorrentStatusAction.START_UPLOAD_IN_PROGRESS))
                 .flatMap(__ -> TorrentDownloaders.getListenStore().notifyWhen(ListenerAction.START_LISTENING_WIND_UP))
-                .flatMap(__ -> store.notifyWhen(TorrentStatusAction.RESUME_UPLOAD_WIND_UP))
+                .flatMap(__ -> torrentDownloader.getTorrentStatusStore().notifyWhen(TorrentStatusAction.RESUME_UPLOAD_WIND_UP))
                 .flatMap(__ -> torrentDownloader$)
                 .map(TorrentDownloader::getSearchPeers)
                 .map(SearchPeers::getPeersProvider)
@@ -891,7 +888,7 @@ public class MyStepdefs {
                     Peer me = new Peer("localhost", AppConfig.getInstance().findFreePort());
                     return peersProvider.connectToPeerMono(me);
                 })
-                .map(fakePeerToMeLink -> fakePeerToMeLink.sendMessages())
+                .map(Link::sendMessages)
                 .flatMapMany(sendMessagesObject -> sendMessagesObject.sendInterestedMessage()
                         .flatMapMany(__ -> TorrentDownloaders.getAllocatorStore()
                                 .latestState$()
@@ -903,7 +900,8 @@ public class MyStepdefs {
                         .concatMap(blockOfPiece -> sendMessagesObject.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(), blockOfPiece.getLength())))
                 .collectList()
                 .doOnNext(requestList -> Assert.assertEquals("We sent less requests then expected.",
-                        peerRequestBlockList.size(), requestList.size()));
+                        peerRequestBlockList.size(), requestList.size()))
+                .cache();
     }
 
     @Then("^we assert that for torrent: \"([^\"]*)\", we gave the following pieces to the random-fake-peer:$")
@@ -923,12 +921,18 @@ public class MyStepdefs {
         // fake-peer will send me request messages and I response to him **piece messages**
         // which I don't want to lose.
         Flux<PieceMessage> recordedPieceMessageFlux = meToFakePeerLink
-                .map(Link::sendMessages)
+                .map(link -> link.sendMessages())
                 .flatMapMany(SendMessagesNotifications::sentPeerMessagesFlux)
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
                 .cast(PieceMessage.class)
                 .replay()
                 .autoConnect(0);
+
+        // I must subscribe to this seperatly because if the number of requests is zero then take(0) will complete the flux before susbcribing to it
+        // and then the mono requestsFromFakePeerToMeList$ will never get subscribed.
+        StepVerifier.create(this.requestsFromFakePeerToMeList$)
+                .expectNextCount(1)
+                .verifyComplete();
 
         // send request massages from fake peer to me and get all the
         // piece messages from me to fake peer and collect them to list.
