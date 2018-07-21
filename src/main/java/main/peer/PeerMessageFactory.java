@@ -19,12 +19,8 @@ import java.util.Objects;
 public class PeerMessageFactory {
     private static Logger logger = LoggerFactory.getLogger(PeerMessageFactory.class);
 
-    public static Mono<? extends PeerMessage> waitForMessage(AllocatorStore allocatorStore,
-                                                             Scheduler scheduler,
-                                                             TorrentInfo torrentInfo,
-                                                             Peer from,
-                                                             Peer to,
-                                                             DataInputStream dataInputStream) {
+    public static Mono<? extends PeerMessage> waitForMessage(AllocatorStore allocatorStore, Scheduler scheduler, TorrentInfo torrentInfo,
+                                                             Peer from, Peer to, DataInputStream dataInputStream) {
         // lengthOfTheRestOfData == messageLength == how much do we need to read more
         int lengthOfTheRestOfData;
         try {
@@ -47,9 +43,7 @@ public class PeerMessageFactory {
         } catch (IOException e) {
             return Mono.error(e);
         }
-        logger.debug(whoAmI + " start received message-id: " + messageId +
-                "==" + PeerMessageId.fromValue(messageId) + " from: " +
-                from + " to: " + to);
+        logger.debug(whoAmI + " start received message-id: " + messageId + "==" + PeerMessageId.fromValue(messageId) + " from: " + from + " to: " + to);
         int messagePayloadLength = lengthOfTheRestOfData - 1;
 
         if (messageId == PeerMessageId.pieceMessage.getMessageId())

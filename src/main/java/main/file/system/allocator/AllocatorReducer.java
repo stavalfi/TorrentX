@@ -122,8 +122,6 @@ public class AllocatorReducer implements Reducer<AllocatorState, AllocatorAction
             return new Result<AllocatorState, AllocatorAction>(request, lastState, false);
         int fixedBegin = fixBlockBegin(request.getPieceLength(), request.getBegin());
         int fixedBlockLength = fixBlockLength(request.getPieceLength(), fixedBegin, request.getBlockLength(), lastState.getBlockLength());
-        int allocatedBlockOffset = 0;
-
 
         BitSet freeBlocksStatus = new BitSet(lastState.getAmountOfBlocks());
         freeBlocksStatus.set(freeIndex, false);

@@ -40,7 +40,7 @@ public class Listener {
     private AllocatorStore allocatorStore;
 
     public Listener(AllocatorStore allocatorStore) {
-        this.allocatorStore=allocatorStore;
+        this.allocatorStore = allocatorStore;
         Store<ListenerState, ListenerAction> listenerStore = TorrentDownloaders.getListenStore();
 
         Supplier<Mono<ServerSocket>> serverSocketSupplier = () -> {
@@ -174,7 +174,7 @@ public class Listener {
         }
         // all went well, I accept this connection.
         Peer peer = new Peer(peerSocket.getInetAddress().getHostAddress(), peerSocket.getPort());
-        return Mono.just(new Link(this.allocatorStore,torrentInfo.get(), peer, peerSocket, peerDataInputStream, peerDataOutputStream));
+        return Mono.just(new Link(this.allocatorStore, torrentInfo.get(), peer, peerSocket, peerDataInputStream, peerDataOutputStream));
     }
 
     private Optional<TorrentInfo> haveThisTorrent(String receivedTorrentInfoHash) {
@@ -192,5 +192,21 @@ public class Listener {
         // TODO: we need to complete this flux when the torrent is removed. need to add test for it.
         return this.resumeListen$.publishOn(Schedulers.elastic())
                 .filter(link -> link.getTorrentInfo().equals(torrentInfo));
+    }
+
+    public Flux<ListenerState> getPauseListen$() {
+        return pauseListen$;
+    }
+
+    public Flux<ListenerState> getRestartListener$() {
+        return restartListener$;
+    }
+
+    public Flux<ServerSocket> getStartListen$() {
+        return startListen$;
+    }
+
+    public Flux<Link> getResumeListen$() {
+        return resumeListen$;
     }
 }
