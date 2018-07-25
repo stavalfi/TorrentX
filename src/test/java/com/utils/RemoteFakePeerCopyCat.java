@@ -19,6 +19,7 @@ import redux.store.Store;
 
 public class RemoteFakePeerCopyCat {
     private static Logger logger = LoggerFactory.getLogger(RemoteFakePeerCopyCat.class);
+
     private Link link;
     private Mono<TorrentDownloader> torrentDownloader$;
     private Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore;
@@ -106,17 +107,20 @@ public class RemoteFakePeerCopyCat {
     private Mono<? extends PeerMessage> responseToApp(Link link, PeerMessage peerMessage) {
         if (peerMessage instanceof PieceMessage) {
             PieceMessage pieceMessage = (PieceMessage) peerMessage;
-            return link.sendMessages().sendRequestMessage(pieceMessage.getIndex(),
-                    pieceMessage.getBegin(),
-                    pieceMessage.getAllocatedBlock().getLength())
+            return link.sendMessages().sendRequestMessage(pieceMessage.getIndex(), pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength())
                     .flatMap(__ -> this.link.getAllocatorStore().free(pieceMessage.getAllocatedBlock()))
                     .map(__ -> peerMessage);
         }
         if (peerMessage instanceof RequestMessage) {
             RequestMessage requestMessage = (RequestMessage) peerMessage;
             return torrentDownloader$.map(TorrentDownloader::getFileSystemLink)
+                    .doOnNext(__ -> logger.debug("start creating piece-message for response to app because he sent me request-message: " + requestMessage))
                     .flatMap(fileSystemLink -> fileSystemLink.buildPieceMessage(requestMessage))
-                    .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage))
+                    .doOnNext(__ -> logger.debug("end creating piece-message for response to app because he sent me request-message: " + requestMessage))
+                    .doOnNext(__ -> logger.debug("start send piece-message for response to app because he sent me request-message: " + requestMessage))
+                    .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
+                            .doOnNext(__ -> logger.debug("end send piece-message for response to app because he sent me request-message. piece message: " + pieceMessage)))
+                    .doOnError(error -> logger.error("wtf: " + error))
                     .map(__ -> peerMessage);
         }
         if (peerMessage instanceof BitFieldMessage) {

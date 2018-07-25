@@ -92,8 +92,6 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
                 .flatMap(this::writeBlock)
                 .doOnNext(pieceMessage -> logger.trace("finished saving piece-message: " + pieceMessage))
-                .flatMap(pieceEvent -> this.allocatorStore.free(pieceEvent.getReceivedPiece().getAllocatedBlock()).map(__ -> pieceEvent))
-                .doOnNext(pieceMessage -> logger.trace("finished cleaning-up piece-message-allocator: " + pieceMessage))
                 .doOnNext(__ -> {
                     // we may come here even if we got am empty flux but the download isn't yet completed.
                     if (areAllPiecesSaved()) {
@@ -229,13 +227,14 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     }
 
     private Mono<PieceEvent> writeBlock(PieceMessage pieceMessage) {
-        if (havePiece(pieceMessage.getIndex()) ||
-                this.downloadedBytesInPieces[pieceMessage.getIndex()] > pieceMessage.getBegin() +
-                        pieceMessage.getAllocatedBlock().getLength())
-            // I already have the received block. I don't need it.
-            return Mono.empty();
-
-        return Mono.create(sink -> {
+        return Mono.<PieceEvent>create(sink -> {
+            if (havePiece(pieceMessage.getIndex()) ||
+                    this.downloadedBytesInPieces[pieceMessage.getIndex()] > pieceMessage.getBegin() +
+                            pieceMessage.getAllocatedBlock().getLength()) {
+                // I already have the received block. I don't need it.
+                sink.success();
+                return;
+            }
             long from = super.getPieceStartPosition(pieceMessage.getIndex()) + pieceMessage.getBegin();
             long to = from + pieceMessage.getAllocatedBlock().getLength();
 
@@ -278,7 +277,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.DOWNLOADING, pieceMessage);
                 sink.success(pieceEvent);
             }
-        });
+        }).doAfterSuccessOrError((__, ___) -> logger.trace("start cleaning-up piece-message-allocator: " + pieceMessage))
+                .doAfterSuccessOrError((__, ___) -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
+                .doAfterSuccessOrError((__, ___) -> logger.trace("finished cleaning-up piece-message-allocator: " + pieceMessage));
     }
 
     private static Mono<List<ActualFile>> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) {

@@ -22,6 +22,8 @@ import main.torrent.status.state.tree.SearchPeersState;
 import main.torrent.status.state.tree.TorrentFileSystemState;
 import main.torrent.status.state.tree.TorrentStatusState;
 import org.junit.Assert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -43,6 +45,8 @@ import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
 public class Utils {
+    private static Logger logger = LoggerFactory.getLogger(Utils.class);
+
     public static TorrentInfo createTorrentInfo(String torrentFilePath) throws IOException {
         String torrentFilesPath = "src" + File.separator +
                 "test" + File.separator +
@@ -295,8 +299,13 @@ public class Utils {
             case PieceMessage:
                 return TorrentDownloaders.getAllocatorStore()
                         .createRequestMessage(null, null, pieceIndex, begin, blockLength, pieceLength)
+                        .doOnNext(requestMessage -> logger.debug("start creating fake-piece-message to send to a fake-peer. " +
+                                "the details of the piece-message are coming from a fake-request-message I created: " + requestMessage))
                         .flatMap(requestMessage -> fileSystemLink.buildPieceMessage(requestMessage))
-                        .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage));
+                        .doOnNext(pieceMessage -> logger.debug("end creating fake-piece-message to send to a fake-peer: " + pieceMessage))
+                        .doOnNext(pieceMessage -> logger.debug("start send fake-peer-message to fake-peer: " + pieceMessage))
+                        .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
+                                .doOnNext(__ -> logger.debug("end send fake-peer-message to fake-peer: " + pieceMessage)));
             case CancelMessage:
                 return link.sendMessages().sendCancelMessage(2, 0, 10);
             case KeepAliveMessage:

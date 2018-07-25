@@ -29,7 +29,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
             while (true) {
                 try {
                     Request<ACTION> request = this.requestsQueue.take();
-                    logger.debug(this.identifier + " - start inspecting request: " + request + "\n");
+                    logger.debug(this.identifier + " - start inspecting request: " + request);
                     sink.next(request);
                 } catch (InterruptedException e) {
                     sink.error(e);
@@ -38,6 +38,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
             }
         }).subscribeOn(Schedulers.newSingle(this.identifier + " - PULLER - "))
                 .scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
+                    logger.debug(this.identifier + " - start processing request: " + request + ", current state: " + lastResult.getState());
                     Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
                     if (!result.isNewState())
                         logger.debug(this.identifier + " - ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
@@ -128,9 +129,9 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 
     @Override
     public Flux<STATE_IMPL> statesByAction(ACTION action) {
-        logger.debug(this.identifier + " - statesByAction - 0: " + action);
+        //logger.debug(this.identifier + " - statesByAction - 0: " + action);
         return states$()
-                .doOnNext(__ -> logger.debug(this.identifier + " - statesByAction - 1: " + action + " - state: " + __))
+                //.doOnNext(__ -> logger.debug(this.identifier + " - statesByAction - 1: " + action + " - state: " + __))
                 .filter(stateImpl -> stateImpl.getAction().equals(action));
     }
 

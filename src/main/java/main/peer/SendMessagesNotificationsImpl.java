@@ -31,7 +31,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
                                   PeerCurrentStatus peerCurrentStatus,
                                   Runnable closeConnectionMethod,
                                   DataOutputStream peerDataOutputStream) {
-        this.allocatorStore=allocatorStore;
+        this.allocatorStore = allocatorStore;
         this.torrentInfo = torrentInfo;
         this.me = me;
         this.peer = peer;
@@ -62,9 +62,9 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     public Mono<SendMessagesNotifications> sendPieceMessage(PieceMessage pieceMessage) {
         return send(pieceMessage)
                 .map(__ -> this.allocatorStore)
-                .doOnNext(__ -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
-                .doOnError(throwable -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
-                .doOnCancel(() -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
+                .doOnSuccessOrError((__, ___) -> logger.debug("dispatching cleaning for piece-message: " + pieceMessage))
+                .doOnError(__ -> logger.debug("I shouldn't be here: " + __))
+                .doAfterSuccessOrError((__, ___) -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
                 .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(pieceMessage.getIndex()))
                 .map(__ -> this);
     }

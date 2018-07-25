@@ -196,12 +196,14 @@ public class MyStepdefs {
 
         ConnectableFlux<PieceMessage> fakePieceMessageToSave$ = TorrentDownloaders.getAllocatorStore()
                 .updateAllocations(1, blockLength)
+                .doOnNext(__ -> logger.debug("start allocate fake-piece-message and then fill it with fake-data to maybe use that piece later to send to a fake-peer."))
                 .flatMap(allocatorState -> TorrentDownloaders.getAllocatorStore().createPieceMessage(fakePeer, app, pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
                 .publishOn(Schedulers.elastic())
                 .doOnNext(pieceMessageToSave -> {
                     for (int i = 0; i < blockLength; i++)
                         pieceMessageToSave.getAllocatedBlock().getBlock()[i] = 11;
                 })
+                .doOnNext(__ -> logger.debug("end allocate fake-piece-message and then fill it with fake-data to maybe use that piece later to send to a fake-peer."))
                 .flux()
                 .publish();
 
@@ -335,8 +337,7 @@ public class MyStepdefs {
                         })
                         .take(messageToSendList.size())
                         .collectList()
-                        .doOnNext(actualReceivedMessagesList -> Assert.assertEquals("we didn't receive all the messages from fake-peer.", messageToSendList.size(), actualReceivedMessagesList.size())))
-                .timeout(Duration.ofSeconds(10));
+                        .doOnNext(actualReceivedMessagesList -> Assert.assertEquals("we didn't receive all the messages from fake-peer.", messageToSendList.size(), actualReceivedMessagesList.size())));
 
         if (peerFakeRequestResponses.size() == 3 && peerFakeRequestResponses.get(2).getErrorSignalType().isPresent())
             StepVerifier.create(fakePeerResponses$)
@@ -520,8 +521,7 @@ public class MyStepdefs {
                 .doOnNext(torrentDownloader -> {
                     Mono<List<Integer>> piecesCompleted1 = torrentDownloader.getFileSystemLink().savedBlockFlux()
                             //.doOnNext(pieceEvent -> System.out.println("block complete:" + pieceEvent))
-                            .flatMap(pieceEvent ->
-                            {
+                            .flatMap(pieceEvent -> {
                                 AllocatedBlock allocatedBlock = pieceEvent.getReceivedPiece().getAllocatedBlock();
                                 return TorrentDownloaders.getAllocatorStore()
                                         .free(allocatedBlock)
