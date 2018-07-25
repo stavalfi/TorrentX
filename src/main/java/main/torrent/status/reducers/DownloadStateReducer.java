@@ -144,7 +144,6 @@ public class DownloadStateReducer {
                         .setResumeDownloadInProgress(false)
                         .setResumeDownloadSelfResolved(false)
                         .setResumeDownloadWindUp(true)
-                        // TODO: critical bug: need to change this to .setPauseDownloadWindUp(true)
                         .setPauseDownloadWindUp(false)
                         .build();
 

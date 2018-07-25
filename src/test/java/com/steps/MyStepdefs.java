@@ -261,8 +261,12 @@ public class MyStepdefs {
                 .collect(Collectors.toList());
 
         Flux<? extends PeerMessage> recordedResponses$ = Flux.fromIterable(messageToReceive)
+                // I don't want to listen multipl times concurrently to the same channel.
+                // because if yes, I Will receive multiple messages in each step instead of a signle message.
+                .distinct()
                 .doOnNext(peerMessageType -> logger.debug("start listen to incoming message from type: " + peerMessageType.name()))
-                .flatMap(peerMessageType -> meToFakePeerLink$.flatMapMany(link -> Utils.getSpecificMessageResponseFluxByMessageType(link, peerMessageType)), messageToReceive.size())
+                .flatMap(peerMessageType -> meToFakePeerLink$.flatMapMany(link ->
+                        Utils.getSpecificMessageResponseFluxByMessageType(link, peerMessageType)), messageToReceive.size())
                 .doOnNext(peerMessage -> logger.debug("App received message from fake peer: " + peerMessage))
                 // if we received a piece message, then free it's allocation.
                 .concatMap(peerMessage -> {
@@ -275,6 +279,7 @@ public class MyStepdefs {
                     }
                     return Mono.just(peerMessage);
                 })
+                .doOnError(__ -> logger.error("something went wrong1: " + __))
                 .replay(messageToReceive.size())
                 // start record incoming messages from fake peer
                 .autoConnect(0);
