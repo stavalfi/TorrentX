@@ -59,6 +59,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         this.actualFileImplList = actualFileList;
 
         this.completeDownload$ = torrentStatusStore.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
+
                 .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.COMPLETED_DOWNLOADING_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
@@ -80,6 +81,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .publishOn(Schedulers.elastic())
                 .flatMapMany(isCompletedDownloading -> {
                     if (isCompletedDownloading) {
+                        logger.info("Torrent: " + torrentInfo + ", the torrent download is already completed so we update our internal state that all the pieces are completed.");
                         this.piecesStatus.set(0, torrentInfo.getPieces().size());
                         return Flux.empty();
                     }
@@ -90,17 +92,21 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
                 .flatMap(this::writeBlock)
                 .doOnNext(pieceMessage -> logger.trace("finished saving piece-message: " + pieceMessage))
-                // takeUntil will signal the last next signal he received and then he will send complete signal.
-                .doOnNext(pieceEvent -> {
-                    if (areAllPiecesSaved())
+                .flatMap(pieceEvent -> this.allocatorStore.free(pieceEvent.getReceivedPiece().getAllocatedBlock()).map(__ -> pieceEvent))
+                .doOnNext(pieceMessage -> logger.trace("finished cleaning-up piece-message-allocator: " + pieceMessage))
+                .doOnNext(__ -> {
+                    // we may come here even if we got am empty flux but the download isn't yet completed.
+                    if (areAllPiecesSaved()) {
+                        logger.info("Torrent: " + torrentInfo + ", we finished to download the torrent and we dispatch a comeplete notification using redux.");
                         torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS);
+                    }
                 })
+                // takeUntil will signal the last next signal he received and then he will send complete signal.
                 .takeUntil(pieceEvent -> areAllPiecesSaved())
                 .publish()
                 .autoConnect(0);
 
-        this.savedPiecesFlux = this.savedBlocksFlux
-                .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
+        this.savedPiecesFlux = this.savedBlocksFlux.filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
                 .map(PieceEvent::getReceivedPiece)
                 .map(PieceMessage::getIndex)
                 .doOnNext(pieceIndex -> logger.debug("completed saving piece-index: " + pieceIndex))

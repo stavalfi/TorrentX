@@ -71,6 +71,7 @@ public class Utils {
         TorrentDownloaders.getAllocatorStore()
                 .freeAll()
                 .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(2, 17_000))
+                .publishOn(Schedulers.elastic())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();

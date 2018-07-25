@@ -29,7 +29,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
             while (true) {
                 try {
                     Request<ACTION> request = this.requestsQueue.take();
-                    logger.debug(this.identifier + " - left in queue: " + this.requestsQueue.size() + " - start inspecting request: " + request + "\n");
+                    logger.debug(this.identifier + " - start inspecting request: " + request + "\n");
                     sink.next(request);
                 } catch (InterruptedException e) {
                     sink.error(e);
@@ -60,7 +60,6 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 
     public void dispatchNonBlocking(ACTION action) {
         Request<ACTION> request = new Request<>(action);
-        logger.debug(this.identifier + " - left in quque: " + this.requestsQueue.size() + " - getting ready for dispatching request1: " + request);
         try {
             this.requestsQueue.put(request);
         } catch (InterruptedException e) {
@@ -70,10 +69,8 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
     }
 
     public void dispatchNonBlocking(Request<ACTION> request) {
-        logger.debug(this.identifier + " - left in queue: " + this.requestsQueue.size() + " - getting ready for dispatching request2: " + request);
         try {
             this.requestsQueue.put(request);
-            logger.debug(this.identifier + " - left in queue: " + this.requestsQueue.size() + " - after adding the request to the queue: " + request);
         } catch (InterruptedException e) {
             // TODO: do something with this
             e.printStackTrace();
@@ -81,7 +78,6 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
     }
 
     public Mono<Result<STATE_IMPL, ACTION>> dispatch(Request<ACTION> request) {
-        logger.debug(this.identifier + " - left in queue: " + this.requestsQueue.size() + " - getting ready for dispatching request3: " + request);
         Flux<Result<STATE_IMPL, ACTION>> resultFlux = this.results$
                 .filter(result -> result.getRequest().equals(request))
                 .take(1)
@@ -89,7 +85,6 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
                 .autoConnect(0);
         try {
             this.requestsQueue.put(request);
-            logger.debug(this.identifier + " - left in queue: " + this.requestsQueue.size() + " - after adding the request to the queue: " + request);
         } catch (InterruptedException e) {
             return Mono.error(e);
         }
