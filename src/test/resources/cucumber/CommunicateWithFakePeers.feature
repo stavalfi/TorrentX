@@ -48,11 +48,11 @@ Feature: connect to a fake peers and communicate with them
 #  1. the fake peers response with the same peer-message they received
 #  2. the second response will be delayed in 2 seconds
 #  3. the third response will cause the peer to shutdown the connection and not responding anything
-    Then application send to [peer ip: "localhost", peer port: "8985"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+    Then application send to [peer ip: "localhost", peer port: "8988"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
       | sendMessageType | receiveMessageType | errorSignalType |
       | RequestMessage  | PieceMessage       |                 |
       | PieceMessage    | RequestMessage     |                 |
-      | UnchokeMessage  |                    | EOFException    |
+#      | UnchokeMessage  |                    | EOFException    |
 
     Examples:
       | torrent                                   | downloadLocation |
@@ -62,10 +62,10 @@ Feature: connect to a fake peers and communicate with them
 #  1. the fake peers response with the same peer-message they received
 #  2. the second response will be delayed in 2 seconds
 #  3. the third response will cause the peer to shutdown the connection and not responding anything
-    Then application send to [peer ip: "localhost", peer port: "8985"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+    Then application send to [peer ip: "localhost", peer port: "8989"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
       | sendMessageType | receiveMessageType | errorSignalType |
-      | RequestMessage  | RequestMessage     |                 |
-      | RequestMessage  | RequestMessage     |                 |
+      | RequestMessage  | PieceMessage       |                 |
+      | RequestMessage  | PieceMessage       |                 |
       | RequestMessage  |                    | EOFException    |
 
     Examples:
@@ -77,10 +77,10 @@ Feature: connect to a fake peers and communicate with them
 #  2. the second response will be delayed in 2 seconds
 #  3. the third response will cause the peer to shutdown the connection and not responding anything
     # TODO: Bug: blocking and i don't know why
-    Then application send to [peer ip: "localhost", peer port: "8985"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+    Then application send to [peer ip: "localhost", peer port: "8990"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
       | sendMessageType | receiveMessageType | errorSignalType |
-      | PieceMessage    | PieceMessage       |                 |
-      | PieceMessage    | PieceMessage       |                 |
+      | PieceMessage    | RequestMessage       |                 |
+      | PieceMessage    | RequestMessage       |                 |
       | PieceMessage    |                    | EOFException    |
 
     Examples:
