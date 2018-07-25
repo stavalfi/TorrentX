@@ -195,7 +195,7 @@ public class MyStepdefs {
         int blockLength = pieceLength;
 
         ConnectableFlux<PieceMessage> fakePieceMessageToSave$ = TorrentDownloaders.getAllocatorStore()
-                .updateAllocations(1, blockLength)
+                .updateAllocations(10, blockLength)
                 .doOnNext(__ -> logger.debug("start allocate fake-piece-message and then fill it with fake-data to maybe use that piece later to send to a fake-peer."))
                 .flatMap(allocatorState -> TorrentDownloaders.getAllocatorStore().createPieceMessage(fakePeer, app, pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
                 .publishOn(Schedulers.elastic())

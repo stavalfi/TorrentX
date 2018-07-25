@@ -41,7 +41,7 @@ public class RemoteFakePeerCopyCat {
                 .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_SELF_RESOLVED))
                 .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
                 //.publishOn(Schedulers.elastic())
-                .flatMap(__ -> this.link.getAllocatorStore().updateAllocations(1, blockLength))
+                .flatMap(__ -> this.link.getAllocatorStore().updateAllocations(10, blockLength))
                 .flatMap(allocatorState -> this.link.getAllocatorStore()
                         .createPieceMessage(link.getPeer(), link.getMe(), pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
                 //.publishOn(Schedulers.elastic())
