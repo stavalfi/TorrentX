@@ -25,7 +25,7 @@ So many measurement and analytical studies have published suggestions for differ
 
 
 ## Enviroment
-* Linux / Windows
+* Linux 14,16, Windows 7, macOS High Sierra
 * Java 8
 * Maven 3
 
