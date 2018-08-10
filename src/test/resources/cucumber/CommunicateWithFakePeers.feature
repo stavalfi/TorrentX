@@ -9,7 +9,7 @@ Feature: connect to a fake peers and communicate with them
       | sendMessageType | receiveMessageType | errorSignalType |
       | PieceMessage    | RequestMessage     |                 |
       | RequestMessage  | PieceMessage       |                 |
-
+#
     Then application send to [peer ip: "localhost", peer port: "8982"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
       | sendMessageType | receiveMessageType | errorSignalType |
       | BitFieldMessage | BitFieldMessage    |                 |
@@ -52,7 +52,7 @@ Feature: connect to a fake peers and communicate with them
       | sendMessageType | receiveMessageType | errorSignalType |
       | RequestMessage  | PieceMessage       |                 |
       | PieceMessage    | RequestMessage     |                 |
-#      | UnchokeMessage  |                    | EOFException    |
+      | UnchokeMessage  |                    | EOFException    |
 
     Examples:
       | torrent                                   | downloadLocation |

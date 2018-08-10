@@ -55,8 +55,13 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
                 .distinctUntilChanged()
                 .doOnNext(state -> logger.debug(this.identifier + " - new state1: " + state))
                 .replay(1)
-                .autoConnect(0)
-                .doOnNext(state -> logger.debug(this.identifier + " - new state2: " + state));
+                .autoConnect(0);
+//                .doOnNext(state -> logger.debug(this.identifier + " - new state2: " + state));
+    }
+
+    // TODO: remove this function. there should be a global bean for this.
+    public String getIdentifier() {
+        return identifier;
     }
 
     public void dispatchNonBlocking(ACTION action) {

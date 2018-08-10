@@ -49,6 +49,7 @@ public class RemoteFakePeerCopyCat {
                     for (int i = 0; i < blockLength; i++)
                         pieceMessageToSave.getAllocatedBlock().getBlock()[i] = 11;
                 })
+                .doOnNext(pieceMessage -> logger.debug(identifier + " - setup piece1: " + pieceMessage + "."))
                 .flux()
                 .publish();
 

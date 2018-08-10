@@ -176,7 +176,6 @@ public class MyStepdefs {
                                                                                         String downloadLocation,
                                                                                         List<PeerFakeRequestResponse> peerFakeRequestResponses) throws Throwable {
         Utils.removeEverythingRelatedToLastTest();
-
         logger.debug("end clean last test resources.");
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
@@ -191,7 +190,6 @@ public class MyStepdefs {
         int pieceIndex = 3;
         int pieceLength = torrentInfo.getPieceLength(pieceIndex);
         int begin = 0;
-        @SuppressWarnings("UnnecessaryLocalVariable")
         int blockLength = pieceLength;
 
         ConnectableFlux<PieceMessage> fakePieceMessageToSave$ = TorrentDownloaders.getAllocatorStore()
@@ -303,8 +301,6 @@ public class MyStepdefs {
         Mono<RemoteFakePeerCopyCat> fakePeerToApp$ = TorrentDownloaders.getListenStore()
                 .dispatch(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> TorrentDownloaders.getListenStore().notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP))
-                // I need to add this torrent to the list of
-                // my torrents before a peer connect to me about this torrent.
                 .flatMap(__ -> torrentDownloader$)
                 .map(__ -> new PeersProvider(fakePeerAllocatorStore, torrentInfo))
                 .flatMap(peersProvider -> peersProvider.connectToPeerMono(app))
@@ -312,6 +308,10 @@ public class MyStepdefs {
                 .map(link -> new RemoteFakePeerCopyCat(link, "Test-Fake-Peer-" + fakePeerPort, fullDownloadPathForFakePeer))
                 .doOnNext(__ -> logger.info("successfully initialized RemoteFakePeerCopyCat object to fake peer link: " + fakePeerPort))
                 .cache();
+
+        StepVerifier.create(fakePeerToApp$)
+                .expectNextCount(1)
+                .verifyComplete();
 
         Mono<?> fakePeerResponses$ = fakePeerToApp$.doOnNext(remoteFakePeerCopyCat -> logger.debug("start sending messages to fake-peer: " + fakePeerPort))
                 .flatMap(remoteFakePeerCopyCat -> Flux.fromIterable(messageToSendList)
