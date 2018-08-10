@@ -337,7 +337,8 @@ public class MyStepdefs {
                         })
                         .take(messageToSendList.size())
                         .collectList()
-                        .doOnNext(actualReceivedMessagesList -> Assert.assertEquals("we didn't receive all the messages from fake-peer.", messageToSendList.size(), actualReceivedMessagesList.size())));
+                        .doOnNext(actualReceivedMessagesList -> Assert.assertEquals("we didn't receive all the messages from fake-peer.", messageToSendList.size(), actualReceivedMessagesList.size())))
+                .timeout(Duration.ofSeconds(15));
 
         if (peerFakeRequestResponses.size() == 3 && peerFakeRequestResponses.get(2).getErrorSignalType().isPresent())
             StepVerifier.create(fakePeerResponses$)
