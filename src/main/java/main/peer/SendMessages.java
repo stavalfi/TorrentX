@@ -1,16 +1,20 @@
 package main.peer;
 
-import main.App;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class SendMessages {
+    private static Logger logger = LoggerFactory.getLogger(SendMessages.class);
+
     private DataOutputStream dataOutputStream;
     private Runnable closeConnectionMethod;
 
@@ -39,7 +43,7 @@ public class SendMessages {
                 this.closeConnectionMethod.run();
                 monoSink.error(e);
             }
-        }).subscribeOn(App.MyScheduler);
+        });
     }
 
     public Mono<SendMessages> send(PieceMessage pieceMessage) {
@@ -56,14 +60,18 @@ public class SendMessages {
                 int begin = pieceMessage.getBegin();
                 buffer.putInt(begin);
                 byte[] array = buffer.array();
+
+                logger.debug("start writing to stream the metadata of a piece:" + pieceMessage);
                 this.dataOutputStream.write(array);
-                this.dataOutputStream.write(pieceMessage.getAllocatedBlock().getBlock(),
-                        pieceMessage.getAllocatedBlock().getOffset(), pieceMessage.getAllocatedBlock().getLength());
+                logger.debug("end writing to stream the metadata of a piece:" + pieceMessage);
+                logger.debug("start writing to stream the actual data of a piece:" + pieceMessage);
+                this.dataOutputStream.write(pieceMessage.getAllocatedBlock().getBlock(), pieceMessage.getAllocatedBlock().getOffset(), pieceMessage.getAllocatedBlock().getLength());
+                logger.debug("end writing to stream the actual data of a piece:" + pieceMessage);
                 monoSink.success(this);
             } catch (IOException e) {
                 this.closeConnectionMethod.run();
                 monoSink.error(e);
             }
-        }).subscribeOn(App.MyScheduler);
+        });
     }
 }

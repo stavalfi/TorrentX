@@ -3,11 +3,10 @@ package com.utils;
 import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
 import main.TorrentInfo;
-import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.ActualFileImpl;
-import main.file.system.FileSystemLinkImpl;
+import main.file.system.FileSystemLink;
 import main.listener.ListenerAction;
 import main.listener.reducers.ListenerReducer;
 import main.listener.state.tree.ListenerState;
@@ -18,13 +17,13 @@ import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.reducers.TorrentStatusReducer;
-import main.torrent.status.side.effects.TorrentFileSystemStatesSideEffects;
 import main.torrent.status.state.tree.DownloadState;
 import main.torrent.status.state.tree.SearchPeersState;
 import main.torrent.status.state.tree.TorrentFileSystemState;
 import main.torrent.status.state.tree.TorrentStatusState;
 import org.junit.Assert;
-import reactor.core.publisher.ConnectableFlux;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -37,12 +36,17 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.HashSet;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
 public class Utils {
+    private static Logger logger = LoggerFactory.getLogger(Utils.class);
+
     public static TorrentInfo createTorrentInfo(String torrentFilePath) throws IOException {
         String torrentFilesPath = "src" + File.separator +
                 "test" + File.separator +
@@ -71,6 +75,7 @@ public class Utils {
         TorrentDownloaders.getAllocatorStore()
                 .freeAll()
                 .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(2, 17_000))
+                .publishOn(Schedulers.elastic())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -119,7 +124,8 @@ public class Utils {
                 .verifyComplete();
 
         // delete download folder from last test
-        Utils.deleteDownloadFolder();
+        deleteAppDownloadFolder();
+        deleteFakePeerDownloadFolder();
     }
 
     public static void changeListenerState(List<ListenerAction> changesActionList, Store<ListenerState, ListenerAction> listenStore) {
@@ -274,7 +280,15 @@ public class Utils {
                 .build();
     }
 
-    public static Mono<SendMessagesNotifications> sendFakeMessage(TorrentInfo torrentInfo, String downloadPath, Link link, PeerMessageType peerMessageType) {
+    public static Mono<SendMessagesNotifications> sendFakeMessage(TorrentInfo torrentInfo,
+                                                                  String downloadPath,
+                                                                  Link link,
+                                                                  PeerMessageType peerMessageType,
+                                                                  FileSystemLink fileSystemLink,
+                                                                  int pieceIndex,
+                                                                  int begin,
+                                                                  int blockLength,
+                                                                  int pieceLength) {
         switch (peerMessageType) {
             case HaveMessage:
                 return link.sendMessages().sendHaveMessage(0);
@@ -283,13 +297,23 @@ public class Utils {
             case ChokeMessage:
                 return link.sendMessages().sendChokeMessage();
             case PieceMessage:
-                return createAndSendFakePieceMessage(torrentInfo, downloadPath, link);
+                return TorrentDownloaders.getAllocatorStore()
+                        .createRequestMessage(null, null, pieceIndex, begin, blockLength, pieceLength)
+                        .doOnNext(requestMessage -> logger.debug("start creating fake-piece-message to send to a fake-peer. " +
+                                "the details of the piece-message are coming from a fake-request-message I created: " + requestMessage))
+                        .flatMap(requestMessage -> fileSystemLink.buildPieceMessage(requestMessage))
+                        .doOnNext(pieceMessage -> logger.debug("end creating fake-piece-message to send to a fake-peer: " + pieceMessage))
+                        .doOnNext(pieceMessage -> logger.debug("start send fake-peer-message to fake-peer: " + pieceMessage))
+                        .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
+                                .doOnNext(__ -> logger.debug("end send fake-peer-message to fake-peer: " + pieceMessage)));
             case CancelMessage:
                 return link.sendMessages().sendCancelMessage(2, 0, 10);
             case KeepAliveMessage:
                 return link.sendMessages().sendKeepAliveMessage();
             case RequestMessage:
                 return link.sendMessages().sendRequestMessage(1, 0, 3);
+            case ExtendedMessage:
+                return null;
             case UnchokeMessage:
                 return link.sendMessages().sendUnchokeMessage();
             case BitFieldMessage:
@@ -301,55 +325,6 @@ public class Utils {
             default:
                 throw new IllegalArgumentException(peerMessageType.toString());
         }
-    }
-
-    private static Mono<SendMessagesNotifications> createAndSendFakePieceMessage(TorrentInfo torrentInfo, String downloadPath,
-                                                                                 Link link) {
-        int pieceIndex = 3;
-        int pieceLength = torrentInfo.getPieceLength(pieceIndex);
-        int begin = 0;
-        int blockLength = pieceLength;
-        return TorrentDownloaders.getAllocatorStore()
-                .updateAllocations(4, blockLength)
-                .flatMap(allocatorState -> TorrentDownloaders.getAllocatorStore()
-                        .createPieceMessage(link.getPeer(), link.getMe(), pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
-                .doOnNext(pieceMessageToSave -> {
-                    for (int i = 0; i < blockLength; i++)
-                        pieceMessageToSave.getAllocatedBlock().getBlock()[i] = 11;
-                })
-                .flatMap(pieceMessageToSave -> {
-                    ConnectableFlux<PieceMessage> pieceMessageFlux = Flux.just(pieceMessageToSave).publish();
-                    Store<TorrentStatusState, TorrentStatusAction> store = new Store<>(new TorrentStatusReducer(),
-                            TorrentStatusReducer.defaultTorrentState);
-                    TorrentFileSystemStatesSideEffects torrentFileSystemStatesSideEffects =
-                            new TorrentFileSystemStatesSideEffects(store);
-                    return FileSystemLinkImpl.create(link.getTorrentInfo(), downloadPath, store, pieceMessageFlux)
-                            .flatMap(fileSystemLink -> {
-                                Flux<PieceEvent> savedPieces$ = fileSystemLink.savedBlockFlux()
-                                        .replay()
-                                        .autoConnect(0);
-                                pieceMessageFlux.connect();
-                                // wait until we saved the piece and then send it to the fake peer.
-                                return savedPieces$
-                                        .doOnNext(pieceEvent -> Assert.assertEquals("the piece I saved is not " +
-                                                "the pieces that was saved.", pieceIndex, pieceEvent.getReceivedPiece().getIndex()))
-                                        .map(PieceEvent::getReceivedPiece)
-                                        .map(PieceMessage::getAllocatedBlock)
-                                        .flatMap(allocatedBlock -> TorrentDownloaders.getAllocatorStore().free(allocatedBlock))
-                                        .map(__ -> new RequestMessage(link.getMe(), link.getPeer(), pieceIndex, begin, blockLength))
-                                        .flatMap(requestMessage -> fileSystemLink.buildPieceMessage(requestMessage))
-                                        .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
-                                                .flatMap(sendMessagesNotifications -> {
-                                                    store.dispatchNonBlocking(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS);
-                                                    store.dispatchNonBlocking(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS);
-                                                    return store.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP)
-                                                            .flatMap(___ -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
-                                                            .map(___ -> sendMessagesNotifications);
-                                                }))
-                                        .take(1)
-                                        .single();
-                            });
-                });
     }
 
     public static Flux<? extends PeerMessage> getSpecificMessageResponseFluxByMessageType(Link link, PeerMessageType peerMessageType) {
@@ -381,17 +356,6 @@ public class Utils {
             default:
                 throw new IllegalArgumentException(peerMessageType.toString());
         }
-    }
-
-    public static long folderSize(File directory) {
-        long length = 0;
-        for (File file : Objects.requireNonNull(directory.listFiles())) {
-            if (file.isFile())
-                length += file.length();
-            else
-                length += folderSize(file);
-        }
-        return length;
     }
 
     public static Mono<PieceMessage> readFromFile(TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
@@ -471,9 +435,21 @@ public class Utils {
                 });
     }
 
-    public static void deleteDownloadFolder() {
+    public static void deleteAppDownloadFolder() {
+        String fullDownloadPathForRealApp = System.getProperty("user.dir") + File.separator + "torrents-test";
+        deleteFolderAndItsContent(fullDownloadPathForRealApp);
+    }
+
+    public static void deleteFakePeerDownloadFolder() {
+        String fullDownloadPathForFakePeer = System.getProperty("user.dir") + File.separator + "fake-peer-download-folder";
+        deleteFolderAndItsContent(fullDownloadPathForFakePeer);
+        Assert.assertFalse("we couldn't delete a folder. ",
+                new File(fullDownloadPathForFakePeer).exists());
+    }
+
+    private static void deleteFolderAndItsContent(String fullDownloadPathForFakePeer) {
         try {
-            File file = new File(System.getProperty("user.dir") + File.separator + "torrents-test");
+            File file = new File(fullDownloadPathForFakePeer);
             if (file.exists()) {
                 deleteDirectory(file);
             }
@@ -485,8 +461,7 @@ public class Utils {
     private static void deleteDirectory(File directoryToBeDeleted) throws IOException {
         Files.walkFileTree(directoryToBeDeleted.toPath(), new HashSet<>(), Integer.MAX_VALUE, new FileVisitor<Path>() {
             @Override
-            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-                    throws IOException {
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                 return FileVisitResult.CONTINUE;
             }
 
@@ -498,8 +473,7 @@ public class Utils {
             }
 
             @Override
-            public FileVisitResult visitFileFailed(Path file, IOException exc)
-                    throws IOException {
+            public FileVisitResult visitFileFailed(Path file, IOException exc) {
                 return FileVisitResult.CONTINUE;
             }
 

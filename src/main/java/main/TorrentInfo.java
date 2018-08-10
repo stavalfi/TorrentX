@@ -72,6 +72,7 @@ public class TorrentInfo {
     public long getPieceStartPosition(int pieceIndex) {
         long totalSize = getTotalSize();
         long thisPieceLength = getPieceLength(pieceIndex);
+        @SuppressWarnings("UnnecessaryLocalVariable")
         long position = pieceIndex < getPieces().size() - 1 ?
                 pieceIndex * this.torrent.getPieceLength() :
                 totalSize - thisPieceLength;

@@ -53,14 +53,11 @@ public class ListenerSideEffects {
 
         this.startListen$ = store.statesByAction(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .concatMap(__ -> store.tryDispatchUntil(ListenerAction.START_LISTENING_WIND_UP, isStartCanceled))
-                .doOnNext(__ -> logger.debug("side effects end deal with start and it start resume... 1 :" + __))
                 .concatMap(__ -> store.dispatch(ListenerAction.RESUME_LISTENING_IN_PROGRESS))
-                .doOnNext(__ -> logger.debug("side effects end deal with start and it start resume... 2 :" + __))
                 .publish()
                 .autoConnect(0);
 
         this.resumeListen$ = store.statesByAction(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
-                .doOnNext(__ -> logger.debug("side effects start deal with resume... 1 :" + __))
                 .concatMap(__ -> store.tryDispatchUntil(ListenerAction.RESUME_LISTENING_WIND_UP, isResumeCanceled))
                 .publish()
                 .autoConnect(0);
@@ -72,34 +69,28 @@ public class ListenerSideEffects {
                 .autoConnect(0);
 
         this.restartListen$ = store.statesByAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                .doOnNext(__ -> logger.debug("8..."))
                 .concatMap(__ -> store.dispatch(ListenerAction.PAUSE_LISTENING_IN_PROGRESS))
-                .doOnNext(__ -> logger.debug("9..."))
                 .concatMap(__ -> store.notifyWhen(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
-                .doOnNext(__ -> logger.debug("10..."))
                 .concatMap(__ -> store.notifyWhen(ListenerAction.PAUSE_LISTENING_WIND_UP))
-                .doOnNext(__ -> logger.debug("11..."))
                 .concatMap(__ -> store.dispatch(ListenerAction.RESTART_LISTENING_WIND_UP))
-                .doOnNext(__ -> logger.debug("12..."))
                 .concatMap(__ -> store.dispatch(ListenerAction.INITIALIZE))
-                .doOnNext(__ -> logger.debug("13..."))
                 .publish()
                 .autoConnect(0);
     }
 
     public Flux<ListenerState> getStartListen$() {
-        return startListen$.publishOn(Schedulers.elastic());
+        return startListen$;
     }
 
     public Flux<ListenerState> getResumeListen$() {
-        return resumeListen$.publishOn(Schedulers.elastic());
+        return resumeListen$;
     }
 
     public Flux<ListenerState> getPauseListen$() {
-        return pauseListen$.publishOn(Schedulers.elastic());
+        return pauseListen$;
     }
 
     public Flux<ListenerState> getRestartListen$() {
-        return restartListen$.publishOn(Schedulers.elastic());
+        return restartListen$;
     }
 }

@@ -2,17 +2,20 @@ package main.peer;
 
 import main.App;
 import main.TorrentInfo;
-import main.downloader.TorrentDownloaders;
+import main.file.system.allocator.AllocatorStore;
 import main.peer.peerMessages.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.DataOutputStream;
 import java.util.BitSet;
 
 class SendMessagesNotificationsImpl implements SendMessagesNotifications {
+    private static Logger logger = LoggerFactory.getLogger(SendMessagesNotificationsImpl.class);
+
     private TorrentInfo torrentInfo;
     private Peer me;
     private Peer peer;
@@ -20,12 +23,15 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     private FluxSink<PeerMessage> sentMessagesFluxSink;
     private PeerCurrentStatus peerCurrentStatus;
     private SendMessages sendMessages;
+    private AllocatorStore allocatorStore;
 
-    SendMessagesNotificationsImpl(TorrentInfo torrentInfo,
+    SendMessagesNotificationsImpl(AllocatorStore allocatorStore,
+                                  TorrentInfo torrentInfo,
                                   Peer me, Peer peer,
                                   PeerCurrentStatus peerCurrentStatus,
                                   Runnable closeConnectionMethod,
                                   DataOutputStream peerDataOutputStream) {
+        this.allocatorStore = allocatorStore;
         this.torrentInfo = torrentInfo;
         this.me = me;
         this.peer = peer;
@@ -39,6 +45,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
 
     private Mono<SendMessagesNotifications> send(PeerMessage peerMessage) {
         return peerMessage.sendMessage(this.sendMessages)
+                .doOnNext(__ -> logger.debug("sent message to peer: " + peerMessage))
                 .map(sendMessages -> (SendMessagesNotifications) this)
                 .doOnNext(peersCommunicator -> {
                     if (this.sentMessagesFluxSink != null)
@@ -46,21 +53,20 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
                 });
     }
 
+    // TODO: remove this getter. this object is for internal use only by this class.
+    public SendMessages getSendMessages() {
+        return sendMessages;
+    }
+
     @Override
     public Mono<SendMessagesNotifications> sendPieceMessage(PieceMessage pieceMessage) {
         return send(pieceMessage)
-                .flatMap(pieceEvent -> TorrentDownloaders.getAllocatorStore()
-                        .free(pieceMessage.getAllocatedBlock())
-                        .map(__ -> pieceEvent))
-                .doOnError(throwable -> TorrentDownloaders.getAllocatorStore()
-                        .free(pieceMessage.getAllocatedBlock())
-                        .publishOn(Schedulers.elastic())
-                        .block())
-                .doOnCancel(() -> TorrentDownloaders.getAllocatorStore()
-                        .free(pieceMessage.getAllocatedBlock())
-                        .publishOn(Schedulers.elastic())
-                        .block())
-                .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(pieceMessage.getIndex()));
+                .map(__ -> this.allocatorStore)
+                .doOnSuccessOrError((__, ___) -> logger.debug("dispatching cleaning for piece-message: " + pieceMessage))
+                .doOnError(__ -> logger.debug("I shouldn't be here: " + __))
+                .doAfterSuccessOrError((__, ___) -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
+                .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(pieceMessage.getIndex()))
+                .map(__ -> this);
     }
 
     @Override
@@ -111,8 +117,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     @Override
     public Mono<SendMessagesNotifications> sendRequestMessage(int index, int begin, int blockLength) {
         int pieceLength = this.torrentInfo.getPieceLength(index);
-        return TorrentDownloaders.getAllocatorStore()
-                .createRequestMessage(this.getMe(), this.getPeer(), index, begin, blockLength, pieceLength)
+        return this.allocatorStore.createRequestMessage(this.getMe(), this.getPeer(), index, begin, blockLength, pieceLength)
                 .flatMap(this::send);
     }
 

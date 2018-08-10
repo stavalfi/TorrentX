@@ -5,8 +5,8 @@ import main.peer.Link;
 import reactor.core.publisher.Mono;
 
 public class RemoteFakePeer extends Link {
-	public RemoteFakePeer(Link link, FakePeerType fakePeerType) {
-		super(link);
+    public RemoteFakePeer(Link link, FakePeerType fakePeerType) {
+        super(link);
 
 		this.receivePeerMessages()
 				.getRequestMessageResponseFlux()
@@ -47,13 +47,13 @@ public class RemoteFakePeer extends Link {
 					return Mono.empty();
 				}).publish()
 				.autoConnect(0);
-	}
+    }
 
-	private void blockThread(int durationInMillis) {
-		try {
-			Thread.sleep(durationInMillis);
-		} catch (InterruptedException e) {
-			//e.printStackTrace();
-		}
-	}
+    private void blockThread(int durationInMillis) {
+        try {
+            Thread.sleep(durationInMillis);
+        } catch (InterruptedException e) {
+            //e.printStackTrace();
+        }
+    }
 }

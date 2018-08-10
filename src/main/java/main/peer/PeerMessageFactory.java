@@ -2,8 +2,12 @@ package main.peer;
 
 import main.TorrentInfo;
 import main.downloader.TorrentDownloaders;
+import main.file.system.allocator.AllocatorStore;
 import main.peer.peerMessages.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
 
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -13,7 +17,10 @@ import java.util.Objects;
 
 // TODO: implement visitor.
 public class PeerMessageFactory {
-    public static Mono<? extends PeerMessage> waitForMessage(TorrentInfo torrentInfo, Peer from, Peer to, DataInputStream dataInputStream) {
+    private static Logger logger = LoggerFactory.getLogger(PeerMessageFactory.class);
+
+    public static Mono<? extends PeerMessage> waitForMessage(AllocatorStore allocatorStore, Scheduler scheduler, TorrentInfo torrentInfo,
+                                                             Peer from, Peer to, DataInputStream dataInputStream) {
         // lengthOfTheRestOfData == messageLength == how much do we need to read more
         int lengthOfTheRestOfData;
         try {
@@ -21,6 +28,9 @@ public class PeerMessageFactory {
         } catch (IOException e) {
             return Mono.error(e);
         }
+        boolean amIApp = to.getPeerPort() == TorrentDownloaders.getListener().getTcpPort();
+        String whoAmI = amIApp ? "App" : "Fake-peer";
+        logger.debug(whoAmI + " start received message from: " + from + " to: " + to);
 
         if (lengthOfTheRestOfData == 0) {
             byte keepAliveMessageId = 10;
@@ -33,11 +43,11 @@ public class PeerMessageFactory {
         } catch (IOException e) {
             return Mono.error(e);
         }
-
+        logger.debug(whoAmI + " start received message-id: " + messageId + "==" + PeerMessageId.fromValue(messageId) + " from: " + from + " to: " + to);
         int messagePayloadLength = lengthOfTheRestOfData - 1;
 
         if (messageId == PeerMessageId.pieceMessage.getMessageId())
-            return createPieceMessage(torrentInfo, from, to, messagePayloadLength, dataInputStream);
+            return createPieceMessage(allocatorStore, scheduler, torrentInfo, from, to, messagePayloadLength, dataInputStream);
 
         byte[] messagePayloadByteArray = new byte[messagePayloadLength];
         try {
@@ -47,18 +57,25 @@ public class PeerMessageFactory {
         }
 
         if (messageId == PeerMessageId.requestMessage.getMessageId())
-            return createRequestMessage(torrentInfo, from, to, messageId,
-                    messagePayloadByteArray);
+            return createRequestMessage(allocatorStore, scheduler, torrentInfo, from, to, messageId, messagePayloadByteArray);
 
         PeerMessage peerMessage = createMessage(torrentInfo, from, to, messageId, messagePayloadByteArray);
+        logger.debug(whoAmI + " end received message-id: " + messageId +
+                "==" + PeerMessageId.fromValue(messageId) + " from: " +
+                from + " to: " + to);
         return Mono.just(peerMessage);
     }
 
-    public static Mono<? extends PeerMessage> createPieceMessage(TorrentInfo torrentInfo, Peer from, Peer to,
+    public static Mono<? extends PeerMessage> createPieceMessage(AllocatorStore allocatorStore, Scheduler scheduler,
+                                                                 TorrentInfo torrentInfo, Peer from, Peer to,
                                                                  int messagePayloadLength, DataInputStream dataInputStream) {
+        boolean amIApp = to.getPeerPort() == TorrentDownloaders.getListener().getTcpPort();
+        String whoAmI = amIApp ? "App" : "Fake-peer";
         int index;
         try {
             index = dataInputStream.readInt();
+            logger.debug(whoAmI + " start received piece message. piece-index: " + index);
+
         } catch (IOException e) {
             return Mono.error(e);
         }
@@ -66,41 +83,50 @@ public class PeerMessageFactory {
         int begin;
         try {
             begin = dataInputStream.readInt();
+            logger.debug(whoAmI + " start received piece message. piece-begin: " + begin);
         } catch (IOException e) {
             return Mono.error(e);
         }
         int blockLength = messagePayloadLength - 8;// 8 == 'index' length in bytes + 'begin' length in bytes
-        PieceMessage result = TorrentDownloaders.getAllocatorStore()
-                .createPieceMessage(from, to, index, begin, blockLength, pieceLength)
+        logger.debug(whoAmI + " start received piece message. piece-block-length: " + blockLength);
+        return allocatorStore.createPieceMessage(from, to, index, begin, blockLength, pieceLength)
+                .publishOn(scheduler)
                 .flatMap(pieceMessage -> {
                     try {
-                        dataInputStream.readFully(pieceMessage.getAllocatedBlock().getBlock(),
-                                pieceMessage.getAllocatedBlock().getOffset(),
-                                pieceMessage.getAllocatedBlock().getLength());
+                        byte[] block = pieceMessage.getAllocatedBlock().getBlock();
+                        int offset = pieceMessage.getAllocatedBlock().getOffset();
+                        int length = pieceMessage.getAllocatedBlock().getLength();
+                        dataInputStream.readFully(block, offset, length);
+                        logger.debug(whoAmI + " end received piece message.");
                         return Mono.just(pieceMessage);
                     } catch (IOException e) {
                         return Mono.error(e);
                     }
-                    // TODO: remove the block() operator. we have a bug because
-                    // if we remove the block(), than sometimes I can't
-                    // readFully anything. Its like someone is reading
-                    // while I read.
-                }).block();
-        return Mono.just(result);
+                });
     }
 
-    public static Mono<? extends PeerMessage> createRequestMessage(TorrentInfo torrentInfo, Peer from, Peer to, byte messageId,
+    public static Mono<? extends PeerMessage> createRequestMessage(AllocatorStore allocatorStore,
+                                                                   Scheduler scheduler,
+                                                                   TorrentInfo torrentInfo,
+                                                                   Peer from,
+                                                                   Peer to,
+                                                                   byte messageId,
                                                                    byte[] payload) {
+        boolean amIApp = to.getPeerPort() == TorrentDownloaders.getListener().getTcpPort();
+        String whoAmI = amIApp ? "App" : "Fake-peer";
         assert messageId == PeerMessageId.requestMessage.getMessageId();
 
         ByteBuffer wrap = ByteBuffer.wrap(payload);
         int index = wrap.getInt();
+        logger.debug(whoAmI + " start received request message. request-index: " + index);
         int begin = wrap.getInt();
+        logger.debug(whoAmI + " start received request message. request-begin: " + begin);
         int blockLength = wrap.getInt();
+        logger.debug(whoAmI + " start received request message. request-block-length: " + blockLength);
 
-        return TorrentDownloaders.getAllocatorStore()
-                .createRequestMessage(from, to, index, begin, blockLength,
-                        torrentInfo.getPieceLength(index));
+        return allocatorStore.createRequestMessage(from, to, index, begin, blockLength, torrentInfo.getPieceLength(index))
+                .doOnNext(__ -> logger.debug(whoAmI + " end received request message."))
+                .publishOn(scheduler);
     }
 
     public static PeerMessage createMessage(TorrentInfo torrentInfo, Peer from, Peer to, byte messageId,

@@ -19,11 +19,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-web</artifactId>
-            <version>3.0.2.RELEASE</version>
-        </dependency>
-        <dependency>
             <groupId>info.cukes</groupId>
             <artifactId>cucumber-java8</artifactId>
             <version>${cucumber.version}</version>
@@ -40,11 +35,6 @@
             <artifactId>selenium-server</artifactId>
             <version>${selenium.version}</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>1.16.18</version>
         </dependency>
         <dependency>
             <groupId>io.github.universityfinalprojects</groupId>

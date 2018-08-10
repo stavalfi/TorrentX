@@ -5,7 +5,6 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Objects;
 
 public class AllocatorState extends State<AllocatorAction> {
 	private int blockLength;
@@ -41,25 +40,6 @@ public class AllocatorState extends State<AllocatorAction> {
 	@Override
 	public boolean fromAction(AllocatorAction allocatorAction) {
 		throw new NotImplementedException();
-	}
-
-	@Override
-	public boolean equals(Object o) {
-		if (this == o) return true;
-		if (!(o instanceof AllocatorState)) return false;
-		AllocatorState that = (AllocatorState) o;
-		return getBlockLength() == that.getBlockLength() &&
-				getAmountOfBlocks() == that.getAmountOfBlocks() &&
-				Objects.equals(getFreeBlocksStatus(), that.getFreeBlocksStatus()) &&
-				Arrays.equals(getAllocatedBlocks(), that.getAllocatedBlocks());
-	}
-
-	@Override
-	public int hashCode() {
-
-		int result = Objects.hash(getBlockLength(), getAmountOfBlocks(), getFreeBlocksStatus());
-		result = 31 * result + Arrays.hashCode(getAllocatedBlocks());
-		return result;
 	}
 
 	@Override

@@ -11,7 +11,6 @@ This architecture lets  us discover and use more seeders by examining more of th
 2. [Enviroment](#enviroment)  
 3. [Dependencies](#dependencies)  
 4. [Continues Integration](#continues-integration)  
-5. [Continues Deployment](#continues-deployment)  
 5. [Installation](#installation)
 
 ## Introduction

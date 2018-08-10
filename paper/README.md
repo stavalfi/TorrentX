@@ -15,7 +15,6 @@
 11. [Builds](#builds)
 12. [Network](#network)
 13. [GUI](#gui)
-14. [Tests](#tests)
 
 ## Introduction
 
@@ -173,7 +172,3 @@ The peers communicate using TCP/IP protocol while the tracker communication is d
 ## GUI
 
 Using the command line. This is because a time-limitation.
-
-## Tests
-
-I use [_Cucumber_](https://cucumber.io/) to write tests. Currently, I test over 200 different senarios.

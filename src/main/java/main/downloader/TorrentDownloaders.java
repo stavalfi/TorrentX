@@ -3,6 +3,7 @@ package main.downloader;
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.file.system.FileSystemLink;
+import main.file.system.allocator.AllocatorReducer;
 import main.file.system.allocator.AllocatorStore;
 import main.listener.Listener;
 import main.listener.ListenerAction;
@@ -24,99 +25,100 @@ import java.util.Optional;
 
 public class TorrentDownloaders {
 
-	private static AllocatorStore allocatorStore = new AllocatorStore();
+    private static TorrentDownloaders instance = new TorrentDownloaders();
 
-	public static AllocatorStore getAllocatorStore() {
-		return allocatorStore;
-	}
+    private static AllocatorStore allocatorStore = new AllocatorStore(new Store<>(new AllocatorReducer(),
+            AllocatorReducer.defaultAllocatorState, "App-Allocator-Store"));
 
-	private static Store<ListenerState, ListenerAction> listenStore = new Store<>(new ListenerReducer(),
-			ListenerReducer.defaultListenState);
+    private static Store<ListenerState, ListenerAction> listenStore = new Store<>(new ListenerReducer(),
+            ListenerReducer.defaultListenState, "App-Listener-Store");
 
-	private static Listener listener = new Listener();
+    private static Listener listener = new Listener(allocatorStore);
 
-	private static ListenerSideEffects listenerSideEffects = new ListenerSideEffects(listenStore);
+    private static ListenerSideEffects listenerSideEffects = new ListenerSideEffects(listenStore);
 
-	private List<TorrentDownloader> torrentDownloaderList = new ArrayList<>();
+    private List<TorrentDownloader> torrentDownloaderList = new ArrayList<>();
 
-	public static Listener getListener() {
-		return listener;
-	}
+    private TorrentDownloaders() {
+    }
 
-	public static Store<ListenerState, ListenerAction> getListenStore() {
-		return listenStore;
-	}
+    public synchronized Flux<TorrentDownloader> getTorrentDownloadersFlux() {
+        // TODO: I can't go over this list and delete it in the same time. I will get concurrenctodificationException.
+        // I should not save this list in the first place. for now I will copy it.
 
-	public static ListenerSideEffects getListenerSideEffects() {
-		return listenerSideEffects;
-	}
+        return Flux.fromIterable(new ArrayList<>(this.torrentDownloaderList));
+    }
 
-	public synchronized Flux<TorrentDownloader> getTorrentDownloadersFlux() {
-		// TODO: I can't go over this list and delete it in the same time. I will get concurrenctodificationException.
-		// I should not save this list in the first place. for now I will copy it.
+    public synchronized TorrentDownloader saveTorrentDownloader(TorrentInfo torrentInfo,
+                                                                SearchPeers searchPeers,
+                                                                FileSystemLink fileSystemLink,
+                                                                BittorrentAlgorithm bittorrentAlgorithm,
+                                                                Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
+                                                                SpeedStatistics torrentSpeedStatistics,
+                                                                TorrentStatesSideEffects torrentStatesSideEffects,
+                                                                Flux<Link> peersCommunicatorFlux) {
+        return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseGet(() -> {
+                    TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
+                            searchPeers,
+                            fileSystemLink,
+                            bittorrentAlgorithm,
+                            torrentStatusStore,
+                            torrentSpeedStatistics,
+                            torrentStatesSideEffects, peersCommunicatorFlux);
 
-		return Flux.fromIterable(new ArrayList<>(this.torrentDownloaderList));
-	}
+                    this.torrentDownloaderList.add(torrentDownloader);
+                    return torrentDownloader;
+                });
+    }
 
-	public synchronized TorrentDownloader saveTorrentDownloader(TorrentInfo torrentInfo,
-																SearchPeers searchPeers,
-																FileSystemLink fileSystemLink,
-																BittorrentAlgorithm bittorrentAlgorithm,
-																Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
-																SpeedStatistics torrentSpeedStatistics,
-																TorrentStatesSideEffects torrentStatesSideEffects,
-																Flux<Link> peersCommunicatorFlux) {
-		return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-				.orElseGet(() -> {
-					TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
-							searchPeers,
-							fileSystemLink,
-							bittorrentAlgorithm,
-							torrentStatusStore,
-							torrentSpeedStatistics,
-							torrentStatesSideEffects, peersCommunicatorFlux);
+    public synchronized TorrentDownloader saveTorrentDownloader(TorrentDownloader torrentDownloader) {
+        return findTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash())
+                .orElseGet(() -> {
+                    this.torrentDownloaderList.add(torrentDownloader);
+                    return torrentDownloader;
+                });
+    }
 
-					this.torrentDownloaderList.add(torrentDownloader);
-					return torrentDownloader;
-				});
-	}
+    /**
+     * This method is only for tests because if the client want to delete the torrent but not the file,
+     * he can do that using TorrentStatusController::removeTorrent.
+     * There is no reason to remove the TorrentDownloader object also.
+     *
+     * @param torrentInfoHash of torrent we need to delete it's TorrentDownload object
+     * @return boolean which indicated if the deletion was successful.
+     */
+    public synchronized boolean deleteTorrentDownloader(String torrentInfoHash) {
+        Optional<TorrentDownloader> torrentDownloaderOptional = findTorrentDownloader(torrentInfoHash);
+        torrentDownloaderOptional.ifPresent(torrentDownloader ->
+                this.torrentDownloaderList.remove(torrentDownloader));
+        return torrentDownloaderOptional.isPresent();
+    }
 
-	public synchronized TorrentDownloader saveTorrentDownloader(TorrentDownloader torrentDownloader) {
-		return findTorrentDownloader(torrentDownloader.getTorrentInfo().getTorrentInfoHash())
-				.orElseGet(() -> {
-					this.torrentDownloaderList.add(torrentDownloader);
-					return torrentDownloader;
-				});
-	}
+    public synchronized Optional<TorrentDownloader> findTorrentDownloader(String torrentInfoHash) {
+        return this.torrentDownloaderList.stream()
+                .filter(torrentDownloader -> torrentDownloader.getTorrentInfo()
+                        .getTorrentInfoHash().toLowerCase().equals(torrentInfoHash.toLowerCase()))
+                .findFirst();
+    }
 
-	/**
-	 * This method is only for tests because if the client want to delete the torrent but not the file,
-	 * he can do that using TorrentStatusController::removeTorrent.
-	 * There is no reason to remove the TorrentDownloader object also.
-	 *
-	 * @param torrentInfoHash of torrent we need to delete it's TorrentDownload object
-	 * @return boolean which indicated if the deletion was successful.
-	 */
-	public synchronized boolean deleteTorrentDownloader(String torrentInfoHash) {
-		Optional<TorrentDownloader> torrentDownloaderOptional = findTorrentDownloader(torrentInfoHash);
-		torrentDownloaderOptional.ifPresent(torrentDownloader ->
-				this.torrentDownloaderList.remove(torrentDownloader));
-		return torrentDownloaderOptional.isPresent();
-	}
+    public static TorrentDownloaders getInstance() {
+        return instance;
+    }
 
-	public synchronized Optional<TorrentDownloader> findTorrentDownloader(String torrentInfoHash) {
-		return this.torrentDownloaderList.stream()
-				.filter(torrentDownloader -> torrentDownloader.getTorrentInfo()
-						.getTorrentInfoHash().toLowerCase().equals(torrentInfoHash.toLowerCase()))
-				.findFirst();
-	}
+    public static AllocatorStore getAllocatorStore() {
+        return allocatorStore;
+    }
 
-	private TorrentDownloaders() {
-	}
+    public static Listener getListener() {
+        return listener;
+    }
 
-	private static TorrentDownloaders instance = new TorrentDownloaders();
+    public static Store<ListenerState, ListenerAction> getListenStore() {
+        return listenStore;
+    }
 
-	public static TorrentDownloaders getInstance() {
-		return instance;
-	}
+    public static ListenerSideEffects getListenerSideEffects() {
+        return listenerSideEffects;
+    }
 }
