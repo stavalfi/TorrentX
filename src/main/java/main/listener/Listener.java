@@ -24,6 +24,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -94,6 +95,7 @@ public class Listener {
         Function<ServerSocket, Mono<ServerSocket>> closeServerSocket = serverSocket -> {
             try {
                 serverSocket.close();
+                logger.info("closed the app listening-for-new-peers socket.");
                 return Mono.just(serverSocket);
             } catch (IOException e) {
                 logger.error("fatal error while closing server-socket object under port " + getTcpPort() + ": " + e);
@@ -120,9 +122,13 @@ public class Listener {
                 sink.next(peerSocket);
             } catch (IOException e) {
                 // isClosed()==true means that only I caused the serverSocket to be closed.
-                if (serverSocket.isClosed())
+                if (e instanceof SocketException && serverSocket.isClosed()) {
+                    logger.info("Listener socket is closed due to explicit closing by the app or the user.");
                     sink.complete();
-                sink.error(e);
+                } else {
+                    logger.error("Listener socket is terminated (maybe not closed (?)): ", e);
+                    sink.error(e);
+                }
             }
         });
 
