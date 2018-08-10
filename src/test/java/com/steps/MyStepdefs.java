@@ -641,6 +641,7 @@ public class MyStepdefs {
                 // tell upstream that we freed the buffer and he can give us one more signal (if he have any left)
                 .doOnNext(__ -> semaphore.release())
                 .collectList()
+                .doOnNext(__ -> logger.debug("completed saving all the blocks for this test."))
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -911,11 +912,13 @@ public class MyStepdefs {
                 .flatMap(__ -> torrentDownloader$)
                 .map(TorrentDownloader::getSearchPeers)
                 .map(SearchPeers::getPeersProvider)
+                .doOnNext(__ -> logger.debug("fake-peer trying to connect to the app."))
                 .flatMap(peersProvider -> {
                     // the fake-peer will connect to me.
                     Peer me = new Peer("localhost", AppConfig.getInstance().findFreePort());
                     return peersProvider.connectToPeerMono(me);
                 })
+                .doOnNext(__ -> logger.debug("fake-peer connected to the app and start sending requests to the app."))
                 .map(Link::sendMessages)
                 .flatMapMany(sendMessagesObject -> sendMessagesObject.sendInterestedMessage()
                         .flatMapMany(__ -> TorrentDownloaders.getAllocatorStore()
@@ -925,10 +928,12 @@ public class MyStepdefs {
                                 .flatMapMany(allocatedBlockLength -> Flux.fromIterable(peerRequestBlockList)
                                         .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo,
                                                 allocatedBlockLength))))
-                        .concatMap(blockOfPiece -> sendMessagesObject.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(), blockOfPiece.getLength())))
+                        .concatMap(blockOfPiece -> sendMessagesObject.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(), blockOfPiece.getLength())
+                                .doOnNext(__ -> logger.debug("fake peer sent request for block: " + blockOfPiece))))
                 .collectList()
                 .doOnNext(requestList -> Assert.assertEquals("We sent less requests then expected.",
                         peerRequestBlockList.size(), requestList.size()))
+                .doOnNext(__ -> logger.debug("fake-peer sent all the requests to the app."))
                 .cache();
     }
 
@@ -948,29 +953,33 @@ public class MyStepdefs {
         // I must record this because when I subscribe to this.requestsFromFakePeerToMeList$,
         // fake-peer will send me request messages and I response to him **piece messages**
         // which I don't want to lose.
+        logger.debug("app start listen for incomign requests from fake-peer.");
         Flux<PieceMessage> recordedPieceMessageFlux = meToFakePeerLink
-                .map(link -> link.sendMessages())
+                .map(Link::sendMessages)
                 .flatMapMany(SendMessagesNotifications::sentPeerMessagesFlux)
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
                 .cast(PieceMessage.class)
                 .replay()
                 .autoConnect(0);
 
-        // I must subscribe to this seperatly because if the number of requests is zero then take(0) will complete the flux before susbcribing to it
+        // I must subscribe to this separably because if the number of requests is zero then take(0) will complete the flux before susbcribing to it
         // and then the mono requestsFromFakePeerToMeList$ will never get subscribed.
+        //...................................................................................................
+        // send request massages from fake peer to me and get all the
+        // piece messages from me to fake peer and collect them to list.
+        logger.debug("fake-peer start sending requests to app.");
         StepVerifier.create(this.requestsFromFakePeerToMeList$)
                 .expectNextCount(1)
                 .verifyComplete();
 
-        // send request massages from fake peer to me and get all the
-        // piece messages from me to fake peer and collect them to list.
-        Set<BlockOfPiece> actualBlockFromMeSet = this.requestsFromFakePeerToMeList$
-                .flatMapMany(remoteFakePeerForRequestingPieces -> recordedPieceMessageFlux)
-                .map(pieceMessage -> new BlockOfPiece(pieceMessage.getIndex(), pieceMessage.getBegin(),
-                        pieceMessage.getAllocatedBlock().getLength()))
+        logger.debug("start asserting that the app actually sent back the pieces to each request.");
+
+        Set<BlockOfPiece> actualBlockFromMeSet = recordedPieceMessageFlux
+                .map(pieceMessage -> new BlockOfPiece(pieceMessage.getIndex(), pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength()))
                 .take(expectedBlockFromMeList.size())
                 .collect(Collectors.toSet())
                 .block();
+        logger.debug("the test collected all the pieces-messages the app actually repleyed to fake peer.");
 
         Set<BlockOfPiece> expectedBlockFromMeSet = TorrentDownloaders.getAllocatorStore()
                 .latestState$()
@@ -984,12 +993,15 @@ public class MyStepdefs {
         // assert that both the list are equal.
         Assert.assertEquals(expectedBlockFromMeSet, actualBlockFromMeSet);
 
+        logger.debug("test passes successfully. start cleaning all the resources by closing the connection with the fake-peer.");
         meToFakePeerLink.doOnNext(Link::closeConnection)
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
 
+        logger.debug("end cleaning all the resources of the test by removing everything I did here.");
         Utils.removeEverythingRelatedToLastTest();
+        logger.debug("ended cleaning all the resources of the test.");
     }
 
     // TODO: is this step in used?
@@ -1547,7 +1559,9 @@ public class MyStepdefs {
 
     @Given("^initial listen-status - default$")
     public void initialListenStatus() {
+        logger.debug("starting test of listener-redux with side effects.");
         Utils.removeEverythingRelatedToLastTest();
+        logger.debug("end cleaning up all reasources from last test of listener-redux with side effects.");
     }
 
 
