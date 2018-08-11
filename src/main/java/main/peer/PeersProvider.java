@@ -4,6 +4,7 @@ import main.App;
 import main.AppConfig;
 import main.HexByteConverter;
 import main.TorrentInfo;
+import main.downloader.TorrentDownloaders;
 import main.file.system.allocator.AllocatorStore;
 import main.peer.peerMessages.HandShake;
 import main.tracker.BadResponseException;
@@ -20,6 +21,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.time.Duration;
 
 public class PeersProvider {
     private static Logger logger = LoggerFactory.getLogger(PeersProvider.class);
@@ -29,7 +31,7 @@ public class PeersProvider {
 
     public PeersProvider(AllocatorStore allocatorStore, TorrentInfo torrentInfo) {
         this.torrentInfo = torrentInfo;
-        this.allocatorStore=allocatorStore;
+        this.allocatorStore = allocatorStore;
     }
 
     public Mono<Link> connectToPeerMono(Peer peer) {
@@ -39,8 +41,9 @@ public class PeersProvider {
                 try {
                     peerSocket.close();
                 } catch (IOException e) {
-                    //e.printStackTrace();
+                    logger.error("fatal error while closing a socket: ", e);
                 }
+                logger.debug("closed a socket because the connection is no longer needed or for any other reason.: " + peerSocket);
             });
             try {
                 peerSocket.connect(new InetSocketAddress(peer.getPeerIp(), peer.getPeerPort()), 1000 * 10);
@@ -62,7 +65,7 @@ public class PeersProvider {
                             " with the wrong torrent-info-hash: " + receivedTorrentInfoHash));
                 } else {
                     // all went well, I accept this connection.
-                    Link link = new Link(this.allocatorStore,this.torrentInfo, peer, peerSocket, receiveMessages, sendMessages);
+                    Link link = new Link(this.allocatorStore, this.torrentInfo, peer, peerSocket, receiveMessages, sendMessages);
                     sink.success(link);
                 }
             } catch (IOException e) {
@@ -70,8 +73,9 @@ public class PeersProvider {
                     peerSocket.close();
                 } catch (IOException e1) {
                     // TODO: do something with this shit
-                    //e1.printStackTrace();
+                    logger.error("fatal error while closing a socket: ", e1);
                 }
+                logger.trace("closed a socket: ", e);
                 sink.error(e);
             }
         }).subscribeOn(App.MyScheduler)
@@ -85,7 +89,11 @@ public class PeersProvider {
     }
 
     public Flux<Peer> connectToPeers$(TrackerConnection trackerConnection) {
-        return trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), AppConfig.getInstance().findFreePort())
+        return TorrentDownloaders.getListener()
+                .getListeningPort()
+                // If we get timeOut then it means that we are not listening so I will just fake a random port which will ignore incoming connections.
+                .timeout(Duration.ofSeconds(2), Mono.just(12345))
+                .flatMap(listeningPort -> trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), listeningPort))
                 .flatMapMany(AnnounceResponse::getPeersFlux);
     }
 

@@ -19,6 +19,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import redux.store.Store;
 
+import java.util.Objects;
+
 // TODO: save the initial status in the mongodb.
 // TODO: in case the test doesn't want the SearchPeers to get more peers from the tracker, I need to take care of it.
 public class TorrentDownloaderBuilder {
@@ -45,6 +47,7 @@ public class TorrentDownloaderBuilder {
 
     public static Mono<TorrentDownloader> buildDefault(TorrentInfo torrentInfo, String downloadPath, String identifer) {
         return builder(torrentInfo)
+                .setToDefaultAllocatorStore()
                 .setToDefaultTorrentStatusStore(identifer)
                 .setToDefaultTorrentStatesSideEffects()
                 .setToDefaultSearchPeers()
@@ -56,8 +59,7 @@ public class TorrentDownloaderBuilder {
     }
 
     public Mono<TorrentDownloader> build() {
-        if (this.allocatorStore == null)
-            this.allocatorStore = TorrentDownloaders.getAllocatorStore();
+        Objects.requireNonNull(this.allocatorStore);
         if (this.fileSystemLink$ == null) {
             // it can't be that fileSystemLink$==null and bittorrentAlgorithm$!=null
             // because we need fileSystemLink object to create bittorrentAlgorithm object.
@@ -95,6 +97,11 @@ public class TorrentDownloaderBuilder {
 
     public TorrentDownloaderBuilder setAllocatorStore(AllocatorStore allocatorStore) {
         this.allocatorStore = allocatorStore;
+        return this;
+    }
+
+    public TorrentDownloaderBuilder setToDefaultAllocatorStore() {
+        this.allocatorStore = TorrentDownloaders.getAllocatorStore();
         return this;
     }
 
