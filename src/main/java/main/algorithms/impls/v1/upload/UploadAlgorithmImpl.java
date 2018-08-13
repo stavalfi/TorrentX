@@ -43,6 +43,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                         .doOnNext(requestMessage -> logger.debug("start creating piece-message for response to peer because he sent me request-message: " + requestMessage))
                         .concatMap(requestMessage -> fileSystemLink.buildPieceMessage(requestMessage))
                         .doOnNext(requestMessage -> logger.debug("end creating piece-message for response to peer because he sent me request-message: " + requestMessage))
+                        .publishOn(Schedulers.newSingle("UPLOADER"))
                         .concatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
                                 .map(___ -> new PieceEvent(TorrentPieceStatus.UPLOADING, pieceMessage))))
                 .publish()

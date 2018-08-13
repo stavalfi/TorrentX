@@ -115,10 +115,20 @@ Feature: connect to a fake peers and communicate with them
     Then random-fake-peer connect to me for torrent: "<torrent>" in "<downloadLocation>" and he request:
       | pieceIndex | from | length     |
       | 0          | 0    | 1000000000 |
+      | 0          | 0    | 1000000000 |
+      | 0          | 0    | 1000000000 |
+      | 0          | 0    | 1000000000 |
+      | 0          | 0    | 1000000000 |
+      | 0          | 0    | 1000000000 |
       | 1          | 0    | 10         |
       | 2          | 30   | 100        |
     Then we assert that for torrent: "<torrent>", we gave the following pieces to the random-fake-peer:
       | pieceIndex | from | length |
+      | 0          | 0    | -1     |
+      | 0          | 0    | -1     |
+      | 0          | 0    | -1     |
+      | 0          | 0    | -1     |
+      | 0          | 0    | -1     |
       | 0          | 0    | -1     |
       | 2          | 30   | 100    |
 
