@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import redux.store.Store;
 
@@ -46,7 +47,7 @@ public class Listener {
 
         Supplier<Mono<ServerSocket>> serverSocketSupplier = () -> {
             try {
-                ServerSocket serverSocket = new ServerSocket(TCP_PORT);
+                ServerSocket serverSocket = new ServerSocket(0);
                 return Mono.just(serverSocket);
             } catch (IOException e) {
                 return Mono.error(e);
@@ -56,39 +57,35 @@ public class Listener {
         this.startListen$ = listenerStore.statesByAction(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .concatMap(__ -> serverSocketSupplier.get())
                 .doOnError(throwable -> logger.error("failed to create ServerSocket object.", throwable))
-                .onErrorResume(PeerExceptions.communicationErrors,
-                        throwable -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                                .flatMap(__ -> Mono.empty()))
+//                .onErrorResume(PeerExceptions.communicationErrors,
+//                        throwable -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
+//                                .flatMap(__ -> Mono.empty()))
                 .concatMap(serverSocket -> listenerStore.dispatch(ListenerAction.START_LISTENING_SELF_RESOLVED)
                         .filter(listenerState -> listenerState.fromAction(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
                                 listenerState.fromAction(ListenerAction.START_LISTENING_WIND_UP))
                         .map(__ -> serverSocket))
-                .doOnNext(serverSocket -> logger.info("started listening by created server-socket under port: " + getTcpPort()))
+                .doOnNext(serverSocket -> logger.info("created server-socket under port: " + serverSocket.getLocalPort() + " (not listening to new incoming peers)."))
                 .replay(1)
                 .autoConnect(0);
 
         this.resumeListen$ = listenerStore.statesByAction(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> startListen$.take(1))
-                .concatMap(serverSocket ->
-                        listenerStore.dispatch(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)
-                                .filter(listenerState -> listenerState.fromAction(ListenerAction.RESUME_LISTENING_SELF_RESOLVED))
-                                .map(__ -> serverSocket))
-                .doOnNext(serverSocket -> logger.info("resume listening to incoming peers under port: " + getTcpPort()))
+                .concatMap(__ -> this.startListen$.take(1))
+                .concatMap(serverSocket -> listenerStore.dispatch(ListenerAction.RESUME_LISTENING_SELF_RESOLVED).filter(listenerState -> listenerState.fromAction(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)).map(__ -> serverSocket))
+                .doOnNext(serverSocket -> logger.info("resume listening to incoming peers under port: " + serverSocket.getLocalPort()))
                 .concatMap(serverSocket -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, serverSocket))
                 .concatMap(this::acceptPeersLinks)
-                .publishOn(Schedulers.elastic())
                 .concatMap(link -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, link))
                 .doOnError(throwable -> logger.error("fatal error while accepting peer connection or in server-socket object", throwable))
-                .onErrorResume(PeerExceptions.communicationErrors,
-                        throwable -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                                .flatMap(__ -> Mono.empty()))
+                .onErrorResume(PeerExceptions.communicationErrors, __ -> Mono.empty())
+                .doOnError(error -> logger.error("internal error in Listener module: " + error))
                 .publish()
                 .autoConnect(0);
 
         this.pauseListen$ = listenerStore.statesByAction(ListenerAction.PAUSE_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> listenerStore.dispatch(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
-                .filter(listenerState -> listenerState.fromAction(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
-                .doOnNext(serverSocket -> logger.info("paused listening to incoming peers under port: " + getTcpPort()))
+                .concatMap(__ -> getListeningPort())
+                .concatMap(listeningPort -> listenerStore.dispatch(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED)
+                        .filter(listenerState -> listenerState.fromAction(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
+                        .doOnNext(serverSocket -> logger.info("paused listening to incoming peers under port: " + listeningPort)))
                 .publish()
                 .autoConnect(0);
 
@@ -98,7 +95,7 @@ public class Listener {
                 logger.info("closed the app listening-for-new-peers socket.");
                 return Mono.just(serverSocket);
             } catch (IOException e) {
-                logger.error("fatal error while closing server-socket object under port " + getTcpPort() + ": " + e);
+                logger.error("fatal error while closing server-socket object under port " + serverSocket.getLocalPort() + ": " + e);
                 return Mono.error(e);
             }
         };
@@ -106,7 +103,7 @@ public class Listener {
         this.restartListener$ = listenerStore.statesByAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                 .concatMap(__ -> this.startListen$.take(1))
                 .concatMap(closeServerSocket)
-                .concatMap(closedServerSocket -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
+                .concatMap(__ -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
                 .filter(listenerState -> listenerState.fromAction(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
@@ -121,12 +118,12 @@ public class Listener {
                 // closed and which errors indicate that the ServerSocket is corrupted.
                 sink.next(peerSocket);
             } catch (IOException e) {
-                // isClosed()==true means that only I caused the serverSocket to be closed.
+                // isClosed()==true means that only I caused the serverSocket to be closed (TODO: is it true???).
                 if (e instanceof SocketException && serverSocket.isClosed()) {
-                    logger.info("Listener socket is closed due to explicit closing by the app or the user.");
+                    logger.info("Listener socket is closed due to explicit closing by the app or the user. - " + e);
                     sink.complete();
                 } else {
-                    logger.error("Listener socket is terminated (maybe not closed (?)): ", e);
+                    logger.error("Listener socket is closed due to internal error: ", e);
                     sink.error(e);
                 }
             }
@@ -191,8 +188,10 @@ public class Listener {
                 .map(TorrentDownloader::getTorrentInfo);
     }
 
-    public int getTcpPort() {
-        return TCP_PORT;
+    public Mono<Integer> getListeningPort() {
+        return this.startListen$.take(1)
+                .map(ServerSocket::getLocalPort)
+                .single();
     }
 
     public Flux<Link> getPeers$(TorrentInfo torrentInfo) {

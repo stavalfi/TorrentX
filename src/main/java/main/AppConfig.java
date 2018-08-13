@@ -17,8 +17,4 @@ public class AppConfig {
     public String getPeerId() {
         return "-AZ5750-TpkXttZLfpSH";
     }
-
-    public int findFreePort() {
-        return TorrentDownloaders.getListener().getTcpPort();
-    }
 }
