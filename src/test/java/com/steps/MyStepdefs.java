@@ -895,7 +895,7 @@ public class MyStepdefs {
                 .flatMap(peersProvider ->
                         TorrentDownloaders.getListener()
                                 .getListeningPort()
-                                .timeout(Duration.ofSeconds(2), Mono.just(12345))
+                                .timeout(Duration.ofSeconds(2))
                                 // the fake-peer will connect to me.
                                 .map(listeningPort -> new Peer("localhost", listeningPort))
                                 .flatMap(me -> peersProvider.connectToPeerMono(me)))
@@ -907,8 +907,7 @@ public class MyStepdefs {
                                 .map(AllocatorState::getBlockLength)
                                 // sendMessage all requests from fake peer to me.
                                 .flatMapMany(allocatedBlockLength -> Flux.fromIterable(peerRequestBlockList)
-                                        .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo,
-                                                allocatedBlockLength))))
+                                        .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength))))
                         .concatMap(blockOfPiece -> sendMessagesObject.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(), blockOfPiece.getLength())
                                 .doOnNext(__ -> logger.debug("fake peer sent request for block: " + blockOfPiece))))
                 .collectList()
