@@ -25,11 +25,6 @@ public class AllocatorStore {
                 .map(Result::getState);
     }
 
-    // TODO: remove this function. there should be a global bean for this.
-    public String getIdentifier() {
-        return this.allocatorStore.getIdentifier();
-    }
-
     public Mono<PieceMessage> createPieceMessage(Peer from, Peer to, int index, int begin, int blockLength, int pieceLength) {
         assert begin >= 0;
         assert blockLength > 0;

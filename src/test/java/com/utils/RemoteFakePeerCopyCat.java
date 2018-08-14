@@ -53,7 +53,7 @@ public class RemoteFakePeerCopyCat {
                 .flux()
                 .publish();
 
-        Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(link.getTorrentInfo(), fakePeerTorrentDownloadPath, this.link.getAllocatorStore(), this.torrentStatusStore, fakePieceMessageToSave$)
+        Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(link.getTorrentInfo(), fakePeerTorrentDownloadPath, this.link.getAllocatorStore(), this.torrentStatusStore, fakePieceMessageToSave$, "App")
                 .cache();
 
         Mono<Integer> pieceSaved$ = fileSystemLink$.flatMapMany(fileSystemLink -> fileSystemLink.savedPieceFlux())
@@ -68,7 +68,7 @@ public class RemoteFakePeerCopyCat {
         // wait until the piece we gave to the FS is saved.
         this.torrentDownloader$ = pieceSaved$.flatMap(__ -> {
             // I'm using this object to send pieceMessages and Request messages to the real app.
-            return TorrentDownloaderBuilder.builder(link.getTorrentInfo(),"Fake peer")
+            return TorrentDownloaderBuilder.builder(link.getTorrentInfo(), "Fake peer")
                     .setTorrentStatusStore(this.torrentStatusStore)
                     .setToDefaultSearchPeers()
                     .setToDefaultTorrentStatesSideEffects()

@@ -127,7 +127,7 @@ public class TorrentDownloaderBuilder {
     public TorrentDownloaderBuilder setToDefaultFileSystemLink(String downloadPath) {
         this.fileSystemLink$ = FileSystemLinkImpl.create(torrentInfo, downloadPath, this.allocatorStore, this.torrentStatusStore,
                 this.peersCommunicatorFlux.map(Link::receivePeerMessages)
-                        .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux));
+                        .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux), this.identifier);
         return this;
     }
 
