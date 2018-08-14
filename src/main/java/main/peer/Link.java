@@ -3,6 +3,7 @@ package main.peer;
 import main.TorrentInfo;
 import main.file.system.allocator.AllocatorStore;
 import main.statistics.SpeedStatistics;
+import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -21,19 +22,22 @@ public class Link {
     private ReceiveMessagesNotifications receiveMessagesNotifications;
     private SpeedStatistics peerSpeedStatistics;
     private AllocatorStore allocatorStore;
+    private String identifier;
 
-    // TODO: remove this copy consturctor - it is in use in in tests.
+    // TODO: remove this copy consturctor - it is in use only in tests.
     public Link(Link link) {
-        this(link.allocatorStore,link.torrentInfo, link.peer, link.peerSocket,
-                link.dataInputStream, link.dataOutputStream);
+        this(link.allocatorStore, link.torrentInfo, link.peer, link.peerSocket,
+                link.dataInputStream, link.dataOutputStream, link.identifier);
     }
 
     public Link(AllocatorStore allocatorStore,
                 TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
                 DataInputStream dataInputStream,
-                DataOutputStream dataOutputStream) {
+                DataOutputStream dataOutputStream,
+                String identifier) {
         assert peerSocket != null;
-        this.allocatorStore=allocatorStore;
+        this.identifier = identifier;
+        this.allocatorStore = allocatorStore;
         this.peer = peer;
         this.peerSocket = peerSocket;
         this.dataInputStream = dataInputStream;
@@ -47,14 +51,14 @@ public class Link {
                 this.me, this.peer,
                 this.peerCurrentStatus,
                 this::closeConnection,
-                dataOutputStream);
-        this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(this.allocatorStore,torrentInfo, this.me,
-                this.peer, this.peerCurrentStatus, dataInputStream);
+                dataOutputStream,
+                identifier);
+        this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(this.allocatorStore, torrentInfo, this.me,
+                this.peer, this.peerCurrentStatus, dataInputStream, identifier);
 
-        // TODO: uncomment
-//        this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-//                this.receiveMessagesNotifications.getPeerMessageResponseFlux(),
-//                this.sendMessages.sentPeerMessagesFlux());
+        this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
+                this.receiveMessagesNotifications.getPeerMessageResponseFlux(),
+                this.sendMessages.sentPeerMessagesFlux());
     }
 
     public AllocatorStore getAllocatorStore() {

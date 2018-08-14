@@ -2,6 +2,7 @@ package com.steps;
 
 import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
+import cucumber.api.PendingException;
 import cucumber.api.java.en.And;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
@@ -9,6 +10,7 @@ import cucumber.api.java.en.When;
 import main.App;
 import main.AppConfig;
 import main.TorrentInfo;
+import main.algorithms.BlockDownloader;
 import main.downloader.*;
 import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
@@ -37,10 +39,7 @@ import org.junit.Assert;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.ConnectableFlux;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Hooks;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.*;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 import reactor.util.function.Tuple2;
@@ -52,7 +51,9 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -241,7 +242,7 @@ public class MyStepdefs {
 
         // I'm using this object to send pieceMessages and Request messages to the real app.
         Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder
-                .builder(torrentInfo)
+                .builder(torrentInfo, "App")
                 .setToDefaultAllocatorStore()
                 .setTorrentStatusStore(torrentStatusStore)
                 .setToDefaultSearchPeers()
@@ -311,7 +312,7 @@ public class MyStepdefs {
         AllocatorStore fakePeerAllocatorStore = new AllocatorStore(new Store<>(new AllocatorReducer(),
                 AllocatorReducer.defaultAllocatorState, "Test-Fake-Peer-" + fakePeerPort + "-Allocator-Store"));
 
-        Mono<RemoteFakePeerCopyCat> fakePeerToApp$ = torrentDownloader$.map(__ -> new PeersProvider(fakePeerAllocatorStore, torrentInfo))
+        Mono<RemoteFakePeerCopyCat> fakePeerToApp$ = torrentDownloader$.map(__ -> new PeersProvider(fakePeerAllocatorStore, torrentInfo, "Fake peer"))
                 .flatMap(peersProvider -> app$.flatMap(app -> peersProvider.connectToPeerMono(app)))
                 .doOnNext(__ -> logger.info("successfully connected to fake peer: " + fakePeerPort))
                 .map(link -> new RemoteFakePeerCopyCat(link, "Test-Fake-Peer-" + fakePeerPort, fullDownloadPathForFakePeer))
@@ -382,7 +383,7 @@ public class MyStepdefs {
         // this will waitForMessage an activeTorrent object.
         String downloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
 
-        TorrentDownloaderBuilder.builder(torrentInfo)
+        TorrentDownloaderBuilder.builder(torrentInfo, "App")
                 .setToDefaultAllocatorStore()
                 .setToDefaultTorrentStatusStore("Test-App-TorrentStatus-Store")
                 .setToDefaultTorrentStatesSideEffects()
@@ -503,7 +504,7 @@ public class MyStepdefs {
 
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
 
-        TorrentDownloaderBuilder.builder(torrentInfo)
+        TorrentDownloaderBuilder.builder(torrentInfo, "App")
                 .setToDefaultAllocatorStore()
                 .setTorrentStatusStore(torrentStatusStore)
                 .setTorrentStatesSideEffects(sideEffects)
@@ -584,7 +585,7 @@ public class MyStepdefs {
 
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
 
-        Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.builder(torrentInfo)
+        Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.builder(torrentInfo, "App")
                 .setToDefaultAllocatorStore()
                 .setTorrentStatusStore(torrentStatusStore)
                 .setTorrentStatesSideEffects(sideEffects)
@@ -761,7 +762,7 @@ public class MyStepdefs {
         Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore =
                 new Store<>(new TorrentStatusReducer(), torrentStatusState, "Test-App-TorrentStatus-Store");
 
-        TorrentDownloaderBuilder.builder(torrentInfo)
+        TorrentDownloaderBuilder.builder(torrentInfo, "App")
                 .setToDefaultAllocatorStore()
                 .setTorrentStatusStore(torrentStatusStore)
                 .build()
@@ -867,11 +868,11 @@ public class MyStepdefs {
         // represent this application TorrentDownloader. (not the fake-peer TorrentDownloader).
         TrackerProvider trackerProvider = Mockito.mock(TrackerProvider.class);
         Mockito.when(trackerProvider.connectToTrackersFlux()).thenReturn(trackerConnectionFlux);
-        Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.builder(torrentInfo)
+        Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.builder(torrentInfo, "App")
                 .setToDefaultAllocatorStore()
                 .setTorrentStatusStore(torrentDownloader.getTorrentStatusStore())
                 .setToDefaultTorrentStatesSideEffects()
-                .setSearchPeers(new SearchPeers(torrentInfo, torrentDownloader.getTorrentStatusStore(), trackerProvider, new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo)))
+                .setSearchPeers(new SearchPeers(torrentInfo, torrentDownloader.getTorrentStatusStore(), "App", trackerProvider, new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo, "App")))
                 .setToDefaultPeersCommunicatorFlux()
                 .setToDefaultBittorrentAlgorithm()
                 .setFileSystemLink$(Mono.just(torrentDownloader.getFileSystemLink()))
@@ -984,24 +985,25 @@ public class MyStepdefs {
         logger.debug("ended cleaning all the resources of the test.");
     }
 
-    // TODO: is this step in used?
+    private Flux<Link> recordedMeToFakePeersLinks$;
+
+    private UnicastProcessor<Link> meToFakePeerLinkProcessor = UnicastProcessor.create();
+    private FluxSink<Link> emitMeToFakePeerLinks = meToFakePeerLinkProcessor.sink();
+    private Flux<Link> meToFakePeerLink$ = meToFakePeerLinkProcessor.replay()
+            .autoConnect(0);
+
     @Given("^torrent: \"([^\"]*)\",\"([^\"]*)\"$")
     public void torrent(String torrentFileName, String downloadLocation) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-        // delete everything from the last test.
         Utils.removeEverythingRelatedToLastTest();
 
-        // close the connection of all the fake peers from the last test and clear their map.
-        this.fakePeersToMeLinkMap.clear();
-        // we can close our connection instead of closing theirs. its the same.
-        if (this.recordedMeToFakePeersLinks$ != null) {
-            this.recordedMeToFakePeersLinks$
-                    .doOnNext(Link::closeConnection)
-                    .blockLast(Duration.ofMillis(500));
-        }
-        this.recordedFakePeersToMeLinks$ = null;
-        this.actualSavedBlocks$ = null;
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        TorrentDownloaders.getAllocatorStore()
+                .updateAllocations(10, torrentInfo.getPieceLength(0))
+                .publishOn(Schedulers.elastic())
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
 
         Flux<TrackerConnection> trackers$ = Flux.empty();
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
@@ -1010,11 +1012,13 @@ public class MyStepdefs {
                 TorrentStatusReducer.defaultTorrentState, "Test-App-TorrentStatus-Store");
         TrackerProvider trackerProvider = Mockito.mock(TrackerProvider.class);
         Mockito.when(trackerProvider.connectToTrackersFlux()).thenReturn(trackers$);
-        // TODO: check that I didn't miss anything
-        TorrentDownloaderBuilder.builder(torrentInfo)
+
+        TorrentDownloaderBuilder.builder(torrentInfo, "App")
+                .setToDefaultAllocatorStore()
+                .setToDefaultBittorrentAlgorithm()
                 .setTorrentStatusStore(torrentStatusStore)
                 .setToDefaultTorrentStatesSideEffects()
-                .setSearchPeers(new SearchPeers(torrentInfo, torrentStatusStore, trackerProvider, new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo)))
+                .setSearchPeers(new SearchPeers(torrentInfo, torrentStatusStore, "App", trackerProvider, new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo, "App")))
                 .setToDefaultPeersCommunicatorFlux()
                 .setToDefaultFileSystemLink(fullDownloadPath)
                 .build()
@@ -1022,30 +1026,27 @@ public class MyStepdefs {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
-    }
 
-    private Flux<Link> recordedMeToFakePeersLinks$;
-    private Flux<RemoteFakePeer> recordedFakePeersToMeLinks$;
-    private Map<Integer, Mono<RemoteFakePeer>> fakePeersToMeLinkMap = new HashMap<>();
+        TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."))
+                .getPeersCommunicatorFlux()
+                // send interested message to the fake-peer.
+                .flatMap(link -> link.sendMessages().sendInterestedMessage().map(sendPeerMessages -> link))
+                .doOnNext(link -> this.emitMeToFakePeerLinks.next(link))
+                .replay()
+                .autoConnect(0);
+    }
 
     @Given("^link to \"([^\"]*)\" - fake-peer on port \"([^\"]*)\" with the following pieces - for torrent: \"([^\"]*)\"$")
     public void linkToFakePeerWithTheFollowingPiecesForTorrent(FakePeerType fakePeerType,
-                                                               Integer fakePeerPort,
+                                                               int fakePeerPort,
                                                                String torrentFileName,
                                                                List<Integer> fakePeerCompletedPieces) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
-
-        this.recordedMeToFakePeersLinks$ = torrentDownloader.getPeersCommunicatorFlux()
-                // send interested message to the fake-peer.
-                .flatMap(link -> link.sendMessages().sendInterestedMessage()
-                        .map(sendPeerMessages -> link))
-                .replay()
-                .autoConnect(0);
-
-        Peer fakePeer = new Peer("localhost", fakePeerPort);
 
         // build a bitfield message so I can send it to my app and also
         // the fake-peer will update his status that he have those pieces.
@@ -1056,128 +1057,114 @@ public class MyStepdefs {
                         torrentInfo.getPieces().size() + completedPieceIndex)
                 .forEach(completedPieceIndex -> bitSet.set(completedPieceIndex));
 
-        Mono<RemoteFakePeer> fakePeerToMeLink$ =
-                TorrentDownloaders.getListener()
-                        .getListeningPort()
-                        .timeout(Duration.ofSeconds(2), Mono.just(12345))
-                        .map(listeningPort -> new Peer("localhost", listeningPort))
-                        .flatMap(me -> new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo).connectToPeerMono(me))
-                        .map(link -> new RemoteFakePeer(link, fakePeerType))
-                        .flatMap(remoteFakePeer -> remoteFakePeer.sendMessages().sendBitFieldMessage(bitSet)
-                                .map(sendPeerMessages -> remoteFakePeer));
+        AllocatorStore allocatorStore = new AllocatorStore(new Store<>(new AllocatorReducer(),
+                AllocatorReducer.defaultAllocatorState, "Fake-peer-Allocator-Store"));
 
-        //noinspection UnassignedFluxMonoInstance
-        this.fakePeersToMeLinkMap.put(fakePeerPort, fakePeerToMeLink$);
+        TorrentDownloaders.getListener()
+                .getListeningPort()
+                .map(listeningPort -> new Peer("localhost", listeningPort))
+                .flatMap(me -> new PeersProvider(allocatorStore, torrentInfo, "Fake-peer").connectToPeerMono(me))
+                .map(link -> new RemoteFakePeer(allocatorStore, link, fakePeerType, "Fake-peer-" + fakePeerPort + "-" + fakePeerType.toString()))
+                .flatMap(remoteFakePeer -> remoteFakePeer.getLink().sendMessages().sendBitFieldMessage(bitSet)
+                        .map(sendPeerMessages -> remoteFakePeer))
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
     }
 
-    private Flux<PieceEvent> actualSavedBlocks$;
 
-    @When("^application request the following blocks from him - for torrent: \"([^\"]*)\":$")
-    public void applicationRequestTheFollowingBlocksFromHimForTorrent(String torrentFileName,
-                                                                      List<BlockOfPiece> peerRequestBlockList) {
-        // at this point, we already started listening for incoming links from the fake-peers.
+    private UnicastProcessor<PieceEvent> actualIncomingPieceMessages = UnicastProcessor.create();
+    private FluxSink<PieceEvent> emitActualIncomingPieceMessages = actualIncomingPieceMessages.sink();
+    private Flux<PieceEvent> actualIncomingPieceMessages$ = actualIncomingPieceMessages.replay()
+            .autoConnect(0);
 
-        // TODO: un comment this.
-//		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-//		TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
-//				.findTorrentDownloader(torrentInfo.getTorrentInfoHash())
-//				.orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
-//
-//		// all fake peers connect to me. In this test there must be only one fake-peer.
-//		this.recordedFakePeersToMeLinks$ = Flux.fromIterable(this.fakePeersToMeLinkMap.entrySet())
-//				.flatMap(Map.Entry::getValue)
-//				.replay()
-//				.autoConnect(0);
-//
-//		// sleep until we actually start listening for new peers.
-//		//TODO: add a notification in PeersListener class to notify when we actually started listening.
-//		Thread.sleep(1000);
-//
-//		Link meToFakePeerLink = this.recordedMeToFakePeersLinks$.take(1)
-//				.single()
-//				.block();
-//
-//		BiFunction<Link, BlockOfPiece, RequestMessage> buildRequestMessage = (link, blockOfPiece) -> {
-//			int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
-//					blockOfPiece.getPieceIndex() :
-//					torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
-//
-////			int requestBlockSize = blockOfPiece.getMessageLength() != null ?
-////					blockOfPiece.getMessageLength() :
-////					torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getOffset();
-//
-//			return new RequestMessage(link.getMe(), link.getPeer(), pieceIndex, blockOfPiece.getOffset(), requestBlockSize);
-//		};
-//
-//		// download the blocks.
-//		BlockDownloader blockDownloader = torrentDownloader
-//				.getBittorrentAlgorithm()
-//				.getDownloadAlgorithm()
-//				.getBlockDownloader();
-//		int concurrentRequestsToSend = peerRequestBlockList.size();
-//		this.actualSavedBlocks$ = Flux.fromIterable(peerRequestBlockList)
-//				.map(blockOfPiece -> buildRequestMessage.apply(meToFakePeerLink, blockOfPiece))
-//				.flatMap(requestMessage ->
-//						blockDownloader.downloadBlock(meToFakePeerLink, requestMessage)
-//								.onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty()), concurrentRequestsToSend);
+    @When("^application request the following blocks from all fake-peers - for torrent: \"([^\"]*)\":$")
+    public void applicationRequestTheFollowingBlocksFromFakePeerOnPortForTorrent(String torrentFileName,
+                                                                                 List<BlockOfPiece> peerRequestBlockList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
+
+        final int concurrentRequestsToSend = peerRequestBlockList.size();
+
+        TorrentDownloaders.getAllocatorStore()
+                .latestState$()
+                .map(AllocatorState::getBlockLength)
+                .flatMapMany(allocatedBlockLength -> Flux.fromIterable(peerRequestBlockList)
+                        .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength)))
+                // create the request message
+                .flatMap(blockOfPiece -> this.meToFakePeerLink$
+                                .flatMap(link -> TorrentDownloaders.getAllocatorStore().createRequestMessage(link.getMe(), link.getPeer(), blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(), blockOfPiece.getLength(), torrentInfo.getPieceLength(blockOfPiece.getPieceIndex()))
+                                        .flatMap(requestMessage -> torrentDownloader.getBittorrentAlgorithm()
+                                                .getDownloadAlgorithm()
+                                                .getBlockDownloader()
+                                                .downloadBlock(link, requestMessage)))
+                                .take(1)
+                        , concurrentRequestsToSend)
+                .doOnNext(pieceEvent -> this.emitActualIncomingPieceMessages.next(pieceEvent))
+                .publish()
+                .autoConnect(0);
     }
 
-    @Then("^application receive the following blocks from him - for torrent: \"([^\"]*)\":$")
+    @Then("^application receive the following blocks from all - for torrent: \"([^\"]*)\":$")
     public void applicationReceiveTheFollowingBlocksFromHimForTorrent(String torrentFileName,
-                                                                      List<BlockOfPiece> expectedBlockFromFakePeerList) {
-        // TODO: un comment this.
-//		TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-//
-//		Function<BlockOfPiece, BlockOfPiece> fixBlockOfPiece = blockOfPiece -> {
-//			int pieceIndex = blockOfPiece.getPieceIndex() >= 0 ?
-//					blockOfPiece.getPieceIndex() :
-//					torrentInfo.getPieces().size() + blockOfPiece.getPieceIndex();
-//
-//			int requestBlockSize = blockOfPiece.getMessageLength() != null ?
-//					blockOfPiece.getMessageLength() :
-//					torrentInfo.getPieceLength(pieceIndex) - blockOfPiece.getOffset();
-//
-//			return new BlockOfPiece(pieceIndex, blockOfPiece.getOffset(), requestBlockSize);
-//		};
-//
-//		List<BlockOfPiece> fixedExpectedBlockFromFakePeerList = expectedBlockFromFakePeerList.stream()
-//				.map(fixBlockOfPiece)
-//				.collect(Collectors.toList());
-//
-//		List<BlockOfPiece> actualDownloadedBlocks = this.actualSavedBlocks$.take(expectedBlockFromFakePeerList.size())
-//				.map(PieceEvent::getReceivedPiece)
-//				.map(pieceEvent -> new BlockOfPiece(pieceEvent.getIndex(),
-//						pieceEvent.getBegin(), pieceEvent.getAllocatedBlock().length))
-//				.collectList()
-//				.block();
-//
-//		Assert.assertTrue(fixedExpectedBlockFromFakePeerList.stream()
-//				.allMatch(actualDownloadedBlocks::contains));
-//
-//		Assert.assertTrue(actualDownloadedBlocks.stream()
-//				.allMatch(fixedExpectedBlockFromFakePeerList::contains));
+                                                                      List<BlockOfPiece> expectedBlockFromFakePeerList) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        // I'm implicitly assuming that the allocator of the fake-peer is big enough
+        // to send me back exactly the blocks I want with the specified size I wanted.
+        List<BlockOfPiece> expectedIncomingBlocks = TorrentDownloaders.getAllocatorStore()
+                .latestState$()
+                .map(AllocatorState::getBlockLength)
+                .flatMapMany(allocatedBlockLength -> Flux.fromIterable(expectedBlockFromFakePeerList)
+                        .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength)))
+                .collectList()
+                .block();
+
+        this.actualIncomingPieceMessages$.take(expectedBlockFromFakePeerList.size())
+                // the timeout is only for stoping a failed test in the CI servers.
+                .timeout(Duration.ofSeconds(3))
+                .map(PieceEvent::getReceivedPiece)
+                .map(pieceMessage -> new BlockOfPiece(pieceMessage.getIndex(), pieceMessage.getBegin(), pieceMessage.getAllocatedBlock().getLength()))
+                .collectList()
+                .doOnNext(actualIncomingBlocks -> Utils.assertListEqualNotByOrder(expectedIncomingBlocks, actualIncomingBlocks, BlockOfPiece::equals))
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+
+        // release reactor lib resources.
+        this.emitMeToFakePeerLinks.complete();
+        this.emitActualIncomingPieceMessages.complete();
+
+        // close the connection of all the me-to-fake-peers
+        this.meToFakePeerLink$.doOnNext(Link::closeConnection)
+                .collectList()
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
     }
 
     @Then("^application doesn't receive the following blocks from him - for torrent: \"([^\"]*)\":$")
     public void applicationDoesnTReceiveTheFollowingBlocksFromHimForTorrent(String torrentFileName,
                                                                             List<BlockOfPiece> notExpectedBlockFromFakePeerList) throws Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-        StepVerifier.create(this.actualSavedBlocks$)
-                .verifyComplete();
+//        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+//
+//        StepVerifier.create(this.actualSavedBlocks$)
+//                .verifyComplete();
     }
 
     @Then("^fake-peer on port \"([^\"]*)\" choke me: \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
     public void fakePeerOnPortChokeMeForTorrent(Integer fakePeerPort, boolean isChoking, String torrentFileName) throws
             Throwable {
-        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
-
-        //noinspection UnassignedFluxMonoInstance
-        this.recordedFakePeersToMeLinks$.filter(remoteFakePeer -> remoteFakePeer.getMe().getPeerPort() == fakePeerPort)
-                .flatMap(remoteFakePeer -> (isChoking ?
-                        remoteFakePeer.sendMessages().sendChokeMessage() :
-                        remoteFakePeer.sendMessages().sendUnchokeMessage())
-                        .map(sendPeerMessages -> remoteFakePeer));
+//        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+//
+//        //noinspection UnassignedFluxMonoInstance
+//        this.recordedFakePeersToMeLinks$.filter(remoteFakePeer -> remoteFakePeer.getMe().getPeerPort() == fakePeerPort)
+//                .flatMap(remoteFakePeer -> (isChoking ?
+//                        remoteFakePeer.sendMessages().sendChokeMessage() :
+//                        remoteFakePeer.sendMessages().sendUnchokeMessage())
+//                        .map(sendPeerMessages -> remoteFakePeer));
     }
 
     private Flux<Integer> availablePieces$;
@@ -1533,7 +1520,7 @@ public class MyStepdefs {
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
-        TorrentDownloaderBuilder.buildDefault(torrentInfo, fullDownloadPath, "Test-App-TorrentStatus-Store")
+        TorrentDownloaderBuilder.buildDefault(torrentInfo, "Test-App", fullDownloadPath)
                 .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
                 .as(StepVerifier::create)
                 .expectNextCount(1)
@@ -1691,11 +1678,12 @@ public class MyStepdefs {
                 throw new InvalidParameterException("the given exception type is not supported in this test case");
         }
 
+        // TODO: need to create a new allocator because it will be used by a fake-peer
         Mono<Link> publisher = TorrentDownloaders.getListener()
                 .getListeningPort()
                 .timeout(Duration.ofSeconds(2), Mono.just(12345))
                 .map(listeningPort -> new Peer("localhost", listeningPort))
-                .flatMap(app -> new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo).connectToPeerMono(app))
+                .flatMap(app -> new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo, "Fake peer").connectToPeerMono(app))
                 .doOnNext(Link::closeConnection);
         if (PeerExceptions.peerNotResponding.test(throwable))
             StepVerifier.create(publisher)
@@ -1716,10 +1704,12 @@ public class MyStepdefs {
                 .replay()
                 .autoConnect(0);
 
+
+        // TODO: need to create a new allocator because it will be used by the fake-peer.
         TorrentDownloaders.getListener()
                 .getListeningPort()
                 .map(listeningPort -> new Peer("localhost", listeningPort))
-                .flatMap(app -> new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo).connectToPeerMono(app))
+                .flatMap(app -> new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo, "Fake peer").connectToPeerMono(app))
                 .doOnNext(Link::closeConnection)
                 .flatMap(__ -> linkFlux.take(1).single())
                 .as(StepVerifier::create)

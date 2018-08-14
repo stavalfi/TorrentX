@@ -20,7 +20,7 @@ public class PeerMessageFactory {
     private static Logger logger = LoggerFactory.getLogger(PeerMessageFactory.class);
 
     public static Mono<? extends PeerMessage> waitForMessage(AllocatorStore allocatorStore, Scheduler scheduler, TorrentInfo torrentInfo,
-                                                             Peer from, Peer to, DataInputStream dataInputStream) {
+                                                             Peer from, Peer to, DataInputStream dataInputStream, String identifier) {
         // lengthOfTheRestOfData == messageLength == how much do we need to read more
         int lengthOfTheRestOfData;
         try {
@@ -28,7 +28,7 @@ public class PeerMessageFactory {
         } catch (IOException e) {
             return Mono.error(e);
         }
-        logger.debug("start received message from: " + from + " to: " + to);
+        logger.debug(identifier+" - start received message from: " + from + " to: " + to);
 
         if (lengthOfTheRestOfData == 0) {
             byte keepAliveMessageId = 10;
@@ -41,11 +41,11 @@ public class PeerMessageFactory {
         } catch (IOException e) {
             return Mono.error(e);
         }
-        logger.debug("start received message-id: " + messageId + "==" + PeerMessageId.fromValue(messageId) + " from: " + from + " to: " + to);
+        logger.debug(identifier+" - start received message-id: " + messageId + "==" + PeerMessageId.fromValue(messageId) + " from: " + from + " to: " + to);
         int messagePayloadLength = lengthOfTheRestOfData - 1;
 
         if (messageId == PeerMessageId.pieceMessage.getMessageId())
-            return createPieceMessage(allocatorStore, scheduler, torrentInfo, from, to, messagePayloadLength, dataInputStream);
+            return createPieceMessage(allocatorStore, scheduler, torrentInfo, from, to, messagePayloadLength, dataInputStream, identifier);
 
         byte[] messagePayloadByteArray = new byte[messagePayloadLength];
         try {
@@ -55,10 +55,10 @@ public class PeerMessageFactory {
         }
 
         if (messageId == PeerMessageId.requestMessage.getMessageId())
-            return createRequestMessage(allocatorStore, scheduler, torrentInfo, from, to, messageId, messagePayloadByteArray);
+            return createRequestMessage(allocatorStore, scheduler, torrentInfo, from, to, messageId, messagePayloadByteArray, identifier);
 
         PeerMessage peerMessage = createMessage(torrentInfo, from, to, messageId, messagePayloadByteArray);
-        logger.debug("end received message-id: " + messageId +
+        logger.debug(identifier+" - end received message-id: " + messageId +
                 "==" + PeerMessageId.fromValue(messageId) + " from: " +
                 from + " to: " + to);
         return Mono.just(peerMessage);
@@ -66,11 +66,12 @@ public class PeerMessageFactory {
 
     public static Mono<? extends PeerMessage> createPieceMessage(AllocatorStore allocatorStore, Scheduler scheduler,
                                                                  TorrentInfo torrentInfo, Peer from, Peer to,
-                                                                 int messagePayloadLength, DataInputStream dataInputStream) {
+                                                                 int messagePayloadLength, DataInputStream dataInputStream,
+                                                                 String identifier) {
         int index;
         try {
             index = dataInputStream.readInt();
-            logger.debug("start received piece message. piece-index: " + index);
+            logger.debug(identifier+" - start received piece message. piece-index: " + index);
 
         } catch (IOException e) {
             return Mono.error(e);
@@ -79,12 +80,12 @@ public class PeerMessageFactory {
         int begin;
         try {
             begin = dataInputStream.readInt();
-            logger.debug("start received piece message. piece-begin: " + begin);
+            logger.debug(identifier+" - start received piece message. piece-begin: " + begin);
         } catch (IOException e) {
             return Mono.error(e);
         }
         int blockLength = messagePayloadLength - 8;// 8 == 'index' length in bytes + 'begin' length in bytes
-        logger.debug("start received piece message. piece-block-length: " + blockLength);
+        logger.debug(identifier+" - start received piece message. piece-block-length: " + blockLength);
         return allocatorStore.createPieceMessage(from, to, index, begin, blockLength, pieceLength)
                 .publishOn(scheduler)
                 .flatMap(pieceMessage -> {
@@ -93,7 +94,7 @@ public class PeerMessageFactory {
                         int offset = pieceMessage.getAllocatedBlock().getOffset();
                         int length = pieceMessage.getAllocatedBlock().getLength();
                         dataInputStream.readFully(block, offset, length);
-                        logger.debug("end received piece message.");
+                        logger.debug(identifier+" - end received piece message.");
                         return Mono.just(pieceMessage);
                     } catch (IOException e) {
                         return Mono.error(e);
@@ -107,19 +108,20 @@ public class PeerMessageFactory {
                                                                    Peer from,
                                                                    Peer to,
                                                                    byte messageId,
-                                                                   byte[] payload) {
+                                                                   byte[] payload,
+                                                                   String identifier) {
         assert messageId == PeerMessageId.requestMessage.getMessageId();
 
         ByteBuffer wrap = ByteBuffer.wrap(payload);
         int index = wrap.getInt();
-        logger.debug("start received request message. request-index: " + index);
+        logger.debug(identifier+" - start received request message. request-index: " + index);
         int begin = wrap.getInt();
-        logger.debug("start received request message. request-begin: " + begin);
+        logger.debug(identifier+" - start received request message. request-begin: " + begin);
         int blockLength = wrap.getInt();
-        logger.debug("start received request message. request-block-length: " + blockLength);
+        logger.debug(identifier+" - start received request message. request-block-length: " + blockLength);
 
         return allocatorStore.createRequestMessage(from, to, index, begin, blockLength, torrentInfo.getPieceLength(index))
-                .doOnNext(__ -> logger.debug("end received request message."))
+                .doOnNext(__ -> logger.debug(identifier+" - end received request message."))
                 .publishOn(scheduler);
     }
 

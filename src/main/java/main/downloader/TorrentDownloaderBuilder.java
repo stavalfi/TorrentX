@@ -34,21 +34,23 @@ public class TorrentDownloaderBuilder {
     private SpeedStatistics torrentSpeedStatistics;
     private Flux<Link> peersCommunicatorFlux;
     private AllocatorStore allocatorStore;
+    private String identifier;
 
-    private TorrentDownloaderBuilder(TorrentInfo torrentInfo) {
+    private TorrentDownloaderBuilder(TorrentInfo torrentInfo, String identifier) {
         this.torrentInfo = torrentInfo;
+        this.identifier = identifier;
     }
 
-    public static TorrentDownloaderBuilder builder(TorrentInfo torrentInfo) {
+    public static TorrentDownloaderBuilder builder(TorrentInfo torrentInfo, String identifier) {
         assert torrentInfo != null;
 
-        return new TorrentDownloaderBuilder(torrentInfo);
+        return new TorrentDownloaderBuilder(torrentInfo, identifier);
     }
 
-    public static Mono<TorrentDownloader> buildDefault(TorrentInfo torrentInfo, String downloadPath, String identifer) {
-        return builder(torrentInfo)
+    public static Mono<TorrentDownloader> buildDefault(TorrentInfo torrentInfo, String identifier, String downloadPath) {
+        return builder(torrentInfo, identifier)
                 .setToDefaultAllocatorStore()
-                .setToDefaultTorrentStatusStore(identifer)
+                .setToDefaultTorrentStatusStore(identifier)
                 .setToDefaultTorrentStatesSideEffects()
                 .setToDefaultSearchPeers()
                 .setToDefaultPeersCommunicatorFlux()
@@ -88,7 +90,7 @@ public class TorrentDownloaderBuilder {
         return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
                 this.searchPeers,
                 fileSystemLink,
-                BittorrentAlgorithmInitializer.v1(this.allocatorStore, torrentInfo, this.torrentStatusStore, fileSystemLink, this.peersCommunicatorFlux),
+                BittorrentAlgorithmInitializer.v1(this.allocatorStore, torrentInfo, this.torrentStatusStore, fileSystemLink, this.peersCommunicatorFlux, this.identifier),
                 this.torrentStatusStore,
                 this.torrentSpeedStatistics,
                 this.torrentStatesSideEffects,
@@ -113,7 +115,7 @@ public class TorrentDownloaderBuilder {
     public TorrentDownloaderBuilder setToDefaultSearchPeers() {
         assert this.torrentStatusStore != null;
 
-        this.searchPeers = new SearchPeers(this.allocatorStore, this.torrentInfo, this.torrentStatusStore);
+        this.searchPeers = new SearchPeers(this.allocatorStore, this.torrentInfo, this.torrentStatusStore, this.identifier);
         return this;
     }
 

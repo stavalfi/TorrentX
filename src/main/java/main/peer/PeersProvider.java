@@ -28,8 +28,10 @@ public class PeersProvider {
 
     private TorrentInfo torrentInfo;
     private AllocatorStore allocatorStore;
+    private String identifier;
 
-    public PeersProvider(AllocatorStore allocatorStore, TorrentInfo torrentInfo) {
+    public PeersProvider(AllocatorStore allocatorStore, TorrentInfo torrentInfo,String identifier) {
+        this.identifier=identifier;
         this.torrentInfo = torrentInfo;
         this.allocatorStore = allocatorStore;
     }
@@ -65,7 +67,7 @@ public class PeersProvider {
                             " with the wrong torrent-info-hash: " + receivedTorrentInfoHash));
                 } else {
                     // all went well, I accept this connection.
-                    Link link = new Link(this.allocatorStore, this.torrentInfo, peer, peerSocket, receiveMessages, sendMessages);
+                    Link link = new Link(this.allocatorStore, this.torrentInfo, peer, peerSocket, receiveMessages, sendMessages,this.identifier);
                     sink.success(link);
                 }
             } catch (IOException e) {

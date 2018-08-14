@@ -20,7 +20,8 @@ public class BittorrentAlgorithmInitializer {
                                          TorrentInfo torrentInfo,
                                          Store<TorrentStatusState, TorrentStatusAction> store,
                                          FileSystemLink fileSystemLink,
-                                         Flux<Link> peersCommunicatorFlux) {
+                                         Flux<Link> peersCommunicatorFlux,
+                                         String identifier) {
         Flux<Link> recordedPeerFlux = peersCommunicatorFlux
                 .flatMap(peersCommunicator ->
                         peersCommunicator.sendMessages().sendInterestedMessage()
@@ -43,7 +44,7 @@ public class BittorrentAlgorithmInitializer {
                 new PeersToPiecesMapperImpl(recordedPeerFlux,
                         fileSystemLink.getUpdatedPiecesStatus());
 
-        BlockDownloader blockDownloader = new BlockDownloaderImpl(torrentInfo, fileSystemLink);
+        BlockDownloader blockDownloader = new BlockDownloaderImpl(torrentInfo, fileSystemLink,identifier);
 
         PiecesDownloader piecesDownloader = new PiecesDownloaderImpl(allocatorStore,
                 torrentInfo, store,

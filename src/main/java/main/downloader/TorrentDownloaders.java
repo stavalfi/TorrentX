@@ -33,7 +33,7 @@ public class TorrentDownloaders {
     private static Store<ListenerState, ListenerAction> listenStore = new Store<>(new ListenerReducer(),
             ListenerReducer.defaultListenState, "App-Listener-Store");
 
-    private static Listener listener = new Listener(allocatorStore);
+    private static Listener listener = new Listener(allocatorStore, "App");
 
     private static ListenerSideEffects listenerSideEffects = new ListenerSideEffects(listenStore);
 

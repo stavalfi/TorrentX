@@ -24,18 +24,21 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     private PeerCurrentStatus peerCurrentStatus;
     private SendMessages sendMessages;
     private AllocatorStore allocatorStore;
+    private String identifier;
 
     SendMessagesNotificationsImpl(AllocatorStore allocatorStore,
                                   TorrentInfo torrentInfo,
                                   Peer me, Peer peer,
                                   PeerCurrentStatus peerCurrentStatus,
                                   Runnable closeConnectionMethod,
-                                  DataOutputStream peerDataOutputStream) {
+                                  DataOutputStream peerDataOutputStream,
+                                  String identifier) {
         this.allocatorStore = allocatorStore;
         this.torrentInfo = torrentInfo;
         this.me = me;
         this.peer = peer;
         this.peerCurrentStatus = peerCurrentStatus;
+        this.identifier = identifier;
         this.sentPeerMessagesFlux = Flux.create((FluxSink<PeerMessage> sink) -> this.sentMessagesFluxSink = sink)
                 .subscribeOn(App.MyScheduler)
                 .publish()
@@ -45,7 +48,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
 
     private Mono<SendMessagesNotifications> send(PeerMessage peerMessage) {
         return peerMessage.sendMessage(this.sendMessages)
-                .doOnNext(__ -> logger.debug("sent message to peer: " + peerMessage))
+                .doOnNext(__ -> logger.debug(this.identifier + " - sent message to peer: " + peerMessage))
                 .map(sendMessages -> (SendMessagesNotifications) this)
                 .doOnNext(peersCommunicator -> {
                     if (this.sentMessagesFluxSink != null)
@@ -62,8 +65,8 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     public Mono<SendMessagesNotifications> sendPieceMessage(PieceMessage pieceMessage) {
         return send(pieceMessage)
                 .map(__ -> this.allocatorStore)
-                .doOnSuccessOrError((__, ___) -> logger.debug("dispatching cleaning for piece-message: " + pieceMessage))
-                .doOnError(__ -> logger.debug("I shouldn't be here: " + __))
+                .doOnSuccessOrError((__, ___) -> logger.debug(this.identifier + " - dispatching cleaning for piece-message: " + pieceMessage))
+                .doOnError(__ -> logger.debug(this.identifier + " - I shouldn't be here: " + __))
                 .doAfterSuccessOrError((__, ___) -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
                 .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(pieceMessage.getIndex()))
                 .map(__ -> this);

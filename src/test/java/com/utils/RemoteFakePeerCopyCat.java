@@ -68,7 +68,7 @@ public class RemoteFakePeerCopyCat {
         // wait until the piece we gave to the FS is saved.
         this.torrentDownloader$ = pieceSaved$.flatMap(__ -> {
             // I'm using this object to send pieceMessages and Request messages to the real app.
-            return TorrentDownloaderBuilder.builder(link.getTorrentInfo())
+            return TorrentDownloaderBuilder.builder(link.getTorrentInfo(),"Fake peer")
                     .setTorrentStatusStore(this.torrentStatusStore)
                     .setToDefaultSearchPeers()
                     .setToDefaultTorrentStatesSideEffects()
