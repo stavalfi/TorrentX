@@ -121,7 +121,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     public Mono<SendMessagesNotifications> sendRequestMessage(int index, int begin, int blockLength) {
         int pieceLength = this.torrentInfo.getPieceLength(index);
         return this.allocatorStore.createRequestMessage(this.getMe(), this.getPeer(), index, begin, blockLength, pieceLength)
-                .flatMap(this::send);
+                .flatMap(requestMessage -> send(requestMessage));
     }
 
     @Override

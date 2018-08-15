@@ -7,6 +7,7 @@ import main.peer.peerMessages.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
@@ -41,8 +42,9 @@ class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
         Scheduler scheduler = Schedulers.newSingle(identifier + " - RECEIVE-PEER-MESSAGES");
         this.peerMessageResponseFlux = Flux.generate(synchronousSink -> synchronousSink.next(0))
                 .publishOn(scheduler)
-                .concatMap(__ -> PeerMessageFactory.waitForMessage(allocatorStore, scheduler, torrentInfo, peer, me, dataInputStream, identifier))
-                .doOnNext(peerMessage -> logger.debug(identifier + " - received new message1: " + peerMessage))
+                .concatMap(__ -> PeerMessageFactory.waitForMessage(allocatorStore, scheduler, torrentInfo, peer, me, dataInputStream, identifier)
+                        .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty()))
+                .doOnNext(peerMessage -> logger.debug(identifier + " - received new message: " + peerMessage))
                 //.onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
                 // there are multiple subscribers to this source (every specific peer-message flux).
                 // all of them must get the same message and ***not activate this source more then once***.
@@ -69,10 +71,8 @@ class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
                             break;
                     }
                 })
-                .doOnNext(peerMessage -> logger.debug(identifier + " - received new message2: " + peerMessage))
                 .publish()
-                .autoConnect(0)
-                .doOnNext(peerMessage -> logger.debug(identifier + " - received new message3: " + peerMessage));
+                .autoConnect(0);
 
         this.bitFieldMessageResponseFlux = peerMessageResponseFlux
                 .filter(peerMessage -> peerMessage instanceof BitFieldMessage)

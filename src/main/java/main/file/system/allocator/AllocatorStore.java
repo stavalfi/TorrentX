@@ -51,7 +51,7 @@ public class AllocatorStore {
         CreateRequestMessageRequest request = new CreateRequestMessageRequest(from, to, index, begin, blockLength, pieceLength);
         return this.allocatorStore.dispatch(request)
                 .cast(CreateRequestMessageResult.class)
-                .map(CreateRequestMessageResult::getRequestMessage);
+                .map(createRequestMessageResult -> createRequestMessageResult.getRequestMessage());
     }
 
     public Mono<AllocatorState> free(AllocatedBlock allocatedBlock) {
