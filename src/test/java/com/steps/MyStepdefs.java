@@ -478,7 +478,7 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         TorrentDownloaders.getAllocatorStore()
-                .updateAllocations(10, 1_000_000)
+                .updateAllocations(10, 17_000)
                 .block();
 
         Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
