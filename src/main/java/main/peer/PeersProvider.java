@@ -29,11 +29,11 @@ public class PeersProvider {
     private TorrentInfo torrentInfo;
     private AllocatorStore allocatorStore;
     private String identifier;
-    private UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
+    private EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
     private FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages;
 
     public PeersProvider(AllocatorStore allocatorStore, TorrentInfo torrentInfo, String identifier,
-                         UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
+                         EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
                          FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
         this.identifier = identifier;
         this.torrentInfo = torrentInfo;

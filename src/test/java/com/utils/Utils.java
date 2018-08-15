@@ -11,6 +11,7 @@ import main.listener.ListenerAction;
 import main.listener.reducers.ListenerReducer;
 import main.listener.state.tree.ListenerState;
 import main.peer.Link;
+import main.peer.IncomingPeerMessagesNotifier;
 import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
@@ -327,32 +328,33 @@ public class Utils {
         }
     }
 
-    public static Flux<? extends PeerMessage> getSpecificMessageResponseFluxByMessageType(Link link, PeerMessageType peerMessageType) {
+    public static Flux<? extends PeerMessage> getSpecificMessageResponseFluxByMessageType(IncomingPeerMessagesNotifier incomingPeerMessagesNotifier,
+                                                                                          Link link, PeerMessageType peerMessageType) {
         switch (peerMessageType) {
             case HaveMessage:
-                return link.receivePeerMessages().getHaveMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getHaveMessageResponse$(link);
             case PortMessage:
-                return link.receivePeerMessages().getPortMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getPortMessageResponse$(link);
             case ChokeMessage:
-                return link.receivePeerMessages().getChokeMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getChokeMessageResponse$(link);
             case PieceMessage:
-                return link.receivePeerMessages().getPieceMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getPieceMessageResponse$(link);
             case CancelMessage:
-                return link.receivePeerMessages().getCancelMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getCancelMessageResponse$(link);
             case KeepAliveMessage:
-                return link.receivePeerMessages().getKeepMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getKeepMessageResponse$(link);
             case RequestMessage:
-                return link.receivePeerMessages().getRequestMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getRequestMessageResponse$(link);
             case UnchokeMessage:
-                return link.receivePeerMessages().getUnchokeMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getUnchokeMessageResponse$(link);
             case BitFieldMessage:
-                return link.receivePeerMessages().getBitFieldMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getBitFieldMessageResponse$(link);
             case InterestedMessage:
-                return link.receivePeerMessages().getInterestedMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getInterestedMessageResponse$(link);
             case NotInterestedMessage:
-                return link.receivePeerMessages().getNotInterestedMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getNotInterestedMessageResponse$(link);
             case ExtendedMessage:
-                return link.receivePeerMessages().getExtendedMessageResponseFlux();
+                return incomingPeerMessagesNotifier.getExtendedMessageResponse$(link);
             default:
                 throw new IllegalArgumentException(peerMessageType.toString());
         }

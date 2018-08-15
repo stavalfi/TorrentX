@@ -4,6 +4,7 @@ import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaderBuilder;
 import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
+import main.peer.IncomingPeerMessagesNotifierImpl;
 import main.peer.Link;
 import main.peer.peerMessages.*;
 import main.torrent.status.TorrentStatusAction;
@@ -13,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 import redux.store.Store;
 
@@ -87,8 +87,7 @@ public class RemoteFakePeerCopyCat {
                 .expectNextCount(1)
                 .verifyComplete();
 
-        //noinspection UnassignedFluxMonoInstance
-        link.receivePeerMessages()
+        new IncomingPeerMessagesNotifierImpl(link.getIncomingPeerMessages$())
                 .getPeerMessageResponseFlux()
                 .index()
                 .doOnNext(peerMessage -> logger.debug("RemoteFakePeerCopyCat (" + identifier + ") received new (" + peerMessage.getT1() + ") message from app: " + peerMessage))

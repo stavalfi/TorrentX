@@ -3,6 +3,7 @@ package main.downloader;
 import main.TorrentInfo;
 import main.algorithms.BittorrentAlgorithm;
 import main.file.system.FileSystemLink;
+import main.peer.IncomingPeerMessagesNotifier;
 import main.peer.Link;
 import main.peer.SearchPeers;
 import main.peer.peerMessages.PeerMessage;
@@ -10,9 +11,9 @@ import main.statistics.SpeedStatistics;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.TorrentStatusState;
+import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.UnicastProcessor;
 import redux.store.Store;
 
 import java.util.AbstractMap;
@@ -27,8 +28,9 @@ public class TorrentDownloader {
     private TorrentStatesSideEffects torrentStatesSideEffects;
     private SpeedStatistics torrentSpeedStatistics;
     private Flux<Link> peersCommunicatorFlux;
-    private UnicastProcessor<AbstractMap.SimpleEntry<Link,PeerMessage>> incomingPeerMessages$;
+    private EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
     private FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages;
+    private IncomingPeerMessagesNotifier incomingPeerMessagesNotifier;
 
     public TorrentDownloader(TorrentInfo torrentInfo,
                              SearchPeers searchPeers,
@@ -38,8 +40,9 @@ public class TorrentDownloader {
                              SpeedStatistics torrentSpeedStatistics,
                              TorrentStatesSideEffects torrentStatesSideEffects,
                              Flux<Link> peersCommunicatorFlux,
-                             UnicastProcessor<AbstractMap.SimpleEntry<Link,PeerMessage>> incomingPeerMessages$,
-                             FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
+                             EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
+                             FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages,
+                             IncomingPeerMessagesNotifier incomingPeerMessagesNotifier) {
         this.torrentInfo = torrentInfo;
         this.searchPeers = searchPeers;
         this.fileSystemLink = fileSystemLink;
@@ -48,8 +51,9 @@ public class TorrentDownloader {
         this.torrentSpeedStatistics = torrentSpeedStatistics;
         this.torrentStatesSideEffects = torrentStatesSideEffects;
         this.peersCommunicatorFlux = peersCommunicatorFlux;
-        this.incomingPeerMessages$=incomingPeerMessages$;
-        this.emitIncomingPeerMessages=emitIncomingPeerMessages;
+        this.incomingPeerMessages$ = incomingPeerMessages$;
+        this.emitIncomingPeerMessages = emitIncomingPeerMessages;
+        this.incomingPeerMessagesNotifier = incomingPeerMessagesNotifier;
     }
 
     public SearchPeers getSearchPeers() {
@@ -84,11 +88,15 @@ public class TorrentDownloader {
         return torrentStatesSideEffects;
     }
 
-    public UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> getIncomingPeerMessages$() {
+    public EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> getIncomingPeerMessages$() {
         return incomingPeerMessages$;
     }
 
     public FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> getEmitIncomingPeerMessages() {
         return emitIncomingPeerMessages;
+    }
+
+    public IncomingPeerMessagesNotifier getIncomingPeerMessagesNotifier() {
+        return incomingPeerMessagesNotifier;
     }
 }

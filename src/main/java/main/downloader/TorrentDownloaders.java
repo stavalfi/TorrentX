@@ -11,15 +11,16 @@ import main.listener.reducers.ListenerReducer;
 import main.listener.side.effects.ListenerSideEffects;
 import main.listener.state.tree.ListenerState;
 import main.peer.Link;
+import main.peer.IncomingPeerMessagesNotifier;
 import main.peer.SearchPeers;
 import main.peer.peerMessages.PeerMessage;
 import main.statistics.SpeedStatistics;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.TorrentStatusState;
+import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.UnicastProcessor;
 import redux.store.Store;
 
 import java.util.AbstractMap;
@@ -61,8 +62,9 @@ public class TorrentDownloaders {
                                                                 SpeedStatistics torrentSpeedStatistics,
                                                                 TorrentStatesSideEffects torrentStatesSideEffects,
                                                                 Flux<Link> peersCommunicatorFlux,
-                                                                UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
-                                                                FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
+                                                                EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
+                                                                FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages,
+                                                                IncomingPeerMessagesNotifier incomingPeerMessagesNotifier) {
         return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .orElseGet(() -> {
                     TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
@@ -73,7 +75,8 @@ public class TorrentDownloaders {
                             torrentSpeedStatistics,
                             torrentStatesSideEffects, peersCommunicatorFlux,
                             incomingPeerMessages$,
-                            emitIncomingPeerMessages);
+                            emitIncomingPeerMessages,
+                            incomingPeerMessagesNotifier);
 
                     this.torrentDownloaderList.add(torrentDownloader);
                     return torrentDownloader;

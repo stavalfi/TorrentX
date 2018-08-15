@@ -6,8 +6,9 @@ import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
 import main.file.system.allocator.AllocatorStore;
+import main.peer.IncomingPeerMessagesNotifier;
+import main.peer.IncomingPeerMessagesNotifierImpl;
 import main.peer.Link;
-import main.peer.ReceiveMessagesNotifications;
 import main.peer.SearchPeers;
 import main.peer.peerMessages.PeerMessage;
 import main.statistics.SpeedStatistics;
@@ -16,11 +17,7 @@ import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.reducers.TorrentStatusReducer;
 import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.TorrentStatusState;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.UnicastProcessor;
-import reactor.util.function.Tuple2;
+import reactor.core.publisher.*;
 import redux.store.Store;
 
 import java.util.AbstractMap;
@@ -40,8 +37,10 @@ public class TorrentDownloaderBuilder {
     private Flux<Link> peersCommunicatorFlux;
     private AllocatorStore allocatorStore;
     private String identifier;
-    private UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
+    private EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
     private FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages;
+    private IncomingPeerMessagesNotifier incomingPeerMessagesNotifier;
+
 
     private TorrentDownloaderBuilder(TorrentInfo torrentInfo, String identifier) {
         this.torrentInfo = torrentInfo;
@@ -86,7 +85,8 @@ public class TorrentDownloaderBuilder {
                     this.torrentStatesSideEffects,
                     this.peersCommunicatorFlux,
                     this.incomingPeerMessages$,
-                    this.emitIncomingPeerMessages));
+                    this.emitIncomingPeerMessages,
+                    this.incomingPeerMessagesNotifier));
         }
         if (!this.isDefaultBittorrentAlgorithm) {
             return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
@@ -98,7 +98,8 @@ public class TorrentDownloaderBuilder {
                     this.torrentStatesSideEffects,
                     this.peersCommunicatorFlux,
                     this.incomingPeerMessages$,
-                    this.emitIncomingPeerMessages));
+                    this.emitIncomingPeerMessages,
+                    this.incomingPeerMessagesNotifier));
         }
         return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
                 this.searchPeers,
@@ -116,16 +117,19 @@ public class TorrentDownloaderBuilder {
                 this.torrentStatesSideEffects,
                 this.peersCommunicatorFlux,
                 this.incomingPeerMessages$,
-                this.emitIncomingPeerMessages));
+                this.emitIncomingPeerMessages,
+                this.incomingPeerMessagesNotifier));
     }
 
-    public TorrentDownloaderBuilder setIncomingPeerMessages(UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$) {
+    public TorrentDownloaderBuilder setIncomingPeerMessages(EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$) {
         this.incomingPeerMessages$ = incomingPeerMessages$;
+        this.incomingPeerMessagesNotifier = new IncomingPeerMessagesNotifierImpl(this.incomingPeerMessages$);
         return this;
     }
 
     public TorrentDownloaderBuilder setToDefaultIncomingPeerMessages() {
-        this.incomingPeerMessages$ = UnicastProcessor.create();
+        this.incomingPeerMessages$ = EmitterProcessor.create();
+        this.incomingPeerMessagesNotifier = new IncomingPeerMessagesNotifierImpl(this.incomingPeerMessages$);
         return this;
     }
 
@@ -173,11 +177,10 @@ public class TorrentDownloaderBuilder {
     public TorrentDownloaderBuilder setToDefaultFileSystemLink(String downloadPath) {
         Objects.requireNonNull(this.torrentStatusStore);
         Objects.requireNonNull(this.allocatorStore);
-        Objects.requireNonNull(this.peersCommunicatorFlux);
+        Objects.requireNonNull(this.incomingPeerMessagesNotifier);
 
         this.fileSystemLink$ = FileSystemLinkImpl.create(this.torrentInfo, downloadPath, this.allocatorStore, this.torrentStatusStore,
-                this.peersCommunicatorFlux.map(Link::receivePeerMessages)
-                        .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux), this.identifier);
+                this.incomingPeerMessagesNotifier.getPieceMessageResponseFlux(), this.identifier);
         return this;
     }
 

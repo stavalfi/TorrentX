@@ -1,8 +1,8 @@
 package com.utils;
 
 import main.algorithms.impls.v1.download.BlockDownloaderImpl;
-import main.downloader.TorrentDownloaders;
 import main.file.system.allocator.AllocatorStore;
+import main.peer.IncomingPeerMessagesNotifierImpl;
 import main.peer.Link;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +23,7 @@ public class RemoteFakePeer {
                 .expectNextCount(1)
                 .verifyComplete();
 
-        link.receivePeerMessages()
+        new IncomingPeerMessagesNotifierImpl(link.getIncomingPeerMessages$())
                 .getRequestMessageResponseFlux()
                 .doOnNext(requestMessage -> logger.info(identifier + " - received a new request: " + requestMessage))
                 .doOnNext(requestMessage -> {

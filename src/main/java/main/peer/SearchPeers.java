@@ -8,6 +8,7 @@ import main.torrent.status.state.tree.TorrentStatusState;
 import main.tracker.TrackerProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.UnicastProcessor;
@@ -25,7 +26,7 @@ public class SearchPeers {
     private String identifier;
 
     public SearchPeers(AllocatorStore allocatorStore, TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store, String identifier,
-                       UnicastProcessor<AbstractMap.SimpleEntry<Link,PeerMessage>> incomingPeerMessages$,
+                       EmitterProcessor<AbstractMap.SimpleEntry<Link,PeerMessage>> incomingPeerMessages$,
                        FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
         this(torrentInfo, store, identifier, new TrackerProvider(torrentInfo),
                 new PeersProvider(allocatorStore, torrentInfo, identifier,incomingPeerMessages$,emitIncomingPeerMessages));

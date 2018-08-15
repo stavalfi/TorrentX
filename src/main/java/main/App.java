@@ -6,8 +6,8 @@ import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaderBuilder;
 import main.downloader.TorrentDownloaders;
 import main.file.system.FileSystemLink;
+import main.peer.IncomingPeerMessagesNotifier;
 import main.peer.Link;
-import main.peer.ReceiveMessagesNotifications;
 import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
@@ -18,8 +18,6 @@ import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashSet;
@@ -33,9 +31,8 @@ public class App {
                 .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
                 .cache();
 
-        torrentDownloader$.flatMapMany(TorrentDownloader::getPeersCommunicatorFlux)
-                .map(Link::receivePeerMessages)
-                .flatMap(ReceiveMessagesNotifications::getPeerMessageResponseFlux)
+        torrentDownloader$.map(TorrentDownloader::getIncomingPeerMessagesNotifier)
+                .flatMapMany(IncomingPeerMessagesNotifier::getPeerMessageResponseFlux)
                 .subscribe(System.out::println);
 
         torrentDownloader$.flatMapMany(TorrentDownloader::getPeersCommunicatorFlux)

@@ -5,6 +5,7 @@ import main.file.system.allocator.AllocatorStore;
 import main.peer.peerMessages.PeerMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
+import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.UnicastProcessor;
 
@@ -13,6 +14,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.AbstractMap;
+import java.util.Objects;
 
 public class Link {
     private Peer me;
@@ -23,14 +25,14 @@ public class Link {
     private TorrentInfo torrentInfo;
     private PeerCurrentStatus peerCurrentStatus;
     private SendMessagesNotifications sendMessages;
-    private ReceiveMessagesNotifications receiveMessagesNotifications;
+    private ReceivePeerMessages receiveMessagesNotifications;
     private SpeedStatistics peerSpeedStatistics;
     private AllocatorStore allocatorStore;
     private String identifier;
-    private UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
+    private EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
     private FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages;
 
-    // TODO: remove this copy consturctor - it is in use only in tests.
+    // TODO: remove this copy constructor - it is in use only in tests.
     public Link(Link link) {
         this(link.allocatorStore, link.torrentInfo, link.peer, link.peerSocket,
                 link.dataInputStream, link.dataOutputStream, link.identifier, link.incomingPeerMessages$, link.emitIncomingPeerMessages);
@@ -41,7 +43,7 @@ public class Link {
                 DataInputStream dataInputStream,
                 DataOutputStream dataOutputStream,
                 String identifier,
-                UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
+                EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
                 FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
         this.incomingPeerMessages$ = incomingPeerMessages$;
         this.emitIncomingPeerMessages = emitIncomingPeerMessages;
@@ -63,12 +65,18 @@ public class Link {
                 this::closeConnection,
                 dataOutputStream,
                 identifier);
-        this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(this.allocatorStore, torrentInfo, this.me,
-                this.peer, this.peerCurrentStatus, dataInputStream, identifier, this, incomingPeerMessages$, emitIncomingPeerMessages);
 
-        this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
-                this.receiveMessagesNotifications.getPeerMessageResponseFlux(),
-                this.sendMessages.sentPeerMessagesFlux());
+        this.receiveMessagesNotifications = new ReceivePeerMessages(this.allocatorStore, torrentInfo, this.me,
+                this.peer, dataInputStream, identifier, this, emitIncomingPeerMessages);
+
+        // TODO: move this to somewhere else.
+//        this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
+//                this.receiveMessagesNotifications.getPeerMessageResponseFlux(),
+//                this.sendMessages.sentPeerMessagesFlux());
+    }
+
+    public EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> getIncomingPeerMessages$() {
+        return incomingPeerMessages$;
     }
 
     public AllocatorStore getAllocatorStore() {
@@ -108,7 +116,7 @@ public class Link {
                 '}';
     }
 
-    public ReceiveMessagesNotifications receivePeerMessages() {
+    public ReceivePeerMessages receivePeerMessages() {
         return receiveMessagesNotifications;
     }
 
@@ -118,5 +126,21 @@ public class Link {
 
     public PeerCurrentStatus getPeerCurrentStatus() {
         return peerCurrentStatus;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Link link = (Link) o;
+        return Objects.equals(me, link.me) &&
+                Objects.equals(peer, link.peer) &&
+                Objects.equals(torrentInfo, link.torrentInfo);
+    }
+
+    @Override
+    public int hashCode() {
+
+        return Objects.hash(me, peer, torrentInfo);
     }
 }
