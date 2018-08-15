@@ -66,7 +66,6 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
         return send(pieceMessage)
                 .map(__ -> this.allocatorStore)
                 .doOnSuccessOrError((__, ___) -> logger.debug(this.identifier + " - dispatching cleaning for piece-message: " + pieceMessage))
-                .doOnError(__ -> logger.debug(this.identifier + " - I shouldn't be here: " + __))
                 .doAfterSuccessOrError((__, ___) -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
                 .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(pieceMessage.getIndex()))
                 .map(__ -> this);

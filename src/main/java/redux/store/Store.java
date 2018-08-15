@@ -59,6 +59,10 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
                 .autoConnect(0);
     }
 
+    public String getIdentifier() {
+        return identifier;
+    }
+
     public void dispatchNonBlocking(ACTION action) {
         Request<ACTION> request = new Request<>(action);
         try {

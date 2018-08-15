@@ -33,11 +33,14 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                 .publishOn(Schedulers.newSingle("PEERS-RECEIVER-FOR-TORRENT-" + torrentInfo.getName()))
                 /*
                 Caution: There maybe a race condition when I miss signals of new requests (in tests when I fake incoming requests)
-                because Ionly subscribe to them when I finish the following method.
+                because I only subscribe to them when I finish the following method.
                 the solution is to report that I'm ready to upload only after I subscribed to the requests stream.
                 */
                 .concatMap(__ -> peersCommunicatorFlux.doOnSubscribe(subscription -> store.dispatchNonBlocking(TorrentStatusAction.RESUME_UPLOAD_SELF_RESOLVED)))
                 .flatMap(link -> link.receivePeerMessages().getRequestMessageResponseFlux()
+                        .doOnNext(requestMessage -> logger.debug("App uploader - start analyze request: " + requestMessage))
+                        .doOnNext(requestMessage -> logger.debug("App uploader - do I have the piece: " + requestMessage + " => " +
+                                fileSystemLink.havePiece(requestMessage.getIndex())))
                         .filter(requestMessage -> fileSystemLink.havePiece(requestMessage.getIndex()))
                         .concatMap(requestMessage -> store.notifyWhen(TorrentStatusAction.RESUME_UPLOAD_WIND_UP, requestMessage))
                         .doOnNext(requestMessage -> logger.debug("start creating piece-message for response to peer because he sent me request-message: " + requestMessage))

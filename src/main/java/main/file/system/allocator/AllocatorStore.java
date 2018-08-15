@@ -6,17 +6,20 @@ import main.file.system.allocator.requests.*;
 import main.peer.Peer;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import redux.store.Result;
 import redux.store.Store;
 
 public class AllocatorStore {
+    private static Logger logger = LoggerFactory.getLogger(AllocatorStore.class);
 
     private Store<AllocatorState, AllocatorAction> allocatorStore;
 
-    public AllocatorStore(Store<AllocatorState, AllocatorAction> allocatorStore){
-        this.allocatorStore=allocatorStore;
+    public AllocatorStore(Store<AllocatorState, AllocatorAction> allocatorStore) {
+        this.allocatorStore = allocatorStore;
     }
 
     public Mono<AllocatorState> updateAllocations(int amountOfBlocks, int blockLength) {
@@ -40,7 +43,8 @@ public class AllocatorStore {
                 .take(1)
                 .single()
                 .cast(CreatePieceMessageResult.class)
-                .map(CreatePieceMessageResult::getPieceMessage);
+                .map(CreatePieceMessageResult::getPieceMessage)
+                .doOnNext(pieceMessage -> logger.info(this.allocatorStore.getIdentifier() + " - " + AllocatorAction.CREATE_PIECE_MESSAGE.toString() + pieceMessage));
     }
 
     public Mono<RequestMessage> createRequestMessage(Peer from, Peer to, int index, int begin, int blockLength, int pieceLength) {
@@ -51,7 +55,8 @@ public class AllocatorStore {
         CreateRequestMessageRequest request = new CreateRequestMessageRequest(from, to, index, begin, blockLength, pieceLength);
         return this.allocatorStore.dispatch(request)
                 .cast(CreateRequestMessageResult.class)
-                .map(createRequestMessageResult -> createRequestMessageResult.getRequestMessage());
+                .map(createRequestMessageResult -> createRequestMessageResult.getRequestMessage())
+                .doOnNext(requestMessage -> logger.info(this.allocatorStore.getIdentifier() + " - " + AllocatorAction.CREATE_REQUEST_MESSAGE.toString() + request));
     }
 
     public Mono<AllocatorState> free(AllocatedBlock allocatedBlock) {
