@@ -10,16 +10,23 @@ import main.algorithms.impls.v1.upload.UploadAlgorithmImpl;
 import main.file.system.FileSystemLink;
 import main.file.system.allocator.AllocatorStore;
 import main.peer.Link;
+import main.peer.peerMessages.PeerMessage;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.UnicastProcessor;
 import redux.store.Store;
+
+import java.util.AbstractMap;
 
 public class BittorrentAlgorithmInitializer {
     public static BittorrentAlgorithm v1(AllocatorStore allocatorStore,
                                          TorrentInfo torrentInfo,
                                          Store<TorrentStatusState, TorrentStatusAction> store,
                                          FileSystemLink fileSystemLink,
+                                         UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
+                                         FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages,
                                          Flux<Link> peersCommunicatorFlux,
                                          String identifier) {
         Flux<Link> recordedPeerFlux = peersCommunicatorFlux
@@ -38,6 +45,7 @@ public class BittorrentAlgorithmInitializer {
         UploadAlgorithm uploadAlgorithm = new UploadAlgorithmImpl(torrentInfo,
                 store,
                 fileSystemLink,
+                incomingPeerMessages$,
                 peersCommunicatorFlux);
 
         PeersToPiecesMapper peersToPiecesMapper =

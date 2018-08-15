@@ -120,35 +120,35 @@ Feature: connect to a fake peers and communicate with them
       | torrent                                   | downloadLocation |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
-#  Scenario Outline: (7) fake peer send invalid requests for pieces and I give him what he want
-#    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
-#      | pieceIndex | from | length |
-#      | 0          | 0    |        |
-#      | 1          | 0    | 10     |
-#      | 2          | 0    |        |
-#    Then random-fake-peer connect to me for torrent: "<torrent>" in "<downloadLocation>" and he request:
-#      | pieceIndex | from | length     |
-#      | 0          | 0    | 1000000000 |
-#      | 0          | 0    | 1000000000 |
-#      | 0          | 0    | 1000000000 |
-#      | 0          | 0    | 1000000000 |
-#      | 0          | 0    | 1000000000 |
-#      | 0          | 0    | 1000000000 |
-#      | 1          | 0    | 10         |
-#      | 2          | 30   | 100        |
-#    Then we assert that for torrent: "<torrent>", we gave the following pieces to the random-fake-peer:
-#      | pieceIndex | from | length |
-#      | 0          | 0    | -1     |
-#      | 0          | 0    | -1     |
-#      | 0          | 0    | -1     |
-#      | 0          | 0    | -1     |
-#      | 0          | 0    | -1     |
-#      | 0          | 0    | -1     |
-#      | 2          | 30   | 100    |
-#
-#    Examples:
-#      | torrent                                   | downloadLocation |
-#      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+  Scenario Outline: (7) fake peer send invalid requests for pieces and I give him what he want
+    Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
+      | pieceIndex | from | length |
+      | 0          | 0    |        |
+      | 1          | 0    | 10     |
+      | 2          | 0    |        |
+    Then random-fake-peer connect to me for torrent: "<torrent>" in "<downloadLocation>" and he request:
+      | pieceIndex | from | length     |
+      | 0          | 0    | 1000000000 |
+      | 0          | 0    | 1000000000 |
+      | 0          | 0    | 1000000000 |
+      | 0          | 0    | 1000000000 |
+      | 0          | 0    | 1000000000 |
+      | 0          | 0    | 1000000000 |
+      | 1          | 0    | 10         |
+      | 2          | 30   | 100        |
+    Then we assert that for torrent: "<torrent>", we gave the following pieces to the random-fake-peer:
+      | pieceIndex | from | length |
+      | 0          | 0    | -1     |
+      | 0          | 0    | -1     |
+      | 0          | 0    | -1     |
+      | 0          | 0    | -1     |
+      | 0          | 0    | -1     |
+      | 0          | 0    | -1     |
+      | 2          | 30   | 100    |
+
+    Examples:
+      | torrent                                   | downloadLocation |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
   Scenario Outline: (8) fake peer request pieces from me but I don't have nothing to give
     Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved

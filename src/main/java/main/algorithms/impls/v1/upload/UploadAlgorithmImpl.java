@@ -6,22 +6,35 @@ import main.downloader.PieceEvent;
 import main.downloader.TorrentPieceStatus;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
+import main.peer.ReceiveMessagesNotifications;
+import main.peer.peerMessages.PeerMessage;
+import main.peer.peerMessages.PieceMessage;
+import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.UnicastProcessor;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import redux.store.Store;
 
+import java.util.AbstractMap;
+import java.util.Map;
+
 public class UploadAlgorithmImpl implements UploadAlgorithm {
     private static Logger logger = LoggerFactory.getLogger(UploadAlgorithmImpl.class);
+    private static Scheduler uploaderScheduler = Schedulers.newSingle("UPLOADER");
 
     private Flux<PieceEvent> uploadedBlocks$;
 
     public UploadAlgorithmImpl(TorrentInfo torrentInfo,
                                Store<TorrentStatusState, TorrentStatusAction> store,
                                FileSystemLink fileSystemLink,
+                               // TODO: I need only request messages here:
+                               UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
                                Flux<Link> peersCommunicatorFlux) {
 
         Flux<TorrentStatusState> startUpload$ = store.statesByAction(TorrentStatusAction.START_UPLOAD_IN_PROGRESS)
@@ -36,19 +49,31 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                 because I only subscribe to them when I finish the following method.
                 the solution is to report that I'm ready to upload only after I subscribed to the requests stream.
                 */
-                .concatMap(__ -> peersCommunicatorFlux.doOnSubscribe(subscription -> store.dispatchNonBlocking(TorrentStatusAction.RESUME_UPLOAD_SELF_RESOLVED)))
-                .flatMap(link -> link.receivePeerMessages().getRequestMessageResponseFlux()
-                        .doOnNext(requestMessage -> logger.debug("App uploader - start analyze request: " + requestMessage))
-                        .doOnNext(requestMessage -> logger.debug("App uploader - do I have the piece: " + requestMessage + " => " +
-                                fileSystemLink.havePiece(requestMessage.getIndex())))
-                        .filter(requestMessage -> fileSystemLink.havePiece(requestMessage.getIndex()))
-                        .concatMap(requestMessage -> store.notifyWhen(TorrentStatusAction.RESUME_UPLOAD_WIND_UP, requestMessage))
-                        .doOnNext(requestMessage -> logger.debug("start creating piece-message for response to peer because he sent me request-message: " + requestMessage))
-                        .concatMap(requestMessage -> fileSystemLink.buildPieceMessage(requestMessage))
-                        .doOnNext(requestMessage -> logger.debug("end creating piece-message for response to peer because he sent me request-message: " + requestMessage))
-                        .publishOn(Schedulers.newSingle("UPLOADER"))
-                        .concatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
-                                .map(___ -> new PieceEvent(TorrentPieceStatus.UPLOADING, pieceMessage))))
+                .concatMap(__ -> {
+                    Flux<PieceEvent> uploader$ = incomingPeerMessages$.filter(tuple2 -> tuple2.getValue() instanceof RequestMessage)
+                            .map(tuple2 -> new AbstractMap.SimpleEntry<Link, RequestMessage>(tuple2.getKey(), (RequestMessage) (tuple2.getValue())))
+                            .flatMap(tuple2 -> {
+                                Link link = tuple2.getKey();
+                                return Mono.just(tuple2.getValue())
+                                        .doOnNext(requestMessage -> logger.debug("App uploader - start analyze request: " + requestMessage))
+                                        .doOnNext(requestMessage -> logger.debug("App uploader - do I have the piece: " + requestMessage + " => " +
+                                                fileSystemLink.havePiece(requestMessage.getIndex())))
+                                        .filter(requestMessage -> fileSystemLink.havePiece(requestMessage.getIndex()))
+                                        .flatMap(requestMessage -> store.notifyWhen(TorrentStatusAction.RESUME_UPLOAD_WIND_UP, requestMessage))
+                                        .doOnNext(requestMessage -> logger.debug("start creating piece-message for response to peer because he sent me request-message: " + requestMessage))
+                                        .flatMap(fileSystemLink::buildPieceMessage)
+                                        .doOnNext(requestMessage -> logger.debug("end creating piece-message for response to peer because he sent me request-message: " + requestMessage))
+                                        .publishOn(UploadAlgorithmImpl.uploaderScheduler)
+                                        .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
+                                                .map(___ -> new PieceEvent(TorrentPieceStatus.UPLOADING, pieceMessage)));
+                            })
+                            .replay()
+                            .autoConnect(0);
+
+                    store.dispatchNonBlocking(TorrentStatusAction.RESUME_UPLOAD_SELF_RESOLVED);
+
+                    return uploader$;
+                })
                 .publish()
                 .autoConnect(0);
 

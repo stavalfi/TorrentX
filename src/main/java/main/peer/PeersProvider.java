@@ -7,14 +7,13 @@ import main.TorrentInfo;
 import main.downloader.TorrentDownloaders;
 import main.file.system.allocator.AllocatorStore;
 import main.peer.peerMessages.HandShake;
+import main.peer.peerMessages.PeerMessage;
 import main.tracker.BadResponseException;
 import main.tracker.TrackerConnection;
 import main.tracker.response.AnnounceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.core.publisher.MonoSink;
+import reactor.core.publisher.*;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -22,6 +21,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.time.Duration;
+import java.util.AbstractMap;
 
 public class PeersProvider {
     private static Logger logger = LoggerFactory.getLogger(PeersProvider.class);
@@ -29,11 +29,17 @@ public class PeersProvider {
     private TorrentInfo torrentInfo;
     private AllocatorStore allocatorStore;
     private String identifier;
+    private UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
+    private FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages;
 
-    public PeersProvider(AllocatorStore allocatorStore, TorrentInfo torrentInfo,String identifier) {
-        this.identifier=identifier;
+    public PeersProvider(AllocatorStore allocatorStore, TorrentInfo torrentInfo, String identifier,
+                         UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
+                         FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
+        this.identifier = identifier;
         this.torrentInfo = torrentInfo;
         this.allocatorStore = allocatorStore;
+        this.incomingPeerMessages$ = incomingPeerMessages$;
+        this.emitIncomingPeerMessages = emitIncomingPeerMessages;
     }
 
     public Mono<Link> connectToPeerMono(Peer peer) {
@@ -67,7 +73,8 @@ public class PeersProvider {
                             " with the wrong torrent-info-hash: " + receivedTorrentInfoHash));
                 } else {
                     // all went well, I accept this connection.
-                    Link link = new Link(this.allocatorStore, this.torrentInfo, peer, peerSocket, receiveMessages, sendMessages,this.identifier);
+                    Link link = new Link(this.allocatorStore, this.torrentInfo, peer, peerSocket, receiveMessages, sendMessages, this.identifier,
+                            incomingPeerMessages$, emitIncomingPeerMessages);
                     sink.success(link);
                 }
             } catch (IOException e) {

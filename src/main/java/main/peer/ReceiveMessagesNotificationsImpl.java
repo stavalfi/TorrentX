@@ -7,11 +7,15 @@ import main.peer.peerMessages.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.UnicastProcessor;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.function.Tuple2;
 
 import java.io.DataInputStream;
+import java.util.AbstractMap;
 
 class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
     private static Logger logger = LoggerFactory.getLogger(ReceiveMessagesNotificationsImpl.class);
@@ -36,10 +40,16 @@ class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
     public ReceiveMessagesNotificationsImpl(AllocatorStore allocatorStore,
                                             TorrentInfo torrentInfo, Peer me, Peer peer,
                                             PeerCurrentStatus peerCurrentStatus, DataInputStream dataInputStream,
-                                            String identifier) {
+                                            String identifier,
+                                            Link link,
+                                            UnicastProcessor<AbstractMap.SimpleEntry<Link,PeerMessage>> incomingPeerMessages$,
+                                            FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
         this.peerCurrentStatus = peerCurrentStatus;
 
+
         Scheduler scheduler = Schedulers.newSingle(identifier + " - RECEIVE-PEER-MESSAGES");
+
+
         this.peerMessageResponseFlux = Flux.generate(synchronousSink -> synchronousSink.next(0))
                 .publishOn(scheduler)
                 .concatMap(__ -> PeerMessageFactory.waitForMessage(allocatorStore, scheduler, torrentInfo, peer, me, dataInputStream, identifier)
@@ -71,6 +81,8 @@ class ReceiveMessagesNotificationsImpl implements ReceiveMessagesNotifications {
                             break;
                     }
                 })
+                .doOnNext(peerMessage -> emitIncomingPeerMessages.next(new AbstractMap.SimpleEntry<>(link, peerMessage)))
+                .doOnError(throwable -> emitIncomingPeerMessages.error(throwable))
                 .publish()
                 .autoConnect(0);
 

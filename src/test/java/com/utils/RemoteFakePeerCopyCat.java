@@ -69,12 +69,14 @@ public class RemoteFakePeerCopyCat {
         this.torrentDownloader$ = pieceSaved$.flatMap(__ -> {
             // I'm using this object to send pieceMessages and Request messages to the real app.
             return TorrentDownloaderBuilder.builder(link.getTorrentInfo(), "Fake peer")
+                    .setToDefaultIncomingPeerMessages()
+                    .setToDefaultEmitIncomingPeerMessages()
+                    .setAllocatorStore(this.link.getAllocatorStore())
                     .setTorrentStatusStore(this.torrentStatusStore)
                     .setToDefaultSearchPeers()
                     .setToDefaultTorrentStatesSideEffects()
                     .setToDefaultPeersCommunicatorFlux()
                     .setFileSystemLink$(fileSystemLink$)
-                    .setAllocatorStore(this.link.getAllocatorStore())
                     .setToDefaultBittorrentAlgorithm()
                     .build();
         })

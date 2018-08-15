@@ -2,13 +2,18 @@ package main.peer;
 
 import main.TorrentInfo;
 import main.file.system.allocator.AllocatorStore;
+import main.peer.peerMessages.PeerMessage;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import main.tracker.TrackerProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.UnicastProcessor;
 import redux.store.Store;
+
+import java.util.AbstractMap;
 
 public class SearchPeers {
     private static Logger logger = LoggerFactory.getLogger(SearchPeers.class);
@@ -19,8 +24,11 @@ public class SearchPeers {
     private Flux<Link> peers$;
     private String identifier;
 
-    public SearchPeers(AllocatorStore allocatorStore, TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store, String identifier) {
-        this(torrentInfo, store, identifier, new TrackerProvider(torrentInfo), new PeersProvider(allocatorStore, torrentInfo, identifier));
+    public SearchPeers(AllocatorStore allocatorStore, TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store, String identifier,
+                       UnicastProcessor<AbstractMap.SimpleEntry<Link,PeerMessage>> incomingPeerMessages$,
+                       FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
+        this(torrentInfo, store, identifier, new TrackerProvider(torrentInfo),
+                new PeersProvider(allocatorStore, torrentInfo, identifier,incomingPeerMessages$,emitIncomingPeerMessages));
     }
 
     public SearchPeers(TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store, String identifier,

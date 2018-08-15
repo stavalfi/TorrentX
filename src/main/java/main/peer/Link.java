@@ -2,13 +2,17 @@ package main.peer;
 
 import main.TorrentInfo;
 import main.file.system.allocator.AllocatorStore;
+import main.peer.peerMessages.PeerMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
+import reactor.core.publisher.FluxSink;
+import reactor.core.publisher.UnicastProcessor;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.AbstractMap;
 
 public class Link {
     private Peer me;
@@ -23,18 +27,24 @@ public class Link {
     private SpeedStatistics peerSpeedStatistics;
     private AllocatorStore allocatorStore;
     private String identifier;
+    private UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
+    private FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages;
 
     // TODO: remove this copy consturctor - it is in use only in tests.
     public Link(Link link) {
         this(link.allocatorStore, link.torrentInfo, link.peer, link.peerSocket,
-                link.dataInputStream, link.dataOutputStream, link.identifier);
+                link.dataInputStream, link.dataOutputStream, link.identifier, link.incomingPeerMessages$, link.emitIncomingPeerMessages);
     }
 
     public Link(AllocatorStore allocatorStore,
                 TorrentInfo torrentInfo, Peer peer, Socket peerSocket,
                 DataInputStream dataInputStream,
                 DataOutputStream dataOutputStream,
-                String identifier) {
+                String identifier,
+                UnicastProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
+                FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
+        this.incomingPeerMessages$ = incomingPeerMessages$;
+        this.emitIncomingPeerMessages = emitIncomingPeerMessages;
         assert peerSocket != null;
         this.identifier = identifier;
         this.allocatorStore = allocatorStore;
@@ -54,7 +64,7 @@ public class Link {
                 dataOutputStream,
                 identifier);
         this.receiveMessagesNotifications = new ReceiveMessagesNotificationsImpl(this.allocatorStore, torrentInfo, this.me,
-                this.peer, this.peerCurrentStatus, dataInputStream, identifier);
+                this.peer, this.peerCurrentStatus, dataInputStream, identifier, this, incomingPeerMessages$, emitIncomingPeerMessages);
 
         this.peerSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(torrentInfo,
                 this.receiveMessagesNotifications.getPeerMessageResponseFlux(),
