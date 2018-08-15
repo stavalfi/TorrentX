@@ -17,6 +17,8 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import redux.store.Store;
 
+import java.util.AbstractMap;
+
 public class RemoteFakePeerCopyCat {
     private static Logger logger = LoggerFactory.getLogger(RemoteFakePeerCopyCat.class);
 
@@ -88,7 +90,8 @@ public class RemoteFakePeerCopyCat {
                 .verifyComplete();
 
         new IncomingPeerMessagesNotifierImpl(link.getIncomingPeerMessages$())
-                .getPeerMessageResponseFlux()
+                .getIncomingPeerMessages$()
+                .map(AbstractMap.SimpleEntry::getValue)
                 .index()
                 .doOnNext(peerMessage -> logger.debug("RemoteFakePeerCopyCat (" + identifier + ") received new (" + peerMessage.getT1() + ") message from app: " + peerMessage))
                 .flatMap(peerMessage -> {

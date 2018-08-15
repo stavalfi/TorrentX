@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.AbstractMap;
 import java.util.HashSet;
 
 public class App {
@@ -32,7 +33,8 @@ public class App {
                 .cache();
 
         torrentDownloader$.map(TorrentDownloader::getIncomingPeerMessagesNotifier)
-                .flatMapMany(IncomingPeerMessagesNotifier::getPeerMessageResponseFlux)
+                .flatMapMany(IncomingPeerMessagesNotifier::getIncomingPeerMessages$)
+                .map(AbstractMap.SimpleEntry::getValue)
                 .subscribe(System.out::println);
 
         torrentDownloader$.flatMapMany(TorrentDownloader::getPeersCommunicatorFlux)

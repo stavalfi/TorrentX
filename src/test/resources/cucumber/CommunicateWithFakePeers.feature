@@ -100,6 +100,7 @@ Feature: connect to a fake peers and communicate with them
       | torrent                                   | downloadLocation |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
+    # race condition.
   Scenario Outline: (6) fake peer request pieces from me and I give him what he want
     Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |

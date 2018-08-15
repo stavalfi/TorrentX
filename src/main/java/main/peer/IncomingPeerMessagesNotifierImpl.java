@@ -8,7 +8,6 @@ import java.util.AbstractMap;
 
 public class IncomingPeerMessagesNotifierImpl implements IncomingPeerMessagesNotifier {
     private Flux<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
-    private Flux<? extends PeerMessage> peerMessageResponseFlux;
 
     private Flux<BitFieldMessage> bitFieldMessageResponseFlux;
     private Flux<CancelMessage> cancelMessageResponseFlux;
@@ -25,61 +24,55 @@ public class IncomingPeerMessagesNotifierImpl implements IncomingPeerMessagesNot
 
     public IncomingPeerMessagesNotifierImpl(EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$) {
         this.incomingPeerMessages$ = incomingPeerMessages$;
-        this.peerMessageResponseFlux = incomingPeerMessages$.map(tuple2 -> tuple2.getValue());
 
-        this.bitFieldMessageResponseFlux = peerMessageResponseFlux
+        this.bitFieldMessageResponseFlux = incomingPeerMessages$.map(tuple2 -> tuple2.getValue())
                 .filter(peerMessage -> peerMessage instanceof BitFieldMessage)
                 .cast(BitFieldMessage.class);
 
-        this.cancelMessageResponseFlux = peerMessageResponseFlux
+        this.cancelMessageResponseFlux = incomingPeerMessages$.map(AbstractMap.SimpleEntry::getValue)
                 .filter(peerMessage -> peerMessage instanceof CancelMessage)
                 .cast(CancelMessage.class);
 
-        this.chokeMessageResponseFlux = peerMessageResponseFlux
+        this.chokeMessageResponseFlux = incomingPeerMessages$.map(AbstractMap.SimpleEntry::getValue)
                 .filter(peerMessage -> peerMessage instanceof ChokeMessage)
                 .cast(ChokeMessage.class);
 
-        this.extendedMessageResponseFlux = peerMessageResponseFlux
+        this.extendedMessageResponseFlux = incomingPeerMessages$.map(AbstractMap.SimpleEntry::getValue)
                 .filter(peerMessage -> peerMessage instanceof ExtendedMessage)
                 .cast(ExtendedMessage.class);
 
-        this.haveMessageResponseFlux = peerMessageResponseFlux
+        this.haveMessageResponseFlux = incomingPeerMessages$.map(AbstractMap.SimpleEntry::getValue)
                 .filter(peerMessage -> peerMessage instanceof HaveMessage)
                 .cast(HaveMessage.class);
 
-        this.interestedMessageResponseFlux = peerMessageResponseFlux
+        this.interestedMessageResponseFlux = incomingPeerMessages$.map(AbstractMap.SimpleEntry::getValue)
                 .filter(peerMessage -> peerMessage instanceof InterestedMessage)
                 .cast(InterestedMessage.class);
 
-        this.keepMessageResponseFlux = peerMessageResponseFlux
+        this.keepMessageResponseFlux = incomingPeerMessages$.map(AbstractMap.SimpleEntry::getValue)
                 .filter(peerMessage -> peerMessage instanceof KeepAliveMessage)
                 .cast(KeepAliveMessage.class);
 
-        this.notInterestedMessageResponseFlux = peerMessageResponseFlux
+        this.notInterestedMessageResponseFlux = incomingPeerMessages$.map(AbstractMap.SimpleEntry::getValue)
                 .filter(peerMessage -> peerMessage instanceof NotInterestedMessage)
                 .cast(NotInterestedMessage.class);
 
-        this.pieceMessageResponseFlux = peerMessageResponseFlux
+        this.pieceMessageResponseFlux = incomingPeerMessages$.map(AbstractMap.SimpleEntry::getValue)
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
                 .cast(PieceMessage.class);
 
-        this.portMessageResponseFlux = peerMessageResponseFlux
+        this.portMessageResponseFlux = incomingPeerMessages$.map(AbstractMap.SimpleEntry::getValue)
                 .filter(peerMessage -> peerMessage instanceof PortMessage)
                 .cast(PortMessage.class);
 
-        this.requestMessageResponseFlux = peerMessageResponseFlux
+        this.requestMessageResponseFlux = incomingPeerMessages$.map(AbstractMap.SimpleEntry::getValue)
                 .filter(peerMessage -> peerMessage instanceof RequestMessage)
                 .cast(RequestMessage.class);
 
-        this.unchokeMessageResponseFlux = peerMessageResponseFlux
+        this.unchokeMessageResponseFlux = incomingPeerMessages$.map(AbstractMap.SimpleEntry::getValue)
                 .filter(peerMessage -> peerMessage instanceof UnchokeMessage)
                 .cast(UnchokeMessage.class);
 
-    }
-
-    @Override
-    public Flux<? extends PeerMessage> getPeerMessageResponseFlux() {
-        return this.peerMessageResponseFlux;
     }
 
     @Override

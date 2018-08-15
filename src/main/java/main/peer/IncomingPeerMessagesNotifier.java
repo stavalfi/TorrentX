@@ -8,8 +8,6 @@ import java.util.AbstractMap;
 public interface IncomingPeerMessagesNotifier {
     Flux<AbstractMap.SimpleEntry<Link, PeerMessage>> getIncomingPeerMessages$();
 
-    Flux<? extends PeerMessage> getPeerMessageResponseFlux();
-
     Flux<BitFieldMessage> getBitFieldMessageResponseFlux();
 
     Flux<CancelMessage> getCancelMessageResponseFlux();
