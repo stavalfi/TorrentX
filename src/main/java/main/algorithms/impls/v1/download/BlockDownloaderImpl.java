@@ -6,26 +6,27 @@ import main.downloader.PieceEvent;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.peerMessages.RequestMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.concurrent.TimeoutException;
 
 public class BlockDownloaderImpl implements BlockDownloader {
+    private static Logger logger = LoggerFactory.getLogger(BlockDownloaderImpl.class);
+
     private TorrentInfo torrentInfo;
     private FileSystemLink fileSystemLink;
-
-    private Flux<PieceEvent> recordedSavedBlockFlux;
+    private String identifier;
 
     public BlockDownloaderImpl(TorrentInfo torrentInfo,
-                               FileSystemLink fileSystemLink) {
+                               FileSystemLink fileSystemLink,
+                               String identifier) {
         this.torrentInfo = torrentInfo;
         this.fileSystemLink = fileSystemLink;
-
-        this.recordedSavedBlockFlux = this.fileSystemLink
-                .savedBlockFlux()
-                .replay()
-                .autoConnect(0);
+        this.identifier = identifier;
     }
 
     /**
@@ -37,16 +38,23 @@ public class BlockDownloaderImpl implements BlockDownloader {
      */
     @Override
     public Mono<PieceEvent> downloadBlock(Link link, RequestMessage requestMessage) {
-        return link.sendMessages()
-                .sendRequestMessage(requestMessage.getIndex(), requestMessage.getBegin(), requestMessage.getBlockLength())
-                .flatMapMany(__ -> this.recordedSavedBlockFlux)
+        Flux<PieceEvent> pieceSavedNotifier$ = this.fileSystemLink.savedBlockFlux()
                 .filter(torrentPieceChanged -> requestMessage.getIndex() == torrentPieceChanged.getReceivedPiece().getIndex())
                 .filter(torrentPieceChanged -> requestMessage.getBegin() == torrentPieceChanged.getReceivedPiece().getBegin())
+                .replay(1)
+                .autoConnect(0);
+
+        return link.sendMessages()
+                .sendRequestMessage(requestMessage.getIndex(), requestMessage.getBegin(), requestMessage.getBlockLength())
+                .doOnSubscribe(__ -> logger.debug(this.identifier + " - start sending request message: " + requestMessage))
+                .doOnNext(__ -> logger.debug(this.identifier + " - end sending request message: " + requestMessage))
+                .flatMapMany(__ -> pieceSavedNotifier$)
                 // max wait to the correct block back from peer.
                 //TODO: in some operating systems, the IO operations are extremely slow.
                 // for example the first use of randomAccessFile object. in linux all good.
                 // we need to remember to change back 20->2.
-                .timeout(Duration.ofMillis(2 * 1000))
+                .timeout(Duration.ofMillis(4 * 1000))
+                .doOnError(TimeoutException.class, throwable -> logger.debug(this.identifier + " - no response to the request: " + requestMessage))
                 .take(1)
                 .single();
     }

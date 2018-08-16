@@ -11,14 +11,19 @@ import main.listener.reducers.ListenerReducer;
 import main.listener.side.effects.ListenerSideEffects;
 import main.listener.state.tree.ListenerState;
 import main.peer.Link;
+import main.peer.IncomingPeerMessagesNotifier;
 import main.peer.SearchPeers;
+import main.peer.peerMessages.PeerMessage;
 import main.statistics.SpeedStatistics;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.TorrentStatusState;
+import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import redux.store.Store;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -33,7 +38,7 @@ public class TorrentDownloaders {
     private static Store<ListenerState, ListenerAction> listenStore = new Store<>(new ListenerReducer(),
             ListenerReducer.defaultListenState, "App-Listener-Store");
 
-    private static Listener listener = new Listener(allocatorStore);
+    private static Listener listener = new Listener(allocatorStore, "App");
 
     private static ListenerSideEffects listenerSideEffects = new ListenerSideEffects(listenStore);
 
@@ -56,7 +61,10 @@ public class TorrentDownloaders {
                                                                 Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
                                                                 SpeedStatistics torrentSpeedStatistics,
                                                                 TorrentStatesSideEffects torrentStatesSideEffects,
-                                                                Flux<Link> peersCommunicatorFlux) {
+                                                                Flux<Link> peersCommunicatorFlux,
+                                                                EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
+                                                                FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages,
+                                                                IncomingPeerMessagesNotifier incomingPeerMessagesNotifier) {
         return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .orElseGet(() -> {
                     TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
@@ -65,7 +73,10 @@ public class TorrentDownloaders {
                             bittorrentAlgorithm,
                             torrentStatusStore,
                             torrentSpeedStatistics,
-                            torrentStatesSideEffects, peersCommunicatorFlux);
+                            torrentStatesSideEffects, peersCommunicatorFlux,
+                            incomingPeerMessages$,
+                            emitIncomingPeerMessages,
+                            incomingPeerMessagesNotifier);
 
                     this.torrentDownloaderList.add(torrentDownloader);
                     return torrentDownloader;

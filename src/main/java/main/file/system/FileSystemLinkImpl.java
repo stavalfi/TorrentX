@@ -45,13 +45,16 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private Flux<TorrentStatusState> completeDownload$;
     private Flux<TorrentStatusState> removeTorrent$;
     private Flux<TorrentStatusState> removeFiles$;
+    private String identifier;
 
     private FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
                                List<ActualFile> actualFileList,
                                AllocatorStore allocatorStore,
                                Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
-                               Flux<PieceMessage> peerResponsesFlux) {
+                               Flux<PieceMessage> peerResponsesFlux,
+                               String identifier) {
         super(torrentInfo);
+        this.identifier = identifier;
         this.allocatorStore = allocatorStore;
         this.downloadPath = downloadPath;
         this.piecesStatus = new BitSet(getPieces().size());
@@ -87,22 +90,22 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .publishOn(Schedulers.elastic())
                 .flatMapMany(isCompletedDownloading -> {
                     if (isCompletedDownloading) {
-                        logger.info(this.allocatorStore.getIdentifier() + " - Torrent: " + torrentInfo.getName() + ", the torrent download is already completed so we update our internal state that all the pieces are completed.");
+                        logger.info(this.identifier + " - Torrent: " + torrentInfo.getName() + ", the torrent download is already completed so we update our internal state that all the pieces are completed.");
                         this.piecesStatus.set(0, torrentInfo.getPieces().size());
                         return Flux.empty();
                     }
-                    logger.info(this.allocatorStore.getIdentifier() + " - Torrent: " + torrentInfo.getName() + ", the torrent download is not completed so we start accepting new incoming pieces.");
+                    logger.info(this.identifier + " - Torrent: " + torrentInfo.getName() + ", the torrent download is not completed so we start accepting new incoming pieces.");
                     return pieceMessageReplay$;
                 })
-                .doOnNext(pieceMessage -> logger.trace(this.allocatorStore.getIdentifier() + " - start saving piece-message: " + pieceMessage))
+                .doOnNext(pieceMessage -> logger.trace(this.identifier + " - start saving piece-message: " + pieceMessage))
                 // If I won't switch thread then I will block Redux thread.
                 .filter(pieceMessage -> !havePiece(pieceMessage.getIndex()))
                 .flatMap(this::writeBlock)
-                .doOnNext(pieceMessage -> logger.trace(this.allocatorStore.getIdentifier() + " - finished saving piece-message: " + pieceMessage))
+                .doOnNext(pieceMessage -> logger.trace(this.identifier + " - finished saving piece-message: " + pieceMessage))
                 .doOnNext(__ -> {
                     // we may come here even if we got am empty flux but the download isn't yet completed.
                     if (areAllPiecesSaved()) {
-                        logger.info(this.allocatorStore.getIdentifier() + " - Torrent: " + torrentInfo + ", we finished to download the torrent and we dispatch a comeplete notification using redux.");
+                        logger.info(this.identifier + " - Torrent: " + torrentInfo + ", we finished to download the torrent and we dispatch a comeplete notification using redux.");
                         torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS);
                     }
                 })
@@ -114,7 +117,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
         this.savedPiecesFlux = this.savedBlocksFlux.filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
                 .map(PieceEvent::getReceivedPiece)
                 .map(PieceMessage::getIndex)
-                .doOnNext(pieceIndex -> logger.debug(this.allocatorStore.getIdentifier() + " - completed saving piece-index: " + pieceIndex))
+                .doOnNext(pieceIndex -> logger.debug(this.identifier + " - completed saving piece-index: " + pieceIndex))
                 .distinct()
                 .publish()
                 .autoConnect(0);
@@ -123,11 +126,12 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     public static Mono<FileSystemLink> create(TorrentInfo torrentInfo, String downloadPath,
                                               AllocatorStore allocatorStore,
                                               Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
-                                              Flux<PieceMessage> peerResponsesFlux) {
+                                              Flux<PieceMessage> peerResponsesFlux,
+                                              String identifier) {
         return Mono.just(torrentInfo)
                 .doOnNext(__ -> createFolders(torrentInfo, downloadPath))
                 .flatMap(__ -> createActiveTorrentFileList(torrentInfo, downloadPath))
-                .map(actualFileList -> new FileSystemLinkImpl(torrentInfo, downloadPath, actualFileList, allocatorStore, torrentStatusStore, peerResponsesFlux));
+                .map(actualFileList -> new FileSystemLinkImpl(torrentInfo, downloadPath, actualFileList, allocatorStore, torrentStatusStore, peerResponsesFlux, identifier));
     }
 
     @Override
@@ -239,7 +243,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     this.downloadedBytesInPieces[pieceMessage.getIndex()] > pieceMessage.getBegin() +
                             pieceMessage.getAllocatedBlock().getLength()) {
                 // I already have the received block. I don't need it.
-                logger.debug(this.allocatorStore.getIdentifier() + " - I already have this block: " + pieceMessage);
+                logger.debug(this.identifier + " - I already have this block: " + pieceMessage);
                 sink.success();
                 return;
             }
@@ -285,9 +289,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.DOWNLOADING, pieceMessage);
                 sink.success(pieceEvent);
             }
-        }).doAfterSuccessOrError((__, ___) -> logger.trace(this.allocatorStore.getIdentifier() + " - start cleaning-up piece-message-allocator: " + pieceMessage))
+        }).doAfterSuccessOrError((__, ___) -> logger.trace(this.identifier + " - start cleaning-up piece-message-allocator: " + pieceMessage))
                 .doAfterSuccessOrError((__, ___) -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
-                .doAfterSuccessOrError((__, ___) -> logger.trace(this.allocatorStore.getIdentifier() + " - finished cleaning-up piece-message-allocator: " + pieceMessage));
+                .doAfterSuccessOrError((__, ___) -> logger.trace(this.identifier + " - finished cleaning-up piece-message-allocator: " + pieceMessage));
     }
 
     private static Mono<List<ActualFile>> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) {

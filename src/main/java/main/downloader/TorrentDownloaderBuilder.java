@@ -6,19 +6,21 @@ import main.algorithms.impls.BittorrentAlgorithmInitializer;
 import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
 import main.file.system.allocator.AllocatorStore;
+import main.peer.IncomingPeerMessagesNotifier;
+import main.peer.IncomingPeerMessagesNotifierImpl;
 import main.peer.Link;
-import main.peer.ReceiveMessagesNotifications;
 import main.peer.SearchPeers;
+import main.peer.peerMessages.PeerMessage;
 import main.statistics.SpeedStatistics;
 import main.statistics.TorrentSpeedSpeedStatisticsImpl;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.reducers.TorrentStatusReducer;
 import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.TorrentStatusState;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.*;
 import redux.store.Store;
 
+import java.util.AbstractMap;
 import java.util.Objects;
 
 // TODO: save the initial status in the mongodb.
@@ -34,21 +36,29 @@ public class TorrentDownloaderBuilder {
     private SpeedStatistics torrentSpeedStatistics;
     private Flux<Link> peersCommunicatorFlux;
     private AllocatorStore allocatorStore;
+    private String identifier;
+    private EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
+    private FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages;
+    private IncomingPeerMessagesNotifier incomingPeerMessagesNotifier;
 
-    private TorrentDownloaderBuilder(TorrentInfo torrentInfo) {
+
+    private TorrentDownloaderBuilder(TorrentInfo torrentInfo, String identifier) {
         this.torrentInfo = torrentInfo;
+        this.identifier = identifier;
     }
 
-    public static TorrentDownloaderBuilder builder(TorrentInfo torrentInfo) {
+    public static TorrentDownloaderBuilder builder(TorrentInfo torrentInfo, String identifier) {
         assert torrentInfo != null;
 
-        return new TorrentDownloaderBuilder(torrentInfo);
+        return new TorrentDownloaderBuilder(torrentInfo, identifier);
     }
 
-    public static Mono<TorrentDownloader> buildDefault(TorrentInfo torrentInfo, String downloadPath, String identifer) {
-        return builder(torrentInfo)
+    public static Mono<TorrentDownloader> buildDefault(TorrentInfo torrentInfo, String identifier, String downloadPath) {
+        return builder(torrentInfo, identifier)
+                .setToDefaultIncomingPeerMessages()
+                .setToDefaultEmitIncomingPeerMessages()
                 .setToDefaultAllocatorStore()
-                .setToDefaultTorrentStatusStore(identifer)
+                .setToDefaultTorrentStatusStore(identifier)
                 .setToDefaultTorrentStatesSideEffects()
                 .setToDefaultSearchPeers()
                 .setToDefaultPeersCommunicatorFlux()
@@ -73,7 +83,10 @@ public class TorrentDownloaderBuilder {
                     this.torrentStatusStore,
                     this.torrentSpeedStatistics,
                     this.torrentStatesSideEffects,
-                    this.peersCommunicatorFlux));
+                    this.peersCommunicatorFlux,
+                    this.incomingPeerMessages$,
+                    this.emitIncomingPeerMessages,
+                    this.incomingPeerMessagesNotifier));
         }
         if (!this.isDefaultBittorrentAlgorithm) {
             return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
@@ -83,16 +96,51 @@ public class TorrentDownloaderBuilder {
                     this.torrentStatusStore,
                     this.torrentSpeedStatistics,
                     this.torrentStatesSideEffects,
-                    this.peersCommunicatorFlux));
+                    this.peersCommunicatorFlux,
+                    this.incomingPeerMessages$,
+                    this.emitIncomingPeerMessages,
+                    this.incomingPeerMessagesNotifier));
         }
         return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.torrentInfo,
                 this.searchPeers,
                 fileSystemLink,
-                BittorrentAlgorithmInitializer.v1(this.allocatorStore, torrentInfo, this.torrentStatusStore, fileSystemLink, this.peersCommunicatorFlux),
+                BittorrentAlgorithmInitializer.v1(this.allocatorStore,
+                        torrentInfo,
+                        this.torrentStatusStore,
+                        fileSystemLink,
+                        this.incomingPeerMessages$,
+                        this.emitIncomingPeerMessages,
+                        this.peersCommunicatorFlux,
+                        this.identifier),
                 this.torrentStatusStore,
                 this.torrentSpeedStatistics,
                 this.torrentStatesSideEffects,
-                this.peersCommunicatorFlux));
+                this.peersCommunicatorFlux,
+                this.incomingPeerMessages$,
+                this.emitIncomingPeerMessages,
+                this.incomingPeerMessagesNotifier));
+    }
+
+    public TorrentDownloaderBuilder setIncomingPeerMessages(EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$) {
+        this.incomingPeerMessages$ = incomingPeerMessages$;
+        this.incomingPeerMessagesNotifier = new IncomingPeerMessagesNotifierImpl(this.incomingPeerMessages$);
+        return this;
+    }
+
+    public TorrentDownloaderBuilder setToDefaultIncomingPeerMessages() {
+        this.incomingPeerMessages$ = EmitterProcessor.create();
+        this.incomingPeerMessagesNotifier = new IncomingPeerMessagesNotifierImpl(this.incomingPeerMessages$);
+        return this;
+    }
+
+    public TorrentDownloaderBuilder setEmitIncomingPeerMessages(FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
+        this.emitIncomingPeerMessages = emitIncomingPeerMessages;
+        return this;
+    }
+
+    public TorrentDownloaderBuilder setToDefaultEmitIncomingPeerMessages() {
+        this.emitIncomingPeerMessages = this.incomingPeerMessages$.sink();
+        return this;
     }
 
     public TorrentDownloaderBuilder setAllocatorStore(AllocatorStore allocatorStore) {
@@ -111,9 +159,13 @@ public class TorrentDownloaderBuilder {
     }
 
     public TorrentDownloaderBuilder setToDefaultSearchPeers() {
-        assert this.torrentStatusStore != null;
+        Objects.requireNonNull(this.torrentStatusStore);
+        Objects.requireNonNull(this.allocatorStore);
+        Objects.requireNonNull(this.incomingPeerMessages$);
+        Objects.requireNonNull(this.emitIncomingPeerMessages);
 
-        this.searchPeers = new SearchPeers(this.allocatorStore, this.torrentInfo, this.torrentStatusStore);
+        this.searchPeers = new SearchPeers(this.allocatorStore, this.torrentInfo, this.torrentStatusStore, this.identifier,
+                this.incomingPeerMessages$, this.emitIncomingPeerMessages);
         return this;
     }
 
@@ -123,9 +175,12 @@ public class TorrentDownloaderBuilder {
     }
 
     public TorrentDownloaderBuilder setToDefaultFileSystemLink(String downloadPath) {
-        this.fileSystemLink$ = FileSystemLinkImpl.create(torrentInfo, downloadPath, this.allocatorStore, this.torrentStatusStore,
-                this.peersCommunicatorFlux.map(Link::receivePeerMessages)
-                        .flatMap(ReceiveMessagesNotifications::getPieceMessageResponseFlux));
+        Objects.requireNonNull(this.torrentStatusStore);
+        Objects.requireNonNull(this.allocatorStore);
+        Objects.requireNonNull(this.incomingPeerMessagesNotifier);
+
+        this.fileSystemLink$ = FileSystemLinkImpl.create(this.torrentInfo, downloadPath, this.allocatorStore, this.torrentStatusStore,
+                this.incomingPeerMessagesNotifier.getPieceMessageResponseFlux(), this.identifier);
         return this;
     }
 
@@ -156,7 +211,7 @@ public class TorrentDownloaderBuilder {
     }
 
     public TorrentDownloaderBuilder setToDefaultTorrentStatesSideEffects() {
-        assert this.torrentStatusStore != null;
+        Objects.requireNonNull(this.torrentStatusStore);
 
         this.torrentStatesSideEffects = new TorrentStatesSideEffects(this.torrentInfo, this.torrentStatusStore);
         return this;
@@ -168,7 +223,7 @@ public class TorrentDownloaderBuilder {
     }
 
     public TorrentDownloaderBuilder setToDefaultTorrentSpeedStatistics() {
-        assert this.peersCommunicatorFlux != null;
+        Objects.requireNonNull(this.peersCommunicatorFlux);
 
         this.torrentSpeedStatistics = new TorrentSpeedSpeedStatisticsImpl(this.torrentInfo,
                 this.peersCommunicatorFlux.map(Link::getPeerSpeedStatistics));
@@ -181,7 +236,7 @@ public class TorrentDownloaderBuilder {
     }
 
     public TorrentDownloaderBuilder setToDefaultPeersCommunicatorFlux() {
-        assert this.searchPeers != null;
+        Objects.requireNonNull(this.searchPeers);
 
         this.peersCommunicatorFlux = Flux.merge(TorrentDownloaders.getListener().getPeers$(this.torrentInfo), this.searchPeers.getPeers$())
                 // multiple subscriptions will activate flatMap(__ -> multiple times and it will cause

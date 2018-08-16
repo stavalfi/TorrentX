@@ -4,6 +4,7 @@ import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaderBuilder;
 import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
+import main.peer.IncomingPeerMessagesNotifierImpl;
 import main.peer.Link;
 import main.peer.peerMessages.*;
 import main.torrent.status.TorrentStatusAction;
@@ -13,9 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 import redux.store.Store;
+
+import java.util.AbstractMap;
 
 public class RemoteFakePeerCopyCat {
     private static Logger logger = LoggerFactory.getLogger(RemoteFakePeerCopyCat.class);
@@ -53,7 +55,7 @@ public class RemoteFakePeerCopyCat {
                 .flux()
                 .publish();
 
-        Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(link.getTorrentInfo(), fakePeerTorrentDownloadPath, this.link.getAllocatorStore(), this.torrentStatusStore, fakePieceMessageToSave$)
+        Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(link.getTorrentInfo(), fakePeerTorrentDownloadPath, this.link.getAllocatorStore(), this.torrentStatusStore, fakePieceMessageToSave$, "App")
                 .cache();
 
         Mono<Integer> pieceSaved$ = fileSystemLink$.flatMapMany(fileSystemLink -> fileSystemLink.savedPieceFlux())
@@ -68,13 +70,15 @@ public class RemoteFakePeerCopyCat {
         // wait until the piece we gave to the FS is saved.
         this.torrentDownloader$ = pieceSaved$.flatMap(__ -> {
             // I'm using this object to send pieceMessages and Request messages to the real app.
-            return TorrentDownloaderBuilder.builder(link.getTorrentInfo())
+            return TorrentDownloaderBuilder.builder(link.getTorrentInfo(), "Fake peer")
+                    .setToDefaultIncomingPeerMessages()
+                    .setToDefaultEmitIncomingPeerMessages()
+                    .setAllocatorStore(this.link.getAllocatorStore())
                     .setTorrentStatusStore(this.torrentStatusStore)
                     .setToDefaultSearchPeers()
                     .setToDefaultTorrentStatesSideEffects()
                     .setToDefaultPeersCommunicatorFlux()
                     .setFileSystemLink$(fileSystemLink$)
-                    .setAllocatorStore(this.link.getAllocatorStore())
                     .setToDefaultBittorrentAlgorithm()
                     .build();
         })
@@ -85,9 +89,9 @@ public class RemoteFakePeerCopyCat {
                 .expectNextCount(1)
                 .verifyComplete();
 
-        //noinspection UnassignedFluxMonoInstance
-        link.receivePeerMessages()
-                .getPeerMessageResponseFlux()
+        new IncomingPeerMessagesNotifierImpl(link.getIncomingPeerMessages$())
+                .getIncomingPeerMessages$()
+                .map(AbstractMap.SimpleEntry::getValue)
                 .index()
                 .doOnNext(peerMessage -> logger.debug("RemoteFakePeerCopyCat (" + identifier + ") received new (" + peerMessage.getT1() + ") message from app: " + peerMessage))
                 .flatMap(peerMessage -> {

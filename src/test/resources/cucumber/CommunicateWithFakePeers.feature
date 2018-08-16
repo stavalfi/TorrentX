@@ -1,6 +1,6 @@
 Feature: connect to a fake peers and communicate with them
 
-  Scenario Outline: we send peer-messages and must receive the same peer-messages back
+  Scenario Outline: (1) we send peer-messages and must receive the same peer-messages back
 #  1. the fake peers response with the same peer-message they received
 #  2. the second response will be delayed in 2 seconds
 #  3. the third response will cause the peer to shutdown the connection and not responding anything
@@ -44,21 +44,35 @@ Feature: connect to a fake peers and communicate with them
       | torrent                                   | downloadLocation |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
-  Scenario Outline: we send 3 peer-messages and the connection must be closed by the rules of the fake peers
+  Scenario Outline: (2) we send 3 peer-messages and the connection must be closed by the rules of the fake peers
+#  1. the fake peers response with the same peer-message they received
+#  2. the second response will be delayed in 2 seconds
+#  3. the third response will cause the peer to shutdown the connection and not responding anything
+    Then application send to [peer ip: "localhost", peer port: "8988"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
+      | sendMessageType | receiveMessageType | errorSignalType |
+      | PortMessage     | PortMessage        |                 |
+      | CancelMessage   | CancelMessage      |                 |
+      | HaveMessage     |                    | EOFException    |
+
+    Examples:
+      | torrent                                   | downloadLocation |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+
+  Scenario Outline: (3) we send 3 peer-messages and the connection must be closed by the rules of the fake peers
 #  1. the fake peers response with the same peer-message they received
 #  2. the second response will be delayed in 2 seconds
 #  3. the third response will cause the peer to shutdown the connection and not responding anything
     Then application send to [peer ip: "localhost", peer port: "8988"] and receive the following messages for torrent: "<torrent>","<downloadLocation>":
       | sendMessageType | receiveMessageType | errorSignalType |
       | RequestMessage  | PieceMessage       |                 |
-      | PieceMessage    | RequestMessage     |                 |
+      | CancelMessage   | CancelMessage      |                 |
       | UnchokeMessage  |                    | EOFException    |
 
     Examples:
       | torrent                                   | downloadLocation |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
-  Scenario Outline: we send 3 request-messages and the connection must be closed by the rules of the fake peers
+  Scenario Outline: (4) we send 3 request-messages and the connection must be closed by the rules of the fake peers
 #  1. the fake peers response with the same peer-message they received
 #  2. the second response will be delayed in 2 seconds
 #  3. the third response will cause the peer to shutdown the connection and not responding anything
@@ -72,7 +86,7 @@ Feature: connect to a fake peers and communicate with them
       | torrent                                   | downloadLocation |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
-  Scenario Outline: we send 3 piece-messages and the connection must be closed by the rules of the fake peers
+  Scenario Outline: (5) we send 3 piece-messages and the connection must be closed by the rules of the fake peers
 #  1. the fake peers response with the same peer-message they received
 #  2. the second response will be delayed in 2 seconds
 #  3. the third response will cause the peer to shutdown the connection and not responding anything
@@ -86,7 +100,8 @@ Feature: connect to a fake peers and communicate with them
       | torrent                                   | downloadLocation |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
-  Scenario Outline: fake peer request pieces from me and I give him what he want
+    # race condition.
+  Scenario Outline: (6) fake peer request pieces from me and I give him what he want
     Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
       | 0          | 0    |        |
@@ -106,7 +121,7 @@ Feature: connect to a fake peers and communicate with them
       | torrent                                   | downloadLocation |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
-  Scenario Outline: fake peer send invalid requests for pieces and I give him what he want
+  Scenario Outline: (7) fake peer send invalid requests for pieces and I give him what he want
     Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
       | 0          | 0    |        |
@@ -136,7 +151,7 @@ Feature: connect to a fake peers and communicate with them
       | torrent                                   | downloadLocation |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
 
-  Scenario Outline: fake peer request pieces from me but I don't have nothing to give
+  Scenario Outline: (8) fake peer request pieces from me but I don't have nothing to give
     Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
     Then random-fake-peer connect to me for torrent: "<torrent>" in "<downloadLocation>" and he request:
