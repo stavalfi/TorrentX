@@ -32,7 +32,6 @@ public class Link {
                 DataInputStream dataInputStream,
                 DataOutputStream dataOutputStream,
                 String identifier,
-                EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
                 FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
         assert peerSocket != null;
         this.allocatorStore = allocatorStore;

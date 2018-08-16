@@ -310,7 +310,7 @@ public class MyStepdefs {
         Mono<RemoteFakePeerCopyCat> fakePeerToApp$ = Mono.just(new AllocatorStore(new Store<>(new AllocatorReducer(), AllocatorReducer.defaultAllocatorState, "Test-Fake-Peer-" + fakePeerPort + "-Allocator-Store")))
                 .flatMap(allocatorStore -> allocatorStore.updateAllocations(10, torrentInfo.getPieceLength(0)).map(__ -> allocatorStore))
                 .flatMap(fakePeerAllocatorStore -> app$.flatMap(app ->
-                        new PeersProvider(fakePeerAllocatorStore, torrentInfo, "Fake peer", incomingPeerMessages$, emitIncomingPeerMessages)
+                        new PeersProvider(fakePeerAllocatorStore, torrentInfo, "Fake peer", emitIncomingPeerMessages)
                                 .connectToPeerMono(app))
                         .doOnNext(__ -> logger.info("successfully connected to fake peer: " + fakePeerPort))
                         .map(link -> new RemoteFakePeerCopyCat(link, "Test-Fake-Peer-" + fakePeerPort, fullDownloadPathForFakePeer,
@@ -480,7 +480,7 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         TorrentDownloaders.getAllocatorStore()
-                .updateAllocations(10, 100_000)
+                .updateAllocations(10, 500_000)
                 .block();
 
         Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
@@ -563,7 +563,7 @@ public class MyStepdefs {
 
         TorrentDownloaders.getAllocatorStore()
                 .freeAll()
-                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(10, torrentInfo.getPieceLength(0)))
+                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(10, 500_000))
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -885,7 +885,7 @@ public class MyStepdefs {
                 .setTorrentStatusStore(torrentDownloader.getTorrentStatusStore())
                 .setToDefaultTorrentStatesSideEffects()
                 .setSearchPeers(new SearchPeers(torrentInfo, torrentDownloader.getTorrentStatusStore(), "App", trackerProvider,
-                        new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo, "App", incomingPeerMessages$, emitIncomingPeerMessages)))
+                        new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo, "App", emitIncomingPeerMessages)))
                 .setToDefaultPeersCommunicatorFlux()
                 .setToDefaultBittorrentAlgorithm()
                 .setFileSystemLink$(Mono.just(torrentDownloader.getFileSystemLink()))
@@ -909,7 +909,7 @@ public class MyStepdefs {
                 .map(fakePeerAllocator -> {
                     EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessagesFakePeer$ = EmitterProcessor.create();
                     FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessagesFakePeer = incomingPeerMessagesFakePeer$.sink();
-                    return new PeersProvider(fakePeerAllocator, torrentInfo, "fake-peer", incomingPeerMessagesFakePeer$, emitIncomingPeerMessagesFakePeer);
+                    return new PeersProvider(fakePeerAllocator, torrentInfo, "fake-peer", emitIncomingPeerMessagesFakePeer);
                 })
                 .doOnNext(__ -> logger.debug("fake-peer trying to connect to the app."))
                 .flatMap(peersProvider ->
@@ -1042,7 +1042,7 @@ public class MyStepdefs {
                 .setTorrentStatusStore(torrentStatusStore)
                 .setToDefaultTorrentStatesSideEffects()
                 .setSearchPeers(new SearchPeers(torrentInfo, torrentStatusStore, "App", trackerProvider,
-                        new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo, "App", incomingPeerMessages$, emitIncomingPeerMessages)))
+                        new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo, "App", emitIncomingPeerMessages)))
                 .setToDefaultPeersCommunicatorFlux()
                 .setToDefaultFileSystemLink(fullDownloadPath)
                 .build()
@@ -1090,7 +1090,7 @@ public class MyStepdefs {
                 .map(listeningPort -> new Peer("localhost", listeningPort))
                 .flatMap(me -> {
                     FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessagesFakePeer = incomingPeerMessagesFakePeer$.sink();
-                    return new PeersProvider(allocatorStore, torrentInfo, "Fake-peer", incomingPeerMessagesFakePeer$, emitIncomingPeerMessagesFakePeer).connectToPeerMono(me);
+                    return new PeersProvider(allocatorStore, torrentInfo, "Fake-peer", emitIncomingPeerMessagesFakePeer).connectToPeerMono(me);
                 })
                 .map(link -> new RemoteFakePeer(allocatorStore, link, fakePeerType, "Fake-peer-" + fakePeerPort + "-" + fakePeerType.toString(),
                         new IncomingPeerMessagesNotifierImpl(incomingPeerMessagesFakePeer$)))
@@ -1719,7 +1719,7 @@ public class MyStepdefs {
                     FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessagesFakePeer = incomingPeerMessagesFakePeer$.sink();
                     AllocatorStore allocatorStore = new AllocatorStore(new Store<>(new AllocatorReducer(),
                             AllocatorReducer.defaultAllocatorState, "Fake-Peer-Allocator-Store"));
-                    return new PeersProvider(allocatorStore, torrentInfo, "Fake peer", incomingPeerMessagesFakePeer$, emitIncomingPeerMessagesFakePeer).connectToPeerMono(app);
+                    return new PeersProvider(allocatorStore, torrentInfo, "Fake peer", emitIncomingPeerMessagesFakePeer).connectToPeerMono(app);
                 })
                 .doOnNext(Link::closeConnection);
         if (PeerExceptions.peerNotResponding.test(throwable))
@@ -1749,7 +1749,7 @@ public class MyStepdefs {
                     FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessagesFakePeer = incomingPeerMessagesFakePeer$.sink();
                     AllocatorStore allocatorStore = new AllocatorStore(new Store<>(new AllocatorReducer(),
                             AllocatorReducer.defaultAllocatorState, "Fake-Peer-Allocator-Store"));
-                    PeersProvider peersProvider = new PeersProvider(allocatorStore, torrentInfo, "Fake peer", incomingPeerMessagesFakePeer$, emitIncomingPeerMessagesFakePeer);
+                    PeersProvider peersProvider = new PeersProvider(allocatorStore, torrentInfo, "Fake peer", emitIncomingPeerMessagesFakePeer);
                     return peersProvider.connectToPeerMono(app);
                 })
                 .doOnNext(Link::closeConnection)
