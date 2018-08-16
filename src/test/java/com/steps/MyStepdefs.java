@@ -561,7 +561,7 @@ public class MyStepdefs {
 
         TorrentDownloaders.getAllocatorStore()
                 .freeAll()
-                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(10, 100_000))
+                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(10, torrentInfo.getPieceLength(0)))
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
