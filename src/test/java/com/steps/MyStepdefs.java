@@ -478,7 +478,7 @@ public class MyStepdefs {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         TorrentDownloaders.getAllocatorStore()
-                .updateAllocations(10, 1_000_000)
+                .updateAllocations(10, 100_000)
                 .block();
 
         Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
@@ -561,7 +561,7 @@ public class MyStepdefs {
 
         TorrentDownloaders.getAllocatorStore()
                 .freeAll()
-                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(10, torrentInfo.getPieceLength(0)))
+                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(10, 100_000))
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();

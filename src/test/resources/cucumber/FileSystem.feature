@@ -19,9 +19,9 @@ Feature: create get and delete active torrents
   Scenario Outline: (2) remove files concurrently while nothing has started
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" with default initial state
     When torrent-status for torrent "<torrent>" is trying to change to:
-      | REMOVE_FILES_IN_PROGRESS   |
+      | REMOVE_FILES_IN_PROGRESS |
     Then wait until state contain the following for torrent: "<torrent>":
-      | REMOVE_FILES_WIND_UP   |
+      | REMOVE_FILES_WIND_UP |
     Then torrent-status for torrent "<torrent>" will be:
       | PAUSE_DOWNLOAD_WIND_UP        |
       | PAUSE_UPLOAD_WIND_UP          |
@@ -192,11 +192,12 @@ Feature: create get and delete active torrents
       | -2 |
 
     Examples:
-      | torrent                                   | downloadLocation |
-      | torrent-file-example1.torrent             | torrents-test    |
-      | torrent-file-example2.torrent             | torrents-test    |
-      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-      | ComplexFolderStructure.torrent            | torrents-test    |
+      | torrent                        | downloadLocation |
+      | torrent-file-example1.torrent  | torrents-test    |
+      # it takes too much time:
+#      | torrent-file-example2.torrent             | torrents-test    |
+#      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent | torrents-test    |
 
   Scenario Outline: (11) we save a block which is too large than the corresponding actual piece.
     # we expect that it will be as saving a piece when we don't specify "length".
@@ -211,11 +212,12 @@ Feature: create get and delete active torrents
       | 3  |
 
     Examples:
-      | torrent                                   | downloadLocation |
-      | torrent-file-example1.torrent             | torrents-test    |
-      | torrent-file-example2.torrent             | torrents-test    |
-      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-      | ComplexFolderStructure.torrent            | torrents-test    |
+      | torrent                        | downloadLocation |
+      | torrent-file-example1.torrent  | torrents-test    |
+      # it takes too much time:
+#      | torrent-file-example2.torrent  | torrents-test    |
+      # | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent | torrents-test    |
 
   Scenario Outline: (12) we save all the pieces and expect to see that the fluxes are completed
     When application save the all the pieces of torrent: "<torrent>","<downloadLocation>"

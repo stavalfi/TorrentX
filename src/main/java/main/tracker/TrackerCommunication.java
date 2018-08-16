@@ -109,7 +109,7 @@ class TrackerCommunication {
 	private static Mono<ByteBuffer> receiveResponseMono(DatagramSocket trackerSocket) {
 		return Mono.create(sink -> {
 			try {
-				byte[] receiveData = new byte[100000];
+				byte[] receiveData = new byte[10000];
 				DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
 				trackerSocket.setSoTimeout(4000);
 				trackerSocket.receive(receivePacket);
