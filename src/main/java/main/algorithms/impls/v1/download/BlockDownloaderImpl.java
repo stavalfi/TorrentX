@@ -53,7 +53,7 @@ public class BlockDownloaderImpl implements BlockDownloader {
                 //TODO: in some operating systems, the IO operations are extremely slow.
                 // for example the first use of randomAccessFile object. in linux all good.
                 // we need to remember to change back 20->2.
-                .timeout(Duration.ofMillis(4 * 1000))
+                .timeout(Duration.ofMillis(2500))
                 .doOnError(TimeoutException.class, throwable -> logger.debug(this.identifier + " - no response to the request: " + requestMessage))
                 .take(1)
                 .single();

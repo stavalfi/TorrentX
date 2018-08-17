@@ -46,6 +46,8 @@ public class RemoteFakePeer {
                 .flatMap(requestMessage -> {
                     switch (fakePeerType) {
                         case CLOSE_IN_FIRST_REQUEST:
+                            // its important because the socket may close up-to 4 min so it may be still
+                            // active and working so I don't want to send anything by mistake.
                             return Mono.empty();
                         default:
                             return Mono.just(requestMessage);
