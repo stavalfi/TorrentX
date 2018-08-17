@@ -33,8 +33,5 @@ public interface SendMessagesNotifications {
 
     Mono<SendMessagesNotifications> sendUnchokeMessage();
 
-    Flux<PeerMessage> sentPeerMessagesFlux();
-
-    // TODO: remove this getter. this object is for internal use only by this class.
-    SendMessages getSendMessages();
+    Flux<PeerMessage> sentPeerMessages$();
 }

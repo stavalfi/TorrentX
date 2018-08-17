@@ -187,7 +187,6 @@ public class Listener {
                 peerDataInputStream,
                 peerDataOutputStream,
                 this.identifier,
-                torrentDownloader.get().getIncomingPeerMessages$(),
                 torrentDownloader.get().getEmitIncomingPeerMessages()));
     }
 

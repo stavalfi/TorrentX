@@ -39,7 +39,7 @@ public class App {
 
         torrentDownloader$.flatMapMany(TorrentDownloader::getPeersCommunicatorFlux)
                 .map(Link::sendMessages)
-                .flatMap(SendMessagesNotifications::sentPeerMessagesFlux)
+                .flatMap(SendMessagesNotifications::sentPeerMessages$)
                 .filter(peerMessage -> peerMessage instanceof RequestMessage)
                 .cast(RequestMessage.class)
                 .map(requestMessage -> "request: index: " + requestMessage.getIndex() +

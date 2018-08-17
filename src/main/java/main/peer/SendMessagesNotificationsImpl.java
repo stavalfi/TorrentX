@@ -1,14 +1,16 @@
 package main.peer;
 
-import main.App;
 import main.TorrentInfo;
 import main.file.system.allocator.AllocatorStore;
 import main.peer.peerMessages.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.DataOutputStream;
 import java.util.BitSet;
@@ -19,8 +21,8 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     private TorrentInfo torrentInfo;
     private Peer me;
     private Peer peer;
-    private Flux<PeerMessage> sentPeerMessagesFlux;
-    private FluxSink<PeerMessage> sentMessagesFluxSink;
+    private Flux<PeerMessage> sentMessages$;
+    private FluxSink<PeerMessage> emitSentMessages;
     private PeerCurrentStatus peerCurrentStatus;
     private SendMessages sendMessages;
     private AllocatorStore allocatorStore;
@@ -39,10 +41,9 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
         this.peer = peer;
         this.peerCurrentStatus = peerCurrentStatus;
         this.identifier = identifier;
-        this.sentPeerMessagesFlux = Flux.create((FluxSink<PeerMessage> sink) -> this.sentMessagesFluxSink = sink)
-                .subscribeOn(App.MyScheduler)
-                .publish()
-                .autoConnect(0);
+        EmitterProcessor<PeerMessage> sentMessages$ = EmitterProcessor.create();
+        this.sentMessages$ = sentMessages$.publishOn(Schedulers.elastic());
+        this.emitSentMessages = sentMessages$.sink();
         this.sendMessages = new SendMessages(peerDataOutputStream, closeConnectionMethod);
     }
 
@@ -51,14 +52,9 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
                 .doOnNext(__ -> logger.debug(this.identifier + " - sent message to peer: " + peerMessage))
                 .map(sendMessages -> (SendMessagesNotifications) this)
                 .doOnNext(peersCommunicator -> {
-                    if (this.sentMessagesFluxSink != null)
-                        this.sentMessagesFluxSink.next(peerMessage);
+                    if (this.emitSentMessages != null)
+                        this.emitSentMessages.next(peerMessage);
                 });
-    }
-
-    // TODO: remove this getter. this object is for internal use only by this class.
-    public SendMessages getSendMessages() {
-        return sendMessages;
     }
 
     @Override
@@ -120,7 +116,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     public Mono<SendMessagesNotifications> sendRequestMessage(int index, int begin, int blockLength) {
         int pieceLength = this.torrentInfo.getPieceLength(index);
         return this.allocatorStore.createRequestMessage(this.getMe(), this.getPeer(), index, begin, blockLength, pieceLength)
-                .flatMap(requestMessage -> send(requestMessage));
+                .flatMap(this::send);
     }
 
     @Override
@@ -130,8 +126,8 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     }
 
     @Override
-    public Flux<PeerMessage> sentPeerMessagesFlux() {
-        return this.sentPeerMessagesFlux;
+    public Flux<PeerMessage> sentPeerMessages$() {
+        return this.sentMessages$;
     }
 
     private Peer getPeer() {

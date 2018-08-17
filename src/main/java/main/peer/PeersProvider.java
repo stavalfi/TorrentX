@@ -29,16 +29,13 @@ public class PeersProvider {
     private TorrentInfo torrentInfo;
     private AllocatorStore allocatorStore;
     private String identifier;
-    private EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$;
     private FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages;
 
     public PeersProvider(AllocatorStore allocatorStore, TorrentInfo torrentInfo, String identifier,
-                         EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
                          FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
         this.identifier = identifier;
         this.torrentInfo = torrentInfo;
         this.allocatorStore = allocatorStore;
-        this.incomingPeerMessages$ = incomingPeerMessages$;
         this.emitIncomingPeerMessages = emitIncomingPeerMessages;
     }
 
@@ -73,8 +70,7 @@ public class PeersProvider {
                             " with the wrong torrent-info-hash: " + receivedTorrentInfoHash));
                 } else {
                     // all went well, I accept this connection.
-                    Link link = new Link(this.allocatorStore, this.torrentInfo, peer, peerSocket, receiveMessages, sendMessages, this.identifier,
-                            incomingPeerMessages$, emitIncomingPeerMessages);
+                    Link link = new Link(this.allocatorStore, this.torrentInfo, peer, peerSocket, receiveMessages, sendMessages, this.identifier, emitIncomingPeerMessages);
                     sink.success(link);
                 }
             } catch (IOException e) {
