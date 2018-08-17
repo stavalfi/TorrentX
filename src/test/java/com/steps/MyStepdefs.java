@@ -2,13 +2,16 @@ package com.steps;
 
 import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
+import cucumber.api.PendingException;
 import cucumber.api.java.en.And;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
 import main.App;
 import main.TorrentInfo;
+import main.algorithms.PeersToPiecesMapper;
 import main.algorithms.impls.v1.download.BlockDownloaderImpl;
+import main.algorithms.impls.v1.download.PeersToPiecesMapperImpl;
 import main.downloader.*;
 import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
@@ -1005,17 +1008,24 @@ public class MyStepdefs {
         logger.debug("ended cleaning all the resources of the test.");
     }
 
-    private Flux<Link> recordedMeToFakePeersLinks$;
-
     private FluxSink<Link> emitMeToFakePeerLinks;
     private Flux<Link> meToFakePeerLink$;
 
     private FluxSink<PieceEvent> emitActualIncomingPieceMessages;
     private Flux<PieceEvent> actualIncomingPieceMessages$;
 
+    private PeersToPiecesMapper peersToPiecesMapper;
+
     @Given("^torrent: \"([^\"]*)\",\"([^\"]*)\"$")
     public void torrent(String torrentFileName, String downloadLocation) throws Throwable {
         Utils.removeEverythingRelatedToLastTest();
+
+        if (this.meToFakePeerLink$ != null)
+            this.meToFakePeerLink$.doOnNext(Link::closeConnection)
+                    .collectList()
+                    .as(StepVerifier::create)
+                    .expectNextCount(1)
+                    .verifyComplete();
 
         UnicastProcessor<Link> meToFakePeerLinkProcessor = UnicastProcessor.create();
         this.emitMeToFakePeerLinks = meToFakePeerLinkProcessor.sink();
@@ -1057,6 +1067,8 @@ public class MyStepdefs {
                 .setToDefaultPeersCommunicatorFlux()
                 .setToDefaultFileSystemLink(fullDownloadPath)
                 .build()
+                .doOnNext(torrentDownloader -> this.peersToPiecesMapper = new PeersToPiecesMapperImpl(torrentDownloader.getPeersCommunicatorFlux(),
+                        torrentDownloader.getFileSystemLink().getUpdatedPiecesStatus()))
                 .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
                 .as(StepVerifier::create)
                 .expectNextCount(1)
@@ -1240,7 +1252,9 @@ public class MyStepdefs {
                 .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
-        List<Integer> actualAvailablePiecesList = this.availablePieces$.collectList()
+
+        List<Integer> actualAvailablePiecesList = this.peersToPiecesMapper.getAvailablePiecesFlux()
+                .collectList()
                 .block(Duration.ofMillis(500));
 
         Assert.assertArrayEquals(expectedAvailablePiecesList.toArray(), actualAvailablePiecesList.toArray());
@@ -1869,5 +1883,30 @@ public class MyStepdefs {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+    }
+
+    @Then("^application receive the following available pieces - for torrent: \"([^\"]*)\": - none$")
+    public void applicationReceiveTheFollowingAvailablePiecesForTorrentNone(String torrentFileName) throws Throwable {
+
+    }
+
+    @Then("^application receive the following available fake-peers for piece: \"([^\"]*)\" - for torrent: \"([^\"]*)\": - none$")
+    public void applicationReceiveTheFollowingAvailableFakePeersForPieceForTorrentNone(String pieceIndex, String torrentFileName) throws Throwable {
+
+    }
+
+    @When("^application request something from all fake-peer on port \"([^\"]*)\" - for torrent: \"([^\"]*)\"$")
+    public void applicationRequestSomethingFromAllFakePeerOnPortForTorrent(int fakePeerPort, String torrentFileName) throws Throwable {
+
+    }
+
+    @Given("^the following saved pieces - for torrent: \"([^\"]*)\": - none$")
+    public void theFollowingSavedPiecesForTorrentNone(String torrentFileName) throws Throwable {
+
+    }
+
+    @Given("^the following saved pieces - for torrent: \"([^\"]*)\":$")
+    public void theFollowingSavedPiecesForTorrent(String torrentFileName, List<Integer> piecesToSave) throws Throwable {
+
     }
 }
