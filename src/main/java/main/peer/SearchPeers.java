@@ -26,10 +26,9 @@ public class SearchPeers {
     private String identifier;
 
     public SearchPeers(AllocatorStore allocatorStore, TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store, String identifier,
-                       EmitterProcessor<AbstractMap.SimpleEntry<Link,PeerMessage>> incomingPeerMessages$,
                        FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
         this(torrentInfo, store, identifier, new TrackerProvider(torrentInfo),
-                new PeersProvider(allocatorStore, torrentInfo, identifier,incomingPeerMessages$,emitIncomingPeerMessages));
+                new PeersProvider(allocatorStore, torrentInfo, identifier, emitIncomingPeerMessages));
     }
 
     public SearchPeers(TorrentInfo torrentInfo, Store<TorrentStatusState, TorrentStatusAction> store, String identifier,

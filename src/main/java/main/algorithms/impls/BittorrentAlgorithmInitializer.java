@@ -27,8 +27,7 @@ public class BittorrentAlgorithmInitializer {
                                          TorrentInfo torrentInfo,
                                          Store<TorrentStatusState, TorrentStatusAction> store,
                                          FileSystemLink fileSystemLink,
-                                         EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
-                                         FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages,
+                                         Flux<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
                                          Flux<Link> peersCommunicatorFlux,
                                          String identifier) {
         Flux<Link> recordedPeerFlux = peersCommunicatorFlux

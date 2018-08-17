@@ -54,7 +54,8 @@ public class TorrentDownloaders {
         return Flux.fromIterable(new ArrayList<>(this.torrentDownloaderList));
     }
 
-    public synchronized TorrentDownloader saveTorrentDownloader(TorrentInfo torrentInfo,
+    public synchronized TorrentDownloader saveTorrentDownloader(String identifier,
+                                                                TorrentInfo torrentInfo,
                                                                 SearchPeers searchPeers,
                                                                 FileSystemLink fileSystemLink,
                                                                 BittorrentAlgorithm bittorrentAlgorithm,
@@ -67,14 +68,14 @@ public class TorrentDownloaders {
                                                                 IncomingPeerMessagesNotifier incomingPeerMessagesNotifier) {
         return findTorrentDownloader(torrentInfo.getTorrentInfoHash())
                 .orElseGet(() -> {
-                    TorrentDownloader torrentDownloader = new TorrentDownloader(torrentInfo,
-                            searchPeers,
+                    TorrentDownloader torrentDownloader = new TorrentDownloader(identifier,
+                            torrentInfo,
+                            allocatorStore, searchPeers,
                             fileSystemLink,
                             bittorrentAlgorithm,
                             torrentStatusStore,
                             torrentSpeedStatistics,
                             torrentStatesSideEffects, peersCommunicatorFlux,
-                            incomingPeerMessages$,
                             emitIncomingPeerMessages,
                             incomingPeerMessagesNotifier);
 

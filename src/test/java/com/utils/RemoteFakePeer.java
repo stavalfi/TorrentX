@@ -2,6 +2,7 @@ package com.utils;
 
 import main.algorithms.impls.v1.download.BlockDownloaderImpl;
 import main.file.system.allocator.AllocatorStore;
+import main.peer.IncomingPeerMessagesNotifier;
 import main.peer.IncomingPeerMessagesNotifierImpl;
 import main.peer.Link;
 import org.slf4j.Logger;
@@ -14,7 +15,8 @@ public class RemoteFakePeer {
     private static Logger logger = LoggerFactory.getLogger(BlockDownloaderImpl.class);
     private Link link;
 
-    public RemoteFakePeer(AllocatorStore allocatorStore, Link link, FakePeerType fakePeerType, String identifier) {
+    public RemoteFakePeer(AllocatorStore allocatorStore, Link link, FakePeerType fakePeerType, String identifier,
+                          IncomingPeerMessagesNotifier incomingPeerMessagesNotifier) {
         this.link = link;
 
         allocatorStore.updateAllocations(10, link.getTorrentInfo().getPieceLength(0))
@@ -23,8 +25,7 @@ public class RemoteFakePeer {
                 .expectNextCount(1)
                 .verifyComplete();
 
-        new IncomingPeerMessagesNotifierImpl(link.getIncomingPeerMessages$())
-                .getRequestMessageResponseFlux()
+        incomingPeerMessagesNotifier.getRequestMessageResponseFlux()
                 .doOnNext(requestMessage -> logger.info(identifier + " - received a new request: " + requestMessage))
                 .doOnNext(requestMessage -> {
                     switch (fakePeerType) {
@@ -45,6 +46,8 @@ public class RemoteFakePeer {
                 .flatMap(requestMessage -> {
                     switch (fakePeerType) {
                         case CLOSE_IN_FIRST_REQUEST:
+                            // its important because the socket may close up-to 4 min so it may be still
+                            // active and working so I don't want to send anything by mistake.
                             return Mono.empty();
                         default:
                             return Mono.just(requestMessage);
