@@ -113,7 +113,7 @@ public class TorrentDownloaderBuilder {
                         torrentInfo,
                         this.torrentStatusStore,
                         fileSystemLink,
-                        this.incomingPeerMessages$,
+                        this.incomingPeerMessagesNotifier,
                         this.peersCommunicatorFlux,
                         this.identifier),
                 this.torrentStatusStore,

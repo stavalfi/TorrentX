@@ -1,5 +1,7 @@
 package main.peer;
 
+import java.util.function.Predicate;
+
 public class Peer implements Comparable<Peer> {
     private final String peerIp;
     private final int peerPort;
@@ -24,8 +26,13 @@ public class Peer implements Comparable<Peer> {
 
         Peer peer = (Peer) o;
 
+        Predicate<String> isAddressEqual = peerIp ->
+                peerIp.equals(this.peerIp) ||
+                        (peerIp.equals("127.0.0.1") && this.peerIp.equals("localhost")) ||
+                        (peerIp.equals("localhost") && this.peerIp.equals("127.0.0.1"));
+
         return getPeerPort() == peer.getPeerPort() &&
-                getPeerIp().equals(peer.getPeerIp());
+                isAddressEqual.test(peer.peerIp);
     }
 
     @Override

@@ -2,6 +2,7 @@ package main.algorithms;
 
 import main.peer.Link;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.GroupedFlux;
 
 public interface PeersToPiecesMapper {
     /**
@@ -9,7 +10,5 @@ public interface PeersToPiecesMapper {
      *
      * @return flux of pieces numbers.
      */
-    Flux<Integer> getAvailablePiecesFlux();
-
-    Flux<Link> peerSupplierFlux(int pieceIndex);
+    Flux<GroupedFlux<Integer, Link>> getLinksByAvailableMissingPiece$();
 }
