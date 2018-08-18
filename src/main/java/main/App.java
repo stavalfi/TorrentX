@@ -47,7 +47,7 @@ public class App {
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
         torrentDownloader$.map(TorrentDownloader::getFileSystemLink)
-                .flatMapMany(FileSystemLink::savedBlockFlux)
+                .flatMapMany(FileSystemLink::savedBlocks$)
                 .map(PieceEvent::getReceivedPiece)
                 .map(pieceMessage -> "received: index: " + pieceMessage.getIndex() +
                         ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())

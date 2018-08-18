@@ -11,9 +11,6 @@ import main.TorrentInfo;
 import main.algorithms.*;
 import main.algorithms.impls.v1.download.BlockDownloaderImpl;
 import main.algorithms.impls.v1.download.PeersToPiecesMapperImpl;
-import main.algorithms.impls.v1.download.PiecesDownloaderImpl;
-import main.algorithms.impls.v1.notification.NotifyAboutCompletedPieceAlgorithmImpl;
-import main.algorithms.impls.v1.upload.UploadAlgorithmImpl;
 import main.downloader.*;
 import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
@@ -227,7 +224,7 @@ public class MyStepdefs {
                 FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, TorrentDownloaders.getAllocatorStore(), torrentStatusStore, fakePieceMessageToSave$, "App")
                         .cache();
 
-        Mono<Integer> notifyWhenPieceSaved = fileSystemLink$.flatMapMany(FileSystemLink::savedPieceFlux)
+        Mono<Integer> notifyWhenPieceSaved = fileSystemLink$.flatMapMany(FileSystemLink::savedPieces$)
                 .doOnNext(__ -> logger.info("App saved successfully piece: " + pieceIndex + "."))
                 .take(1)
                 .replay()
@@ -298,8 +295,7 @@ public class MyStepdefs {
                     }
                     return Mono.just(peerMessage);
                 })
-                .doOnError(__ -> logger.error("something went wrong1: " + __))
-                .replay(messageToReceive.size())
+                .replay()
                 // start record incoming messages from fake peer
                 .autoConnect(0);
 
@@ -363,8 +359,8 @@ public class MyStepdefs {
                     .verifyComplete();
         } else
             // no errors
-            StepVerifier.create(fakePeerResponses$.take(2))
-                    .expectNextCount(2)
+            StepVerifier.create(fakePeerResponses$.take(messageToReceive.size()))
+                    .expectNextCount(messageToReceive.size())
                     .verifyComplete();
 
         fakePeerToApp$.doOnNext(remoteFakePeerCopyCat -> logger.debug("clean up fake-peer resources."))
@@ -524,7 +520,7 @@ public class MyStepdefs {
                 .build()
                 .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
                 .doOnNext(torrentDownloader -> {
-                    Mono<List<Integer>> piecesCompleted1 = torrentDownloader.getFileSystemLink().savedBlockFlux()
+                    Mono<List<Integer>> piecesCompleted1 = torrentDownloader.getFileSystemLink().savedBlocks$()
                             //.doOnNext(pieceEvent -> System.out.println("block complete:" + pieceEvent))
                             .flatMap(pieceEvent -> {
                                 AllocatedBlock allocatedBlock = pieceEvent.getReceivedPiece().getAllocatedBlock();
@@ -541,7 +537,7 @@ public class MyStepdefs {
                             .autoConnect(0)
                             .collectList();
 
-                    Mono<List<Integer>> piecesCompleted2 = torrentDownloader.getFileSystemLink().savedPieceFlux()
+                    Mono<List<Integer>> piecesCompleted2 = torrentDownloader.getFileSystemLink().savedPieces$()
                             .replay()
                             .autoConnect(0)
                             .collectList();
@@ -612,13 +608,13 @@ public class MyStepdefs {
         // this.actualCompletedSavedPiecesReadByFS$ will be used in later step.
         this.actualCompletedSavedPiecesReadByFS$ = torrentDownloader$
                 .map(TorrentDownloader::getFileSystemLink)
-                .flatMapMany(FileSystemLink::savedPieceFlux)
+                .flatMapMany(FileSystemLink::savedPieces$)
                 .replay()
                 .autoConnect(0);
 
         Flux<PieceMessage> customPieces$ = torrentDownloader$
                 .map(TorrentDownloader::getFileSystemLink)
-                .flatMapMany(FileSystemLink::savedBlockFlux)
+                .flatMapMany(FileSystemLink::savedBlocks$)
                 .map(PieceEvent::getReceivedPiece);
 
         Flux.zip(customPieces$, generatedWrittenPieceMessages$)
@@ -1064,11 +1060,6 @@ public class MyStepdefs {
         Mockito.when(trackerProvider.connectToTrackersFlux()).thenReturn(trackers$);
 
 
-
-
-
-
-
 //        UploadAlgorithm uploadAlgorithm = new UploadAlgorithmImpl(torrentInfo,
 //                torrentStatusStore,
 //                fileSystemLink,
@@ -1077,13 +1068,6 @@ public class MyStepdefs {
 //                        .map(tuple2 -> new AbstractMap.SimpleEntry<>(tuple2.getKey(), (RequestMessage) (tuple2.getValue()))));
 //
 //        new BittorrentAlgorithm(uploadAlgorithm, downloadAlgorithm, notifyAboutCompletedPieceAlgorithm);
-
-
-
-
-
-
-
 
 
         TorrentDownloaderBuilder.builder(torrentInfo, "App")
@@ -2029,7 +2013,7 @@ public class MyStepdefs {
                 .verifyComplete();
 
         Flux<Integer> savedPieces$ = torrentDownloader.getFileSystemLink()
-                .savedPieceFlux()
+                .savedPieces$()
                 .replay()
                 .autoConnect(0);
 

@@ -59,20 +59,20 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
 //                .publish()
 //                .autoConnect(0);
 //
-//        this.startDownload$ = this.store.statesByAction(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
-//                .concatMap(__ -> this.store.dispatch(TorrentStatusAction.START_DOWNLOAD_SELF_RESOLVED))
-//                .publish()
-//                .autoConnect(0);
-//
-//        this.resumeDownload = this.store.statesByAction(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS)
-//                .concatMap(__ -> this.store.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_SELF_RESOLVED))
-//                .publish()
-//                .autoConnect(0);
-//
-//        this.pauseDownload = this.store.statesByAction(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS)
-//                .concatMap(__ -> this.store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_SELF_RESOLVED))
-//                .publish()
-//                .autoConnect(0);
+        this.startDownload$ = this.store.statesByAction(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
+                .concatMap(__ -> this.store.dispatch(TorrentStatusAction.START_DOWNLOAD_SELF_RESOLVED))
+                .publish()
+                .autoConnect(0);
+
+        this.resumeDownload = this.store.statesByAction(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS)
+                .concatMap(__ -> this.store.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_SELF_RESOLVED))
+                .publish()
+                .autoConnect(0);
+
+        this.pauseDownload = this.store.statesByAction(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS)
+                .concatMap(__ -> this.store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_SELF_RESOLVED))
+                .publish()
+                .autoConnect(0);
 
     }
 

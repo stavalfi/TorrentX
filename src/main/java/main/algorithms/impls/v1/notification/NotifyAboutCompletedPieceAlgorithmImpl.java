@@ -34,7 +34,7 @@ public class NotifyAboutCompletedPieceAlgorithmImpl implements NotifyAboutComple
         this.recordedFreePeerFlux = recordedFreePeerFlux;
 
         this.notifiedCompletedPiecesFlux =
-                this.fileSystemLink.savedBlockFlux()
+                this.fileSystemLink.savedBlocks$()
                         .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
                         .map(PieceEvent::getReceivedPiece)
                         .map(PieceMessage::getIndex)

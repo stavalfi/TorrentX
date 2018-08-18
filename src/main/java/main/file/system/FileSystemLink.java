@@ -19,7 +19,7 @@ public interface FileSystemLink {
 
     boolean havePiece(int pieceIndex);
 
-    List<ActualFile> getTorrentFiles();
+    Flux<ActualFile> getTorrentFiles();
 
     BitSet getUpdatedPiecesStatus();
 
@@ -37,7 +37,7 @@ public interface FileSystemLink {
      */
     Mono<PieceMessage> buildPieceMessage(RequestMessage requestMessage);
 
-    Flux<PieceEvent> savedBlockFlux();
+    Flux<PieceEvent> savedBlocks$();
 
-    Flux<Integer> savedPieceFlux();
+    Flux<Integer> savedPieces$();
 }

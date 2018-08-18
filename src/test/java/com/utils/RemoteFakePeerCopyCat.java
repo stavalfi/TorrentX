@@ -6,7 +6,6 @@ import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
 import main.file.system.allocator.AllocatorStore;
 import main.peer.IncomingPeerMessagesNotifier;
-import main.peer.IncomingPeerMessagesNotifierImpl;
 import main.peer.Link;
 import main.peer.peerMessages.*;
 import main.torrent.status.TorrentStatusAction;
@@ -66,7 +65,7 @@ public class RemoteFakePeerCopyCat {
         Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(link.getTorrentInfo(), fakePeerTorrentDownloadPath, this.allocatorStore, this.torrentStatusStore, fakePieceMessageToSave$, "App")
                 .cache();
 
-        Mono<Integer> pieceSaved$ = fileSystemLink$.flatMapMany(fileSystemLink -> fileSystemLink.savedPieceFlux())
+        Mono<Integer> pieceSaved$ = fileSystemLink$.flatMapMany(fileSystemLink -> fileSystemLink.savedPieces$())
                 .filter(savedPieceIndex -> savedPieceIndex.equals(pieceIndex))
                 .doOnNext(__ -> logger.info(identifier + " finished to save the piece: " + pieceIndex))
                 .replay(1)
