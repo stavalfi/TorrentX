@@ -50,10 +50,8 @@ public class RemoteFakePeerCopyCat {
                 .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
                 .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_SELF_RESOLVED))
                 .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
-                //.publishOn(Schedulers.elastic())
                 .flatMap(__ -> this.allocatorStore.updateAllocations(10, blockLength))
                 .flatMap(allocatorState -> this.allocatorStore.createPieceMessage(link.getPeer(), link.getMe(), pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
-                //.publishOn(Schedulers.elastic())
                 .doOnNext(pieceMessageToSave -> {
                     for (int i = 0; i < blockLength; i++)
                         pieceMessageToSave.getAllocatedBlock().getBlock()[i] = 11;
@@ -107,6 +105,10 @@ public class RemoteFakePeerCopyCat {
                         blockThread(0 * 1000);
                     if (peerMessage.getT1() == 2) {
                         link.closeConnection();
+                        if (peerMessage.getT2() instanceof PieceMessage)
+                            return allocatorStore.free(((PieceMessage) peerMessage.getT2()).getAllocatedBlock())
+                                    .map(__ -> peerMessage.getT2())
+                                    .ignoreElement();
                         return Mono.empty();
                     }
                     return Mono.just(peerMessage.getT2());

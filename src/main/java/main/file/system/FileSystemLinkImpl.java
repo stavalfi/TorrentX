@@ -68,8 +68,10 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
         createFolders(torrentInfo, downloadPath);
 
+        // this flux will run on this thread so there won't be a chance that
+        // someone ask if the files are exist when we go out this constructor and the files weren't created yet.
+        // there is a test that sometimes (5%) fail because this race condition.
         this.actualFileImplList = createActiveTorrentFileList(torrentInfo, downloadPath)
-                .subscribeOn(Schedulers.elastic())
                 .replay()
                 .autoConnect(0);
 
@@ -213,35 +215,36 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
             }
             sink.success(super.getPieceLength(requestMessage.getIndex()));
         }).flatMap(pieceLength -> this.allocatorStore.createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(), requestMessage.getIndex(),
-                        requestMessage.getBegin(), requestMessage.getBlockLength(), pieceLength)
-                        .flatMap(pieceMessage -> this.actualFileImplList.collectList().flatMap(actualFiles -> {
-                            long from = super.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
-                            long to = from + requestMessage.getBlockLength();
-                            int freeIndexInResultArray = pieceMessage.getAllocatedBlock().getOffset();
+                requestMessage.getBegin(), requestMessage.getBlockLength(), pieceLength)
+                .flatMap(pieceMessage -> this.actualFileImplList.collectList().flatMap(actualFiles -> {
+                    long from = super.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
+                    long to = from + requestMessage.getBlockLength();
+                    int freeIndexInResultArray = pieceMessage.getAllocatedBlock().getOffset();
 
-                            for (ActualFile actualFile : actualFiles) {
-                                if (from != to)
-                                    if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
-                                        // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
-                                        int howMuchToReadFromThisFile = (int) Math.min(actualFile.getTo() - from, to - from);
-                                        try {
-                                            actualFile.readBlock(from, howMuchToReadFromThisFile,
-                                                    pieceMessage.getAllocatedBlock().getBlock(),
-                                                    freeIndexInResultArray);
-                                            freeIndexInResultArray += howMuchToReadFromThisFile;
-                                        } catch (IOException e) {
-                                            return Mono.error(e);
-                                        }
-                                        from += howMuchToReadFromThisFile;
-                                    }
+                    for (ActualFile actualFile : actualFiles) {
+                        if (from != to)
+                            if (actualFile.getFrom() <= from && from <= actualFile.getTo()) {
+                                // to,from are taken from the requestMessage message object so "to-from" must be valid integer.
+                                int howMuchToReadFromThisFile = (int) Math.min(actualFile.getTo() - from, to - from);
+                                try {
+                                    actualFile.readBlock(from, howMuchToReadFromThisFile,
+                                            pieceMessage.getAllocatedBlock().getBlock(),
+                                            freeIndexInResultArray);
+                                    freeIndexInResultArray += howMuchToReadFromThisFile;
+                                } catch (IOException e) {
+                                    return Mono.error(e);
+                                }
+                                from += howMuchToReadFromThisFile;
                             }
-                            return Mono.just(pieceMessage);
-                        })));
+                    }
+                    return Mono.just(pieceMessage);
+                })));
     }
 
     private Mono<PieceEvent> writeBlock(PieceMessage pieceMessage) {
         return this.actualFileImplList.collectList()
                 .flatMap(actualFiles -> Mono.<PieceEvent>create(sink -> {
+                    logger.debug(this.identifier + " - start writing block to FS: " + pieceMessage);
                     if (havePiece(pieceMessage.getIndex()) ||
                             this.downloadedBytesInPieces[pieceMessage.getIndex()] > pieceMessage.getBegin() +
                                     pieceMessage.getAllocatedBlock().getLength()) {
@@ -284,6 +287,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                         this.downloadedBytesInPieces[pieceMessage.getIndex()] = getPieceLength(pieceMessage.getIndex());
 
                     long howMuchWeWroteUntilNowInThisPiece = this.downloadedBytesInPieces[pieceMessage.getIndex()];
+                    logger.debug(this.identifier + " - end writing block to FS: " + pieceMessage);
                     if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
                         this.piecesStatus.set(pieceMessage.getIndex());
                         PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.COMPLETED, pieceMessage);
@@ -292,9 +296,10 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                         PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.DOWNLOADING, pieceMessage);
                         sink.success(pieceEvent);
                     }
-                }).doAfterSuccessOrError((__, ___) -> logger.trace(this.identifier + " - start cleaning-up piece-message-allocator: " + pieceMessage))
+                }).doAfterSuccessOrError((__, ___) -> logger.debug(this.identifier + " - start cleaning-up piece-message-allocator: " + pieceMessage))
+//                        .flatMap(pieceEvent -> this.allocatorStore.free(pieceMessage.getAllocatedBlock()).map(__ -> pieceEvent))
                         .doAfterSuccessOrError((__, ___) -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
-                        .doAfterSuccessOrError((__, ___) -> logger.trace(this.identifier + " - finished cleaning-up piece-message-allocator: " + pieceMessage)));
+                        .doAfterSuccessOrError((__, ___) -> logger.debug(this.identifier + " - finished cleaning-up piece-message-allocator: " + pieceMessage)));
     }
 
     private static Flux<ActualFile> createActiveTorrentFileList(TorrentInfo torrentInfo, String downloadPath) {

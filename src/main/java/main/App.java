@@ -11,6 +11,7 @@ import main.peer.Link;
 import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
@@ -27,7 +28,11 @@ public class App {
     public static Scheduler MyScheduler = Schedulers.elastic();
     private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test" + File.separator;
 
-    private static void f5() throws IOException {
+    private static void f5() throws IOException, InterruptedException {
+
+        System.out.println(getTorrentInfo());
+        Thread.sleep(10000000);
+
         Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath)
                 .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
                 .cache();
@@ -112,7 +117,7 @@ public class App {
                 "main" + File.separator +
                 "resources" + File.separator +
                 "torrents" + File.separator +
-                "tor.torrent";
+                "ComplexFolderStructure.torrent";
         return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
     }
 }

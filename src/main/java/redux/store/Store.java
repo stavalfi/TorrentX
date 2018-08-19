@@ -29,7 +29,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
             while (true) {
                 try {
                     Request<ACTION> request = this.requestsQueue.take();
-                    logger.trace(this.identifier + " - start inspecting request: " + request);
+                    logger.debug(this.identifier + " - start inspecting request: " + request);
                     sink.next(request);
                 } catch (InterruptedException e) {
                     sink.error(e);
@@ -38,23 +38,22 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
             }
         }).subscribeOn(Schedulers.newSingle(this.identifier + " - PULLER - "))
                 .scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
-                    logger.trace(this.identifier + " - start processing request: " + request + ", current state: " + lastResult.getState());
+                    logger.debug(this.identifier + " - start processing request: " + request + ", current state: " + lastResult.getState());
                     Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
                     if (!result.isNewState())
-                        logger.trace(this.identifier + " - ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
+                        logger.debug(this.identifier + " - ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
                     else
-                        logger.trace(this.identifier + " - passed - request: " + request + " new state: " + result.getState() + "\n");
+                        logger.debug(this.identifier + " - passed - request: " + request + " new state: " + result.getState() + "\n");
                     return result;
                 })
                 .replay()
                 .autoConnect(0);
 
         this.states$ = this.results$
-                .doOnNext(result -> logger.trace(this.identifier + " - analyzing result: " + result))
+                .doOnNext(result -> logger.debug(this.identifier + " - analyzing result: " + result))
                 .map(Result::getState)
                 .distinctUntilChanged()
-                .doOnNext(state -> logger.trace(this.identifier + " - new state: " + state))
-                .doOnNext(state -> logger.info(this.identifier + " - new state: " + state.getAction()))
+                .doOnNext(state -> logger.info(this.identifier + " - new state: " + state))
                 .replay(1)
                 .autoConnect(0);
     }

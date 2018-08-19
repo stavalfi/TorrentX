@@ -18,4 +18,11 @@ public class CreatePieceMessageResult extends Result<AllocatorState, AllocatorAc
 	public PieceMessage getPieceMessage() {
 		return pieceMessage;
 	}
+
+	@Override
+	public String toString() {
+		return "CreatePieceMessageResult{" +
+				"pieceMessage=" + pieceMessage +
+				'}';
+	}
 }

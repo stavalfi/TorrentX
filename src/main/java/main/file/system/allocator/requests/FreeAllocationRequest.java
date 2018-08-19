@@ -15,4 +15,11 @@ public class FreeAllocationRequest extends Request<AllocatorAction> {
 	public AllocatedBlock getAllocatedBlock() {
 		return allocatedBlock;
 	}
+
+	@Override
+	public String toString() {
+		return "FreeAllocationRequest{" +
+				"allocatedBlock=" + allocatedBlock +
+				'}';
+	}
 }

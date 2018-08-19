@@ -150,7 +150,7 @@ Feature: connect to a fake peers and communicate with them
     Examples:
       | torrent                                   | downloadLocation |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-
+#
   Scenario Outline: (8) fake peer request pieces from me but I don't have nothing to give
     Then application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved
       | pieceIndex | from | length |
@@ -165,3 +165,20 @@ Feature: connect to a fake peers and communicate with them
     Examples:
       | torrent                                   | downloadLocation |
       | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+
+  Scenario Outline: (0) download blocks from a valid fake-peer
+    Given torrent: "<torrent>","<downloadLocation>"
+    When listen-status is trying to change to:
+      | START_LISTENING_IN_PROGRESS |
+    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+      | 0 |
+    When application request the following blocks from all fake-peers - for torrent: "<torrent>":
+      | pieceIndex | from | length |
+      | 0          | 0    | 1      |
+    Then application receive the following blocks from all - for torrent: "<torrent>":
+      | pieceIndex | from | length |
+      | 0          | 0    | 1      |
+
+    Examples:
+      | torrent                        | downloadLocation |
+      | ComplexFolderStructure.torrent | torrents-test    |

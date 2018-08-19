@@ -21,4 +21,12 @@ public class UpdateAllocationArrayRequest extends Request<AllocatorAction> {
 	public int getBlockLength() {
 		return blockLength;
 	}
+
+	@Override
+	public String toString() {
+		return "UpdateAllocationArrayRequest{" +
+				"amountOfBlocks=" + amountOfBlocks +
+				", blockLength=" + blockLength +
+				'}';
+	}
 }
