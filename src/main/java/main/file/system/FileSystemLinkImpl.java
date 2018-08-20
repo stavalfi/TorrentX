@@ -45,16 +45,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private Flux<TorrentStatusState> removeFiles$;
     private String identifier;
 
-    public static Mono<FileSystemLink> create(TorrentInfo torrentInfo, String downloadPath,
-                                              AllocatorStore allocatorStore,
-                                              Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
-                                              Flux<PieceMessage> peerResponses$,
-                                              String identifier) {
-        return Mono.just(torrentInfo)
-                .map(actualFileList -> new FileSystemLinkImpl(torrentInfo, downloadPath, allocatorStore, torrentStatusStore, peerResponses$, identifier));
-    }
-
-    private FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
+    public FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
                                AllocatorStore allocatorStore,
                                Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
                                Flux<PieceMessage> peerResponses$,

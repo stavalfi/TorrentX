@@ -230,11 +230,10 @@ public class MyStepdefs {
         Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore = new Store<>(new TorrentStatusReducer(),
                 TorrentStatusReducer.defaultTorrentState, "Test-App-TorrentStatus-Store");
 
-        Mono<FileSystemLink> fileSystemLink$ =
-                FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, TorrentDownloaders.getAllocatorStore(), torrentStatusStore, fakePieceMessageToSave$, "App")
-                        .cache();
+        FileSystemLink fileSystemLink$ =
+                new FileSystemLinkImpl(torrentInfo, fullDownloadPath, TorrentDownloaders.getAllocatorStore(), torrentStatusStore, fakePieceMessageToSave$, "App");
 
-        Mono<Integer> notifyWhenPieceSaved = fileSystemLink$.flatMapMany(FileSystemLink::savedPieces$)
+        Mono<Integer> notifyWhenPieceSaved = fileSystemLink$.savedPieces$()
                 .doOnNext(__ -> logger.info("App saved successfully piece: " + pieceIndex + "."))
                 .take(1)
                 .replay()
@@ -279,7 +278,7 @@ public class MyStepdefs {
                 .setToDefaultSearchPeers()
                 .setToDefaultTorrentStatesSideEffects()
                 .setToDefaultPeersCommunicatorFlux()
-                .setFileSystemLink$(fileSystemLink$)
+                .setFileSystemLink(fileSystemLink$)
                 .build()
                 .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
                 .cache();
@@ -556,7 +555,7 @@ public class MyStepdefs {
                 .setToDefaultAllocatorStore()
                 .setTorrentStatusStore(torrentStatusStore)
                 .setTorrentStatesSideEffects(sideEffects)
-                .setFileSystemLink$(FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, TorrentDownloaders.getAllocatorStore(), torrentStatusStore, allBlocksMessages$, "App"))
+                .setFileSystemLink(new FileSystemLinkImpl(torrentInfo, fullDownloadPath, TorrentDownloaders.getAllocatorStore(), torrentStatusStore, allBlocksMessages$, "App"))
                 .build()
                 .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
                 .doOnNext(torrentDownloader -> {
@@ -639,7 +638,7 @@ public class MyStepdefs {
                 .setTorrentStatesSideEffects(sideEffects)
                 .setToDefaultSearchPeers()
                 .setToDefaultPeersCommunicatorFlux()
-                .setFileSystemLink$(FileSystemLinkImpl.create(torrentInfo, fullDownloadPath, TorrentDownloaders.getAllocatorStore(), torrentStatusStore, generatedWrittenPieceMessages$, "App"))
+                .setFileSystemLink(new FileSystemLinkImpl(torrentInfo, fullDownloadPath, TorrentDownloaders.getAllocatorStore(), torrentStatusStore, generatedWrittenPieceMessages$, "App"))
                 .build()
                 .map(torrentDownloader -> TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader))
                 .cache();
@@ -954,8 +953,8 @@ public class MyStepdefs {
                 .setSearchPeers(new SearchPeers(torrentInfo, torrentDownloader.getTorrentStatusStore(), "App", trackerProvider,
                         new PeersProvider(TorrentDownloaders.getAllocatorStore(), torrentInfo, "App", emitIncomingPeerMessages)))
                 .setToDefaultPeersCommunicatorFlux()
+                .setFileSystemLink(torrentDownloader.getFileSystemLink())
                 .setToDefaultBittorrentAlgorithm()
-                .setFileSystemLink$(Mono.just(torrentDownloader.getFileSystemLink()))
                 .build()
                 .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
                 .flux()

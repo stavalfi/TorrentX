@@ -60,10 +60,9 @@ public class RemoteFakePeerCopyCat {
                 .flux()
                 .publish();
 
-        Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(link.getTorrentInfo(), fakePeerTorrentDownloadPath, this.allocatorStore, this.torrentStatusStore, fakePieceMessageToSave$, "App")
-                .cache();
+        FileSystemLink fileSystemLink$ = new FileSystemLinkImpl(link.getTorrentInfo(), fakePeerTorrentDownloadPath, this.allocatorStore, this.torrentStatusStore, fakePieceMessageToSave$, "App");
 
-        Mono<Integer> pieceSaved$ = fileSystemLink$.flatMapMany(fileSystemLink -> fileSystemLink.savedPieces$())
+        Mono<Integer> pieceSaved$ = fileSystemLink$.savedPieces$()
                 .filter(savedPieceIndex -> savedPieceIndex.equals(pieceIndex))
                 .doOnNext(__ -> logger.info(identifier + " finished to save the piece: " + pieceIndex))
                 .replay(1)
@@ -83,7 +82,7 @@ public class RemoteFakePeerCopyCat {
                     .setToDefaultSearchPeers()
                     .setToDefaultTorrentStatesSideEffects()
                     .setToDefaultPeersCommunicatorFlux()
-                    .setFileSystemLink$(fileSystemLink$)
+                    .setFileSystemLink(fileSystemLink$)
                     .setToDefaultBittorrentAlgorithm()
                     .build();
         })
