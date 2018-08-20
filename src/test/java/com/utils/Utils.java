@@ -84,19 +84,21 @@ public class Utils {
                             .forEach(i -> Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
                                     allocatorState.getFreeBlocksStatus().get(i)));
                 })
-                .publishOn(Schedulers.elastic())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
 
         MyStepdefs.globalFakePeerAllocator
                 .latestState$()
-                .doOnNext(allocatorState -> {
-                    IntStream.range(0, allocatorState.getAmountOfBlocks())
-                            .forEach(i -> Assert.assertTrue("i: " + i + " - global fake-peer allocator: " + allocatorState.toString(),
-                                    allocatorState.getFreeBlocksStatus().get(i)));
+                .flatMap(allocatorState -> {
+                    boolean anyLeak = IntStream.range(0, allocatorState.getAmountOfBlocks())
+                            .anyMatch(i -> !allocatorState.getFreeBlocksStatus().get(i));
+                    if (anyLeak) {
+                        logger.error("There is a leak!!!!!!!: ", allocatorState.toString());
+                        return MyStepdefs.globalFakePeerAllocator.updateAllocations(10, 2_500_000);
+                    } else
+                        return Mono.just(allocatorState);
                 })
-                .publishOn(Schedulers.elastic())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
