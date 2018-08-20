@@ -33,16 +33,15 @@ public class App {
         System.out.println(getTorrentInfo());
         Thread.sleep(10000000);
 
-        Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath)
-                .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
-                .cache();
+        TorrentDownloader torrentDownloader$ = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath);
+        TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader$);
 
-        torrentDownloader$.map(TorrentDownloader::getIncomingPeerMessagesNotifier)
-                .flatMapMany(IncomingPeerMessagesNotifier::getIncomingPeerMessages$)
+        torrentDownloader$.getIncomingPeerMessagesNotifier()
+                .getIncomingPeerMessages$()
                 .map(AbstractMap.SimpleEntry::getValue)
                 .subscribe(System.out::println);
 
-        torrentDownloader$.flatMapMany(TorrentDownloader::getPeersCommunicatorFlux)
+        torrentDownloader$.getPeersCommunicatorFlux()
                 .map(Link::sendMessages)
                 .flatMap(SendMessagesNotifications::sentPeerMessages$)
                 .filter(peerMessage -> peerMessage instanceof RequestMessage)
@@ -51,18 +50,16 @@ public class App {
                         ", begin: " + requestMessage.getBegin() + ", from: " + requestMessage.getTo())
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
-        torrentDownloader$.map(TorrentDownloader::getFileSystemLink)
-                .flatMapMany(FileSystemLink::savedBlocks$)
+        torrentDownloader$.getFileSystemLink()
+                .savedBlocks$()
                 .map(PieceEvent::getReceivedPiece)
                 .map(pieceMessage -> "received: index: " + pieceMessage.getIndex() +
                         ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
-        torrentDownloader$.map(TorrentDownloader::getTorrentStatusStore)
-                .doOnNext(torrentStatusStore -> torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS))
-                .doOnNext(torrentStatusStore -> torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.START_UPLOAD_IN_PROGRESS))
-                .doOnNext(torrentStatusStore -> torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS))
-                .subscribe();
+        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS);
+        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_UPLOAD_IN_PROGRESS);
+        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS);
     }
 
 

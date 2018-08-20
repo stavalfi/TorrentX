@@ -52,7 +52,7 @@ public class TorrentDownloaderBuilder {
         return new TorrentDownloaderBuilder(torrentInfo, identifier);
     }
 
-    public static Mono<TorrentDownloader> buildDefault(TorrentInfo torrentInfo, String identifier, String downloadPath) {
+    public static TorrentDownloader buildDefault(TorrentInfo torrentInfo, String identifier, String downloadPath) {
         return builder(torrentInfo, identifier)
                 .setToDefaultIncomingPeerMessages()
                 .setToDefaultEmitIncomingPeerMessages()
@@ -67,8 +67,8 @@ public class TorrentDownloaderBuilder {
                 .build();
     }
 
-    public Mono<TorrentDownloader> build() {
-        return Mono.just(new TorrentDownloader(this.identifier,
+    public TorrentDownloader build() {
+        return new TorrentDownloader(this.identifier,
                 this.torrentInfo,
                 this.allocatorStore,
                 this.searchPeers,
@@ -79,7 +79,7 @@ public class TorrentDownloaderBuilder {
                 this.torrentStatesSideEffects,
                 this.peersCommunicatorFlux,
                 this.emitIncomingPeerMessages,
-                incomingPeerMessagesNotifier));
+                incomingPeerMessagesNotifier);
     }
 
     public TorrentDownloaderBuilder setIncomingPeerMessages(EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$) {
