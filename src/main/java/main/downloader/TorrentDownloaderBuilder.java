@@ -28,8 +28,7 @@ import java.util.Objects;
 public class TorrentDownloaderBuilder {
     private TorrentInfo torrentInfo;
     private SearchPeers searchPeers;
-    private Mono<FileSystemLink> fileSystemLink$;
-    private boolean isDefaultBittorrentAlgorithm = false;
+    private FileSystemLink fileSystemLink;
     private BittorrentAlgorithm bittorrentAlgorithm;
     private Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore;
     private TorrentStatesSideEffects torrentStatesSideEffects;
@@ -69,59 +68,18 @@ public class TorrentDownloaderBuilder {
     }
 
     public Mono<TorrentDownloader> build() {
-        Objects.requireNonNull(this.allocatorStore);
-
-
-        IncomingPeerMessagesNotifier incomingPeerMessagesNotifier = new IncomingPeerMessagesNotifierImpl(this.incomingPeerMessages$);
-        if (this.fileSystemLink$ == null) {
-            // it can't be that fileSystemLink$==null and bittorrentAlgorithm$!=null
-            // because we need fileSystemLink object to create bittorrentAlgorithm object.
-            assert !this.isDefaultBittorrentAlgorithm;
-            assert this.bittorrentAlgorithm == null;
-
-            return Mono.just(new TorrentDownloader(this.identifier,
-                    this.torrentInfo,
-                    this.allocatorStore, this.searchPeers,
-                    null,
-                    null,
-                    this.torrentStatusStore,
-                    this.torrentSpeedStatistics,
-                    this.torrentStatesSideEffects,
-                    this.peersCommunicatorFlux,
-                    this.emitIncomingPeerMessages,
-                    this.incomingPeerMessagesNotifier));
-        }
-        if (!this.isDefaultBittorrentAlgorithm) {
-            return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.identifier,
-                    this.torrentInfo,
-                    this.allocatorStore, this.searchPeers,
-                    fileSystemLink,
-                    this.bittorrentAlgorithm,
-                    this.torrentStatusStore,
-                    this.torrentSpeedStatistics,
-                    this.torrentStatesSideEffects,
-                    this.peersCommunicatorFlux,
-                    this.emitIncomingPeerMessages,
-                    this.incomingPeerMessagesNotifier));
-        }
-        return this.fileSystemLink$.map(fileSystemLink -> new TorrentDownloader(this.identifier,
+        return Mono.just(new TorrentDownloader(this.identifier,
                 this.torrentInfo,
                 this.allocatorStore,
                 this.searchPeers,
-                fileSystemLink,
-                BittorrentAlgorithmInitializer.v1(this.allocatorStore,
-                        torrentInfo,
-                        this.torrentStatusStore,
-                        fileSystemLink,
-                        this.incomingPeerMessagesNotifier,
-                        this.peersCommunicatorFlux,
-                        this.identifier),
+                this.fileSystemLink,
+                this.bittorrentAlgorithm,
                 this.torrentStatusStore,
                 this.torrentSpeedStatistics,
                 this.torrentStatesSideEffects,
                 this.peersCommunicatorFlux,
                 this.emitIncomingPeerMessages,
-                this.incomingPeerMessagesNotifier));
+                incomingPeerMessagesNotifier));
     }
 
     public TorrentDownloaderBuilder setIncomingPeerMessages(EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$) {
@@ -171,8 +129,8 @@ public class TorrentDownloaderBuilder {
         return this;
     }
 
-    public TorrentDownloaderBuilder setFileSystemLink$(Mono<FileSystemLink> fileSystemLink$) {
-        this.fileSystemLink$ = fileSystemLink$;
+    public TorrentDownloaderBuilder setFileSystemLink(FileSystemLink fileSystemLink) {
+        this.fileSystemLink = fileSystemLink;
         return this;
     }
 
@@ -181,7 +139,7 @@ public class TorrentDownloaderBuilder {
         Objects.requireNonNull(this.allocatorStore);
         Objects.requireNonNull(this.incomingPeerMessagesNotifier);
 
-        this.fileSystemLink$ = FileSystemLinkImpl.create(this.torrentInfo, downloadPath, this.allocatorStore, this.torrentStatusStore,
+        this.fileSystemLink = new FileSystemLinkImpl(this.torrentInfo, downloadPath, this.allocatorStore, this.torrentStatusStore,
                 this.incomingPeerMessagesNotifier.getPieceMessageResponseFlux(), this.identifier);
         return this;
     }
@@ -192,7 +150,21 @@ public class TorrentDownloaderBuilder {
     }
 
     public TorrentDownloaderBuilder setToDefaultBittorrentAlgorithm() {
-        this.isDefaultBittorrentAlgorithm = true;
+        Objects.requireNonNull(this.allocatorStore);
+        Objects.requireNonNull(this.torrentInfo);
+        Objects.requireNonNull(this.torrentStatusStore);
+        Objects.requireNonNull(this.fileSystemLink);
+        Objects.requireNonNull(this.incomingPeerMessagesNotifier);
+        Objects.requireNonNull(this.peersCommunicatorFlux);
+        Objects.requireNonNull(this.identifier);
+
+        this.bittorrentAlgorithm = BittorrentAlgorithmInitializer.v1(this.allocatorStore,
+                this.torrentInfo,
+                this.torrentStatusStore,
+                this.fileSystemLink,
+                this.incomingPeerMessagesNotifier,
+                this.peersCommunicatorFlux,
+                this.identifier);
         return this;
     }
 
