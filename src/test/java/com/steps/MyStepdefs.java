@@ -11,6 +11,7 @@ import main.TorrentInfo;
 import main.algorithms.*;
 import main.algorithms.impls.v1.download.BlockDownloaderImpl;
 import main.algorithms.impls.v1.download.PeersToPiecesMapperImpl;
+import main.algorithms.impls.v1.upload.UploadAlgorithmImpl;
 import main.downloader.*;
 import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
@@ -2017,10 +2018,18 @@ public class MyStepdefs {
                 .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
 
         torrentDownloader.getAllocatorStore()
-                .updateAllocations(2, torrentInfo.getPieceLength(0))
+                .updateAllocations(10, torrentInfo.getPieceLength(0))
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+
+        UploadAlgorithm uploadAlgorithm = new UploadAlgorithmImpl(torrentInfo,
+                torrentDownloader.getTorrentStatusStore(),
+                torrentDownloader.getFileSystemLink(),
+                torrentDownloader.getIncomingPeerMessagesNotifier()
+                        .getIncomingPeerMessages$()
+                        .filter(tuple2 -> tuple2.getValue() instanceof RequestMessage)
+                        .map(tuple2 -> new AbstractMap.SimpleEntry<>(tuple2.getKey(), (RequestMessage) (tuple2.getValue()))));
 
         torrentDownloader.getTorrentStatusStore()
                 .dispatchNonBlocking(TorrentStatusAction.START_UPLOAD_IN_PROGRESS);
@@ -2051,14 +2060,15 @@ public class MyStepdefs {
                         .flatMapMany(allocatorState ->
                                 Flux.fromIterable(piecesToSave)
                                         .flatMap(pieceToSave ->
-                                                torrentDownloader.getAllocatorStore()
+                                                MyStepdefs.globalFakePeerAllocator
                                                         .createPieceMessage(link.getMe(), link.getPeer(), pieceToSave, 0, torrentInfo.getPieceLength(pieceToSave), allocatorState.getBlockLength())))
+                        .publishOn(Schedulers.elastic())
                         .flatMap(pieceMessage ->
                                         link.sendMessages().sendPieceMessage(pieceMessage)
                                                 .flatMap(__ -> savedPieces$.filter(pieceIndex -> pieceIndex == pieceMessage.getIndex()).take(1).single())
                                 , piecesToSave.size())
-                        .doOnNext(__ -> link.closeConnection())
-                        .collectList())
+                        .collectList()
+                        .doOnNext(__ -> link.closeConnection()))
                 .doOnNext(__ -> torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS))
                 .flatMap(__ -> torrentDownloader.getTorrentStatusStore().notifyWhen(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
                 .as(StepVerifier::create)

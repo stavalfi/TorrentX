@@ -52,40 +52,40 @@ Feature: connect to valid fake-peers and map between them and their pieces
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test/   |
 
-#  Scenario Outline: (4) I can't find any pieces I don't have yet
-#    Given torrent: "<torrent>","<downloadLocation>"
-#    When listen-status is trying to change to:
-#      | START_LISTENING_IN_PROGRESS |
-#    Given the following saved pieces - for torrent: "<torrent>":
-#      | 1 |
-#      | 2 |
-#    Then application receive the following available pieces - for torrent: "<torrent>":
-#      | pieceIndex | peers |
-#    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
-#      | 1 |
-#    Then application receive the following available pieces - for torrent: "<torrent>":
-#      | pieceIndex | peers |
-#
-#    Examples:
-#      | torrent                       | downloadLocation |
-#      | torrent-file-example1.torrent | torrents-test/   |
-#
-#  Scenario Outline: (5) I can't find any pieces I don't have yet until a new fake-peer notify he can give me something I don't have
-#    Given torrent: "<torrent>","<downloadLocation>"
-#    When listen-status is trying to change to:
-#      | START_LISTENING_IN_PROGRESS |
-#    Given the following saved pieces - for torrent: "<torrent>":
-#      | 1 |
-#      | 2 |
-#    Then application receive the following available pieces - for torrent: "<torrent>":
-#      | pieceIndex | peers |
-#    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
-#      | -1 |
-#    Then application receive the following available pieces - for torrent: "<torrent>":
-#      | pieceIndex | peers |
-#      | -1         | 4040  |
-#
-#
-#    Examples:
-#      | torrent                       | downloadLocation |
-#      | torrent-file-example1.torrent | torrents-test/   |
+  Scenario Outline: (4) I can't find any pieces I don't have yet
+    Given torrent: "<torrent>","<downloadLocation>"
+    When listen-status is trying to change to:
+      | START_LISTENING_IN_PROGRESS |
+    Given the following saved pieces - for torrent: "<torrent>":
+      | 1 |
+      | 2 |
+    Then application receive the following available pieces - for torrent: "<torrent>":
+      | pieceIndex | peers |
+    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+      | 1 |
+    Then application receive the following available pieces - for torrent: "<torrent>":
+      | pieceIndex | peers |
+
+    Examples:
+      | torrent                       | downloadLocation |
+      | torrent-file-example1.torrent | torrents-test/   |
+
+  Scenario Outline: (5) I can't find any pieces I don't have yet until a new fake-peer notify he can give me something I don't have
+    Given torrent: "<torrent>","<downloadLocation>"
+    When listen-status is trying to change to:
+      | START_LISTENING_IN_PROGRESS |
+    Given the following saved pieces - for torrent: "<torrent>":
+      | 1 |
+      | 2 |
+    Then application receive the following available pieces - for torrent: "<torrent>":
+      | pieceIndex | peers |
+    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+      | -1 |
+    Then application receive the following available pieces - for torrent: "<torrent>":
+      | pieceIndex | peers |
+      | -1         | 4040  |
+
+
+    Examples:
+      | torrent                       | downloadLocation |
+      | torrent-file-example1.torrent | torrents-test/   |
