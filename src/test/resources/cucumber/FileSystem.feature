@@ -192,12 +192,11 @@ Feature: create get and delete active torrents
       | -2 |
 
     Examples:
-      | torrent                        | downloadLocation |
-      | torrent-file-example1.torrent  | torrents-test    |
-      # it takes too much time:
-#      | torrent-file-example2.torrent             | torrents-test    |
-#      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-      | ComplexFolderStructure.torrent | torrents-test    |
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
 
   Scenario Outline: (11) we save a block which is too large than the corresponding actual piece.
     # we expect that it will be as saving a piece when we don't specify "length".
@@ -212,12 +211,11 @@ Feature: create get and delete active torrents
       | 3  |
 
     Examples:
-      | torrent                        | downloadLocation |
-      | torrent-file-example1.torrent  | torrents-test    |
-      # it takes too much time:
-#      | torrent-file-example2.torrent  | torrents-test    |
-      # | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-      | ComplexFolderStructure.torrent | torrents-test    |
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
 
   Scenario Outline: (12) we save all the pieces and expect to see that the fluxes are completed
     When application save the all the pieces of torrent: "<torrent>","<downloadLocation>"

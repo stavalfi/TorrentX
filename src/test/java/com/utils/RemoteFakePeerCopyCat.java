@@ -101,8 +101,9 @@ public class RemoteFakePeerCopyCat {
                 .doOnNext(peerMessage -> logger.debug("RemoteFakePeerCopyCat (" + identifier + ") received new (" + peerMessage.getT1() + ") message from app: " + peerMessage))
                 .flatMap(peerMessage -> {
                     // the index start from zero.
-                    if (peerMessage.getT1() == 1)
-                        blockThread(0 * 1000);
+                    if (peerMessage.getT1() == 1) {
+//                        blockThread(0 * 1000);
+                    }
                     if (peerMessage.getT1() == 2) {
                         link.closeConnection();
                         if (peerMessage.getT2() instanceof PieceMessage)

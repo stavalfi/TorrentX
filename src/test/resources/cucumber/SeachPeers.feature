@@ -91,10 +91,10 @@ Feature: start/stop downloading/uploading with side effects
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test    |
 
-  Scenario Outline: (6) resume search and then get two peers
-    Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" with default initial state
-    Then start search and receive "2" peers from search-module for torrent: "<torrent>"
-
-    Examples:
-      | torrent     | downloadLocation |
-      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+#  Scenario Outline: (6) resume search and then get two peers
+#    Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" with default initial state
+#    Then start search and receive "2" peers from search-module for torrent: "<torrent>"
+#
+#    Examples:
+#      | torrent     | downloadLocation |
+#      | multiple-active-seeders-torrent-1.torrent | torrents-test    |

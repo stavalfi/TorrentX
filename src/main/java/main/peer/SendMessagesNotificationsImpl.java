@@ -60,9 +60,9 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
     @Override
     public Mono<SendMessagesNotifications> sendPieceMessage(PieceMessage pieceMessage) {
         return send(pieceMessage)
-                .map(__ -> this.allocatorStore)
-                .doOnSuccessOrError((__, ___) -> logger.debug(this.identifier + " - dispatching cleaning for piece-message: " + pieceMessage))
-                .doAfterSuccessOrError((__, ___) -> this.allocatorStore.freeNonBlocking(pieceMessage.getAllocatedBlock()))
+                .doOnSuccessOrError((__, ___) -> logger.debug(this.identifier + " - cleaning allocation of piece-message: " + pieceMessage))
+                .flatMap(__ -> this.allocatorStore.free(pieceMessage.getAllocatedBlock()))
+                .onErrorResume(throwable -> this.allocatorStore.free(pieceMessage.getAllocatedBlock()))
                 .doOnNext(sendPeerMessages -> this.peerCurrentStatus.updatePiecesStatus(pieceMessage.getIndex()))
                 .map(__ -> this);
     }
