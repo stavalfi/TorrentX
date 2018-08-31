@@ -11,6 +11,7 @@ import main.peer.Link;
 import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
@@ -27,17 +28,20 @@ public class App {
     public static Scheduler MyScheduler = Schedulers.elastic();
     private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test" + File.separator;
 
-    private static void f5() throws IOException {
-        Mono<TorrentDownloader> torrentDownloader$ = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath)
-                .map(TorrentDownloaders.getInstance()::saveTorrentDownloader)
-                .cache();
+    private static void f5() throws IOException, InterruptedException {
 
-        torrentDownloader$.map(TorrentDownloader::getIncomingPeerMessagesNotifier)
-                .flatMapMany(IncomingPeerMessagesNotifier::getIncomingPeerMessages$)
+        System.out.println(getTorrentInfo());
+        Thread.sleep(10000000);
+
+        TorrentDownloader torrentDownloader$ = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath);
+        TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader$);
+
+        torrentDownloader$.getIncomingPeerMessagesNotifier()
+                .getIncomingPeerMessages$()
                 .map(AbstractMap.SimpleEntry::getValue)
                 .subscribe(System.out::println);
 
-        torrentDownloader$.flatMapMany(TorrentDownloader::getPeersCommunicatorFlux)
+        torrentDownloader$.getPeersCommunicatorFlux()
                 .map(Link::sendMessages)
                 .flatMap(SendMessagesNotifications::sentPeerMessages$)
                 .filter(peerMessage -> peerMessage instanceof RequestMessage)
@@ -46,18 +50,16 @@ public class App {
                         ", begin: " + requestMessage.getBegin() + ", from: " + requestMessage.getTo())
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
-        torrentDownloader$.map(TorrentDownloader::getFileSystemLink)
-                .flatMapMany(FileSystemLink::savedBlockFlux)
+        torrentDownloader$.getFileSystemLink()
+                .savedBlocks$()
                 .map(PieceEvent::getReceivedPiece)
                 .map(pieceMessage -> "received: index: " + pieceMessage.getIndex() +
                         ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
                 .subscribe(System.out::println, Throwable::printStackTrace);
 
-        torrentDownloader$.map(TorrentDownloader::getTorrentStatusStore)
-                .doOnNext(torrentStatusStore -> torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS))
-                .doOnNext(torrentStatusStore -> torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.START_UPLOAD_IN_PROGRESS))
-                .doOnNext(torrentStatusStore -> torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS))
-                .subscribe();
+        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS);
+        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_UPLOAD_IN_PROGRESS);
+        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS);
     }
 
 
@@ -112,7 +114,7 @@ public class App {
                 "main" + File.separator +
                 "resources" + File.separator +
                 "torrents" + File.separator +
-                "tor.torrent";
+                "ComplexFolderStructure.torrent";
         return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
     }
 }

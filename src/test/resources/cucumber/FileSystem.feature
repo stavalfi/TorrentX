@@ -192,13 +192,13 @@ Feature: create get and delete active torrents
       | -2 |
 
     Examples:
-      | torrent                        | downloadLocation |
-      | torrent-file-example1.torrent  | torrents-test    |
-      # it takes too much time:
-#      | torrent-file-example2.torrent             | torrents-test    |
-#      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-      | ComplexFolderStructure.torrent | torrents-test    |
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
 
+    # bug: the first example cause block for ever (first step).
   Scenario Outline: (11) we save a block which is too large than the corresponding actual piece.
     # we expect that it will be as saving a piece when we don't specify "length".
     # we can't use "Then application create active-torrent for" because we don't have Flux<PieceMessage> to give yet.
@@ -212,19 +212,18 @@ Feature: create get and delete active torrents
       | 3  |
 
     Examples:
-      | torrent                        | downloadLocation |
-      | torrent-file-example1.torrent  | torrents-test    |
-      # it takes too much time:
-#      | torrent-file-example2.torrent  | torrents-test    |
-      # | multiple-active-seeders-torrent-1.torrent | torrents-test    |
-      | ComplexFolderStructure.torrent | torrents-test    |
+      | torrent                                   | downloadLocation |
+      | torrent-file-example1.torrent             | torrents-test    |
+      | torrent-file-example2.torrent             | torrents-test    |
+      | multiple-active-seeders-torrent-1.torrent | torrents-test    |
+      | ComplexFolderStructure.torrent            | torrents-test    |
 
-  Scenario Outline: (12) we save all the pieces and expect to see that the fluxes are completed
-    When application save the all the pieces of torrent: "<torrent>","<downloadLocation>"
-    And the saved-pieces-flux send complete signal - for torrent: "<torrent>","<downloadLocation>"
-    And the saved-blocks-flux send  complete signal - for torrent: "<torrent>","<downloadLocation>"
-
-    Examples:
-      | torrent                        | downloadLocation |
-      | ComplexFolderStructure.torrent | torrents-test    |
+#  Scenario Outline: (12) we save all the pieces and expect to see that the fluxes are completed
+#    When application save the all the pieces of torrent: "<torrent>","<downloadLocation>"
+#    And the saved-pieces-flux send complete signal - for torrent: "<torrent>","<downloadLocation>"
+#    And the saved-blocks-flux send  complete signal - for torrent: "<torrent>","<downloadLocation>"
+#
+#    Examples:
+#      | torrent                        | downloadLocation |
+#      | ComplexFolderStructure.torrent | torrents-test    |
 

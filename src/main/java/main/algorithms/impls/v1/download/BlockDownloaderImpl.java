@@ -38,7 +38,7 @@ public class BlockDownloaderImpl implements BlockDownloader {
      */
     @Override
     public Mono<PieceEvent> downloadBlock(Link link, RequestMessage requestMessage) {
-        Flux<PieceEvent> pieceSavedNotifier$ = this.fileSystemLink.savedBlockFlux()
+        Flux<PieceEvent> pieceSavedNotifier$ = this.fileSystemLink.savedBlocks$()
                 .filter(torrentPieceChanged -> requestMessage.getIndex() == torrentPieceChanged.getReceivedPiece().getIndex())
                 .filter(torrentPieceChanged -> requestMessage.getBegin() == torrentPieceChanged.getReceivedPiece().getBegin())
                 .replay(1)

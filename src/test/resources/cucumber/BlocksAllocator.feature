@@ -16,7 +16,7 @@ Feature: allocate and free blocks from multiple threads
       | -2         | 10   | 3      |
     Then the allocator have "4" used blocks
     Then the allocator have "1" free blocks
-
+    When we free all piece-messages for torrent: "<torrent>"
     Examples:
       | torrent                       |
       | torrent-file-example1.torrent |
@@ -50,7 +50,7 @@ Feature: allocate and free blocks from multiple threads
       | -6         |      | 1      |
     Then the allocator have "9" used blocks
     Then the allocator have "0" free blocks
-
+    When we free all piece-messages for torrent: "<torrent>"
     Examples:
       | torrent                       |
       # don't replace this torrent. I'm counting on the piece length of each piece.
@@ -66,7 +66,7 @@ Feature: allocate and free blocks from multiple threads
       | -1         | 0    | 3      |
     Then the allocator have "1" used blocks
     Then the allocator have "0" free blocks
-
+    When we free all piece-messages for torrent: "<torrent>"
     Examples:
       | torrent                       |
       | torrent-file-example1.torrent |
@@ -141,7 +141,7 @@ Feature: allocate and free blocks from multiple threads
 
     Then the allocator have "9" used blocks
     Then the allocator have "0" free blocks
-
+    When we free all piece-messages for torrent: "<torrent>"
     Examples:
       | torrent                       |
       | torrent-file-example1.torrent |
@@ -163,7 +163,7 @@ Feature: allocate and free blocks from multiple threads
       | -1         | 10   | 3      |
     Then the allocator have "0" used blocks
     Then the allocator have "5" free blocks
-
+    When we free all piece-messages for torrent: "<torrent>"
     Examples:
       | torrent                       |
       | torrent-file-example1.torrent |
@@ -197,7 +197,7 @@ Feature: allocate and free blocks from multiple threads
       | -6         |      | 1      |
     Then the allocator have "0" used blocks
     Then the allocator have "8" free blocks
-
+    When we free all piece-messages for torrent: "<torrent>"
     Examples:
       | torrent                       |
       | torrent-file-example1.torrent |
@@ -218,7 +218,7 @@ Feature: allocate and free blocks from multiple threads
       | -1         | 0    | 3      |
     Then the allocator have "2" used blocks
     Then the allocator have "3" free blocks
-
+    When we free all piece-messages for torrent: "<torrent>"
     Examples:
       | torrent                       |
       | torrent-file-example1.torrent |
@@ -232,7 +232,7 @@ Feature: allocate and free blocks from multiple threads
     When we free all piece-messages for torrent: "<torrent>"
     Then the allocator have "0" used blocks
     Then the allocator have "5" free blocks
-
+    When we free all piece-messages for torrent: "<torrent>"
     Examples:
       | torrent                       |
       | torrent-file-example1.torrent |
@@ -250,7 +250,7 @@ Feature: allocate and free blocks from multiple threads
     When we free all piece-messages for torrent: "<torrent>"
     Then the allocator have "0" used blocks
     Then the allocator have "5" free blocks
-
+    When we free all piece-messages for torrent: "<torrent>"
     Examples:
       | torrent                       |
       | torrent-file-example1.torrent |

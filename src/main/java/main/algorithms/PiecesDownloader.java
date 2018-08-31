@@ -5,6 +5,4 @@ import reactor.core.publisher.Mono;
 
 public interface PiecesDownloader {
     Mono<Integer> downloadPieceMono(int pieceIndex);
-
-    Flux<Integer> getDownloadedPiecesFlux();
 }

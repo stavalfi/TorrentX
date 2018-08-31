@@ -133,14 +133,17 @@ class ReceivePeerMessages {
         int blockLength = messagePayloadLength - 8;// 8 == 'index' length in bytes + 'begin' length in bytes
         logger.debug(identifier + " - start received piece message. piece-block-length: " + blockLength);
         return allocatorStore.createPieceMessage(from, to, index, begin, blockLength, pieceLength)
+                .doOnNext(__ -> logger.debug(identifier + " - start received piece message. piece-index1: " + index))
                 .publishOn(scheduler)
+                .doOnNext(__ -> logger.debug(identifier + " - start received piece message. piece-index2: " + index))
                 .flatMap(pieceMessage -> {
+                    logger.debug(identifier + " - start received piece message. piece-block-length3: " + index);
                     try {
                         byte[] block = pieceMessage.getAllocatedBlock().getBlock();
                         int offset = pieceMessage.getAllocatedBlock().getOffset();
                         int length = pieceMessage.getAllocatedBlock().getLength();
                         dataInputStream.readFully(block, offset, length);
-                        logger.debug(identifier + " - end received piece message.");
+                        logger.debug(identifier + " - end received piece message: " + pieceMessage);
                         return Mono.just(pieceMessage);
                     } catch (IOException e) {
                         return Mono.error(e);

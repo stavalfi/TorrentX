@@ -18,4 +18,11 @@ public class CreateRequestMessageResult extends Result<AllocatorState, Allocator
 	public RequestMessage getRequestMessage() {
 		return requestMessage;
 	}
+
+	@Override
+	public String toString() {
+		return "CreateRequestMessageResult{" +
+				"requestMessage=" + requestMessage +
+				'}';
+	}
 }

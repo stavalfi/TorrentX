@@ -2,11 +2,13 @@ package com.utils;
 
 import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
+import com.steps.MyStepdefs;
 import main.TorrentInfo;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.ActualFileImpl;
 import main.file.system.FileSystemLink;
+import main.file.system.allocator.AllocatorStore;
 import main.listener.ListenerAction;
 import main.listener.reducers.ListenerReducer;
 import main.listener.state.tree.ListenerState;
@@ -44,6 +46,7 @@ import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class Utils {
     private static Logger logger = LoggerFactory.getLogger(Utils.class);
@@ -73,10 +76,29 @@ public class Utils {
                     defaultListenState.isRestartListeningWindUp() == listenerState.isRestartListeningWindUp();
 
     public static void removeEverythingRelatedToLastTest() {
+
         TorrentDownloaders.getAllocatorStore()
-                .freeAll()
-                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().updateAllocations(2, 17_000))
-                .publishOn(Schedulers.elastic())
+                .latestState$()
+                .doOnNext(allocatorState -> {
+                    IntStream.range(0, allocatorState.getAmountOfBlocks())
+                            .forEach(i -> Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
+                                    allocatorState.getFreeBlocksStatus().get(i)));
+                })
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+
+        MyStepdefs.globalFakePeerAllocator
+                .latestState$()
+                .flatMap(allocatorState -> {
+                    boolean anyLeak = IntStream.range(0, allocatorState.getAmountOfBlocks())
+                            .anyMatch(i -> !allocatorState.getFreeBlocksStatus().get(i));
+                    if (anyLeak) {
+                        logger.error("There is a leak!!!!!!!: ", allocatorState.toString());
+                        return MyStepdefs.globalFakePeerAllocator.updateAllocations(10, 2_500_000);
+                    } else
+                        return Mono.just(allocatorState);
+                })
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -284,6 +306,7 @@ public class Utils {
     public static Mono<SendMessagesNotifications> sendFakeMessage(TorrentInfo torrentInfo,
                                                                   String downloadPath,
                                                                   Link link,
+                                                                  AllocatorStore allocatorStore,
                                                                   PeerMessageType peerMessageType,
                                                                   FileSystemLink fileSystemLink,
                                                                   int pieceIndex,
@@ -298,7 +321,7 @@ public class Utils {
             case ChokeMessage:
                 return link.sendMessages().sendChokeMessage();
             case PieceMessage:
-                return TorrentDownloaders.getAllocatorStore()
+                return allocatorStore
                         .createRequestMessage(null, null, pieceIndex, begin, blockLength, pieceLength)
                         .doOnNext(requestMessage -> logger.debug("start creating fake-piece-message to send to a fake-peer. " +
                                 "the details of the piece-message are coming from a fake-request-message I created: " + requestMessage))
@@ -360,7 +383,7 @@ public class Utils {
         }
     }
 
-    public static Mono<PieceMessage> readFromFile(TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
+    public static Mono<PieceMessage> readFromFile(AllocatorStore allocatorStore, TorrentInfo torrentInfo, String downloadPath, RequestMessage requestMessage) {
         List<TorrentFile> fileList = torrentInfo.getFileList();
 
         List<ActualFileImpl> actualFileImplList = new ArrayList<>();
@@ -382,10 +405,9 @@ public class Utils {
 
         // read from the file:
 
-        return TorrentDownloaders.getAllocatorStore()
-                .createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
-                        requestMessage.getIndex(), requestMessage.getBegin(),
-                        requestMessage.getBlockLength(), torrentInfo.getPieceLength(requestMessage.getIndex()))
+        return allocatorStore.createPieceMessage(requestMessage.getTo(), requestMessage.getFrom(),
+                requestMessage.getIndex(), requestMessage.getBegin(),
+                requestMessage.getBlockLength(), torrentInfo.getPieceLength(requestMessage.getIndex()))
                 .flatMap(pieceMessage -> {
                     long from = torrentInfo.getPieceStartPosition(requestMessage.getIndex()) + requestMessage.getBegin();
                     long to = from + requestMessage.getBlockLength();
@@ -488,7 +510,8 @@ public class Utils {
         });
     }
 
-    public static Flux<PieceMessage> createRandomPieceMessages(TorrentInfo torrentInfo,
+    public static Flux<PieceMessage> createRandomPieceMessages(AllocatorStore allocatorStore,
+                                                               TorrentInfo torrentInfo,
                                                                Semaphore semaphore,
                                                                BlockOfPiece blockOfPiece,
                                                                int allocatedBlockLength) {
@@ -519,13 +542,10 @@ public class Utils {
 
             return blockStartPosition + blockLength;
         })
-                .flatMap(smallBlock -> {
-                    return TorrentDownloaders.getAllocatorStore()
-                            .createPieceMessage(null, null, smallBlock.getPieceIndex(), smallBlock.getFrom(), smallBlock.getLength(), pieceLength)
-                            .doOnNext(pieceMessage -> Assert.assertEquals("I didn't proceed the length as good as I should have.",
-                                    smallBlock.getLength().longValue(),
-                                    pieceMessage.getAllocatedBlock().getLength()));
-                })
+                .flatMap(smallBlock -> allocatorStore.createPieceMessage(null, null, smallBlock.getPieceIndex(), smallBlock.getFrom(), smallBlock.getLength(), pieceLength)
+                        .doOnNext(pieceMessage -> Assert.assertEquals("I didn't proceed the length as good as I should have.",
+                                smallBlock.getLength().longValue(),
+                                pieceMessage.getAllocatedBlock().getLength())))
                 .doOnNext(pieceMessage -> {
                     for (int i = 0; i < pieceMessage.getAllocatedBlock().getLength(); i++)
                         pieceMessage.getAllocatedBlock().getBlock()[i] = (byte) i;

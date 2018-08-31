@@ -9,15 +9,12 @@ import main.algorithms.impls.v1.notification.NotifyAboutCompletedPieceAlgorithmI
 import main.algorithms.impls.v1.upload.UploadAlgorithmImpl;
 import main.file.system.FileSystemLink;
 import main.file.system.allocator.AllocatorStore;
+import main.peer.IncomingPeerMessagesNotifier;
 import main.peer.Link;
-import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
-import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.UnicastProcessor;
 import redux.store.Store;
 
 import java.util.AbstractMap;
@@ -27,7 +24,7 @@ public class BittorrentAlgorithmInitializer {
                                          TorrentInfo torrentInfo,
                                          Store<TorrentStatusState, TorrentStatusAction> store,
                                          FileSystemLink fileSystemLink,
-                                         Flux<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessages$,
+                                         IncomingPeerMessagesNotifier incomingPeerMessagesNotifier,
                                          Flux<Link> peersCommunicatorFlux,
                                          String identifier) {
         Flux<Link> recordedPeerFlux = peersCommunicatorFlux
@@ -46,18 +43,20 @@ public class BittorrentAlgorithmInitializer {
         UploadAlgorithm uploadAlgorithm = new UploadAlgorithmImpl(torrentInfo,
                 store,
                 fileSystemLink,
-                incomingPeerMessages$.filter(tuple2 -> tuple2.getValue() instanceof RequestMessage)
+                incomingPeerMessagesNotifier.getIncomingPeerMessages$()
+                        .filter(tuple2 -> tuple2.getValue() instanceof RequestMessage)
                         .map(tuple2 -> new AbstractMap.SimpleEntry<>(tuple2.getKey(), (RequestMessage) (tuple2.getValue()))));
 
         PeersToPiecesMapper peersToPiecesMapper =
-                new PeersToPiecesMapperImpl(recordedPeerFlux,
+                new PeersToPiecesMapperImpl(torrentInfo,
+                        incomingPeerMessagesNotifier,
+                        recordedPeerFlux,
                         fileSystemLink.getUpdatedPiecesStatus());
 
         BlockDownloader blockDownloader = new BlockDownloaderImpl(torrentInfo, fileSystemLink, identifier);
 
         PiecesDownloader piecesDownloader = new PiecesDownloaderImpl(allocatorStore,
-                torrentInfo, store,
-                fileSystemLink, peersToPiecesMapper, blockDownloader);
+                torrentInfo, store, fileSystemLink, peersToPiecesMapper, blockDownloader);
 
         DownloadAlgorithm downloadAlgorithm = new DownloadAlgorithm(piecesDownloader, blockDownloader, peersToPiecesMapper);
 

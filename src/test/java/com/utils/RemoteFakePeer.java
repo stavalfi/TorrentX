@@ -19,12 +19,6 @@ public class RemoteFakePeer {
                           IncomingPeerMessagesNotifier incomingPeerMessagesNotifier) {
         this.link = link;
 
-        allocatorStore.updateAllocations(10, link.getTorrentInfo().getPieceLength(0))
-                .publishOn(Schedulers.elastic())
-                .as(StepVerifier::create)
-                .expectNextCount(1)
-                .verifyComplete();
-
         incomingPeerMessagesNotifier.getRequestMessageResponseFlux()
                 .doOnNext(requestMessage -> logger.info(identifier + " - received a new request: " + requestMessage))
                 .doOnNext(requestMessage -> {

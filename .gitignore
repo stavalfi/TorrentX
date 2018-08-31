@@ -36,3 +36,4 @@ target/
 .idea/
 /torrentx.iml
 torrents-test/
+.DS_Store

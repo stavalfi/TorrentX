@@ -6,7 +6,6 @@ import main.file.system.FileSystemLink;
 import main.file.system.FileSystemLinkImpl;
 import main.file.system.allocator.AllocatorStore;
 import main.peer.IncomingPeerMessagesNotifier;
-import main.peer.IncomingPeerMessagesNotifierImpl;
 import main.peer.Link;
 import main.peer.peerMessages.*;
 import main.torrent.status.TorrentStatusAction;
@@ -51,10 +50,8 @@ public class RemoteFakePeerCopyCat {
                 .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
                 .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_SELF_RESOLVED))
                 .flatMap(__ -> this.torrentStatusStore.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
-                //.publishOn(Schedulers.elastic())
                 .flatMap(__ -> this.allocatorStore.updateAllocations(10, blockLength))
                 .flatMap(allocatorState -> this.allocatorStore.createPieceMessage(link.getPeer(), link.getMe(), pieceIndex, begin, blockLength, allocatorState.getBlockLength()))
-                //.publishOn(Schedulers.elastic())
                 .doOnNext(pieceMessageToSave -> {
                     for (int i = 0; i < blockLength; i++)
                         pieceMessageToSave.getAllocatedBlock().getBlock()[i] = 11;
@@ -63,10 +60,9 @@ public class RemoteFakePeerCopyCat {
                 .flux()
                 .publish();
 
-        Mono<FileSystemLink> fileSystemLink$ = FileSystemLinkImpl.create(link.getTorrentInfo(), fakePeerTorrentDownloadPath, this.allocatorStore, this.torrentStatusStore, fakePieceMessageToSave$, "App")
-                .cache();
+        FileSystemLink fileSystemLink$ = new FileSystemLinkImpl(link.getTorrentInfo(), fakePeerTorrentDownloadPath, this.allocatorStore, this.torrentStatusStore, fakePieceMessageToSave$, "App");
 
-        Mono<Integer> pieceSaved$ = fileSystemLink$.flatMapMany(fileSystemLink -> fileSystemLink.savedPieceFlux())
+        Mono<Integer> pieceSaved$ = fileSystemLink$.savedPieces$()
                 .filter(savedPieceIndex -> savedPieceIndex.equals(pieceIndex))
                 .doOnNext(__ -> logger.info(identifier + " finished to save the piece: " + pieceIndex))
                 .replay(1)
@@ -76,7 +72,7 @@ public class RemoteFakePeerCopyCat {
         fakePieceMessageToSave$.connect(); // let the FS receive the piece I gave him.
 
         // wait until the piece we gave to the FS is saved.
-        this.torrentDownloader$ = pieceSaved$.flatMap(__ -> {
+        this.torrentDownloader$ = pieceSaved$.map(__ -> {
             // I'm using this object to send pieceMessages and Request messages to the real app.
             return TorrentDownloaderBuilder.builder(link.getTorrentInfo(), "Fake peer")
                     .setIncomingPeerMessages(incomingPeerMessages$)
@@ -86,7 +82,7 @@ public class RemoteFakePeerCopyCat {
                     .setToDefaultSearchPeers()
                     .setToDefaultTorrentStatesSideEffects()
                     .setToDefaultPeersCommunicatorFlux()
-                    .setFileSystemLink$(fileSystemLink$)
+                    .setFileSystemLink(fileSystemLink$)
                     .setToDefaultBittorrentAlgorithm()
                     .build();
         })
@@ -104,10 +100,15 @@ public class RemoteFakePeerCopyCat {
                 .doOnNext(peerMessage -> logger.debug("RemoteFakePeerCopyCat (" + identifier + ") received new (" + peerMessage.getT1() + ") message from app: " + peerMessage))
                 .flatMap(peerMessage -> {
                     // the index start from zero.
-                    if (peerMessage.getT1() == 1)
-                        blockThread(0 * 1000);
+                    if (peerMessage.getT1() == 1) {
+//                        blockThread(0 * 1000);
+                    }
                     if (peerMessage.getT1() == 2) {
                         link.closeConnection();
+                        if (peerMessage.getT2() instanceof PieceMessage)
+                            return allocatorStore.free(((PieceMessage) peerMessage.getT2()).getAllocatedBlock())
+                                    .map(__ -> peerMessage.getT2())
+                                    .ignoreElement();
                         return Mono.empty();
                     }
                     return Mono.just(peerMessage.getT2());

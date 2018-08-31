@@ -45,4 +45,16 @@ public class CreateRequestMessageRequest extends Request<AllocatorAction> {
 	public int getPieceLength() {
 		return pieceLength;
 	}
+
+	@Override
+	public String toString() {
+		return "CreateRequestMessageRequest{" +
+				"from=" + from +
+				", to=" + to +
+				", index=" + index +
+				", begin=" + begin +
+				", blockLength=" + blockLength +
+				", pieceLength=" + pieceLength +
+				'}';
+	}
 }

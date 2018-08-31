@@ -53,8 +53,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
                 .doOnNext(result -> logger.trace(this.identifier + " - analyzing result: " + result))
                 .map(Result::getState)
                 .distinctUntilChanged()
-                .doOnNext(state -> logger.trace(this.identifier + " - new state: " + state))
-                .doOnNext(state -> logger.info(this.identifier + " - new state: " + state.getAction()))
+                .doOnNext(state -> logger.info(this.identifier + " - new state: " + state))
                 .replay(1)
                 .autoConnect(0);
     }
