@@ -6,16 +6,11 @@ import main.algorithms.PeersToPiecesMapper;
 import main.algorithms.PiecesDownloader;
 import main.file.system.FileSystemLink;
 import main.file.system.allocator.AllocatorStore;
-import main.peer.PeerExceptions;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import redux.store.Store;
-
-import java.time.Duration;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 
 public class PiecesDownloaderImpl implements PiecesDownloader {
     private TorrentInfo torrentInfo;
@@ -126,11 +121,6 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
 //                .map(torrentPieceChangedList -> pieceIndex)
 //                // couldn't download a block from this piece in the specified time.
 //                .doOnError(TimeoutException.class, throwable -> System.out.println("stop downloading piece: " + pieceIndex));
-    }
-
-    @Override
-    public Flux<Integer> getDownloadedPiecesFlux() {
-        return this.downloadedPiecesFlux;
     }
 
     public Flux<TorrentStatusState> getStartDownload$() {

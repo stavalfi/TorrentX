@@ -2,6 +2,7 @@ package com.steps;
 
 import christophedetroyer.torrent.TorrentFile;
 import com.utils.*;
+import cucumber.api.PendingException;
 import cucumber.api.java.en.And;
 import cucumber.api.java.en.Given;
 import cucumber.api.java.en.Then;
@@ -2074,6 +2075,11 @@ public class MyStepdefs {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+
+    }
+
+    @Then("^application download the following pieces - for torrent: \"([^\"]*)\":$")
+    public void applicationDownloadTheFollowingPiecesForTorrent(String torrentFileName, List<PeersContainingPiece> peersContainingPieces) throws Throwable {
 
     }
 }
