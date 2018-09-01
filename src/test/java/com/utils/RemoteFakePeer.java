@@ -5,6 +5,8 @@ import main.file.system.allocator.AllocatorStore;
 import main.peer.IncomingPeerMessagesNotifier;
 import main.peer.IncomingPeerMessagesNotifierImpl;
 import main.peer.Link;
+import main.peer.SendMessagesNotifications;
+import main.peer.peerMessages.RequestMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
@@ -55,20 +57,27 @@ public class RemoteFakePeer {
                     if (!doesFakePeerHaveThePiece)
                         return Mono.empty();
 
+                    int pieceLength = link.getTorrentInfo().getPieceLength(requestMessage.getIndex());
                     switch (fakePeerType) {
+                        case SEND_LESS_DATA_THEN_REQUESTED:
+                            int responseLength = requestMessage.getBlockLength() > 1 ? requestMessage.getBlockLength() - 1 : requestMessage.getBlockLength();
+                            return sendPieceMessage(allocatorStore, link, identifier, requestMessage, pieceLength, responseLength);
                         case VALID:
                         case RESPOND_WITH_DELAY_100:
                         case RESPOND_WITH_DELAY_3000:
-                            int pieceLength = link.getTorrentInfo().getPieceLength(requestMessage.getIndex());
-                            // create a piece message with random bytes.
-                            return allocatorStore.createPieceMessage(link.getMe(), link.getPeer(), requestMessage.getIndex(), requestMessage.getBegin(), requestMessage.getBlockLength(), pieceLength)
-                                    .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
-                                            .doOnNext(__ -> logger.info(identifier + " - sent piece message to the app: " + pieceMessage + " for request: " + requestMessage)));
+                            return sendPieceMessage(allocatorStore, link, identifier, requestMessage, pieceLength, requestMessage.getBlockLength());
                     }
                     // we will never be here... (by the current fake-peer-types).
                     return Mono.empty();
                 }).publish()
                 .autoConnect(0);
+    }
+
+    private Mono<SendMessagesNotifications> sendPieceMessage(AllocatorStore allocatorStore, Link link, String identifier, RequestMessage requestMessage, int pieceLength, int responseLength) {
+        // create a piece message with random bytes.
+        return allocatorStore.createPieceMessage(link.getMe(), link.getPeer(), requestMessage.getIndex(), requestMessage.getBegin(), responseLength, pieceLength)
+                .flatMap(pieceMessage -> link.sendMessages().sendPieceMessage(pieceMessage)
+                        .doOnNext(__ -> logger.info(identifier + " - sent piece message to the app: " + pieceMessage + " for request: " + requestMessage)));
     }
 
     private void blockThread(int durationInMillis) {

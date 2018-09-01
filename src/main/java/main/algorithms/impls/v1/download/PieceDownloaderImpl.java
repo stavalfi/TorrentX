@@ -35,9 +35,6 @@ public class PieceDownloaderImpl implements PieceDownloader {
 
     @Override
     public Mono<Integer> downloadPiece$(int pieceIndex, Flux<Link> links$) {
-        // note: need to take care a situation were the peer sent me less data then I requested so we need to change the next request before we send to the peer the next request.
-        // TODO: I implemented the noted but we need to make tests for it.
-
         final int pieceLength = this.torrentInfo.getPieceLength(pieceIndex);
         final int maxRequestBlockLength = 17_000;
 
