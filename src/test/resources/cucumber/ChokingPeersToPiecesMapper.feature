@@ -1,4 +1,4 @@
-Feature: connect to choking fake-peers and map between them and their pieces
+Feature: (2) connect to choking fake-peers and map between them and their pieces
 
 #  Scenario Outline: get available pieces from multiple fake-peers while only one is choking me
 #    Given torrent: "<torrent>","<downloadLocation>"

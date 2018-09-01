@@ -40,13 +40,16 @@ public class PieceDownloaderImpl implements PieceDownloader {
         final int maxRequestBlockLength = 17_000;
 
         return Flux.<Integer>generate(sink -> sink.next(this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex]))
+                .doOnSubscribe(__ -> logger.info("start downloading piece: " + pieceIndex))
                 .concatMap(requestFrom ->
                         links$.filter(link -> !link.getPeerCurrentStatus().getIsHeChokingMe())
+                                .doOnNext(link -> logger.info("1. downloading piece: " + pieceIndex + " from: " + requestFrom + " from peer: " + link.getPeer()))
                                 .concatMap(link ->
                                         this.allocatorStore.createRequestMessage(link.getMe(), link.getPeer(), pieceIndex, requestFrom, maxRequestBlockLength, pieceLength)
                                                 .doOnNext(requestMessage -> logger.debug("start downloading block: " + requestMessage))
-                                                .flatMap(requestMessage -> blockDownloader.downloadBlock(link, requestMessage))
-                                                .doOnError(TimeoutException.class, throwable -> link.getPeerCurrentStatus().setIsHeChokingMe(true))
+                                                .flatMap(requestMessage -> blockDownloader.downloadBlock(link, requestMessage)
+                                                        .doOnError(TimeoutException.class, throwable -> link.getPeerCurrentStatus().setIsHeChokingMe(true))
+                                                        .doOnError(TimeoutException.class, throwable -> logger.debug("peer: " + link.getPeer() + " not responding to my request: " + requestMessage)))
                                                 .doOnNext(pieceEvent -> logger.debug("ended downloading block: " + pieceEvent)))
                                 .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty())
                                 .limitRequest(1))
@@ -54,7 +57,6 @@ public class PieceDownloaderImpl implements PieceDownloader {
                 .doOnNext(__ -> logger.info("finished to download piece: " + pieceIndex))
                 .limitRequest(1)
                 .single()
-                .map(__ -> pieceIndex)
-                .timeout(Duration.ofSeconds(30));
+                .map(__ -> pieceIndex);
     }
 }

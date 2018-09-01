@@ -1,4 +1,4 @@
-Feature: connect to valid fake-peers and map between them and their pieces
+Feature: (17) connect to valid fake-peers and map between them and their pieces
 
   Scenario Outline: (1) get available pieces from one valid fake-peer
     Given torrent: "<torrent>","<downloadLocation>"

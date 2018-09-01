@@ -1,4 +1,4 @@
-Feature: start/stop downloading/uploading with side effects
+Feature: (13) start/stop downloading/uploading with side effects
 
   Scenario Outline: (1) start search
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" with default initial state

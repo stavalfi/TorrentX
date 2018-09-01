@@ -1,4 +1,4 @@
-Feature: connect to a fake peers and communicate with them
+Feature: (3) connect to a fake peers and communicate with them
 
   Scenario Outline: (6) fake peer request pieces from me and I give him what he want
     When application save random blocks for torrent: "<torrent>" in "<downloadLocation>" and check it saved

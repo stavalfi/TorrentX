@@ -1,4 +1,4 @@
-Feature: download blocks from fake-peers
+Feature: (5) download blocks from fake-peers
 
   Scenario Outline: (0) download blocks from a valid fake-peer
     Given torrent: "<torrent>","<downloadLocation>"

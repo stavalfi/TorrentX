@@ -95,7 +95,7 @@ public class Utils {
                             .anyMatch(i -> !allocatorState.getFreeBlocksStatus().get(i));
                     if (anyLeak) {
                         logger.error("There is a leak!!!!!!!: ", allocatorState.toString());
-                        return MyStepdefs.globalFakePeerAllocator.updateAllocations(10, 2_500_000);
+                        return MyStepdefs.globalFakePeerAllocator.freeAll();
                     } else
                         return Mono.just(allocatorState);
                 })
@@ -109,7 +109,7 @@ public class Utils {
                 .map(TorrentDownloader::getTorrentStatusStore)
                 .flatMap(store -> store.dispatch(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
                         .flatMap(__ -> store.dispatch(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)))
-                .defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
+                .collectList()
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -120,8 +120,9 @@ public class Utils {
                 .filter(torrentDownloader -> torrentDownloader.getTorrentStatesSideEffects() != null)
                 .map(TorrentDownloader::getTorrentStatusStore)
                 .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP, store))
-                .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
-                .defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
+                .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP, store))
+                .doOnNext(Store::dispose)
+                .collectList()
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -145,6 +146,7 @@ public class Utils {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+
 
         // delete download folder from last test
         deleteAppDownloadFolder();
