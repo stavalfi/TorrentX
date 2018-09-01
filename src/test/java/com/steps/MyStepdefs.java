@@ -936,20 +936,26 @@ public class MyStepdefs {
         TorrentDownloaders.getListener()
                 .getListeningPort()
                 .map(listeningPort -> new Peer("localhost", listeningPort))
+                .doOnNext(peer -> logger.info(fakePeerPort + " - received port from listener: " + peer))
                 .delayElement(Duration.ofMillis(delayInMilliSeconds))
+                .doOnNext(peer -> logger.info(fakePeerPort + " - waited: " + delayInMilliSeconds))
                 .flatMap(me -> {
                     FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessagesFakePeer = incomingPeerMessagesFakePeer$.sink();
                     return new PeersProvider(MyStepdefs.globalFakePeerAllocator, torrentInfo, "Fake-peer", emitIncomingPeerMessagesFakePeer).connectToPeerMono(me);
                 })
+                .doOnNext(peer -> logger.info("fake peer: " + fakePeerPort + " connected to app -->> " + peer.getMe().getPeerPort()))
                 .map(fakePeerToAppLink -> new RemoteFakePeer(MyStepdefs.globalFakePeerAllocator, fakePeerToAppLink, fakePeerType,
                         "Fake-peer-" + fakePeerPort + "-" + fakePeerType.toString(),
                         new IncomingPeerMessagesNotifierImpl(incomingPeerMessagesFakePeer$)))
+                .doOnNext(remoteFakePeer -> logger.info("created fake-peer " + remoteFakePeer.getLink().getMe().getPeerPort() + "  object"))
                 .doOnNext(remoteFakePeer -> {
                     synchronized (this.fakePeersByPort) {
                         this.fakePeersByPort.add(new AbstractMap.SimpleEntry<>(fakePeerPort, remoteFakePeer));
                     }
                 })
-                .flatMap(remoteFakePeer -> remoteFakePeer.getLink().sendMessages().sendBitFieldMessage(bitSet).map(sendPeerMessages -> remoteFakePeer))
+                .doOnNext(remoteFakePeer -> logger.info(remoteFakePeer.getLink().getMe().getPeerPort() + " - added fake peer to the list of fake peers"))
+                .flatMap(remoteFakePeer -> remoteFakePeer.getLink().sendMessages().sendBitFieldMessage(bitSet).map(sendPeerMessages -> remoteFakePeer)
+                        .doOnNext(peer -> logger.info("fake-peer " + remoteFakePeer.getLink().getMe().getPeerPort() + " sent to app a bitfield message:" + bitSet)))
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();

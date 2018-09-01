@@ -33,7 +33,6 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
         BiFunction<BitSet, BitSet, BitSet> extractMissingPieces = (peerStatus, appStatus) -> {
             BitSet missingPiecesStatus = new BitSet(torrentInfo.getPieces().size());
             IntStream.range(0, torrentInfo.getPieces().size())
-                    .parallel()
                     .forEach(i -> missingPiecesStatus.set(i, peerStatus.get(i) && !appStatus.get(i)));
             return missingPiecesStatus;
         };
@@ -52,6 +51,8 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
         Flux<AbstractMap.SimpleEntry<Link, Integer>> fromBitFieldMessages = incomingPeerMessagesNotifier.getIncomingPeerMessages$()
                 .filter(peerMessage -> peerMessage.getValue() instanceof BitFieldMessage)
                 .map(peerMessage -> new AbstractMap.SimpleEntry<>(peerMessage.getKey(), (BitFieldMessage) peerMessage.getValue()))
+                .doOnNext(bitFieldMessage -> logger.info("1. before filter - peer: " + bitFieldMessage.getKey().getPeer() +
+                        " - published he can give me the following pieces using bitFieldMessage: " + bitFieldMessage.getValue()))
                 .map(bitFieldMessage -> new AbstractMap.SimpleEntry<>(bitFieldMessage.getKey(), bitFieldMessage.getValue().getPiecesStatus()))
                 .map(bitFieldMessage -> new AbstractMap.SimpleEntry<>(bitFieldMessage.getKey(), extractMissingPieces.apply(bitFieldMessage.getValue(), updatedPieceState)))
                 .doOnNext(bitFieldMessage -> logger.info("peer: " + bitFieldMessage.getKey().getPeer() +
