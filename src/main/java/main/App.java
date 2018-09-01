@@ -29,10 +29,6 @@ public class App {
     private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test" + File.separator;
 
     private static void f5() throws IOException, InterruptedException {
-
-        System.out.println(getTorrentInfo());
-        Thread.sleep(10000000);
-
         TorrentDownloader torrentDownloader$ = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath);
         TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader$);
 
@@ -114,7 +110,7 @@ public class App {
                 "main" + File.separator +
                 "resources" + File.separator +
                 "torrents" + File.separator +
-                "ComplexFolderStructure.torrent";
+                "tor.torrent";
         return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
     }
 }

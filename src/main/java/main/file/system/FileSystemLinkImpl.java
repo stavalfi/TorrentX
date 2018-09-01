@@ -35,7 +35,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
     private final Flux<ActualFile> actualFileImplList;
     private final BitSet piecesStatus;
-    private final long[] downloadedBytesInPieces;
+    private final int[] downloadedBytesInPieces;
     private final String downloadPath;
     private Flux<Integer> savedPieces$;
     private Flux<PieceEvent> savedBlocks$;
@@ -46,16 +46,16 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private String identifier;
 
     public FileSystemLinkImpl(TorrentInfo torrentInfo, String downloadPath,
-                               AllocatorStore allocatorStore,
-                               Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
-                               Flux<PieceMessage> peerResponses$,
-                               String identifier) {
+                              AllocatorStore allocatorStore,
+                              Store<TorrentStatusState, TorrentStatusAction> torrentStatusStore,
+                              Flux<PieceMessage> peerResponses$,
+                              String identifier) {
         super(torrentInfo);
         this.identifier = identifier;
         this.allocatorStore = allocatorStore;
         this.downloadPath = downloadPath;
         this.piecesStatus = new BitSet(getPieces().size());
-        this.downloadedBytesInPieces = new long[getPieces().size()];
+        this.downloadedBytesInPieces = new int[getPieces().size()];
 
         createFolders(torrentInfo, downloadPath);
 
@@ -193,7 +193,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
 
     @Override
-    public long[] getDownloadedBytesInPieces() {
+    public int[] getDownloadedBytesInPieces() {
         return this.downloadedBytesInPieces;
     }
 
@@ -237,7 +237,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .flatMap(actualFiles -> Mono.<PieceEvent>create(sink -> {
                     logger.debug(this.identifier + " - start writing block to FS: " + pieceMessage);
                     if (havePiece(pieceMessage.getIndex()) ||
-                            this.downloadedBytesInPieces[pieceMessage.getIndex()] > pieceMessage.getBegin() +
+                            this.downloadedBytesInPieces[pieceMessage.getIndex()] >= pieceMessage.getBegin() +
                                     pieceMessage.getAllocatedBlock().getLength()) {
                         // I already have the received block. I don't need it.
                         logger.debug(this.identifier + " - I already have this block: " + pieceMessage);

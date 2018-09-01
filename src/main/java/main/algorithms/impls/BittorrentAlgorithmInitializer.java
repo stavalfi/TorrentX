@@ -4,6 +4,7 @@ import main.TorrentInfo;
 import main.algorithms.*;
 import main.algorithms.impls.v1.download.BlockDownloaderImpl;
 import main.algorithms.impls.v1.download.PeersToPiecesMapperImpl;
+import main.algorithms.impls.v1.download.PieceDownloaderImpl;
 import main.algorithms.impls.v1.download.PiecesDownloaderImpl;
 import main.algorithms.impls.v1.notification.NotifyAboutCompletedPieceAlgorithmImpl;
 import main.algorithms.impls.v1.upload.UploadAlgorithmImpl;
@@ -55,8 +56,10 @@ public class BittorrentAlgorithmInitializer {
 
         BlockDownloader blockDownloader = new BlockDownloaderImpl(torrentInfo, fileSystemLink, identifier);
 
+        PieceDownloader pieceDownloader = new PieceDownloaderImpl(allocatorStore, torrentInfo, fileSystemLink, blockDownloader);
+
         PiecesDownloader piecesDownloader = new PiecesDownloaderImpl(allocatorStore,
-                torrentInfo, store, fileSystemLink, peersToPiecesMapper, blockDownloader);
+                torrentInfo, store, fileSystemLink, peersToPiecesMapper, pieceDownloader);
 
         DownloadAlgorithm downloadAlgorithm = new DownloadAlgorithm(piecesDownloader, blockDownloader, peersToPiecesMapper);
 

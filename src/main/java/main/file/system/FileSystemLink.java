@@ -25,7 +25,7 @@ public interface FileSystemLink {
 
     BitFieldMessage buildBitFieldMessage(Peer from, Peer to);
 
-    long[] getDownloadedBytesInPieces();
+    int[] getDownloadedBytesInPieces();
 
     /**
      * read from the file and fill up an allocatedBlock with what it read.

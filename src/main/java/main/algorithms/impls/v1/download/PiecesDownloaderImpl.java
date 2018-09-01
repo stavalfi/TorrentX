@@ -3,6 +3,7 @@ package main.algorithms.impls.v1.download;
 import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
 import main.algorithms.PeersToPiecesMapper;
+import main.algorithms.PieceDownloader;
 import main.algorithms.PiecesDownloader;
 import main.file.system.FileSystemLink;
 import main.file.system.allocator.AllocatorStore;
@@ -17,7 +18,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
     private Store<TorrentStatusState, TorrentStatusAction> store;
     private PeersToPiecesMapper peersToPiecesMapper;
     private FileSystemLink fileSystemLink;
-    private BlockDownloader blockDownloader;
+    private PieceDownloader pieceDownloader;
 
     private Flux<Integer> downloadedPiecesFlux;
     private AllocatorStore allocatorStore;
@@ -30,13 +31,13 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
                                 Store<TorrentStatusState, TorrentStatusAction> store,
                                 FileSystemLink fileSystemLink,
                                 PeersToPiecesMapper peersToPiecesMapper,
-                                BlockDownloader blockDownloader) {
+                                PieceDownloader pieceDownloader) {
         this.allocatorStore = allocatorStore;
         this.torrentInfo = torrentInfo;
         this.store = store;
         this.peersToPiecesMapper = peersToPiecesMapper;
         this.fileSystemLink = fileSystemLink;
-        this.blockDownloader = blockDownloader;
+        this.pieceDownloader = pieceDownloader;
 
         // TODO: note: if we ask for notification AFTER the download started, we will lose the notification.
 //        downloadedPiecesFlux = store.states$()
@@ -44,7 +45,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
 //                //.filter(TorrentStatusState::isStartedDownload)
 //                .take(1)
 //                .flatMap(__ -> this.peersToPiecesMapper.getAvailablePieces$())
-//                .flatMap(pieceIndex -> downloadPieceMono(pieceIndex)
+//                .flatMap(pieceIndex -> downloadPiece$(pieceIndex)
 //                        // couldn't download a block from this piece in the specified time.
 //                        // I will try to download the next piece.
 //                        //.onErrorResume(TimeoutException.class, throwable -> Mono.empty())
@@ -72,7 +73,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
     }
 
     @Override
-    public Mono<Integer> downloadPieceMono(int pieceIndex) {
+    public Mono<Integer> downloadPiece$(int pieceIndex) {
         return null;
 //        System.out.println("start downloading piece: " + pieceIndex);
 //        final int REQUEST_BLOCK_SIZE = 16_384;

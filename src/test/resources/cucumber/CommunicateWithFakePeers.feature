@@ -69,7 +69,7 @@ Feature: connect to a fake peers and communicate with them
     Given torrent: "<torrent>","<downloadLocation>"
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
-    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4040" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 0 |
     When application request the following blocks from all fake-peers - for torrent: "<torrent>":
       | pieceIndex | from | length |
