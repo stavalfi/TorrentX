@@ -14,6 +14,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Duration;
+import java.util.concurrent.TimeoutException;
 
 public class PieceDownloaderImpl implements PieceDownloader {
     private static Logger logger = LoggerFactory.getLogger(PieceDownloaderImpl.class);
@@ -40,11 +41,13 @@ public class PieceDownloaderImpl implements PieceDownloader {
 
         return Flux.<Integer>generate(sink -> sink.next(this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex]))
                 .concatMap(requestFrom ->
-                        links$.concatMap(link ->
-                                this.allocatorStore.createRequestMessage(link.getMe(), link.getPeer(), pieceIndex, requestFrom, maxRequestBlockLength, pieceLength)
-                                        .doOnNext(requestMessage -> logger.debug("start downloading block: " + requestMessage))
-                                        .flatMap(requestMessage -> blockDownloader.downloadBlock(link, requestMessage))
-                                        .doOnNext(pieceEvent -> logger.debug("ended downloading block: " + pieceEvent)))
+                        links$.filter(link -> !link.getPeerCurrentStatus().getIsHeChokingMe())
+                                .concatMap(link ->
+                                        this.allocatorStore.createRequestMessage(link.getMe(), link.getPeer(), pieceIndex, requestFrom, maxRequestBlockLength, pieceLength)
+                                                .doOnNext(requestMessage -> logger.debug("start downloading block: " + requestMessage))
+                                                .flatMap(requestMessage -> blockDownloader.downloadBlock(link, requestMessage))
+                                                .doOnError(TimeoutException.class, throwable -> link.getPeerCurrentStatus().setIsHeChokingMe(true))
+                                                .doOnNext(pieceEvent -> logger.debug("ended downloading block: " + pieceEvent)))
                                 .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty())
                                 .limitRequest(1))
                 .filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))

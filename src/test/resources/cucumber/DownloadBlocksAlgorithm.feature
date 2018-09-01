@@ -4,7 +4,7 @@ Feature: download blocks from fake-peers
     Given torrent: "<torrent>","<downloadLocation>"
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
-    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4040" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 0 |
     When application request the following blocks from all fake-peers - for torrent: "<torrent>":
       | pieceIndex | from | length |
@@ -21,7 +21,7 @@ Feature: download blocks from fake-peers
     Given torrent: "<torrent>","<downloadLocation>"
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
-    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4040" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 0  |
       | -1 |
     When application request the following blocks from all fake-peers - for torrent: "<torrent>":
@@ -42,13 +42,13 @@ Feature: download blocks from fake-peers
     Given torrent: "<torrent>","<downloadLocation>"
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
-    Given link to "CLOSE_IN_FIRST_REQUEST" - fake-peer on port "4045" with the following pieces - for torrent: "<torrent>"
+    Given link to "CLOSE_IN_FIRST_REQUEST" - fake-peer on port "4045" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 0 |
       | 1 |
-    Given link to "VALID" - fake-peer on port "4046" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4046" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 2 |
       | 3 |
-    Given link to "CLOSE_IN_FIRST_REQUEST" - fake-peer on port "4046" with the following pieces - for torrent: "<torrent>"
+    Given link to "CLOSE_IN_FIRST_REQUEST" - fake-peer on port "4046" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 4 |
       | 5 |
     When application request the following blocks from all fake-peers - for torrent: "<torrent>":
@@ -78,13 +78,13 @@ Feature: download blocks from fake-peers
     Given torrent: "<torrent>","<downloadLocation>"
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
-    Given link to "VALID" - fake-peer on port "4041" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4041" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 0 |
       | 1 |
-    Given link to "VALID" - fake-peer on port "4042" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4042" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 2 |
       | 3 |
-    Given link to "VALID" - fake-peer on port "4043" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4043" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 4 |
     When application request the following blocks from all fake-peers - for torrent: "<torrent>":
       | pieceIndex | from | length |
@@ -108,7 +108,7 @@ Feature: download blocks from fake-peers
     Given torrent: "<torrent>","<downloadLocation>"
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
-    Given link to "CLOSE_IN_FIRST_REQUEST" - fake-peer on port "4044" with the following pieces - for torrent: "<torrent>"
+    Given link to "CLOSE_IN_FIRST_REQUEST" - fake-peer on port "4044" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 0 |
       | 1 |
     When application request the following blocks from all fake-peers - for torrent: "<torrent>":
@@ -133,7 +133,7 @@ Feature: download blocks from fake-peers
     Given torrent: "<torrent>","<downloadLocation>"
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
-    Given link to "RESPOND_WITH_DELAY_100" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+    Given link to "RESPOND_WITH_DELAY_100" - fake-peer on port "4040" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 0  |
       | 1  |
       | -1 |
@@ -157,7 +157,7 @@ Feature: download blocks from fake-peers
     Given torrent: "<torrent>","<downloadLocation>"
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
-    Given link to "RESPOND_WITH_DELAY_3000" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+    Given link to "RESPOND_WITH_DELAY_3000" - fake-peer on port "4040" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 0  |
       | 1  |
       | -1 |

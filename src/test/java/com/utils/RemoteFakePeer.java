@@ -3,15 +3,13 @@ package com.utils;
 import main.algorithms.impls.v1.download.BlockDownloaderImpl;
 import main.file.system.allocator.AllocatorStore;
 import main.peer.IncomingPeerMessagesNotifier;
-import main.peer.IncomingPeerMessagesNotifierImpl;
 import main.peer.Link;
 import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.RequestMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
-import reactor.test.StepVerifier;
+import reactor.util.function.Tuple2;
 
 public class RemoteFakePeer {
     private static Logger logger = LoggerFactory.getLogger(BlockDownloaderImpl.class);
@@ -39,16 +37,25 @@ public class RemoteFakePeer {
                             return;
                     }
                 })
+                .index()
                 .flatMap(requestMessage -> {
                     switch (fakePeerType) {
                         case CLOSE_IN_FIRST_REQUEST:
                             // its important because the socket may close up-to 4 min so it may be still
                             // active and working so I don't want to send anything by mistake.
                             return Mono.empty();
+                        case VALID_AND_SEND_CHOKE_AFTER_2_REQUESTS:
+                            if (requestMessage.getT1() == 2)
+                                return link.sendMessages()
+                                        .sendChokeMessage()
+                                        .map(__ -> requestMessage);
+                            else if (requestMessage.getT1() > 2)
+                                return Mono.empty();
                         default:
                             return Mono.just(requestMessage);
                     }
                 })
+                .map(Tuple2::getT2)
                 .flatMap(requestMessage -> {
                     boolean doesFakePeerHaveThePiece = link.getPeerCurrentStatus()
                             .getPiecesStatus()

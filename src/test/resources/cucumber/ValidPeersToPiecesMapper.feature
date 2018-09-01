@@ -5,7 +5,7 @@ Feature: connect to valid fake-peers and map between them and their pieces
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
     Given the following saved pieces - for torrent: "<torrent>": - none
-    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4040" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 0 |
       | 1 |
     Then application receive the following available pieces - for torrent: "<torrent>":
@@ -22,9 +22,9 @@ Feature: connect to valid fake-peers and map between them and their pieces
     When listen-status is trying to change to:
       | START_LISTENING_IN_PROGRESS |
     Given the following saved pieces - for torrent: "<torrent>": - none
-    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4040" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 0 |
-    Given link to "VALID" - fake-peer on port "4041" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4041" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 1 |
     Then application receive the following available pieces - for torrent: "<torrent>":
       | pieceIndex | peers |
@@ -42,7 +42,7 @@ Feature: connect to valid fake-peers and map between them and their pieces
     Given the following saved pieces - for torrent: "<torrent>": - none
     Then application receive the following available pieces - for torrent: "<torrent>":
       | pieceIndex | peers |
-    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4040" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 0 |
     Then application receive the following available pieces - for torrent: "<torrent>":
       | pieceIndex | peers |
@@ -61,7 +61,7 @@ Feature: connect to valid fake-peers and map between them and their pieces
       | 2 |
     Then application receive the following available pieces - for torrent: "<torrent>":
       | pieceIndex | peers |
-    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4040" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | 1 |
     Then application receive the following available pieces - for torrent: "<torrent>":
       | pieceIndex | peers |
@@ -79,7 +79,7 @@ Feature: connect to valid fake-peers and map between them and their pieces
       | 2 |
     Then application receive the following available pieces - for torrent: "<torrent>":
       | pieceIndex | peers |
-    Given link to "VALID" - fake-peer on port "4040" with the following pieces - for torrent: "<torrent>"
+    Given link to "VALID" - fake-peer on port "4040" with the following pieces - with delay: "0" milliseconds - for torrent: "<torrent>"
       | -1 |
     Then application receive the following available pieces - for torrent: "<torrent>":
       | pieceIndex | peers |

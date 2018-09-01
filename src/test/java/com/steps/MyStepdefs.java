@@ -1150,9 +1150,10 @@ public class MyStepdefs {
                 .autoConnect(0);
     }
 
-    @Given("^link to \"([^\"]*)\" - fake-peer on port \"([^\"]*)\" with the following pieces - for torrent: \"([^\"]*)\"$")
+    @Given("^link to \"([^\"]*)\" - fake-peer on port \"([^\"]*)\" with the following pieces - with delay: \"([^\"]*)\" milliseconds - for torrent: \"([^\"]*)\"$")
     public void linkToFakePeerWithTheFollowingPiecesForTorrent(FakePeerType fakePeerType,
                                                                int fakePeerPort,
+                                                               int delayInMilliSeconds,
                                                                String torrentFileName,
                                                                List<Integer> fakePeerCompletedPieces) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
@@ -1170,6 +1171,7 @@ public class MyStepdefs {
         TorrentDownloaders.getListener()
                 .getListeningPort()
                 .map(listeningPort -> new Peer("localhost", listeningPort))
+                .delayElement(Duration.ofMillis(delayInMilliSeconds))
                 .flatMap(me -> {
                     FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessagesFakePeer = incomingPeerMessagesFakePeer$.sink();
                     return new PeersProvider(MyStepdefs.globalFakePeerAllocator, torrentInfo, "Fake-peer", emitIncomingPeerMessagesFakePeer).connectToPeerMono(me);
@@ -2079,6 +2081,8 @@ public class MyStepdefs {
                 .verifyComplete();
     }
 
+    private Flux<List<Integer>> downloadPieces$;
+
     @Then("^application download the following pieces - for torrent: \"([^\"]*)\":$")
     public void applicationDownloadTheFollowingPiecesForTorrent(String torrentFileName, List<Integer> expectedPiecesToDownload) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
@@ -2095,7 +2099,7 @@ public class MyStepdefs {
         PieceDownloader pieceDownloader = new PieceDownloaderImpl(torrentDownloader.getAllocatorStore(), torrentInfo, torrentDownloader.getFileSystemLink(),
                 new BlockDownloaderImpl(torrentInfo, torrentDownloader.getFileSystemLink(), torrentDownloader.getIdentifier()));
 
-        this.linksByAvailableMissingPiece$.flatMap(peersByPiece$ ->
+        this.downloadPieces$ = this.linksByAvailableMissingPiece$.flatMap(peersByPiece$ ->
                         Flux.fromIterable(fixedExpectedPiecesToDownload)
                                 .map(pieceToDownload -> pieceToDownload >= 0 ?
                                         pieceToDownload :
@@ -2106,9 +2110,26 @@ public class MyStepdefs {
                 .take(fixedExpectedPiecesToDownload.size())
                 .collectList()
                 .doOnNext(actualDownloadedPieces -> Utils.assertListEqualNotByOrder(fixedExpectedPiecesToDownload, actualDownloadedPieces, Integer::equals))
-                .as(StepVerifier::create)
+                .flux()
+                .replay()
+                .autoConnect(0);
+    }
+
+    @Then("^wait until download is finished - for torrent: \"([^\"]*)\"$")
+    public void waitUntilDownloadIsFinishedForTorrent(String torrentFileName) throws Throwable {
+        this.downloadPieces$.as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+
+        if (this.meToFakePeerLink$ != null) {
+            this.meToFakePeerLink$.doOnNext(Link::closeConnection)
+                    .timeout(Duration.ofMillis(100), Mono.empty())
+                    .collectList()
+                    .as(StepVerifier::create)
+                    .expectNextCount(1)
+                    .verifyComplete();
+            this.meToFakePeerLink$ = null;
+        }
 
         Utils.removeEverythingRelatedToLastTest();
     }
