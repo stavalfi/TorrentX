@@ -38,6 +38,8 @@ public class BlockDownloaderImpl implements BlockDownloader {
      */
     @Override
     public Mono<PieceEvent> downloadBlock(Link link, RequestMessage requestMessage) {
+        // TODO: we should send this message and listen concurrently using Flux.merge to the saved pieces instead of this impolemenation using replay.
+
         Flux<PieceEvent> pieceSavedNotifier$ = this.fileSystemLink.savedBlocks$()
                 .filter(torrentPieceChanged -> requestMessage.getIndex() == torrentPieceChanged.getReceivedPiece().getIndex())
                 .filter(torrentPieceChanged -> requestMessage.getBegin() == torrentPieceChanged.getReceivedPiece().getBegin())
@@ -48,14 +50,12 @@ public class BlockDownloaderImpl implements BlockDownloader {
                 .sendRequestMessage(requestMessage.getIndex(), requestMessage.getBegin(), requestMessage.getBlockLength())
                 .doOnSubscribe(__ -> logger.debug(this.identifier + " - start sending request message: " + requestMessage))
                 .doOnNext(__ -> logger.debug(this.identifier + " - end sending request message: " + requestMessage))
-                .flatMapMany(__ -> pieceSavedNotifier$)
+                .flatMap(__ -> pieceSavedNotifier$.limitRequest(1).single())
                 // max wait to the correct block back from peer.
                 //TODO: in some operating systems, the IO operations are extremely slow.
                 // for example the first use of randomAccessFile object. in linux all good.
                 // we need to remember to change back 20->2.
                 .timeout(Duration.ofMillis(2500))
-                .doOnError(TimeoutException.class, throwable -> logger.debug(this.identifier + " - no response to the request: " + requestMessage))
-                .take(1)
-                .single();
+                .doOnError(TimeoutException.class, throwable -> logger.debug(this.identifier + " - no response to the request: " + requestMessage));
     }
 }
