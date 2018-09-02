@@ -22,7 +22,6 @@ import java.util.function.Function;
 
 class TrackerCommunication {
     private static Logger logger = LoggerFactory.getLogger(TrackerCommunication.class);
-    private static Scheduler connectToTrackersScheduler = Schedulers.newParallel("CONNECT-TO-TRACKER", 4);
 
     public static <Request extends TrackerRequest, Response extends TrackerResponse>
     Mono<Response> communicateMono(Request request, Function<ByteBuffer, Response> createResponse) {
@@ -91,7 +90,7 @@ class TrackerCommunication {
                 error.setStackTrace(ex.getStackTrace());
                 sink.error(error);
             }
-        }).subscribeOn(connectToTrackersScheduler);
+        }).subscribeOn(Schedulers.parallel());
     }
 
     private static Mono<DatagramSocket> sendRequestMono(DatagramPacket request) {

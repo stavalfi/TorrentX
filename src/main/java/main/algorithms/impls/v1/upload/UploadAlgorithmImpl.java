@@ -22,13 +22,13 @@ import java.util.AbstractMap;
 public class UploadAlgorithmImpl implements UploadAlgorithm {
     private static Logger logger = LoggerFactory.getLogger(UploadAlgorithmImpl.class);
     private static Scheduler uploaderScheduler = Schedulers.newSingle("UPLOADER");
+    private static Scheduler peersReceiverScheduler = Schedulers.newSingle("PEERS-RECEIVER-FOR-TORRENT");
 
     private Flux<PieceEvent> uploadedBlocks$;
 
     public UploadAlgorithmImpl(TorrentInfo torrentInfo,
                                Store<TorrentStatusState, TorrentStatusAction> store,
                                FileSystemLink fileSystemLink,
-                               // TODO: I need only request messages here:
                                Flux<AbstractMap.SimpleEntry<Link, RequestMessage>> incomingRequestMessages$) {
 
         Flux<TorrentStatusState> startUpload$ = store.statesByAction(TorrentStatusAction.START_UPLOAD_IN_PROGRESS)
@@ -37,7 +37,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                 .autoConnect(0);
 
         this.uploadedBlocks$ = store.statesByAction(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS)
-                .publishOn(Schedulers.newSingle("PEERS-RECEIVER-FOR-TORRENT-" + torrentInfo.getName()))
+                .publishOn(peersReceiverScheduler)
                 /*
                 Caution: There maybe a race condition when I miss signals of new requests (in tests when I fake incoming requests)
                 because I only subscribe to them when I finish the following method.
