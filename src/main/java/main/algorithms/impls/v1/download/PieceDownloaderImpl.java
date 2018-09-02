@@ -37,7 +37,7 @@ public class PieceDownloaderImpl implements PieceDownloader {
     @Override
     public Mono<Integer> downloadPiece$(int pieceIndex, Flux<Link> links$) {
         final int pieceLength = this.torrentInfo.getPieceLength(pieceIndex);
-        final int maxRequestBlockLength = 17_000;
+        final int maxRequestBlockLength = pieceLength;
 
         return Flux.<Integer>generate(sink -> sink.next(this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex]))
                 .doOnSubscribe(__ -> logger.info("start downloading piece: " + pieceIndex))
@@ -46,7 +46,7 @@ public class PieceDownloaderImpl implements PieceDownloader {
                                 .doOnNext(link -> logger.info("1. downloading piece: " + pieceIndex + " from: " + requestFrom + " from peer: " + link.getPeer()))
                                 .concatMap(link ->
                                         this.allocatorStore.createRequestMessage(link.getMe(), link.getPeer(), pieceIndex, requestFrom, maxRequestBlockLength, pieceLength)
-                                                .doOnNext(requestMessage -> logger.debug("start downloading block: " + requestMessage))
+                                                .doOnNext(requestMessage -> logger.info("start downloading block: " + requestMessage))
                                                 .flatMap(requestMessage -> blockDownloader.downloadBlock(link, requestMessage)
                                                         .doOnError(TimeoutException.class, throwable -> link.getPeerCurrentStatus().setIsHeChokingMe(true))
                                                         .doOnError(TimeoutException.class, throwable -> logger.debug("peer: " + link.getPeer() + " not responding to my request: " + requestMessage)))

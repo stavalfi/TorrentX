@@ -81,8 +81,18 @@ public class Utils {
                 .latestState$()
                 .doOnNext(allocatorState -> {
                     IntStream.range(0, allocatorState.getAmountOfBlocks())
-                            .forEach(i -> Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
-                                    allocatorState.getFreeBlocksStatus().get(i)));
+                            .forEach(i -> {
+                                if (!allocatorState.getFreeBlocksStatus().get(i)) {
+                                    logger.error("fuck");
+//                                    try {
+//                                        Thread.sleep(100000000);
+//                                    } catch (InterruptedException e) {
+//                                        e.printStackTrace();
+//                                    }
+                                }
+                                Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
+                                        allocatorState.getFreeBlocksStatus().get(i));
+                            });
                 })
                 .as(StepVerifier::create)
                 .expectNextCount(1)
@@ -90,14 +100,20 @@ public class Utils {
 
         MyStepdefs.globalFakePeerAllocator
                 .latestState$()
-                .flatMap(allocatorState -> {
-                    boolean anyLeak = IntStream.range(0, allocatorState.getAmountOfBlocks())
-                            .anyMatch(i -> !allocatorState.getFreeBlocksStatus().get(i));
-                    if (anyLeak) {
-                        logger.error("There is a leak!!!!!!!: ", allocatorState.toString());
-                        return MyStepdefs.globalFakePeerAllocator.freeAll();
-                    } else
-                        return Mono.just(allocatorState);
+                .doOnNext(allocatorState -> {
+                    IntStream.range(0, allocatorState.getAmountOfBlocks())
+                            .forEach(i -> {
+                                if (!allocatorState.getFreeBlocksStatus().get(i)) {
+                                    logger.error("fuck");
+//                                    try {
+//                                        Thread.sleep(100000000);
+//                                    } catch (InterruptedException e) {
+//                                        e.printStackTrace();
+//                                    }
+                                }
+                                Assert.assertTrue("i: " + i + " - fake-peer allocator: " + allocatorState.toString(),
+                                        allocatorState.getFreeBlocksStatus().get(i));
+                            });
                 })
                 .as(StepVerifier::create)
                 .expectNextCount(1)
@@ -167,8 +183,6 @@ public class Utils {
                     switch (action) {
                         case START_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
-                                    .subscribeOn(Schedulers.elastic())
-                                    .publishOn(Schedulers.elastic())
                                     .flatMapMany(__ -> listenStore.states$())
                                     .filter(listenerState -> listenerState.isResumeListeningWindUp())
                                     .take(1)
@@ -177,17 +191,13 @@ public class Utils {
                             return listenStore.states$()
                                     .filter(ListenerState::isStartedListeningInProgress)
                                     .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action)
-                                            .subscribeOn(Schedulers.elastic())
-                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.states$())
                                     .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
                                     .single();
                         case RESUME_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
-                                    .subscribeOn(Schedulers.elastic())
-                                    .publishOn(Schedulers.elastic())
                                     .flatMapMany(__ -> listenStore.states$())
                                     .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
@@ -196,17 +206,13 @@ public class Utils {
                             return listenStore.states$()
                                     .filter(ListenerState::isResumeListeningInProgress)
                                     .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action)
-                                            .subscribeOn(Schedulers.elastic())
-                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.states$())
                                     .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
                                     .single();
                         case PAUSE_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
-                                    .subscribeOn(Schedulers.elastic())
-                                    .publishOn(Schedulers.elastic())
                                     .flatMapMany(__ -> listenStore.states$())
                                     .filter(ListenerState::isPauseListeningWindUp)
                                     .take(1)
@@ -215,17 +221,13 @@ public class Utils {
                             return listenStore.states$()
                                     .filter(ListenerState::isPauseListeningInProgress)
                                     .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action)
-                                            .subscribeOn(Schedulers.elastic())
-                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.states$())
                                     .filter(ListenerState::isPauseListeningWindUp)
                                     .take(1)
                                     .single();
                         case RESTART_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
-                                    .subscribeOn(Schedulers.elastic())
-                                    .publishOn(Schedulers.elastic())
                                     .flatMapMany(__ -> listenStore.states$())
                                     .filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
                                     .take(1)
@@ -234,9 +236,7 @@ public class Utils {
                             return listenStore.states$()
                                     .filter(ListenerState::isRestartListeningInProgress)
                                     .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action)
-                                            .subscribeOn(Schedulers.elastic())
-                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.states$())
                                     .filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
                                     .take(1)

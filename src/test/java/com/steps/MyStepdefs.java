@@ -45,6 +45,7 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.*;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 import reactor.util.function.Tuple2;
@@ -66,6 +67,7 @@ import static org.mockito.Mockito.mock;
 
 public class MyStepdefs {
     private static Logger logger = LoggerFactory.getLogger(MyStepdefs.class);
+    private static Scheduler testParallelScheduler = Schedulers.newParallel("TEST-HELPER-PARALLEL", 1);
 
     public static AllocatorStore globalFakePeerAllocator = new AllocatorStore(new Store<>(new AllocatorReducer(),
             AllocatorReducer.defaultAllocatorState, "Global-Fake-Peer-Allocator"));
@@ -80,7 +82,6 @@ public class MyStepdefs {
         Utils.removeEverythingRelatedToLastTest();
 
         MyStepdefs.globalFakePeerAllocator.updateAllocations(10, 2_500_000)
-                .publishOn(Schedulers.elastic())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -315,7 +316,7 @@ public class MyStepdefs {
                                 .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength))
                                 .flatMap(blockOfPiece -> Utils.createRandomPieceMessages(TorrentDownloaders.getAllocatorStore(), torrentInfo, semaphore, blockOfPiece, allocatedBlockLength)))
                         .doOnNext(pieceMessage -> System.out.println("saving: " + pieceMessage.getIndex() + "," + pieceMessage.getBegin() + "," + pieceMessage.getAllocatedBlock().getLength()))
-                        .publishOn(App.MyScheduler)
+                        .publishOn(MyStepdefs.testParallelScheduler)
                         .publish();
 
         String fullDownloadPath = System.getProperty("user.dir") + File.separator + downloadLocation + File.separator;
@@ -457,7 +458,6 @@ public class MyStepdefs {
                             .forEach(i -> Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
                                     allocatorState.getFreeBlocksStatus().get(i)));
                 })
-                .publishOn(Schedulers.elastic())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -469,7 +469,6 @@ public class MyStepdefs {
                             .forEach(i -> Assert.assertTrue("i: " + i + " - global fake-peer allocator: " + allocatorState.toString(),
                                     allocatorState.getFreeBlocksStatus().get(i)));
                 })
-                .publishOn(Schedulers.elastic())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -867,7 +866,6 @@ public class MyStepdefs {
 
         TorrentDownloaders.getAllocatorStore()
                 .updateAllocations(10, torrentInfo.getPieceLength(0))
-                .publishOn(Schedulers.elastic())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -1275,7 +1273,7 @@ public class MyStepdefs {
                             int pieceLength = torrentInfo.getPieceLength(pieceIndex);
                             return TorrentDownloaders.getAllocatorStore()
                                     .createPieceMessage(null, null, pieceIndex, from, length, pieceLength)
-                                    .subscribeOn(Schedulers.elastic());
+                                    .subscribeOn(MyStepdefs.testParallelScheduler);
                         }
                         , threadsAmount)
                 .doOnNext(pieceMessage -> System.out.println("created the following pieceMessage: " + pieceMessage))
@@ -1337,7 +1335,7 @@ public class MyStepdefs {
                     int pieceLength = torrentInfo.getPieceLength(pieceIndex);
                     return TorrentDownloaders.getAllocatorStore()
                             .createRequestMessage(null, null, pieceIndex, from, length, pieceLength)
-                            .subscribeOn(Schedulers.elastic());
+                            .subscribeOn(MyStepdefs.testParallelScheduler);
                 }, threadsAmount)
                 .collectList()
                 .block();
@@ -1512,9 +1510,12 @@ public class MyStepdefs {
     @When("^listen-status is trying to change to - no side effects:$")
     public void listenStatusIsTryingToChangeToNoSideEffects(List<ListenerAction> changesActionList) {
         Flux.fromIterable(changesActionList)
-                .flatMap(listenerAction -> this.listenStore.dispatch(listenerAction).publishOn(Schedulers.elastic()),
+                .flatMap(listenerAction -> this.listenStore.dispatch(listenerAction),
                         changesActionList.size())
-                .blockLast();
+                .as(StepVerifier::create)
+                .expectNextCount(changesActionList.size())
+                .verifyComplete();
+        ;
     }
 
     @When("^listen-status is trying to change \"([^\"]*)\" when it can and also - no side effects:$")
@@ -1550,12 +1551,13 @@ public class MyStepdefs {
                 .negate();
 
         Mono<List<ListenerState>> changeTo$ = Flux.fromIterable(changesActionList)
-                .flatMap(action -> this.listenStore.dispatch(action).publishOn(Schedulers.elastic()),
-                        changesActionList.size())
+                .flatMap(action -> this.listenStore.dispatch(action), changesActionList.size())
                 .collectList();
 
-        Flux.merge(this.listenStore.tryDispatchUntil(listenerAction, isCanceled).publishOn(Schedulers.elastic())
-                .defaultIfEmpty(ListenerReducer.defaultListenState), changeTo$.publishOn(Schedulers.elastic()))
+        Mono<ListenerState> listenerStateMono = this.listenStore.tryDispatchUntil(listenerAction, isCanceled)
+                .publishOn(MyStepdefs.testParallelScheduler)
+                .defaultIfEmpty(ListenerReducer.defaultListenState);
+        Flux.merge(listenerStateMono, changeTo$.publishOn(MyStepdefs.testParallelScheduler))
                 .blockLast();
     }
 
@@ -1800,6 +1802,8 @@ public class MyStepdefs {
                 .expectNextCount(1)
                 .verifyComplete();
 
+        logger.info("app updated the allocator");
+
         UploadAlgorithm uploadAlgorithm = new UploadAlgorithmImpl(torrentInfo,
                 torrentDownloader.getTorrentStatusStore(),
                 torrentDownloader.getFileSystemLink(),
@@ -1815,6 +1819,8 @@ public class MyStepdefs {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+
+        logger.info("app started uploading");
 
         Flux<Integer> savedPieces$ = torrentDownloader.getFileSystemLink()
                 .savedPieces$()
@@ -1839,7 +1845,7 @@ public class MyStepdefs {
                                         .flatMap(pieceToSave ->
                                                 MyStepdefs.globalFakePeerAllocator
                                                         .createPieceMessage(link.getMe(), link.getPeer(), pieceToSave, 0, torrentInfo.getPieceLength(pieceToSave), allocatorState.getBlockLength())))
-                        .publishOn(Schedulers.elastic())
+                        .publishOn(MyStepdefs.testParallelScheduler)
                         .flatMap(pieceMessage ->
                                         link.sendMessages().sendPieceMessage(pieceMessage)
                                                 .flatMap(__ -> savedPieces$.filter(pieceIndex -> pieceIndex == pieceMessage.getIndex()).take(1).single())
