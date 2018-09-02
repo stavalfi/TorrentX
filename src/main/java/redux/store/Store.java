@@ -6,6 +6,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.UnicastProcessor;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import redux.reducer.Reducer;
 import redux.state.State;
@@ -20,15 +21,17 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
     private Flux<STATE_IMPL> states$;
 
     private FluxSink<Request<ACTION>> emitRequestsSink;
+    private Scheduler pullerScheduler;
 
     public Store(Reducer<STATE_IMPL, ACTION> reducer, STATE_IMPL defaultState, String identifier) {
         this.identifier = identifier;
+        this.pullerScheduler = Schedulers.newSingle(this.identifier + " - PULLER");
         Result<STATE_IMPL, ACTION> initialResult = new Result<>(new Request<>(defaultState.getAction()), defaultState, true);
 
         UnicastProcessor<Request<ACTION>> requests$ = UnicastProcessor.create();
         this.emitRequestsSink = requests$.sink();
 
-        this.results$ = requests$.subscribeOn(Schedulers.newSingle(this.identifier + " - PULLER - "))
+        this.results$ = requests$.subscribeOn(this.pullerScheduler)
                 .doOnNext(request -> logger.info(this.identifier + " - start inspecting request: " + request))
                 .scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
                     logger.trace(this.identifier + " - start processing request: " + request + ", current state: " + lastResult.getState());
@@ -133,5 +136,6 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 
     public void dispose() {
         this.emitRequestsSink.complete();
+        this.pullerScheduler.dispose();
     }
 }

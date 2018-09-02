@@ -12,6 +12,7 @@ Feature: (17) connect to valid fake-peers and map between them and their pieces
       | pieceIndex | peers |
       | 0          | 4040  |
       | 1          | 4040  |
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                       | downloadLocation |
@@ -30,6 +31,7 @@ Feature: (17) connect to valid fake-peers and map between them and their pieces
       | pieceIndex | peers |
       | 0          | 4040  |
       | 1          | 4041  |
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                       | downloadLocation |
@@ -47,6 +49,7 @@ Feature: (17) connect to valid fake-peers and map between them and their pieces
     Then application receive the following available pieces - for torrent: "<torrent>":
       | pieceIndex | peers |
       | 0          | 4040  |
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                       | downloadLocation |
@@ -65,6 +68,7 @@ Feature: (17) connect to valid fake-peers and map between them and their pieces
       | 1 |
     Then application receive the following available pieces - for torrent: "<torrent>":
       | pieceIndex | peers |
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                       | downloadLocation |
@@ -84,7 +88,7 @@ Feature: (17) connect to valid fake-peers and map between them and their pieces
     Then application receive the following available pieces - for torrent: "<torrent>":
       | pieceIndex | peers |
       | -1         | 4040  |
-
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                       | downloadLocation |

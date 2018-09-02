@@ -675,6 +675,7 @@ public class MyStepdefs {
                 .verifyComplete();
     }
 
+    private Mono<Link> fakePeerToAppLink$;
     private Mono<List<SendMessagesNotifications>> requestsFromFakePeerToMeList$;
     private Flux<AllocatorState> freePiecesFromApp$;
 
@@ -726,7 +727,7 @@ public class MyStepdefs {
                 .autoConnect(0);
 
         // start listen -> make fake peer connect to me -> send fake messages from fake-peer to me.
-        this.requestsFromFakePeerToMeList$ = TorrentDownloaders.getListenStore()
+        this.fakePeerToAppLink$ = TorrentDownloaders.getListenStore()
                 .dispatch(ListenerAction.START_LISTENING_IN_PROGRESS)
                 .flatMap(__ -> torrentDownloader.getTorrentStatusStore().dispatch(TorrentStatusAction.START_UPLOAD_IN_PROGRESS))
                 .flatMap(__ -> TorrentDownloaders.getListenStore().notifyWhen(ListenerAction.START_LISTENING_WIND_UP))
@@ -741,6 +742,8 @@ public class MyStepdefs {
                                 .map(listeningPort -> new Peer("localhost", listeningPort))
                                 .flatMap(me -> peersProvider.connectToPeerMono(me)))
                 .doOnNext(__ -> logger.debug("fake-peer connected to the app and start sending requests to the app."))
+                .cache();
+        this.requestsFromFakePeerToMeList$ = fakePeerToAppLink$
                 .map(Link::sendMessages)
                 .flatMapMany(sendMessagesObject -> sendMessagesObject.sendInterestedMessage()
                         .flatMapMany(__ -> MyStepdefs.globalFakePeerAllocator.latestState$()
@@ -814,7 +817,7 @@ public class MyStepdefs {
         Assert.assertEquals(expectedBlockFromMeSet, actualBlockFromMeSet);
 
         logger.debug("test passes successfully. start cleaning all the resources by closing the connection with the fake-peer.");
-        meToFakePeerLink.doOnNext(Link::closeConnection)
+        meToFakePeerLink.doOnNext(Link::dispose)
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -825,6 +828,12 @@ public class MyStepdefs {
                 .verifyComplete();
 
         logger.debug("end cleaning all the resources of the test by removing everything I did here.");
+
+        this.fakePeerToAppLink$.doOnNext(Link::dispose)
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+
         Utils.removeEverythingRelatedToLastTest();
         logger.debug("ended cleaning all the resources of the test.");
     }
@@ -846,7 +855,7 @@ public class MyStepdefs {
 
         this.fakePeersByPort = new LinkedList<>();
         if (this.meToFakePeerLink$ != null)
-            this.meToFakePeerLink$.doOnNext(Link::closeConnection)
+            this.meToFakePeerLink$.doOnNext(Link::dispose)
                     .collectList()
                     .as(StepVerifier::create)
                     .expectNextCount(1)
@@ -1021,7 +1030,7 @@ public class MyStepdefs {
         this.emitActualIncomingPieceMessages.complete();
 
         // close the connection of all the me-to-fake-peers
-        this.meToFakePeerLink$.doOnNext(Link::closeConnection)
+        this.meToFakePeerLink$.doOnNext(Link::dispose)
                 .collectList()
                 .as(StepVerifier::create)
                 .expectNextCount(1)
@@ -1586,9 +1595,7 @@ public class MyStepdefs {
     }
 
     @When("^fake-peer on port \"([^\"]*)\" try to connect for torrent \"([^\"]*)\", he receive the following error: \"([^\"]*)\"$")
-    public void fakePeerOnPortTryToConnectForTorrentHeReceiveTheFollowingError(String fakePeerPort, String
-            torrentFileName,
-                                                                               String exceptionType) throws Throwable {
+    public void fakePeerOnPortTryToConnectForTorrentHeReceiveTheFollowingError(String fakePeerPort, String torrentFileName, String exceptionType) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
         Throwable throwable;
@@ -1600,6 +1607,11 @@ public class MyStepdefs {
                 throw new InvalidParameterException("the given exception type is not supported in this test case");
         }
 
+        Flux<Link> appToFakePeerLink$ = TorrentDownloaders.getListener()
+                .getPeers$(torrentInfo)
+                .replay()
+                .autoConnect(0);
+
         Mono<Link> publisher = TorrentDownloaders.getListener()
                 .getListeningPort()
                 .timeout(Duration.ofSeconds(2), Mono.just(12345))
@@ -1609,7 +1621,7 @@ public class MyStepdefs {
                     FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessagesFakePeer = incomingPeerMessagesFakePeer$.sink();
                     return new PeersProvider(MyStepdefs.globalFakePeerAllocator, torrentInfo, "Fake peer", emitIncomingPeerMessagesFakePeer).connectToPeerMono(app);
                 })
-                .doOnNext(Link::closeConnection);
+                .doOnNext(Link::dispose);
         if (PeerExceptions.peerNotResponding.test(throwable))
             StepVerifier.create(publisher)
                     .verifyComplete();
@@ -1618,13 +1630,23 @@ public class MyStepdefs {
                     .expectError(throwable.getClass())
                     .verify();
 
-
+        appToFakePeerLink$.doOnNext(Link::dispose)
+                .timeout(Duration.ofMillis(100), Mono.empty())
+                .collectList()
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
     }
 
     @When("^fake-peer on port \"([^\"]*)\" try to connect for torrent \"([^\"]*)\", he succeed$")
     public void fakePeerOnPortTryToConnectForTorrentHeSucceed(String fakePeerPort, String torrentFileName) throws Throwable {
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
         Flux<Link> linkFlux = TorrentDownloaders.getListener()
+                .getPeers$(torrentInfo)
+                .replay()
+                .autoConnect(0);
+
+        Flux<Link> appToFakePeerLink$ = TorrentDownloaders.getListener()
                 .getPeers$(torrentInfo)
                 .replay()
                 .autoConnect(0);
@@ -1638,8 +1660,15 @@ public class MyStepdefs {
                     PeersProvider peersProvider = new PeersProvider(MyStepdefs.globalFakePeerAllocator, torrentInfo, "Fake peer", emitIncomingPeerMessagesFakePeer);
                     return peersProvider.connectToPeerMono(app);
                 })
-                .doOnNext(Link::closeConnection)
+                .doOnNext(Link::dispose)
                 .flatMap(__ -> linkFlux.take(1).single())
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+
+        appToFakePeerLink$.doOnNext(Link::dispose)
+                .timeout(Duration.ofMillis(100), Mono.empty())
+                .collectList()
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -1851,7 +1880,7 @@ public class MyStepdefs {
                                                 .flatMap(__ -> savedPieces$.filter(pieceIndex -> pieceIndex == pieceMessage.getIndex()).take(1).single())
                                 , piecesToSave.size())
                         .collectList()
-                        .doOnNext(__ -> link.closeConnection()))
+                        .doOnNext(__ -> link.dispose()))
                 .doOnNext(__ -> torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS))
                 .flatMap(__ -> torrentDownloader.getTorrentStatusStore().notifyWhen(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
                 .as(StepVerifier::create)
@@ -1900,7 +1929,7 @@ public class MyStepdefs {
                 .verifyComplete();
 
         if (this.meToFakePeerLink$ != null) {
-            this.meToFakePeerLink$.doOnNext(Link::closeConnection)
+            this.meToFakePeerLink$.doOnNext(Link::dispose)
                     .timeout(Duration.ofMillis(100), Mono.empty())
                     .collectList()
                     .as(StepVerifier::create)
@@ -1908,6 +1937,31 @@ public class MyStepdefs {
                     .verifyComplete();
             this.meToFakePeerLink$ = null;
         }
+
+        this.fakePeersByPort.stream()
+                .map(AbstractMap.SimpleEntry::getValue)
+                .map(RemoteFakePeer::getLink)
+                .forEach(Link::dispose);
+
+        Utils.removeEverythingRelatedToLastTest();
+    }
+
+    @Then("^fake-peers disconnect- for torrent: \"([^\"]*)\"$")
+    public void fakePeersDisconnectForTorrent(String torrentFileName) throws Throwable {
+        if (this.meToFakePeerLink$ != null) {
+            this.meToFakePeerLink$.doOnNext(Link::dispose)
+                    .timeout(Duration.ofMillis(100), Mono.empty())
+                    .collectList()
+                    .as(StepVerifier::create)
+                    .expectNextCount(1)
+                    .verifyComplete();
+            this.meToFakePeerLink$ = null;
+        }
+
+        this.fakePeersByPort.stream()
+                .map(AbstractMap.SimpleEntry::getValue)
+                .map(RemoteFakePeer::getLink)
+                .forEach(Link::dispose);
 
         Utils.removeEverythingRelatedToLastTest();
     }

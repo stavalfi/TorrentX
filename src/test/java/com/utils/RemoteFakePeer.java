@@ -24,7 +24,7 @@ public class RemoteFakePeer {
                 .doOnNext(requestMessage -> {
                     switch (fakePeerType) {
                         case CLOSE_IN_FIRST_REQUEST:
-                            link.closeConnection();
+                            link.dispose();
                             logger.info(identifier + " - closed the connection as it should do at the first message he receive.");
                             return;
                         case RESPOND_WITH_DELAY_100:

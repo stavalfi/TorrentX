@@ -119,6 +119,11 @@ public class Utils {
                 .expectNextCount(1)
                 .verifyComplete();
 
+        List<TorrentDownloader> torrentDownloaders = TorrentDownloaders.getInstance()
+                .getTorrentDownloadersFlux()
+                .collectList()
+                .block();
+
         TorrentDownloaders.getInstance()
                 .getTorrentDownloadersFlux()
                 .filter(torrentDownloader -> torrentDownloader.getTorrentStatusStore() != null)
@@ -137,7 +142,6 @@ public class Utils {
                 .map(TorrentDownloader::getTorrentStatusStore)
                 .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP, store))
                 .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP, store))
-                .doOnNext(Store::dispose)
                 .collectList()
                 .as(StepVerifier::create)
                 .expectNextCount(1)
@@ -153,6 +157,10 @@ public class Utils {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+
+        torrentDownloaders.stream()
+                .map(TorrentDownloader::getTorrentStatusStore)
+                .forEach(Store::dispose);
 
         TorrentDownloaders.getListenStore()
                 .dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
