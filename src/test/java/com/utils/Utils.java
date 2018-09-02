@@ -90,10 +90,11 @@ public class Utils {
 //                                        e.printStackTrace();
 //                                    }
                                 }
-                                Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
-                                        allocatorState.getFreeBlocksStatus().get(i));
+//                                Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
+//                                        allocatorState.getFreeBlocksStatus().get(i));
                             });
                 })
+                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().freeAll())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -111,10 +112,11 @@ public class Utils {
 //                                        e.printStackTrace();
 //                                    }
                                 }
-                                Assert.assertTrue("i: " + i + " - fake-peer allocator: " + allocatorState.toString(),
-                                        allocatorState.getFreeBlocksStatus().get(i));
+//                                Assert.assertTrue("i: " + i + " - fake-peer allocator: " + allocatorState.toString(),
+//                                        allocatorState.getFreeBlocksStatus().get(i));
                             });
                 })
+                .flatMap(__ -> MyStepdefs.globalFakePeerAllocator.freeAll())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
