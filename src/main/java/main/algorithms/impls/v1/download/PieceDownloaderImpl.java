@@ -37,7 +37,7 @@ public class PieceDownloaderImpl implements PieceDownloader {
     @Override
     public Mono<Integer> downloadPiece$(int pieceIndex, Flux<Link> links$) {
         final int pieceLength = this.torrentInfo.getPieceLength(pieceIndex);
-        final int maxRequestBlockLength = pieceLength;
+        final int maxRequestBlockLength = 17_000;
 
         return Flux.<Integer>generate(sink -> sink.next(this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex]))
                 .doOnSubscribe(__ -> logger.info("start downloading piece: " + pieceIndex))
