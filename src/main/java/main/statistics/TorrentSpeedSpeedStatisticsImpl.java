@@ -6,6 +6,8 @@ import main.file.system.allocator.AllocatedBlock;
 import main.peer.peerMessages.PeerMessage;
 import main.peer.peerMessages.PieceMessage;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.List;
@@ -13,6 +15,7 @@ import java.util.function.Function;
 import java.util.stream.DoubleStream;
 
 public class TorrentSpeedSpeedStatisticsImpl implements SpeedStatistics {
+    private static Scheduler statisticsScheduler = Schedulers.newSingle("STATISTICS");
 
     // don't change this number unless you change the expected results in the tests also.
     private final long rateInMillSeconds = 100;
@@ -44,7 +47,7 @@ public class TorrentSpeedSpeedStatisticsImpl implements SpeedStatistics {
         Function<Flux<? extends PeerMessage>, Flux<Double>> messagesToSpeedFlux =
                 pieceMessageToSize.andThen(pieceMessageSizeFlux ->
                         Flux.merge(pieceMessageSizeFlux, intervalFlux)
-                                .buffer(Duration.ofMillis(this.rateInMillSeconds), App.MyScheduler)
+                                .buffer(Duration.ofMillis(this.rateInMillSeconds), statisticsScheduler)
                                 .map(List::stream)
                                 .map(doubleStream -> doubleStream.mapToDouble(Double::doubleValue))
                                 .map(DoubleStream::sum));

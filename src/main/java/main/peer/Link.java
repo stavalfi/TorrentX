@@ -70,13 +70,18 @@ public class Link {
         return torrentInfo;
     }
 
-    public void closeConnection() {
+    private void closeConnection() {
         try {
             this.peerSocket.close();
         } catch (IOException exception) {
             // TODO: do something better... it's a fatal problem with my design!!!
             //exception.printStackTrace();
         }
+    }
+
+    public void dispose() {
+        closeConnection();
+        this.receivePeerMessages().dispose();
     }
 
     public SpeedStatistics getPeerSpeedStatistics() {

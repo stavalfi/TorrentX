@@ -81,27 +81,50 @@ public class Utils {
                 .latestState$()
                 .doOnNext(allocatorState -> {
                     IntStream.range(0, allocatorState.getAmountOfBlocks())
-                            .forEach(i -> Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
-                                    allocatorState.getFreeBlocksStatus().get(i)));
+                            .forEach(i -> {
+                                if (!allocatorState.getFreeBlocksStatus().get(i)) {
+                                    logger.error("fuck");
+//                                    try {
+//                                        Thread.sleep(100000000);
+//                                    } catch (InterruptedException e) {
+//                                        e.printStackTrace();
+//                                    }
+                                }
+//                                Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
+//                                        allocatorState.getFreeBlocksStatus().get(i));
+                            });
                 })
+                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().freeAll())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
 
         MyStepdefs.globalFakePeerAllocator
                 .latestState$()
-                .flatMap(allocatorState -> {
-                    boolean anyLeak = IntStream.range(0, allocatorState.getAmountOfBlocks())
-                            .anyMatch(i -> !allocatorState.getFreeBlocksStatus().get(i));
-                    if (anyLeak) {
-                        logger.error("There is a leak!!!!!!!: ", allocatorState.toString());
-                        return MyStepdefs.globalFakePeerAllocator.updateAllocations(10, 2_500_000);
-                    } else
-                        return Mono.just(allocatorState);
+                .doOnNext(allocatorState -> {
+                    IntStream.range(0, allocatorState.getAmountOfBlocks())
+                            .forEach(i -> {
+                                if (!allocatorState.getFreeBlocksStatus().get(i)) {
+                                    logger.error("fuck");
+//                                    try {
+//                                        Thread.sleep(100000000);
+//                                    } catch (InterruptedException e) {
+//                                        e.printStackTrace();
+//                                    }
+                                }
+//                                Assert.assertTrue("i: " + i + " - fake-peer allocator: " + allocatorState.toString(),
+//                                        allocatorState.getFreeBlocksStatus().get(i));
+                            });
                 })
+                .flatMap(__ -> MyStepdefs.globalFakePeerAllocator.freeAll())
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+
+        List<TorrentDownloader> torrentDownloaders = TorrentDownloaders.getInstance()
+                .getTorrentDownloadersFlux()
+                .collectList()
+                .block();
 
         TorrentDownloaders.getInstance()
                 .getTorrentDownloadersFlux()
@@ -109,7 +132,7 @@ public class Utils {
                 .map(TorrentDownloader::getTorrentStatusStore)
                 .flatMap(store -> store.dispatch(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
                         .flatMap(__ -> store.dispatch(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)))
-                .defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
+                .collectList()
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -120,8 +143,8 @@ public class Utils {
                 .filter(torrentDownloader -> torrentDownloader.getTorrentStatesSideEffects() != null)
                 .map(TorrentDownloader::getTorrentStatusStore)
                 .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_FILES_WIND_UP, store))
-                .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP))
-                .defaultIfEmpty(TorrentStatusReducer.defaultTorrentState)
+                .flatMap(store -> store.notifyWhen(TorrentStatusAction.REMOVE_TORRENT_WIND_UP, store))
+                .collectList()
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
@@ -137,6 +160,10 @@ public class Utils {
                 .expectNextCount(1)
                 .verifyComplete();
 
+        torrentDownloaders.stream()
+                .map(TorrentDownloader::getTorrentStatusStore)
+                .forEach(Store::dispose);
+
         TorrentDownloaders.getListenStore()
                 .dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
                 .flatMapMany(__ -> TorrentDownloaders.getListenStore().states$())
@@ -145,6 +172,7 @@ public class Utils {
                 .as(StepVerifier::create)
                 .expectNextCount(1)
                 .verifyComplete();
+
 
         // delete download folder from last test
         deleteAppDownloadFolder();
@@ -165,8 +193,6 @@ public class Utils {
                     switch (action) {
                         case START_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
-                                    .subscribeOn(Schedulers.elastic())
-                                    .publishOn(Schedulers.elastic())
                                     .flatMapMany(__ -> listenStore.states$())
                                     .filter(listenerState -> listenerState.isResumeListeningWindUp())
                                     .take(1)
@@ -175,17 +201,13 @@ public class Utils {
                             return listenStore.states$()
                                     .filter(ListenerState::isStartedListeningInProgress)
                                     .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action)
-                                            .subscribeOn(Schedulers.elastic())
-                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.states$())
                                     .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
                                     .single();
                         case RESUME_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
-                                    .subscribeOn(Schedulers.elastic())
-                                    .publishOn(Schedulers.elastic())
                                     .flatMapMany(__ -> listenStore.states$())
                                     .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
@@ -194,17 +216,13 @@ public class Utils {
                             return listenStore.states$()
                                     .filter(ListenerState::isResumeListeningInProgress)
                                     .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action)
-                                            .subscribeOn(Schedulers.elastic())
-                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.states$())
                                     .filter(ListenerState::isResumeListeningWindUp)
                                     .take(1)
                                     .single();
                         case PAUSE_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
-                                    .subscribeOn(Schedulers.elastic())
-                                    .publishOn(Schedulers.elastic())
                                     .flatMapMany(__ -> listenStore.states$())
                                     .filter(ListenerState::isPauseListeningWindUp)
                                     .take(1)
@@ -213,17 +231,13 @@ public class Utils {
                             return listenStore.states$()
                                     .filter(ListenerState::isPauseListeningInProgress)
                                     .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action)
-                                            .subscribeOn(Schedulers.elastic())
-                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.states$())
                                     .filter(ListenerState::isPauseListeningWindUp)
                                     .take(1)
                                     .single();
                         case RESTART_LISTENING_IN_PROGRESS:
                             return listenStore.dispatch(action)
-                                    .subscribeOn(Schedulers.elastic())
-                                    .publishOn(Schedulers.elastic())
                                     .flatMapMany(__ -> listenStore.states$())
                                     .filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
                                     .take(1)
@@ -232,9 +246,7 @@ public class Utils {
                             return listenStore.states$()
                                     .filter(ListenerState::isRestartListeningInProgress)
                                     .take(1)
-                                    .flatMap(__ -> listenStore.dispatch(action)
-                                            .subscribeOn(Schedulers.elastic())
-                                            .publishOn(Schedulers.elastic()))
+                                    .flatMap(__ -> listenStore.dispatch(action))
                                     .flatMap(__ -> listenStore.states$())
                                     .filter(state -> isEqualByProperties.test(state, ListenerReducer.defaultListenState))
                                     .take(1)

@@ -32,6 +32,7 @@ import java.util.function.Supplier;
 
 public class Listener {
     private static Logger logger = LoggerFactory.getLogger(Listener.class);
+    private static Scheduler listenerScheduler = Schedulers.newSingle("LISTENER");
 
     private static final int TCP_PORT = 8040;
 
@@ -131,7 +132,7 @@ public class Listener {
             }
         });
 
-        return peersSocket.subscribeOn(Schedulers.newSingle("LISTENER"))
+        return peersSocket.subscribeOn(listenerScheduler)
                 .concatMap(peerSocket -> acceptPeerConnection(peerSocket)
                         .doOnNext(link -> logger.info(this.identifier + " - new peer connected to me successfully: " + link))
                         .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty()));

@@ -1,4 +1,4 @@
-Feature: remove torrent and files
+Feature: (8) remove torrent and files
 
   Scenario Outline: (1) start remove torrent while we didn't start to download and upload
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is - no side effects:

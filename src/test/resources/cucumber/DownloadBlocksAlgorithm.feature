@@ -1,4 +1,4 @@
-Feature: download blocks from fake-peers
+Feature: (5) download blocks from fake-peers
 
   Scenario Outline: (0) download blocks from a valid fake-peer
     Given torrent: "<torrent>","<downloadLocation>"
@@ -12,6 +12,7 @@ Feature: download blocks from fake-peers
     Then application receive the following blocks from all - for torrent: "<torrent>":
       | pieceIndex | from | length |
       | 0          | 0    |        |
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                        | downloadLocation |
@@ -33,6 +34,7 @@ Feature: download blocks from fake-peers
       | pieceIndex | from | length |
       | 0          | 0    |        |
       | -1         | 0    | 10     |
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                        | downloadLocation |
@@ -69,6 +71,7 @@ Feature: download blocks from fake-peers
       | 1          | 0    |        |
       | 4          | 0    |        |
       | 5          | 0    | 10     |
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                        | downloadLocation |
@@ -98,6 +101,7 @@ Feature: download blocks from fake-peers
       | 2          | 0    | 2      |
       | 3          | 0    | 3      |
       | 4          | 0    | 4      |
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                        | downloadLocation |
@@ -123,6 +127,7 @@ Feature: download blocks from fake-peers
       | 0          | 0    |        |
       | -2         | 0    |        |
       | -1         | 0    | 10     |
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                        | downloadLocation |
@@ -148,6 +153,7 @@ Feature: download blocks from fake-peers
       | 0          | 0    |        |
       | -2         | 0    |        |
       | -1         | 0    | 10     |
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                        | downloadLocation |
@@ -174,6 +180,7 @@ Feature: download blocks from fake-peers
       | 0          | 0    |        |
       | -2         | 0    |        |
       | -1         | 0    | 10     |
+    Then fake-peers disconnect- for torrent: "<torrent>"
 
     Examples:
       | torrent                        | downloadLocation |

@@ -5,12 +5,12 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.UnicastProcessor;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import redux.reducer.Reducer;
 import redux.state.State;
 
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.BiPredicate;
 
 public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier<STATE_IMPL, ACTION> {
@@ -19,31 +19,27 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 
     private Flux<Result<STATE_IMPL, ACTION>> results$;
     private Flux<STATE_IMPL> states$;
-    private BlockingQueue<Request<ACTION>> requestsQueue = new LinkedBlockingQueue<>();
+
+    private FluxSink<Request<ACTION>> emitRequestsSink;
+    private Scheduler pullerScheduler;
 
     public Store(Reducer<STATE_IMPL, ACTION> reducer, STATE_IMPL defaultState, String identifier) {
         this.identifier = identifier;
+        this.pullerScheduler = Schedulers.newSingle(this.identifier + " - PULLER");
         Result<STATE_IMPL, ACTION> initialResult = new Result<>(new Request<>(defaultState.getAction()), defaultState, true);
 
-        this.results$ = Flux.create((FluxSink<Request<ACTION>> sink) -> {
-            while (true) {
-                try {
-                    Request<ACTION> request = this.requestsQueue.take();
-                    logger.trace(this.identifier + " - start inspecting request: " + request);
-                    sink.next(request);
-                } catch (InterruptedException e) {
-                    sink.error(e);
-                    return;
-                }
-            }
-        }).subscribeOn(Schedulers.newSingle(this.identifier + " - PULLER - "))
+        UnicastProcessor<Request<ACTION>> requests$ = UnicastProcessor.create();
+        this.emitRequestsSink = requests$.sink();
+
+        this.results$ = requests$.subscribeOn(this.pullerScheduler)
+                .doOnNext(request -> logger.info(this.identifier + " - start inspecting request: " + request))
                 .scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
                     logger.trace(this.identifier + " - start processing request: " + request + ", current state: " + lastResult.getState());
                     Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
                     if (!result.isNewState())
-                        logger.trace(this.identifier + " - ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
+                        logger.debug(this.identifier + " - ignored -  request: " + request + " last state: " + lastResult.getState() + "\n");
                     else
-                        logger.trace(this.identifier + " - passed - request: " + request + " new state: " + result.getState() + "\n");
+                        logger.debug(this.identifier + " - passed - request: " + request + " new state: " + result.getState() + "\n");
                     return result;
                 })
                 .replay()
@@ -53,7 +49,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
                 .doOnNext(result -> logger.trace(this.identifier + " - analyzing result: " + result))
                 .map(Result::getState)
                 .distinctUntilChanged()
-                .doOnNext(state -> logger.info(this.identifier + " - new state: " + state))
+                .doOnNext(state -> logger.debug(this.identifier + " - new state: " + state))
                 .replay(1)
                 .autoConnect(0);
     }
@@ -64,21 +60,11 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 
     public void dispatchNonBlocking(ACTION action) {
         Request<ACTION> request = new Request<>(action);
-        try {
-            this.requestsQueue.put(request);
-        } catch (InterruptedException e) {
-            // TODO: do something with this
-            e.printStackTrace();
-        }
+        this.emitRequestsSink.next(request);
     }
 
     public void dispatchNonBlocking(Request<ACTION> request) {
-        try {
-            this.requestsQueue.put(request);
-        } catch (InterruptedException e) {
-            // TODO: do something with this
-            e.printStackTrace();
-        }
+        this.emitRequestsSink.next(request);
     }
 
     public Mono<Result<STATE_IMPL, ACTION>> dispatch(Request<ACTION> request) {
@@ -87,13 +73,9 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
                 .take(1)
                 .replay()
                 .autoConnect(0);
-        try {
-            this.requestsQueue.put(request);
-        } catch (InterruptedException e) {
-            return Mono.error(e);
-        }
+        this.emitRequestsSink.next(request);
         return resultFlux.take(1)
-                .single();
+                .singleOrEmpty();
     }
 
     public Mono<STATE_IMPL> dispatch(ACTION action) {
@@ -110,14 +92,14 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
                 .filter(stateImpl -> stateImpl.fromAction(action))
                 .take(1)
                 .switchIfEmpty(latestState$())
-                .single();
+                .singleOrEmpty();
     }
 
     @Override
     public Mono<STATE_IMPL> latestState$() {
         return this.states$
                 .take(1)
-                .single();
+                .singleOrEmpty();
     }
 
     @Override
@@ -140,7 +122,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
         return states$()
                 .filter(stateImpl -> stateImpl.fromAction(when))
                 .take(1)
-                .single();
+                .singleOrEmpty();
     }
 
     @Override
@@ -148,7 +130,12 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
         return states$()
                 .filter(stateImpl -> stateImpl.fromAction(when))
                 .take(1)
-                .single()
+                .singleOrEmpty()
                 .map(stateImpl -> mapTo);
+    }
+
+    public void dispose() {
+        this.emitRequestsSink.complete();
+        this.pullerScheduler.dispose();
     }
 }

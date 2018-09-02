@@ -42,7 +42,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
         this.peerCurrentStatus = peerCurrentStatus;
         this.identifier = identifier;
         EmitterProcessor<PeerMessage> sentMessages$ = EmitterProcessor.create();
-        this.sentMessages$ = sentMessages$.publishOn(Schedulers.elastic());
+        this.sentMessages$ = sentMessages$;
         this.emitSentMessages = sentMessages$.sink();
         this.sendMessages = new SendMessages(peerDataOutputStream, closeConnectionMethod);
     }

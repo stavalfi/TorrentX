@@ -1,4 +1,4 @@
-Feature: start/stop/restart listening to new peers
+Feature: (11) start/stop/restart listening to new peers
 
   Scenario: (1) start listener
     Given initial listen-status - no side effects:

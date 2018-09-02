@@ -1,4 +1,4 @@
-Feature: download pieces from fake-peers
+Feature: (12) download pieces from fake-peers
 
 #  Scenario Outline: download 2 pieces ,one by one, from a valid fake-peer
 #    Given torrent: "<torrent>","<downloadLocation>"

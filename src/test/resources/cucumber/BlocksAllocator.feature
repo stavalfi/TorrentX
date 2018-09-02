@@ -1,4 +1,4 @@
-Feature: allocate and free blocks from multiple threads
+Feature: (1) allocate and free blocks from multiple threads
 
   Scenario Outline: (1) we create a piece-message with valid parameters
     Given allocator for "5" blocks with "17000" bytes each

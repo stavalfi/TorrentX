@@ -1,4 +1,4 @@
-Feature: create get and delete active torrents
+Feature: (7) create get and delete active torrents
 
   Scenario Outline: (1) remove torrent concurrently while nothing has started
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" with default initial state

@@ -1,4 +1,4 @@
-Feature: connect to invalid fake-peers and download a piece from them
+Feature: (9) connect to invalid fake-peers and download a piece from them
 
   Scenario Outline: (3) try to download from multiple invalid peers until valid peers are available
     Given torrent: "<torrent>","<downloadLocation>"

@@ -1,4 +1,4 @@
-Feature: connect to valid fake-peers and download a piece from them
+Feature: (16) connect to valid fake-peers and download a piece from them
 
   Scenario Outline: (1) download one piece from valid peer
     Given torrent: "<torrent>","<downloadLocation>"
@@ -67,6 +67,7 @@ Feature: connect to valid fake-peers and download a piece from them
       | torrent                       | downloadLocation |
       | torrent-file-example1.torrent | torrents-test/   |
 
+   # bug blocked
   Scenario Outline: (5) download one piece from valid peer who send less data then requested every time
     Given torrent: "<torrent>","<downloadLocation>"
     When listen-status is trying to change to:

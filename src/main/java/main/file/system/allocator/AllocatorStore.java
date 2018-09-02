@@ -65,8 +65,8 @@ public class AllocatorStore {
     public Mono<AllocatorState> free(AllocatedBlock allocatedBlock) {
         FreeAllocationRequest request = new FreeAllocationRequest(allocatedBlock);
         return this.allocatorStore.dispatch(request)
-                .map(allocatorStateAllocatorActionResult -> allocatorStateAllocatorActionResult.getState())
-                .doOnNext(requestMessage -> logger.info(this.allocatorStore.getIdentifier() + " -123 " + AllocatorAction.FREE_ALLOCATION.toString() + allocatedBlock));
+                .map(Result::getState)
+                .doOnNext(requestMessage -> logger.info(this.allocatorStore.getIdentifier() + AllocatorAction.FREE_ALLOCATION.toString() + allocatedBlock));
     }
 
     public Mono<AllocatorState> freeAll() {

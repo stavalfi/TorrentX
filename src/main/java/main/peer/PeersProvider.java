@@ -14,6 +14,8 @@ import main.tracker.response.AnnounceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.*;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -25,7 +27,6 @@ import java.util.AbstractMap;
 
 public class PeersProvider {
     private static Logger logger = LoggerFactory.getLogger(PeersProvider.class);
-
     private TorrentInfo torrentInfo;
     private AllocatorStore allocatorStore;
     private String identifier;
@@ -83,7 +84,7 @@ public class PeersProvider {
                 logger.trace("closed a socket: ", e);
                 sink.error(e);
             }
-        }).subscribeOn(App.MyScheduler)
+        }).subscribeOn(Schedulers.parallel())
                 .doOnNext(link -> logger.info("connected to peer successfully: " + link))
                 .doOnError(PeerExceptions.communicationErrors, throwable -> logger.debug("error signal: (the application failed to connect to a peer." +
                         " the application will try to connect to the next available peer).\n" +

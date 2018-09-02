@@ -1,4 +1,4 @@
-Feature: start/stop/restart listening to new peers and include side-effects in the test
+Feature: (10) start/stop/restart listening to new peers and include side-effects in the test
 
   Scenario: (1) start listener
     Given initial listen-status - default

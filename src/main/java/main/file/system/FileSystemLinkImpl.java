@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import redux.store.Store;
 
@@ -32,7 +33,7 @@ import java.util.stream.Collectors;
 
 public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     private static Logger logger = LoggerFactory.getLogger(FileSystemLinkImpl.class);
-
+    private static Scheduler saveBlockScheduler = Schedulers.newSingle("FS-SAVE-BLOCK");
     private final Flux<ActualFile> actualFileImplList;
     private final BitSet piecesStatus;
     private final int[] downloadedBytesInPieces;
@@ -91,7 +92,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
         this.savedBlocks$ = torrentStatusStore.latestState$()
                 .map(torrentStatusState -> torrentStatusState.fromAction(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP))
-                .publishOn(Schedulers.elastic())
+                .publishOn(saveBlockScheduler)
                 .flatMapMany(isCompletedDownloading -> {
                     if (isCompletedDownloading) {
                         logger.info(this.identifier + " - Torrent: " + torrentInfo.getName() + ", the torrent download is already completed so we update our internal state that all the pieces are completed.");

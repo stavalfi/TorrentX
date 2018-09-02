@@ -5,6 +5,7 @@ import main.algorithms.BlockDownloader;
 import main.downloader.PieceEvent;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
+import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.RequestMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,24 +39,19 @@ public class BlockDownloaderImpl implements BlockDownloader {
      */
     @Override
     public Mono<PieceEvent> downloadBlock(Link link, RequestMessage requestMessage) {
-        // TODO: we should send this message and listen concurrently using Flux.merge to the saved pieces instead of this impolemenation using replay.
-
-        Flux<PieceEvent> pieceSavedNotifier$ = this.fileSystemLink.savedBlocks$()
+        Mono<PieceEvent> savedPiece$ = this.fileSystemLink.savedBlocks$()
                 .filter(torrentPieceChanged -> requestMessage.getIndex() == torrentPieceChanged.getReceivedPiece().getIndex())
                 .filter(torrentPieceChanged -> requestMessage.getBegin() == torrentPieceChanged.getReceivedPiece().getBegin())
-                .replay(1)
-                .autoConnect(0);
+                .limitRequest(1)
+                .single();
 
-        return link.sendMessages()
-                .sendRequestMessage(requestMessage.getIndex(), requestMessage.getBegin(), requestMessage.getBlockLength())
+        Mono<SendMessagesNotifications> sendRequestMessage$ = link.sendMessages()
+                .sendRequestMessage(requestMessage.getIndex(), requestMessage.getBegin(), requestMessage.getBlockLength());
+
+        return Mono.zip(savedPiece$, sendRequestMessage$, (pieceEvent, sendMessagesNotifications) -> pieceEvent)
                 .doOnSubscribe(__ -> logger.debug(this.identifier + " - start sending request message: " + requestMessage))
-                .doOnNext(__ -> logger.debug(this.identifier + " - end sending request message: " + requestMessage))
-                .flatMap(__ -> pieceSavedNotifier$.limitRequest(1).single())
-                // max wait to the correct block back from peer.
-                //TODO: in some operating systems, the IO operations are extremely slow.
-                // for example the first use of randomAccessFile object. in linux all good.
-                // we need to remember to change back 20->2.
                 .timeout(Duration.ofMillis(2500))
-                .doOnError(TimeoutException.class, throwable -> logger.debug(this.identifier + " - no response to the request: " + requestMessage));
+                .doOnError(TimeoutException.class, throwable -> logger.debug(this.identifier + " - no response to the request: " + requestMessage))
+                .doOnNext(__ -> logger.debug(this.identifier + " - end sending request message: " + requestMessage));
     }
 }

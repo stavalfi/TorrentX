@@ -1,4 +1,4 @@
-Feature: start/stop downloading/uploading
+Feature: (6) start/stop downloading/uploading
 
   Scenario Outline: (1) start downloading
     Given initial torrent-status for torrent: "<torrent>" in "<downloadLocation>" is - no side effects:

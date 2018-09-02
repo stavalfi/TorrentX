@@ -21,13 +21,15 @@ import java.util.Objects;
 class ReceivePeerMessages {
     private static Logger logger = LoggerFactory.getLogger(ReceivePeerMessages.class);
 
+    private Scheduler scheduler;
+
     public ReceivePeerMessages(AllocatorStore allocatorStore,
                                TorrentInfo torrentInfo, Peer me, Peer peer,
                                DataInputStream dataInputStream,
                                String identifier,
                                Link link,
                                FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessages) {
-        Scheduler scheduler = Schedulers.newSingle(identifier + " - RECEIVE-PEER-MESSAGES");
+        this.scheduler = Schedulers.newSingle(identifier + " - MESSAGES");
         Mono<? extends PeerMessage> peerMessage$ = Mono.just(scheduler)
                 .flatMap(__ -> waitForMessage(allocatorStore, scheduler, torrentInfo, peer, me, dataInputStream, identifier))
                 .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty())
@@ -63,6 +65,10 @@ class ReceivePeerMessages {
                 .repeat()
                 .publish()
                 .autoConnect(0);
+    }
+
+    public void dispose() {
+        this.scheduler.dispose();
     }
 
     private static Mono<? extends PeerMessage> waitForMessage(AllocatorStore allocatorStore, Scheduler scheduler, TorrentInfo torrentInfo,

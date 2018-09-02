@@ -25,7 +25,6 @@ import java.util.AbstractMap;
 import java.util.HashSet;
 
 public class App {
-    public static Scheduler MyScheduler = Schedulers.elastic();
     private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test" + File.separator;
 
     private static void f5() throws IOException, InterruptedException {
