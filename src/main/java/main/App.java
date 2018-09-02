@@ -109,7 +109,12 @@ public class App {
                 "main" + File.separator +
                 "resources" + File.separator +
                 "torrents" + File.separator +
-                "tor.torrent";
-        return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
+                "torrent-file-example3.torrent";
+        TorrentInfo torrentInfo = new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
+        System.out.println(torrentInfo);
+        System.out.println("--------------------------------------");
+        System.out.println("--------------------------------------");
+        System.out.println("--------------------------------------");
+        return torrentInfo;
     }
 }

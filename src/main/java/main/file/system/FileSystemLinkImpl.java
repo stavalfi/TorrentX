@@ -110,7 +110,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .doOnNext(__ -> {
                     // we may come here even if we got am empty flux but the download isn't yet completed.
                     if (areAllPiecesSaved()) {
-                        logger.info(this.identifier + " - Torrent: " + torrentInfo + ", we finished to download the torrent and we dispatch a comeplete notification using redux.");
+                        logger.info(this.identifier + " - Torrent: " + torrentInfo + ", we finished to download the torrent and we dispatch a complete notification using redux.");
                         torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS);
                     }
                 })

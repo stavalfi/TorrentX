@@ -47,7 +47,7 @@ public class AllocatorStore {
                 .single()
                 .cast(CreatePieceMessageResult.class)
                 .map(CreatePieceMessageResult::getPieceMessage)
-                .doOnNext(pieceMessage -> logger.info(this.allocatorStore.getIdentifier() + " - allocation ended " + AllocatorAction.CREATE_PIECE_MESSAGE.toString() + pieceMessage));
+                .doOnNext(pieceMessage -> logger.debug(this.allocatorStore.getIdentifier() + " - allocation ended " + AllocatorAction.CREATE_PIECE_MESSAGE.toString() + pieceMessage));
     }
 
     public Mono<RequestMessage> createRequestMessage(Peer from, Peer to, int index, int begin, int blockLength, int pieceLength) {
@@ -59,14 +59,14 @@ public class AllocatorStore {
         return this.allocatorStore.dispatch(request)
                 .cast(CreateRequestMessageResult.class)
                 .map(CreateRequestMessageResult::getRequestMessage)
-                .doOnNext(requestMessage -> logger.info(this.allocatorStore.getIdentifier() + " - " + AllocatorAction.CREATE_REQUEST_MESSAGE.toString() + request));
+                .doOnNext(requestMessage -> logger.debug(this.allocatorStore.getIdentifier() + " - " + AllocatorAction.CREATE_REQUEST_MESSAGE.toString() + request));
     }
 
     public Mono<AllocatorState> free(AllocatedBlock allocatedBlock) {
         FreeAllocationRequest request = new FreeAllocationRequest(allocatedBlock);
         return this.allocatorStore.dispatch(request)
                 .map(Result::getState)
-                .doOnNext(requestMessage -> logger.info(this.allocatorStore.getIdentifier() + AllocatorAction.FREE_ALLOCATION.toString() + allocatedBlock));
+                .doOnNext(requestMessage -> logger.debug(this.allocatorStore.getIdentifier() + AllocatorAction.FREE_ALLOCATION.toString() + allocatedBlock));
     }
 
     public Mono<AllocatorState> freeAll() {

@@ -32,7 +32,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
         this.emitRequestsSink = requests$.sink();
 
         this.results$ = requests$.subscribeOn(this.pullerScheduler)
-                .doOnNext(request -> logger.info(this.identifier + " - start inspecting request: " + request))
+                .doOnNext(request -> logger.debug(this.identifier + " - start inspecting request: " + request))
                 .scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
                     logger.trace(this.identifier + " - start processing request: " + request + ", current state: " + lastResult.getState());
                     Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
@@ -49,7 +49,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
                 .doOnNext(result -> logger.trace(this.identifier + " - analyzing result: " + result))
                 .map(Result::getState)
                 .distinctUntilChanged()
-                .doOnNext(state -> logger.debug(this.identifier + " - new state: " + state))
+                .doOnNext(state -> logger.info(this.identifier + " - new state: " + state.getAction()))
                 .replay(1)
                 .autoConnect(0);
     }

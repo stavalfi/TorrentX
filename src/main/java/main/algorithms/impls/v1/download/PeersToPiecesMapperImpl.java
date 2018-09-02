@@ -51,11 +51,11 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
         Flux<AbstractMap.SimpleEntry<Link, Integer>> fromBitFieldMessages = incomingPeerMessagesNotifier.getIncomingPeerMessages$()
                 .filter(peerMessage -> peerMessage.getValue() instanceof BitFieldMessage)
                 .map(peerMessage -> new AbstractMap.SimpleEntry<>(peerMessage.getKey(), (BitFieldMessage) peerMessage.getValue()))
-                .doOnNext(bitFieldMessage -> logger.info("1. before filter - peer: " + bitFieldMessage.getKey().getPeer() +
+                .doOnNext(bitFieldMessage -> logger.debug("1. before filter - peer: " + bitFieldMessage.getKey().getPeer() +
                         " - published he can give me the following pieces using bitFieldMessage: " + bitFieldMessage.getValue()))
                 .map(bitFieldMessage -> new AbstractMap.SimpleEntry<>(bitFieldMessage.getKey(), bitFieldMessage.getValue().getPiecesStatus()))
                 .map(bitFieldMessage -> new AbstractMap.SimpleEntry<>(bitFieldMessage.getKey(), extractMissingPieces.apply(bitFieldMessage.getValue(), updatedPieceState)))
-                .doOnNext(bitFieldMessage -> logger.info("peer: " + bitFieldMessage.getKey().getPeer() +
+                .doOnNext(bitFieldMessage -> logger.debug("peer: " + bitFieldMessage.getKey().getPeer() +
                         " - published he can give me the following pieces using bitFieldMessage: " + bitFieldMessage.getValue()))
                 .flatMap(bitFieldMessage -> produceMissingPieces.apply(bitFieldMessage.getKey(), bitFieldMessage.getValue()));
 
@@ -63,11 +63,12 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
                 .filter(peerMessage -> peerMessage.getValue() instanceof HaveMessage)
                 .map(peerMessage -> new AbstractMap.SimpleEntry<>(peerMessage.getKey(), (HaveMessage) peerMessage.getValue()))
                 .map(haveMessage -> new AbstractMap.SimpleEntry<>(haveMessage.getKey(), haveMessage.getValue().getPieceIndex()))
-                .doOnNext(haveMessage -> logger.info("peer: " + haveMessage.getKey().getPeer() +
+                .doOnNext(haveMessage -> logger.debug("peer: " + haveMessage.getKey().getPeer() +
                         " - published he can give me this piece using bitFieldMessage: " + haveMessage.getValue()));
 
         this.linksByAvailableMissingPiece$ = Flux.merge(fromBitFieldMessages, fromHaveMessages)
                 .distinct()
+                // TODO: end stream when download completed and make test for it.
                 .doOnNext(piece -> logger.debug("peer: " + piece.getKey().getPeer() + " - can give me this piece: " + piece.getValue()))
                 .groupBy(AbstractMap.SimpleEntry::getValue, AbstractMap.SimpleEntry::getKey);
     }

@@ -37,16 +37,16 @@ public class PieceDownloaderImpl implements PieceDownloader {
     @Override
     public Mono<Integer> downloadPiece$(int pieceIndex, Flux<Link> links$) {
         final int pieceLength = this.torrentInfo.getPieceLength(pieceIndex);
-        final int maxRequestBlockLength = 17_000;
+        final int maxRequestBlockLength = 16_384;
 
         return Flux.<Integer>generate(sink -> sink.next(this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex]))
                 .doOnSubscribe(__ -> logger.info("start downloading piece: " + pieceIndex))
                 .concatMap(requestFrom ->
                         links$.filter(link -> !link.getPeerCurrentStatus().getIsHeChokingMe())
-                                .doOnNext(link -> logger.info("1. downloading piece: " + pieceIndex + " from: " + requestFrom + " from peer: " + link.getPeer()))
+                                .doOnNext(link -> logger.debug("downloading piece: " + pieceIndex + " from: " + requestFrom + " from peer: " + link.getPeer()))
                                 .concatMap(link ->
                                         this.allocatorStore.createRequestMessage(link.getMe(), link.getPeer(), pieceIndex, requestFrom, maxRequestBlockLength, pieceLength)
-                                                .doOnNext(requestMessage -> logger.info("start downloading block: " + requestMessage))
+                                                .doOnNext(requestMessage -> logger.debug("start downloading block: " + requestMessage))
                                                 .flatMap(requestMessage -> blockDownloader.downloadBlock(link, requestMessage)
                                                         .doOnError(TimeoutException.class, throwable -> link.getPeerCurrentStatus().setIsHeChokingMe(true))
                                                         .doOnError(TimeoutException.class, throwable -> logger.debug("peer: " + link.getPeer() + " not responding to my request: " + requestMessage)))
@@ -54,7 +54,7 @@ public class PieceDownloaderImpl implements PieceDownloader {
                                 .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty())
                                 .limitRequest(1))
                 .filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
-                .doOnNext(__ -> logger.info("finished to download piece: " + pieceIndex))
+                .doOnNext(__ -> logger.debug("finished to download piece: " + pieceIndex))
                 .limitRequest(1)
                 .single()
                 .map(__ -> pieceIndex);
