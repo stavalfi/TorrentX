@@ -15,8 +15,8 @@ import reactor.core.publisher.GroupedFlux;
 import reactor.core.publisher.UnicastProcessor;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.AbstractMap;
-import java.util.BitSet;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.IntStream;
@@ -29,7 +29,7 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
     public PeersToPiecesMapperImpl(TorrentInfo torrentInfo,
                                    IncomingPeerMessagesNotifier incomingPeerMessagesNotifier,
                                    Flux<Link> link$,
-                                   BitSet updatedPieceState) {
+                                   BitSet initialPiecesStatus) {
         BiFunction<BitSet, BitSet, BitSet> extractMissingPieces = (peerStatus, appStatus) -> {
             BitSet missingPiecesStatus = new BitSet(torrentInfo.getPieces().size());
             IntStream.range(0, torrentInfo.getPieces().size())
@@ -54,7 +54,7 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
                 .doOnNext(bitFieldMessage -> logger.debug("1. before filter - peer: " + bitFieldMessage.getKey().getPeer() +
                         " - published he can give me the following pieces using bitFieldMessage: " + bitFieldMessage.getValue()))
                 .map(bitFieldMessage -> new AbstractMap.SimpleEntry<>(bitFieldMessage.getKey(), bitFieldMessage.getValue().getPiecesStatus()))
-                .map(bitFieldMessage -> new AbstractMap.SimpleEntry<>(bitFieldMessage.getKey(), extractMissingPieces.apply(bitFieldMessage.getValue(), updatedPieceState)))
+                .map(bitFieldMessage -> new AbstractMap.SimpleEntry<>(bitFieldMessage.getKey(), extractMissingPieces.apply(bitFieldMessage.getValue(), initialPiecesStatus)))
                 .doOnNext(bitFieldMessage -> logger.debug("peer: " + bitFieldMessage.getKey().getPeer() +
                         " - published he can give me the following pieces using bitFieldMessage: " + bitFieldMessage.getValue()))
                 .flatMap(bitFieldMessage -> produceMissingPieces.apply(bitFieldMessage.getKey(), bitFieldMessage.getValue()));
@@ -70,7 +70,9 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
                 .distinct()
                 // TODO: end stream when download completed and make test for it.
                 .doOnNext(piece -> logger.debug("peer: " + piece.getKey().getPeer() + " - can give me this piece: " + piece.getValue()))
-                .groupBy(AbstractMap.SimpleEntry::getValue, AbstractMap.SimpleEntry::getKey);
+                .groupBy(AbstractMap.SimpleEntry::getValue, AbstractMap.SimpleEntry::getKey)
+                .publish()
+                .autoConnect(0);
     }
 
     @Override

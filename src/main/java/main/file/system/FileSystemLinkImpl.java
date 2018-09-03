@@ -96,7 +96,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .flatMapMany(isCompletedDownloading -> {
                     if (isCompletedDownloading) {
                         logger.info(this.identifier + " - Torrent: " + torrentInfo.getName() + ", the torrent download is already completed so we update our internal state that all the pieces are completed.");
-                        this.piecesStatus.set(0, torrentInfo.getPieces().size());
+                        synchronized (this.piecesStatus) {
+                            this.piecesStatus.set(0, torrentInfo.getPieces().size());
+                        }
                         return Flux.empty();
                     }
                     logger.info(this.identifier + " - Torrent: " + torrentInfo.getName() + ", the torrent download is not completed so we start accepting new incoming pieces.");
@@ -135,7 +137,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
     @Override
     public BitSet getUpdatedPiecesStatus() {
-        return this.piecesStatus;
+        return (BitSet) this.piecesStatus.clone();
     }
 
     @Override
@@ -145,15 +147,18 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
     @Override
     public BitFieldMessage buildBitFieldMessage(Peer from, Peer to) {
-        return new BitFieldMessage(from, to, this.piecesStatus);
+        synchronized (this.piecesStatus) {
+            return new BitFieldMessage(from, to, this.piecesStatus);
+        }
     }
 
     @Override
     public boolean havePiece(int pieceIndex) {
         assert 0 <= pieceIndex;
         assert pieceIndex <= super.getPieces().size();
-
-        return this.piecesStatus.get(pieceIndex);
+        synchronized (this.piecesStatus) {
+            return this.piecesStatus.get(pieceIndex);
+        }
     }
 
     @Override
@@ -186,9 +191,11 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
     }
 
     private boolean areAllPiecesSaved() {
-        for (int i = 0; i < this.getPieces().size(); i++)
-            if (!this.piecesStatus.get(i))
-                return false;
+        synchronized (this.piecesStatus) {
+            for (int i = 0; i < this.getPieces().size(); i++)
+                if (!this.piecesStatus.get(i))
+                    return false;
+        }
         return true;
     }
 
@@ -281,7 +288,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     long howMuchWeWroteUntilNowInThisPiece = this.downloadedBytesInPieces[pieceMessage.getIndex()];
                     logger.debug(this.identifier + " - end writing block to FS: " + pieceMessage);
                     if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
-                        this.piecesStatus.set(pieceMessage.getIndex());
+                        synchronized (this.piecesStatus) {
+                            this.piecesStatus.set(pieceMessage.getIndex());
+                        }
                         PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.COMPLETED, pieceMessage);
                         sink.success(pieceEvent);
                     } else {
