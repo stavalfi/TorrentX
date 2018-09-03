@@ -6,11 +6,16 @@ import main.algorithms.PieceDownloader;
 import main.algorithms.PiecesDownloader;
 import main.file.system.FileSystemLink;
 import main.file.system.allocator.AllocatorStore;
+import main.peer.PeerExceptions;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 import redux.store.Store;
+
+import java.util.concurrent.TimeoutException;
 
 public class PiecesDownloaderImpl implements PiecesDownloader {
     private Flux<TorrentStatusState> startDownload$;
@@ -28,12 +33,13 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
 
         // TODO: due to this implementation we need to first notify we started downloading and only then to start search for peers.
         // if not, we may lose some peers because we will listen to those new peers only after we start downloading.
-        this.downloadedPieces$ = peersToPiecesMapper.getLinksByAvailableMissingPiece$()
-                .flatMap(peersToPiece$ ->
+        this.downloadedPieces$ = peersToPiecesMapper.availablePieces$()
+                .flatMap(pieceIndex ->
                                 store.latestState$()
                                         .filter(torrentStatusState -> torrentStatusState.fromAction(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
-                                        .flatMap(__ -> pieceDownloader.downloadPiece$(peersToPiece$.key(), peersToPiece$.replay().autoConnect(0)))
-                        , 1, 1)
+                                        .flatMap(__ -> pieceDownloader.downloadPiece$(pieceIndex, peersToPiecesMapper.linksForPiece$(pieceIndex))
+                                                .onErrorResume(TimeoutException.class, throwable -> Mono.empty())),
+                        1, 1)
                 .publish()
                 .autoConnect(0);
 

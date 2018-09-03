@@ -9,6 +9,7 @@ import main.file.system.FileSystemLink;
 import main.peer.IncomingPeerMessagesNotifier;
 import main.peer.Link;
 import main.peer.SendMessagesNotifications;
+import main.peer.peerMessages.HaveMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
 import reactor.core.publisher.Flux;
@@ -28,33 +29,23 @@ public class App {
     private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test" + File.separator;
 
     private static void f5() throws IOException, InterruptedException {
-        TorrentDownloader torrentDownloader$ = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath);
-        TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader$);
+        TorrentDownloader torrentDownloader = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath);
 
-        torrentDownloader$.getIncomingPeerMessagesNotifier()
-                .getIncomingPeerMessages$()
-                .map(AbstractMap.SimpleEntry::getValue)
+        torrentDownloader.getIncomingPeerMessagesNotifier()
+                .getPieceMessageResponseFlux()
                 .subscribe(System.out::println);
 
-        torrentDownloader$.getPeersCommunicatorFlux()
+        torrentDownloader.getPeersCommunicatorFlux()
                 .map(Link::sendMessages)
                 .flatMap(SendMessagesNotifications::sentPeerMessages$)
-                .filter(peerMessage -> peerMessage instanceof RequestMessage)
-                .cast(RequestMessage.class)
-                .map(requestMessage -> "request: index: " + requestMessage.getIndex() +
-                        ", begin: " + requestMessage.getBegin() + ", from: " + requestMessage.getTo())
-                .subscribe(System.out::println, Throwable::printStackTrace);
+                .filter(peerMessage -> peerMessage instanceof HaveMessage)
+                .cast(HaveMessage.class)
+                .map(haveMessage -> "sent: " + haveMessage.toString())
+                .subscribe(System.out::println);
 
-        torrentDownloader$.getFileSystemLink()
-                .savedBlocks$()
-                .map(PieceEvent::getReceivedPiece)
-                .map(pieceMessage -> "received: index: " + pieceMessage.getIndex() +
-                        ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
-                .subscribe(System.out::println, Throwable::printStackTrace);
-
-        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS);
-        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_UPLOAD_IN_PROGRESS);
-        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS);
+        torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS);
+        torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_UPLOAD_IN_PROGRESS);
+        torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS);
     }
 
 
@@ -62,7 +53,7 @@ public class App {
         deleteDownloadFolder();
         Hooks.onOperatorDebug();
         f5();
-        Thread.sleep(1000 * 1000);
+        Thread.sleep(10000 * 1000);
     }
 
     private static void deleteDownloadFolder() {

@@ -47,7 +47,7 @@ public class SearchPeers {
                 .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_SEARCHING_PEERS_SELF_RESOLVED))
                 .flatMap(__ -> this.trackerProvider.connectToTrackersFlux()
                         .as(this.peersProvider::connectToPeers$))
-                .doOnNext(link -> logger.info(this.identifier + " - search-peers-module connected to new peer: " + link))
+                .doOnNext(link -> logger.debug(this.identifier + " - search-peers-module connected to new peer: " + link))
                 .flatMap(link -> store.notifyWhen(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP, link))
                 .doOnNext(link -> logger.debug(this.identifier + " - search-peers-module published new peer: " + link))
                 .publish()

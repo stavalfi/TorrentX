@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
@@ -39,24 +40,28 @@ public class PieceDownloaderImpl implements PieceDownloader {
         final int pieceLength = this.torrentInfo.getPieceLength(pieceIndex);
         final int maxRequestBlockLength = 16_384;
 
-        return Flux.<Integer>generate(sink -> sink.next(this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex]))
-                .doOnSubscribe(__ -> logger.info("start downloading piece: " + pieceIndex))
-                .concatMap(requestFrom ->
-                        links$.filter(link -> !link.getPeerCurrentStatus().getIsHeChokingMe())
-                                .doOnNext(link -> logger.debug("downloading piece: " + pieceIndex + " from: " + requestFrom + " from peer: " + link.getPeer()))
-                                .concatMap(link ->
+        return links$.doOnSubscribe(__ -> logger.debug("start downloading piece: " + pieceIndex))
+                .filter(link -> !link.getPeerCurrentStatus().getIsHeChokingMe())
+                .flatMap(link -> {
+                    if (!link.getPeerCurrentStatus().getAmIInterestedInHim())
+                        return link.sendMessages().sendInterestedMessage()
+                                .map(sendPeerMessages -> link);
+                    return Mono.just(link);
+                })
+                .concatMap(link ->
+                        Flux.<Integer>generate(sink -> sink.next(this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex]))
+                                .concatMap(requestFrom ->
                                         this.allocatorStore.createRequestMessage(link.getMe(), link.getPeer(), pieceIndex, requestFrom, maxRequestBlockLength, pieceLength)
                                                 .doOnNext(requestMessage -> logger.debug("start downloading block: " + requestMessage))
                                                 .flatMap(requestMessage -> blockDownloader.downloadBlock(link, requestMessage)
-                                                        .doOnError(TimeoutException.class, throwable -> link.getPeerCurrentStatus().setIsHeChokingMe(true))
                                                         .doOnError(TimeoutException.class, throwable -> logger.debug("peer: " + link.getPeer() + " not responding to my request: " + requestMessage)))
                                                 .doOnNext(pieceEvent -> logger.debug("ended downloading block: " + pieceEvent)))
-                                .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty())
-                                .limitRequest(1))
+                                .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty()))
                 .filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
-                .doOnNext(__ -> logger.debug("finished to download piece: " + pieceIndex))
+                .doOnNext(__ -> logger.info("finished to download piece: " + pieceIndex))
                 .limitRequest(1)
                 .single()
-                .map(__ -> pieceIndex);
+                .map(__ -> pieceIndex)
+                .timeout(Duration.ofSeconds(30), Schedulers.elastic());
     }
 }

@@ -111,13 +111,13 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .doOnNext(pieceMessage -> logger.trace(this.identifier + " - finished saving piece-message: " + pieceMessage))
                 .doOnNext(__ -> {
                     // we may come here even if we got am empty flux but the download isn't yet completed.
-                    if (areAllPiecesSaved()) {
+                    if (isDownloadCompleted()) {
                         logger.info(this.identifier + " - Torrent: " + torrentInfo + ", we finished to download the torrent and we dispatch a complete notification using redux.");
                         torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS);
                     }
                 })
                 // takeUntil will signal the last next signal he received and then he will send complete signal.
-                .takeUntil(pieceEvent -> areAllPiecesSaved())
+                .takeUntil(pieceEvent -> isDownloadCompleted())
                 .publish()
                 .autoConnect(0);
 
@@ -190,7 +190,8 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 });
     }
 
-    private boolean areAllPiecesSaved() {
+    @Override
+    public boolean isDownloadCompleted() {
         synchronized (this.piecesStatus) {
             for (int i = 0; i < this.getPieces().size(); i++)
                 if (!this.piecesStatus.get(i))

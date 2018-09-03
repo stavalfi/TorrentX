@@ -11,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
@@ -50,7 +52,7 @@ public class BlockDownloaderImpl implements BlockDownloader {
 
         return Mono.zip(savedPiece$, sendRequestMessage$, (pieceEvent, sendMessagesNotifications) -> pieceEvent)
                 .doOnSubscribe(__ -> logger.debug(this.identifier + " - start sending request message: " + requestMessage))
-                .timeout(Duration.ofMillis(2500))
+                .timeout(Duration.ofMillis(5000), Schedulers.elastic())
                 .doOnError(TimeoutException.class, throwable -> logger.debug(this.identifier + " - no response to the request: " + requestMessage))
                 .doOnNext(__ -> logger.debug(this.identifier + " - end sending request message: " + requestMessage));
     }

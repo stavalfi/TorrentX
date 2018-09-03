@@ -85,7 +85,7 @@ public class PeersProvider {
                 sink.error(e);
             }
         }).subscribeOn(Schedulers.parallel())
-                .doOnNext(link -> logger.info("connected to peer successfully: " + link))
+                .doOnNext(link -> logger.debug("connected to peer successfully: " + link))
                 .doOnError(PeerExceptions.communicationErrors, throwable -> logger.debug("error signal: (the application failed to connect to a peer." +
                         " the application will try to connect to the next available peer).\n" +
                         "peer: " + peer.toString() + "\n" +

@@ -902,6 +902,7 @@ public class MyStepdefs {
                 .build();
         this.peersToPiecesMapper = new PeersToPiecesMapperImpl(
                 torrentDownloader.getTorrentInfo(),
+                torrentDownloader.getFileSystemLink(),
                 torrentDownloader.getIncomingPeerMessagesNotifier(),
                 torrentDownloader.getPeersCommunicatorFlux(),
                 torrentDownloader.getFileSystemLink().getUpdatedPiecesStatus());
