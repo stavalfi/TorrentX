@@ -19,6 +19,7 @@ import java.util.concurrent.TimeoutException;
 
 public class BlockDownloaderImpl implements BlockDownloader {
     private static Logger logger = LoggerFactory.getLogger(BlockDownloaderImpl.class);
+    private static Scheduler downloadBlockScheduler = Schedulers.newParallel("DOWNLOAD-BLOCK",5);
 
     private TorrentInfo torrentInfo;
     private FileSystemLink fileSystemLink;
@@ -52,6 +53,7 @@ public class BlockDownloaderImpl implements BlockDownloader {
 
         return Mono.zip(savedPiece$, sendRequestMessage$, (pieceEvent, sendMessagesNotifications) -> pieceEvent)
                 .doOnSubscribe(__ -> logger.debug(this.identifier + " - start sending request message: " + requestMessage))
+                .subscribeOn(downloadBlockScheduler)
                 .timeout(Duration.ofMillis(2500))
                 .doOnError(TimeoutException.class, throwable -> logger.debug(this.identifier + " - no response to the request: " + requestMessage))
                 .doOnNext(__ -> logger.debug(this.identifier + " - end sending request message: " + requestMessage));

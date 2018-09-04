@@ -1,6 +1,7 @@
 package main;
 
 import christophedetroyer.torrent.TorrentParser;
+import main.algorithms.impls.v1.download.PieceDownloaderImpl;
 import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaderBuilder;
@@ -12,6 +13,8 @@ import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.HaveMessage;
 import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
@@ -22,15 +25,19 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Duration;
 import java.util.AbstractMap;
 import java.util.HashSet;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class App {
+    private static Logger logger = LoggerFactory.getLogger(App.class);
+
     private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test" + File.separator;
 
-    private static void f5() throws IOException {
+    private static void f5() throws IOException, InterruptedException {
         TorrentDownloader torrentDownloader = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath);
 
         torrentDownloader.getFileSystemLink()

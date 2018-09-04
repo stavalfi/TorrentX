@@ -39,7 +39,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
                                         .filter(torrentStatusState -> torrentStatusState.fromAction(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
                                         .flatMap(__ -> pieceDownloader.downloadPiece$(pieceIndex, peersToPiecesMapper.linksForPiece$(pieceIndex))
                                                 .onErrorResume(TimeoutException.class, throwable -> Mono.empty())),
-                        1, 1)
+                        5, 5)
                 .publish()
                 .autoConnect(0);
 

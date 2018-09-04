@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
@@ -19,6 +20,7 @@ import java.util.concurrent.TimeoutException;
 
 public class PieceDownloaderImpl implements PieceDownloader {
     private static Logger logger = LoggerFactory.getLogger(PieceDownloaderImpl.class);
+    private static Scheduler downloadPieceScheduler = Schedulers.newParallel("DOWNLOAD-PIECE", 5);
 
     private TorrentInfo torrentInfo;
     private FileSystemLink fileSystemLink;
@@ -62,6 +64,7 @@ public class PieceDownloaderImpl implements PieceDownloader {
                 .limitRequest(1)
                 .single()
                 .map(__ -> pieceIndex)
+                .subscribeOn(downloadPieceScheduler)
                 .timeout(Duration.ofSeconds(30));
     }
 }
