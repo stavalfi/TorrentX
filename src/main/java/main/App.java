@@ -24,12 +24,22 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.AbstractMap;
 import java.util.HashSet;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class App {
     private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test" + File.separator;
 
-    private static void f5() throws IOException, InterruptedException {
+    private static void f5() throws IOException {
         TorrentDownloader torrentDownloader = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath);
+
+        torrentDownloader.getFileSystemLink()
+                .savedPieces$()
+                .map(completedPieceIndex ->
+                        IntStream.range(0, torrentDownloader.getTorrentInfo().getPieces().size())
+                                .mapToObj(pieceIndex -> pieceIndex == completedPieceIndex ? "*" : torrentDownloader.getFileSystemLink().havePiece(pieceIndex) ? "1" : "0")
+                                .collect(Collectors.joining()))
+                .subscribe(System.out::println);
 
         torrentDownloader.getIncomingPeerMessagesNotifier()
                 .getPieceMessageResponseFlux()
@@ -100,7 +110,7 @@ public class App {
                 "main" + File.separator +
                 "resources" + File.separator +
                 "torrents" + File.separator +
-                "torrent-file-example3.torrent";
+                "torrent2.torrent";
         TorrentInfo torrentInfo = new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
         System.out.println(torrentInfo);
         System.out.println("--------------------------------------");

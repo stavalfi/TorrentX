@@ -62,6 +62,6 @@ public class PieceDownloaderImpl implements PieceDownloader {
                 .limitRequest(1)
                 .single()
                 .map(__ -> pieceIndex)
-                .timeout(Duration.ofSeconds(30), Schedulers.elastic());
+                .timeout(Duration.ofSeconds(30));
     }
 }

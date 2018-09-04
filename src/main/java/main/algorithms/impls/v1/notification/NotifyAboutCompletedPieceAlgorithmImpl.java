@@ -40,17 +40,19 @@ public class NotifyAboutCompletedPieceAlgorithmImpl implements NotifyAboutComple
                         .filter(torrentPieceChanged -> torrentPieceChanged.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
                         .map(PieceEvent::getReceivedPiece)
                         .map(PieceMessage::getIndex)
+                        .buffer(5)
+                        .flatMap(Flux::fromIterable)
                         .flatMap(completedPiece ->
                                 this.recordedFreePeer$.map(Link::sendMessages)
                                         .flatMap(sendPeerMessages -> sendPeerMessages.sendHaveMessage(completedPiece))
-                                        .timeout(Duration.ofSeconds(1), Schedulers.elastic())
+                                        .timeout(Duration.ofSeconds(1))
                                         // I will never complete the following line because recordedFreePeer$
                                         // never ends so I stop listening to it when I don't get peer per sec from him.
                                         // then I will signal (only once) the index of the piece which was completed.
                                         .collectList().map(sendPeerMessagesList -> completedPiece)
                                         .onErrorResume(TimeoutException.class, throwable -> Mono.just(completedPiece)))
                         .publish()
-                        .autoConnect(0);
+                        .autoConnect(1);
     }
 
     @Override

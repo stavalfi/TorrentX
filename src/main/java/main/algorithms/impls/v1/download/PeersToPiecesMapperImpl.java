@@ -28,8 +28,6 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
     private Flux<AbstractMap.SimpleEntry<Integer, Link>> linksForPiece$;
     private Flux<GroupedFlux<Integer, Link>> linksByAvailableMissingPiece$;
     private Set<Integer> availablePieces;
-    private FileSystemLink fileSystemLink;
-    private BitSet initialPiecesStatus;
 
     public PeersToPiecesMapperImpl(TorrentInfo torrentInfo,
                                    FileSystemLink fileSystemLink,
@@ -37,8 +35,6 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
                                    Flux<Link> link$,
                                    BitSet initialPiecesStatus) {
         this.listenToAvailablePiecesScheduler = Schedulers.newSingle("LISTEN-TO-MAPPER-" + torrentInfo.getTorrentInfoHash());
-        this.initialPiecesStatus = initialPiecesStatus;
-        this.fileSystemLink = fileSystemLink;
         this.availablePieces = ConcurrentHashMap.newKeySet();
 
         fileSystemLink.savedPieces$()
@@ -113,15 +109,15 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
         this.availablePieces$ = Flux.<Integer>create(sink -> {
             while (!sink.isCancelled() && !fileSystemLink.isDownloadCompleted()) {
                 // TODO: remove completed pieces from the set.
-                this.availablePieces.stream()
-                        .forEach(sink::next);
+                this.availablePieces.stream().forEach(sink::next);
             }
+            if (fileSystemLink.isDownloadCompleted())
+                sink.complete();
         }).filter(pieceIndex -> {
             synchronized (initialPiecesStatus) {
                 return !initialPiecesStatus.get(pieceIndex);
             }
-        })
-                .subscribeOn(this.listenToAvailablePiecesScheduler)
+        }).subscribeOn(this.listenToAvailablePiecesScheduler)
                 .publish()
                 .autoConnect(0);
     }
