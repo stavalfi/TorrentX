@@ -21,18 +21,15 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
     private Flux<STATE_IMPL> states$;
 
     private FluxSink<Request<ACTION>> emitRequestsSink;
-    private Scheduler pullerScheduler;
 
     public Store(Reducer<STATE_IMPL, ACTION> reducer, STATE_IMPL defaultState, String identifier) {
         this.identifier = identifier;
-        this.pullerScheduler = Schedulers.newSingle(this.identifier + " - PULLER");
         Result<STATE_IMPL, ACTION> initialResult = new Result<>(new Request<>(defaultState.getAction()), defaultState, true);
 
         UnicastProcessor<Request<ACTION>> requests$ = UnicastProcessor.create();
         this.emitRequestsSink = requests$.sink();
 
-        this.results$ = requests$.publishOn(this.pullerScheduler)
-                .doOnNext(request -> logger.debug(this.identifier + " - start inspecting request: " + request))
+        this.results$ = requests$.doOnNext(request -> logger.debug(this.identifier + " - start inspecting request: " + request))
                 .scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
                     logger.trace(this.identifier + " - start processing request: " + request + ", current state: " + lastResult.getState());
                     Result<STATE_IMPL, ACTION> result = reducer.reducer(lastResult.getState(), request);
@@ -88,7 +85,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
     public Mono<STATE_IMPL> tryDispatchUntil(ACTION action, BiPredicate<ACTION, STATE_IMPL> until) {
         return states$()
                 .takeWhile(stateImpl -> until.test(action, stateImpl))
-                .concatMap(stateImpl -> dispatch(action),1)
+                .concatMap(stateImpl -> dispatch(action), 1)
                 .filter(stateImpl -> stateImpl.fromAction(action))
                 .take(1)
                 .switchIfEmpty(latestState$())
@@ -136,6 +133,5 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
 
     public void dispose() {
         this.emitRequestsSink.complete();
-        this.pullerScheduler.dispose();
     }
 }

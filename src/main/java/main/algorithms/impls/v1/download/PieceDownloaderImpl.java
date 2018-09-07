@@ -61,14 +61,17 @@ public class PieceDownloaderImpl implements PieceDownloader {
                             return Mono.just(link);
                         }, 1)
                         .concatMap(link ->
-                                        Flux.<Integer>generate(sink -> sink.next(this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex]))
+                                        Flux.<Boolean>generate(sink -> sink.next(link.getPeerCurrentStatus().getIsHeChokingMe()))
                                                 // keep downloading blocks while he doesn't choke me and I didn't completely download the piece yet
-                                                .takeWhile(didISavedPieceAlready.negate().and(___ -> link.getPeerCurrentStatus().getIsHeChokingMe()).negate())
-                                                .concatMap(requestFrom ->
-                                                                this.allocatorStore.createRequestMessage(link.getMe(), link.getPeer(), pieceIndex, requestFrom, maxRequestBlockLength, pieceLength)
-                                                                        .doOnNext(requestMessage -> logger.debug("start downloading block: " + requestMessage))
-                                                                        .flatMap(requestMessage -> blockDownloader.downloadBlock(link, requestMessage).doOnError(TimeoutException.class, throwable -> logger.debug("peer: " + link.getPeer() + " not responding to my request: " + requestMessage)))
-                                                                        .doOnNext(pieceEvent -> logger.debug("ended downloading block: " + pieceEvent))
+                                                .takeWhile(isHechokeMe -> !isHechokeMe)
+                                                .takeWhile(didISavedPieceAlready.negate())
+                                                .concatMap(___ ->
+                                                                Mono.just(this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex])
+                                                                        .flatMap(requestFrom ->
+                                                                                this.allocatorStore.createRequestMessage(link.getMe(), link.getPeer(), pieceIndex, requestFrom, maxRequestBlockLength, pieceLength)
+                                                                                        .doOnNext(requestMessage -> logger.debug("start downloading block: " + requestMessage))
+                                                                                        .flatMap(requestMessage -> blockDownloader.downloadBlock(link, requestMessage).doOnError(TimeoutException.class, throwable -> logger.debug("peer: " + link.getPeer() + " not responding to my request: " + requestMessage)))
+                                                                                        .doOnNext(pieceEvent -> logger.debug("ended downloading block: " + pieceEvent)))
                                                         , 1)
                                                 // if the peer is down then I will get another peer to download from the rest of the piece.
                                                 .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty())

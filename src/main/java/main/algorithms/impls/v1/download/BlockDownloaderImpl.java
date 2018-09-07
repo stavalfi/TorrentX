@@ -50,12 +50,13 @@ public class BlockDownloaderImpl implements BlockDownloader {
                 .limitRequest(1)
                 .single();
 
-        Mono<SendMessagesNotifications> sendRequestMessage$ = link.sendMessages().sendRequestMessage(requestMessage.getIndex(), requestMessage.getBegin(), requestMessage.getBlockLength());
+        Mono<SendMessagesNotifications> sendRequestMessage$ = link.sendMessages().sendRequestMessage(requestMessage);
 
         return Mono.zip(savedPiece$, sendRequestMessage$, (pieceEvent, sendMessagesNotifications) -> pieceEvent)
                 .doOnSubscribe(__ -> logger.debug(this.identifier + " - start sending request message: " + requestMessage))
+                .subscribeOn(downloadBlockScheduler)
                 // TODO: there maybe a situation where we already got the piece but after the timeout so in the next time we request it, we won't see it in this implementation because we don't replay saved pieces from FS.
-                .timeout(Duration.ofMillis(25000))
+                .timeout(Duration.ofMillis(2500))
                 .onErrorResume(PeerExceptions.isTimeoutException.and(__ -> fileSystemLink.havePiece(requestMessage.getIndex())), throwable -> Mono.error(new DownloadingSavedPieceException(requestMessage.getIndex())))
                 .doOnError(TimeoutException.class, throwable -> logger.debug(this.identifier + " - no response to the request: " + requestMessage))
                 .doOnNext(__ -> logger.debug(this.identifier + " - received block for request: " + requestMessage));
