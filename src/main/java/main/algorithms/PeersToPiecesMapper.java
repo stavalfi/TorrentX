@@ -15,4 +15,6 @@ public interface PeersToPiecesMapper {
     Flux<Integer> availablePieces$();
 
     Flux<Link> linksForPiece$(int pieceIndex);
+
+    void dispose();
 }

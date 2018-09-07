@@ -135,4 +135,9 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
     public Flux<GroupedFlux<Integer, Link>> getLinksByAvailableMissingPiece$() {
         return this.linksByAvailableMissingPiece$;
     }
+
+    @Override
+    public void dispose() {
+        this.listenToAvailablePiecesScheduler.dispose();
+    }
 }

@@ -440,7 +440,7 @@ public class MyStepdefs {
                                         pieceMessage.getAllocatedBlock(), actualPieceMessage.getAllocatedBlock()))
                                 // free the write and read blocks.
                                 .flatMap(actualPieceMessage -> TorrentDownloaders.getAllocatorStore().free(actualPieceMessage.getAllocatedBlock()))
-                                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().free(pieceMessage.getAllocatedBlock()))),1)
+                                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().free(pieceMessage.getAllocatedBlock()))), 1)
                 // tell upstream that we freed the buffer and he can give us one more signal (if he have any left)
                 .doOnNext(__ -> semaphore.release())
                 .collectList()
@@ -749,7 +749,7 @@ public class MyStepdefs {
                                 .flatMapMany(allocatedBlockLength -> Flux.fromIterable(peerRequestBlockList)
                                         .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength))))
                         .concatMap(blockOfPiece -> sendMessagesObject.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(), blockOfPiece.getLength())
-                                .doOnNext(__ -> logger.debug("fake peer sent request for block: " + blockOfPiece)),1))
+                                .doOnNext(__ -> logger.debug("fake peer sent request for block: " + blockOfPiece)), 1))
                 .collectList()
                 .doOnNext(requestList -> Assert.assertEquals("We sent less requests then expected.",
                         peerRequestBlockList.size(), requestList.size()))
@@ -1922,7 +1922,7 @@ public class MyStepdefs {
                 // the limitRequest is because the availablePieces$ will keep bringing more and more
                 // pieces and when there is no more, he will repeat the all missing available pieces list again.
                 .limitRequest(fixedExpectedPiecesToDownload.size())
-                .concatMap(pieceIndexToDownload -> pieceDownloader.downloadPiece$(pieceIndexToDownload, this.peersToPiecesMapper.linksForPiece$(pieceIndexToDownload)),1)
+                .concatMap(pieceIndexToDownload -> pieceDownloader.downloadPiece$(pieceIndexToDownload, this.peersToPiecesMapper.linksForPiece$(pieceIndexToDownload)), 1)
                 .collectList()
                 .doOnNext(actualDownloadedPieces -> Utils.assertListEqualNotByOrder(fixedExpectedPiecesToDownload, actualDownloadedPieces, Integer::equals))
                 .flux()
@@ -1946,6 +1946,8 @@ public class MyStepdefs {
                     .verifyComplete();
             this.meToFakePeerLink$ = null;
         }
+        if (this.peersToPiecesMapper != null)
+            this.peersToPiecesMapper.dispose();
 
         this.fakePeersByPort.stream()
                 .map(AbstractMap.SimpleEntry::getValue)
