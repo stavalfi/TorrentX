@@ -22,9 +22,11 @@ public class PeerExceptions {
                 throwable instanceof EOFException;
     };
 
+    public static Predicate<Throwable> isTimeoutException = throwable -> throwable instanceof TimeoutException;
+
     // I requested a piece and he didn't response with the piece back or communication problems.
     public static Predicate<Throwable> peerNotResponding =
-            communicationErrors.or(throwable -> throwable instanceof TimeoutException);
+            communicationErrors.or(isTimeoutException);
 
 
 }

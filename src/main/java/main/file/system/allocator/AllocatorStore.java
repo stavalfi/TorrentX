@@ -40,7 +40,7 @@ public class AllocatorStore {
                 .map(AllocatorState::getFreeBlocksStatus)
                 .doOnNext(freeBlocksStatus -> logger.debug(this.allocatorStore.getIdentifier() + " - trying to allocating block for piece: " + request + ", is there a free block: " + (freeBlocksStatus.nextSetBit(0) >= 0) + ", status: " + freeBlocksStatus))
                 .filter(freeBlocksStatus -> freeBlocksStatus.nextSetBit(0) >= 0)
-                .concatMap(__ -> this.allocatorStore.dispatch(request))
+                .concatMap(__ -> this.allocatorStore.dispatch(request),1)
                 .doOnNext(allocatorStateAllocatorActionResult -> logger.debug(this.allocatorStore.getIdentifier() + " - is allocation of block ended for piece: " + request + ": " + allocatorStateAllocatorActionResult.isNewState()))
                 .filter(Result::isNewState)
                 .limitRequest(1)

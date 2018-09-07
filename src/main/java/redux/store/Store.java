@@ -88,7 +88,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
     public Mono<STATE_IMPL> tryDispatchUntil(ACTION action, BiPredicate<ACTION, STATE_IMPL> until) {
         return states$()
                 .takeWhile(stateImpl -> until.test(action, stateImpl))
-                .concatMap(stateImpl -> dispatch(action))
+                .concatMap(stateImpl -> dispatch(action),1)
                 .filter(stateImpl -> stateImpl.fromAction(action))
                 .take(1)
                 .switchIfEmpty(latestState$())

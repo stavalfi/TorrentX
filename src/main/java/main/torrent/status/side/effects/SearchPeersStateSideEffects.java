@@ -28,19 +28,19 @@ public class SearchPeersStateSideEffects {
 
 
         this.startSearchPeers$ = store.statesByAction(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS)
-                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.START_SEARCHING_PEERS_WIND_UP, tryDispatchStartWindupUntil))
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS))
+                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.START_SEARCHING_PEERS_WIND_UP, tryDispatchStartWindupUntil),1)
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS),1)
                 .publish()
                 .autoConnect(0);
 
         this.resumeSearchPeers$ = store.statesByAction(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS)
-                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP, tryDispatchResumeWindupUntil))
+                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP, tryDispatchResumeWindupUntil),1)
                 .publish()
                 .autoConnect(0);
 
         this.pauseSearchPeers$ = store.statesByAction(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS)
-                .concatMap(__ -> store.notifyWhen(TorrentStatusAction.PAUSE_SEARCHING_PEERS_SELF_RESOLVED))
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_SEARCHING_PEERS_WIND_UP))
+                .concatMap(__ -> store.notifyWhen(TorrentStatusAction.PAUSE_SEARCHING_PEERS_SELF_RESOLVED),1)
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_SEARCHING_PEERS_WIND_UP),1)
                 .publish()
                 .autoConnect(0);
     }

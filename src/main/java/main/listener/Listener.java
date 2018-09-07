@@ -60,7 +60,7 @@ public class Listener {
         };
 
         this.startListen$ = listenerStore.statesByAction(ListenerAction.START_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> serverSocketSupplier.get())
+                .concatMap(__ -> serverSocketSupplier.get(),1)
                 .doOnError(throwable -> logger.error(this.identifier + " - failed to create ServerSocket object.", throwable))
 //                .onErrorResume(PeerExceptions.communicationErrors,
 //                        throwable -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
@@ -68,18 +68,19 @@ public class Listener {
                 .concatMap(serverSocket -> listenerStore.dispatch(ListenerAction.START_LISTENING_SELF_RESOLVED)
                         .filter(listenerState -> listenerState.fromAction(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
                                 listenerState.fromAction(ListenerAction.START_LISTENING_WIND_UP))
-                        .map(__ -> serverSocket))
+                        .map(__ -> serverSocket),1)
                 .doOnNext(serverSocket -> logger.info(this.identifier + " - created server-socket under port: " + serverSocket.getLocalPort() + " (not listening to new incoming peers)."))
                 .replay(1)
                 .autoConnect(0);
 
         this.resumeListen$ = listenerStore.statesByAction(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> this.startListen$.take(1))
-                .concatMap(serverSocket -> listenerStore.dispatch(ListenerAction.RESUME_LISTENING_SELF_RESOLVED).filter(listenerState -> listenerState.fromAction(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)).map(__ -> serverSocket))
+                .concatMap(__ -> this.startListen$.take(1),1)
+                .concatMap(serverSocket -> listenerStore.dispatch(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)
+                        .filter(listenerState -> listenerState.fromAction(ListenerAction.RESUME_LISTENING_SELF_RESOLVED)).map(__ -> serverSocket),1)
                 .doOnNext(serverSocket -> logger.info(this.identifier + " - resume listening to incoming peers under port: " + serverSocket.getLocalPort()))
-                .concatMap(serverSocket -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, serverSocket))
-                .concatMap(this::acceptPeersLinks)
-                .concatMap(link -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, link))
+                .concatMap(serverSocket -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, serverSocket),1)
+                .concatMap(this::acceptPeersLinks,1)
+                .concatMap(link -> listenerStore.notifyWhen(ListenerAction.RESUME_LISTENING_WIND_UP, link),1)
                 .doOnError(throwable -> logger.error(this.identifier + " - fatal error while accepting peer connection or in server-socket object", throwable))
                 .onErrorResume(PeerExceptions.communicationErrors, __ -> Mono.empty())
                 .doOnError(error -> logger.error(this.identifier + " - internal error in Listener module: " + error))
@@ -87,10 +88,10 @@ public class Listener {
                 .autoConnect(0);
 
         this.pauseListen$ = listenerStore.statesByAction(ListenerAction.PAUSE_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> getListeningPort())
+                .concatMap(__ -> getListeningPort(),1)
                 .concatMap(listeningPort -> listenerStore.dispatch(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED)
                         .filter(listenerState -> listenerState.fromAction(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
-                        .doOnNext(serverSocket -> logger.info(this.identifier + " - paused listening to incoming peers under port: " + listeningPort)))
+                        .doOnNext(serverSocket -> logger.info(this.identifier + " - paused listening to incoming peers under port: " + listeningPort)),1)
                 .publish()
                 .autoConnect(0);
 
@@ -106,9 +107,9 @@ public class Listener {
         };
 
         this.restartListener$ = listenerStore.statesByAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> this.startListen$.take(1))
-                .concatMap(closeServerSocket)
-                .concatMap(__ -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
+                .concatMap(__ -> this.startListen$.take(1),1)
+                .concatMap(closeServerSocket,1)
+                .concatMap(__ -> listenerStore.dispatch(ListenerAction.RESTART_LISTENING_SELF_RESOLVED),1)
                 .filter(listenerState -> listenerState.fromAction(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
                 .publish()
                 .autoConnect(0);
@@ -137,7 +138,7 @@ public class Listener {
         return peersSocket.subscribeOn(listenerScheduler)
                 .concatMap(peerSocket -> acceptPeerConnection(peerSocket)
                         .doOnNext(link -> logger.info(this.identifier + " - new peer connected to me successfully: " + link))
-                        .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty()));
+                        .onErrorResume(PeerExceptions.communicationErrors, throwable -> Mono.empty()),1);
     }
 
     private Mono<Link> acceptPeerConnection(Socket peerSocket) {

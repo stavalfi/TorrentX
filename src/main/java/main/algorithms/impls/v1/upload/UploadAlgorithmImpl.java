@@ -32,7 +32,7 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                                Flux<AbstractMap.SimpleEntry<Link, RequestMessage>> incomingRequestMessages$) {
 
         Flux<TorrentStatusState> startUpload$ = store.statesByAction(TorrentStatusAction.START_UPLOAD_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.START_UPLOAD_SELF_RESOLVED))
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.START_UPLOAD_SELF_RESOLVED),1)
                 .publish()
                 .autoConnect(0);
 
@@ -65,12 +65,12 @@ public class UploadAlgorithmImpl implements UploadAlgorithm {
                     store.dispatchNonBlocking(TorrentStatusAction.RESUME_UPLOAD_SELF_RESOLVED);
 
                     return uploader$;
-                })
+                },1)
                 .publish()
                 .autoConnect(0);
 
         Flux<TorrentStatusState> pauseUpload$ = store.statesByAction(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_UPLOAD_SELF_RESOLVED))
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_UPLOAD_SELF_RESOLVED),1)
                 .publish()
                 .autoConnect(0);
     }

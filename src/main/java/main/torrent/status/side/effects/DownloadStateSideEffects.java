@@ -39,42 +39,42 @@ public class DownloadStateSideEffects {
                         torrentStatusState.getDownloadState().isNotInAnyCompleteState();
 
         this.startDownload$ = store.statesByAction(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
-                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.START_DOWNLOAD_WIND_UP, shouldCancelStartDownload))
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS))
+                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.START_DOWNLOAD_WIND_UP, shouldCancelStartDownload),1)
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS),1)
                 .publish()
                 .autoConnect(0);
 
         this.resumeDownload$ = store.statesByAction(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS)
-                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP, shouldCancelResumeDownload))
+                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP, shouldCancelResumeDownload),1)
                 .publish()
                 .autoConnect(0);
 
         this.pauseDownload$ = store.statesByAction(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS)
-                .concatMap(__ -> store.notifyWhen(TorrentStatusAction.PAUSE_DOWNLOAD_SELF_RESOLVED))
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_WIND_UP))
+                .concatMap(__ -> store.notifyWhen(TorrentStatusAction.PAUSE_DOWNLOAD_SELF_RESOLVED),1)
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_WIND_UP),1)
                 .publish()
                 .autoConnect(0);
 
         this.completeDownload$ = store.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS))
-                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP, shouldCancelCompleteDownload))
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS),1)
+                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP, shouldCancelCompleteDownload),1)
                 .publish()
                 .autoConnect(0);
 
         this.startUpload$ = store.statesByAction(TorrentStatusAction.START_UPLOAD_IN_PROGRESS)
-                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.START_UPLOAD_WIND_UP, shouldCancelStartUpload))
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS))
+                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.START_UPLOAD_WIND_UP, shouldCancelStartUpload),1)
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS),1)
                 .publish()
                 .autoConnect(0);
 
         this.resumeUpload$ = store.statesByAction(TorrentStatusAction.RESUME_UPLOAD_IN_PROGRESS)
-                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.RESUME_UPLOAD_WIND_UP, shouldCancelResumeUpload))
+                .concatMap(__ -> store.tryDispatchUntil(TorrentStatusAction.RESUME_UPLOAD_WIND_UP, shouldCancelResumeUpload),1)
                 .publish()
                 .autoConnect(0);
 
         this.pauseUpload$ = store.statesByAction(TorrentStatusAction.PAUSE_UPLOAD_IN_PROGRESS)
-                .concatMap(__ -> store.notifyWhen(TorrentStatusAction.PAUSE_UPLOAD_SELF_RESOLVED))
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
+                .concatMap(__ -> store.notifyWhen(TorrentStatusAction.PAUSE_UPLOAD_SELF_RESOLVED),1)
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP),1)
                 .publish()
                 .autoConnect(0);
     }

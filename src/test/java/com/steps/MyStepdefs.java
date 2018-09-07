@@ -440,7 +440,7 @@ public class MyStepdefs {
                                         pieceMessage.getAllocatedBlock(), actualPieceMessage.getAllocatedBlock()))
                                 // free the write and read blocks.
                                 .flatMap(actualPieceMessage -> TorrentDownloaders.getAllocatorStore().free(actualPieceMessage.getAllocatedBlock()))
-                                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().free(pieceMessage.getAllocatedBlock()))))
+                                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().free(pieceMessage.getAllocatedBlock()))),1)
                 // tell upstream that we freed the buffer and he can give us one more signal (if he have any left)
                 .doOnNext(__ -> semaphore.release())
                 .collectList()
@@ -749,7 +749,7 @@ public class MyStepdefs {
                                 .flatMapMany(allocatedBlockLength -> Flux.fromIterable(peerRequestBlockList)
                                         .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength))))
                         .concatMap(blockOfPiece -> sendMessagesObject.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(), blockOfPiece.getLength())
-                                .doOnNext(__ -> logger.debug("fake peer sent request for block: " + blockOfPiece))))
+                                .doOnNext(__ -> logger.debug("fake peer sent request for block: " + blockOfPiece)),1))
                 .collectList()
                 .doOnNext(requestList -> Assert.assertEquals("We sent less requests then expected.",
                         peerRequestBlockList.size(), requestList.size()))
@@ -1911,15 +1911,18 @@ public class MyStepdefs {
                 new BlockDownloaderImpl(torrentInfo, torrentDownloader.getFileSystemLink(), torrentDownloader.getIdentifier()));
 
         this.downloadPieces$ = this.peersToPiecesMapper.availablePieces$()
-                .flatMap(pieceIndexToDownload ->
-                                Flux.fromIterable(fixedExpectedPiecesToDownload)
-                                        .map(pieceToDownload -> pieceToDownload >= 0 ?
-                                                pieceToDownload :
-                                                torrentInfo.getPieces().size() + pieceToDownload)
-                                        .filter(pieceIndex -> pieceIndex.equals(pieceIndexToDownload))
-                                        .flatMap(__ -> pieceDownloader.downloadPiece$(pieceIndexToDownload, this.peersToPiecesMapper.linksForPiece$(pieceIndexToDownload)))
-                        , fixedExpectedPiecesToDownload.size(), fixedExpectedPiecesToDownload.size())
-                .take(fixedExpectedPiecesToDownload.size())
+                .filter(pieceIndexToDownload -> fixedExpectedPiecesToDownload.stream()
+                        .map(pieceToDownload -> pieceToDownload >= 0 ?
+                                pieceToDownload :
+                                torrentInfo.getPieces().size() + pieceToDownload)
+                        .anyMatch(pieceIndex -> pieceIndex.equals(pieceIndexToDownload)))
+                // some fake-peers will only connected to me int he future so I can't send downstream the same piece more then once
+                // (the mapper send in loops the same available missing pieces).
+                .distinct()
+                // the limitRequest is because the availablePieces$ will keep bringing more and more
+                // pieces and when there is no more, he will repeat the all missing available pieces list again.
+                .limitRequest(fixedExpectedPiecesToDownload.size())
+                .concatMap(pieceIndexToDownload -> pieceDownloader.downloadPiece$(pieceIndexToDownload, this.peersToPiecesMapper.linksForPiece$(pieceIndexToDownload)),1)
                 .collectList()
                 .doOnNext(actualDownloadedPieces -> Utils.assertListEqualNotByOrder(fixedExpectedPiecesToDownload, actualDownloadedPieces, Integer::equals))
                 .flux()

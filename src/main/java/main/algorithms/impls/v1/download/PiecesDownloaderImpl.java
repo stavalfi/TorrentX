@@ -38,22 +38,22 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
                         store.latestState$()
                                 .filter(torrentStatusState -> torrentStatusState.fromAction(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
                                 .flatMap(__ -> pieceDownloader.downloadPiece$(pieceIndex, peersToPiecesMapper.linksForPiece$(pieceIndex))
-                                        .onErrorResume(TimeoutException.class, throwable -> Mono.empty())))
+                                        .onErrorResume(TimeoutException.class, throwable -> Mono.empty())),1)
                 .publish()
                 .autoConnect(0);
 
         this.startDownload$ = store.statesByAction(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.START_DOWNLOAD_SELF_RESOLVED))
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.START_DOWNLOAD_SELF_RESOLVED),1)
                 .publish()
                 .autoConnect(0);
 
         this.resumeDownload = store.statesByAction(TorrentStatusAction.RESUME_DOWNLOAD_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_SELF_RESOLVED))
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_DOWNLOAD_SELF_RESOLVED),1)
                 .publish()
                 .autoConnect(0);
 
         this.pauseDownload = store.statesByAction(TorrentStatusAction.PAUSE_DOWNLOAD_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_SELF_RESOLVED))
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_DOWNLOAD_SELF_RESOLVED),1)
                 .publish()
                 .autoConnect(0);
     }
