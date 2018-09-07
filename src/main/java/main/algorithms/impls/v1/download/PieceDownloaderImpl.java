@@ -1,5 +1,6 @@
 package main.algorithms.impls.v1.download;
 
+import main.App;
 import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
 import main.algorithms.PieceDownloader;
@@ -20,7 +21,7 @@ import java.util.concurrent.TimeoutException;
 
 public class PieceDownloaderImpl implements PieceDownloader {
     private static Logger logger = LoggerFactory.getLogger(PieceDownloaderImpl.class);
-    private static Scheduler downloadPieceScheduler = Schedulers.newParallel("DOWNLOAD-PIECE", 5);
+    private static Scheduler downloadPieceScheduler = Schedulers.newParallel("DOWNLOAD-PIECE", 1);
 
     private TorrentInfo torrentInfo;
     private FileSystemLink fileSystemLink;
@@ -40,11 +41,11 @@ public class PieceDownloaderImpl implements PieceDownloader {
     @Override
     public Mono<Integer> downloadPiece$(int pieceIndex, Flux<Link> links$) {
         final int pieceLength = this.torrentInfo.getPieceLength(pieceIndex);
-        final int maxRequestBlockLength = 16_384;
+        final int maxRequestBlockLength = pieceLength;
 
         return links$.doOnSubscribe(__ -> logger.debug("start downloading piece: " + pieceIndex))
                 .filter(link -> !link.getPeerCurrentStatus().getIsHeChokingMe())
-                .flatMap(link -> {
+                .concatMap(link -> {
                     if (!link.getPeerCurrentStatus().getAmIInterestedInHim())
                         return link.sendMessages().sendInterestedMessage()
                                 .map(sendPeerMessages -> link);
@@ -61,10 +62,11 @@ public class PieceDownloaderImpl implements PieceDownloader {
                                 .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty()))
                 .filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
                 .doOnNext(__ -> logger.info("finished to download piece: " + pieceIndex))
+                // its important to limit the requests upstream because i don't want to try to download the same block or piece more then once.
                 .limitRequest(1)
                 .single()
                 .map(__ -> pieceIndex)
                 .subscribeOn(downloadPieceScheduler)
-                .timeout(Duration.ofSeconds(30));
+                .timeout(Duration.ofSeconds(30), Mono.empty(),App.timeoutFallbackScheduler);
     }
 }

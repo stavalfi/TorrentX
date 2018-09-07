@@ -1,5 +1,6 @@
 package main.listener;
 
+import main.App;
 import main.AppConfig;
 import main.HexByteConverter;
 import main.TorrentInfo;
@@ -26,6 +27,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -198,7 +200,8 @@ public class Listener {
     public Mono<Integer> getListeningPort() {
         return this.startListen$.take(1)
                 .map(ServerSocket::getLocalPort)
-                .single();
+                .single()
+                .onErrorResume(throwable -> true, throwable -> Mono.just(12345));
     }
 
     public Flux<Link> getPeers$(TorrentInfo torrentInfo) {

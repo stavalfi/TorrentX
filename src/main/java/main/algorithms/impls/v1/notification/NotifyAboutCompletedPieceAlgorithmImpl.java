@@ -45,7 +45,7 @@ public class NotifyAboutCompletedPieceAlgorithmImpl implements NotifyAboutComple
                         .flatMap(completedPiece ->
                                 this.recordedFreePeer$.map(Link::sendMessages)
                                         .flatMap(sendPeerMessages -> sendPeerMessages.sendHaveMessage(completedPiece))
-                                        .timeout(Duration.ofSeconds(1))
+                                        .timeout(Duration.ofSeconds(1),Schedulers.single())
                                         // I will never complete the following line because recordedFreePeer$
                                         // never ends so I stop listening to it when I don't get peer per sec from him.
                                         // then I will signal (only once) the index of the piece which was completed.

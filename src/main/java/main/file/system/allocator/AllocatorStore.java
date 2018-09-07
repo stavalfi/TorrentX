@@ -47,7 +47,7 @@ public class AllocatorStore {
                 .single()
                 .cast(CreatePieceMessageResult.class)
                 .map(CreatePieceMessageResult::getPieceMessage)
-                .doOnNext(pieceMessage -> logger.debug(this.allocatorStore.getIdentifier() + " - allocation ended " + AllocatorAction.CREATE_PIECE_MESSAGE.toString() + pieceMessage));
+                .doOnNext(pieceMessage -> logger.debug(this.allocatorStore.getIdentifier() + " - allocation ended " + AllocatorAction.CREATE_PIECE_MESSAGE.toString() + " - " + pieceMessage));
     }
 
     public Mono<RequestMessage> createRequestMessage(Peer from, Peer to, int index, int begin, int blockLength, int pieceLength) {

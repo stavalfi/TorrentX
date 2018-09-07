@@ -31,7 +31,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
         UnicastProcessor<Request<ACTION>> requests$ = UnicastProcessor.create();
         this.emitRequestsSink = requests$.sink();
 
-        this.results$ = requests$.subscribeOn(this.pullerScheduler)
+        this.results$ = requests$.publishOn(this.pullerScheduler)
                 .doOnNext(request -> logger.debug(this.identifier + " - start inspecting request: " + request))
                 .scan(initialResult, (Result<STATE_IMPL, ACTION> lastResult, Request<ACTION> request) -> {
                     logger.trace(this.identifier + " - start processing request: " + request + ", current state: " + lastResult.getState());
@@ -49,7 +49,7 @@ public class Store<STATE_IMPL extends State<ACTION>, ACTION> implements Notifier
                 .doOnNext(result -> logger.trace(this.identifier + " - analyzing result: " + result))
                 .map(Result::getState)
                 .distinctUntilChanged()
-                .doOnNext(state -> logger.info(this.identifier + " - new state: " + state.getAction()))
+                .doOnNext(state -> logger.debug(this.identifier + " - new state: " + state.getAction()))
                 .replay(1)
                 .autoConnect(0);
     }

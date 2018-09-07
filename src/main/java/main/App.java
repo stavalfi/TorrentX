@@ -33,6 +33,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class App {
+    public static Scheduler timeoutScheduler = Schedulers.newSingle("TIMEOUT");
+    public static Scheduler timeoutFallbackScheduler = Schedulers.newSingle("TIMEOUT-FALLBACK");
     private static Logger logger = LoggerFactory.getLogger(App.class);
 
     private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test" + File.separator;

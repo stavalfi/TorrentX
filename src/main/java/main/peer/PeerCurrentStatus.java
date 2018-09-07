@@ -132,8 +132,8 @@ public class PeerCurrentStatus {
             this.peerCurrentStatusTypeFluxSink.next(PeerCurrentStatusType.I_AM_NOT_UPLOAD_TO_HIM);
     }
 
-    public BitSet getPiecesStatus() {
-        return piecesStatus;
+    public synchronized boolean doesPeerHavePiece(int pieceIndex){
+        return this.piecesStatus.get(pieceIndex);
     }
 
     public synchronized void updatePiecesStatus(BitSet piecesStatus) {

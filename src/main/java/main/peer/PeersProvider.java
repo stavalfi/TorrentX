@@ -98,10 +98,8 @@ public class PeersProvider {
     private Flux<Peer> connectToPeers$(TrackerConnection trackerConnection) {
         return TorrentDownloaders.getListener()
                 .getListeningPort()
-                // If we get timeOut then it means that we are not listening so I will just fake a random port which will ignore incoming connections.
-                .timeout(Duration.ofSeconds(2), Mono.just(12345))
                 .flatMap(listeningPort -> trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), listeningPort))
-                .flatMapMany(announceResponse -> announceResponse.getPeersFlux());
+                .flatMapMany(AnnounceResponse::getPeersFlux);
     }
 
     public Flux<Link> connectToPeers$(Flux<TrackerConnection> trackerConnectionFlux) {

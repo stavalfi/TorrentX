@@ -38,7 +38,7 @@ public class RemoteFakePeer {
                     }
                 })
                 .index()
-                .flatMap(requestMessage -> {
+                .concatMap(requestMessage -> {
                     switch (fakePeerType) {
                         case CLOSE_IN_FIRST_REQUEST:
                             // its important because the socket may close up-to 4 min so it may be still
@@ -56,10 +56,8 @@ public class RemoteFakePeer {
                     }
                 })
                 .map(Tuple2::getT2)
-                .flatMap(requestMessage -> {
-                    boolean doesFakePeerHaveThePiece = link.getPeerCurrentStatus()
-                            .getPiecesStatus()
-                            .get(requestMessage.getIndex());
+                .concatMap(requestMessage -> {
+                    boolean doesFakePeerHaveThePiece = link.getPeerCurrentStatus().doesPeerHavePiece(requestMessage.getIndex());
                     logger.info(identifier + " - does he have the piece: " + doesFakePeerHaveThePiece + " for request: " + requestMessage);
                     if (!doesFakePeerHaveThePiece)
                         return Mono.empty();
@@ -76,7 +74,8 @@ public class RemoteFakePeer {
                     }
                     // we will never be here... (by the current fake-peer-types).
                     return Mono.empty();
-                }).publish()
+                })
+                .publish()
                 .autoConnect(0);
     }
 

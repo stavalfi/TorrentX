@@ -19,7 +19,7 @@ import java.util.concurrent.TimeoutException;
 
 public class BlockDownloaderImpl implements BlockDownloader {
     private static Logger logger = LoggerFactory.getLogger(BlockDownloaderImpl.class);
-    private static Scheduler downloadBlockScheduler = Schedulers.newParallel("DOWNLOAD-BLOCK",5);
+    private static Scheduler downloadBlockScheduler = Schedulers.newParallel("DOWNLOAD-BLOCK", 1);
 
     private TorrentInfo torrentInfo;
     private FileSystemLink fileSystemLink;
@@ -54,8 +54,9 @@ public class BlockDownloaderImpl implements BlockDownloader {
         return Mono.zip(savedPiece$, sendRequestMessage$, (pieceEvent, sendMessagesNotifications) -> pieceEvent)
                 .doOnSubscribe(__ -> logger.debug(this.identifier + " - start sending request message: " + requestMessage))
                 .subscribeOn(downloadBlockScheduler)
-                .timeout(Duration.ofMillis(2500))
+                // TODO: there maybe a situation where we already got the piece but after the timeout so in the next time we request it, we won't see it in this implementation because we don't replay saved pieces from FS.
+                .timeout(Duration.ofMillis(2500), Schedulers.single())
                 .doOnError(TimeoutException.class, throwable -> logger.debug(this.identifier + " - no response to the request: " + requestMessage))
-                .doOnNext(__ -> logger.debug(this.identifier + " - end sending request message: " + requestMessage));
+                .doOnNext(__ -> logger.debug(this.identifier + " - received block for request: " + requestMessage));
     }
 }

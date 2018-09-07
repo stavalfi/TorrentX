@@ -46,21 +46,21 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
                 .publish()
                 .autoConnect(0);
 
-        BiFunction<BitSet, BitSet, BitSet> extractMissingPieces = (peerStatus, appStatus) -> {
-            BitSet missingPiecesStatus = new BitSet(torrentInfo.getPieces().size());
+        BiFunction<BitSet, BitSet, BitSet> extractMissingAvailablePieces = (peerStatus, appStatus) -> {
+            BitSet missingAvailablePiecesStatus = new BitSet(torrentInfo.getPieces().size());
             IntStream.range(0, torrentInfo.getPieces().size())
-                    .forEach(i -> missingPiecesStatus.set(i, peerStatus.get(i) && !appStatus.get(i)));
-            return missingPiecesStatus;
+                    .forEach(i -> missingAvailablePiecesStatus.set(i, !appStatus.get(i) && peerStatus.get(i)));
+            return missingAvailablePiecesStatus;
         };
 
         BiFunction<Link, BitSet, Flux<AbstractMap.SimpleEntry<Integer, Link>>> produceMissingPieces =
-                (link, missingPiecesFromPeer) -> Flux.generate(() -> 0, (searchIndexFrom, sink) -> {
-                    int missingPieceFromPeer = missingPiecesFromPeer.nextSetBit(searchIndexFrom);
-                    if (missingPieceFromPeer != -1)
-                        sink.next(new AbstractMap.SimpleEntry<>(missingPieceFromPeer, link));
+                (link, missingAvailablePiecesStatus) -> Flux.generate(() -> 0, (searchIndexFrom, sink) -> {
+                    int missingAvailablePieceFromPeer = missingAvailablePiecesStatus.nextSetBit(searchIndexFrom);
+                    if (missingAvailablePieceFromPeer != -1)
+                        sink.next(new AbstractMap.SimpleEntry<>(missingAvailablePieceFromPeer, link));
                     else
                         sink.complete();
-                    return missingPieceFromPeer + 1;
+                    return missingAvailablePieceFromPeer + 1;
 
                 });
 
@@ -72,7 +72,7 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
                 .map(bitFieldMessage -> new AbstractMap.SimpleEntry<>(bitFieldMessage.getKey(), bitFieldMessage.getValue().getPiecesStatus()))
                 .map(bitFieldMessage -> {
                     synchronized (initialPiecesStatus) {
-                        return new AbstractMap.SimpleEntry<>(bitFieldMessage.getKey(), extractMissingPieces.apply(bitFieldMessage.getValue(), initialPiecesStatus));
+                        return new AbstractMap.SimpleEntry<>(bitFieldMessage.getKey(), extractMissingAvailablePieces.apply(bitFieldMessage.getValue(), initialPiecesStatus));
                     }
                 })
                 .doOnNext(bitFieldMessage -> logger.debug("peer: " + bitFieldMessage.getKey().getPeer() +
