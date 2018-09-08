@@ -86,7 +86,7 @@ public class PieceDownloaderImpl implements PieceDownloader {
                         , 1)
                 .filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
                 .map(pieceEvent -> pieceIndex)
-                .doOnNext(___ -> logger.info("finished to download piece: " + pieceIndex))
+                .doOnNext(___ -> logger.debug("finished to download piece: " + pieceIndex))
                 // its important to limit the requests upstream because i don't want to try to download the same block or piece more then once.
                 .limitRequest(1)
                 .single();

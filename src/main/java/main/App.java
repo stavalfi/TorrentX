@@ -1,34 +1,28 @@
 package main;
 
 import christophedetroyer.torrent.TorrentParser;
-import main.algorithms.impls.v1.download.PieceDownloaderImpl;
-import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaderBuilder;
 import main.downloader.TorrentDownloaders;
-import main.file.system.FileSystemLink;
-import main.peer.IncomingPeerMessagesNotifier;
+import main.listener.ListenerAction;
 import main.peer.Link;
 import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.HaveMessage;
-import main.peer.peerMessages.RequestMessage;
 import main.torrent.status.TorrentStatusAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
-import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.time.Duration;
-import java.util.AbstractMap;
 import java.util.HashSet;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -50,9 +44,9 @@ public class App {
                                 .collect(Collectors.joining()))
                 .subscribe(System.out::println);
 
-        torrentDownloader.getIncomingPeerMessagesNotifier()
-                .getPieceMessageResponseFlux()
-                .subscribe(System.out::println);
+//        torrentDownloader.getIncomingPeerMessagesNotifier()
+//                .getPieceMessageResponseFlux()
+//                .subscribe(System.out::println);
 
         torrentDownloader.getPeersCommunicatorFlux()
                 .map(Link::sendMessages)
@@ -62,6 +56,7 @@ public class App {
                 .map(haveMessage -> "sent: " + haveMessage.toString())
                 .subscribe(System.out::println);
 
+        TorrentDownloaders.getListenStore().dispatchNonBlocking(ListenerAction.START_LISTENING_IN_PROGRESS);
         torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS);
         torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_UPLOAD_IN_PROGRESS);
         torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS);
