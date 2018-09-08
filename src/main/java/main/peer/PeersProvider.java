@@ -27,6 +27,7 @@ import java.util.AbstractMap;
 
 public class PeersProvider {
     private static Logger logger = LoggerFactory.getLogger(PeersProvider.class);
+    private static Scheduler connectToPeersScheduler = Schedulers.newParallel("CONNECT-PEERS", 4);
     private TorrentInfo torrentInfo;
     private AllocatorStore allocatorStore;
     private String identifier;
@@ -84,8 +85,8 @@ public class PeersProvider {
                 logger.trace("closed a socket: ", e);
                 sink.error(e);
             }
-        }).subscribeOn(Schedulers.parallel())
-                .doOnNext(link -> logger.info("connected to peer successfully: " + link))
+        }).subscribeOn(connectToPeersScheduler)
+                .doOnNext(link -> logger.debug("connected to peer successfully: " + link))
                 .doOnError(PeerExceptions.communicationErrors, throwable -> logger.debug("error signal: (the application failed to connect to a peer." +
                         " the application will try to connect to the next available peer).\n" +
                         "peer: " + peer.toString() + "\n" +
@@ -94,20 +95,17 @@ public class PeersProvider {
                 .onErrorResume(PeerExceptions.communicationErrors, error -> Mono.empty());
     }
 
-    public Flux<Peer> connectToPeers$(TrackerConnection trackerConnection) {
+    private Flux<Peer> connectToPeers$(TrackerConnection trackerConnection) {
         return TorrentDownloaders.getListener()
                 .getListeningPort()
-                // If we get timeOut then it means that we are not listening so I will just fake a random port which will ignore incoming connections.
-                .timeout(Duration.ofSeconds(2), Mono.just(12345))
                 .flatMap(listeningPort -> trackerConnection.announceMono(torrentInfo.getTorrentInfoHash(), listeningPort))
                 .flatMapMany(AnnounceResponse::getPeersFlux);
     }
 
     public Flux<Link> connectToPeers$(Flux<TrackerConnection> trackerConnectionFlux) {
-        return trackerConnectionFlux
-                .flatMap(trackerConnection -> connectToPeers$(trackerConnection))
+        return trackerConnectionFlux.flatMap(this::connectToPeers$)
                 .distinct()
-                .flatMap((Peer peer) -> connectToPeerMono(peer));
+                .flatMap(this::connectToPeerMono);
     }
 
     public TorrentInfo getTorrentInfo() {

@@ -100,7 +100,7 @@ public class TorrentDownloaderBuilder {
     }
 
     public TorrentDownloaderBuilder setToDefaultEmitIncomingPeerMessages() {
-        this.emitIncomingPeerMessages = this.incomingPeerMessages$.sink();
+        this.emitIncomingPeerMessages = this.incomingPeerMessages$.sink(FluxSink.OverflowStrategy.DROP);
         return this;
     }
 

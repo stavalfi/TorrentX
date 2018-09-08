@@ -5,18 +5,23 @@ import main.algorithms.BlockDownloader;
 import main.downloader.PieceEvent;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
+import main.peer.PeerExceptions;
 import main.peer.SendMessagesNotifications;
 import main.peer.peerMessages.RequestMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Predicate;
 
 public class BlockDownloaderImpl implements BlockDownloader {
     private static Logger logger = LoggerFactory.getLogger(BlockDownloaderImpl.class);
+    private static Scheduler downloadBlockScheduler = Schedulers.newParallel("DOWNLOAD-BLOCK", 1);
 
     private TorrentInfo torrentInfo;
     private FileSystemLink fileSystemLink;
@@ -45,13 +50,15 @@ public class BlockDownloaderImpl implements BlockDownloader {
                 .limitRequest(1)
                 .single();
 
-        Mono<SendMessagesNotifications> sendRequestMessage$ = link.sendMessages()
-                .sendRequestMessage(requestMessage.getIndex(), requestMessage.getBegin(), requestMessage.getBlockLength());
+        Mono<SendMessagesNotifications> sendRequestMessage$ = link.sendMessages().sendRequestMessage(requestMessage);
 
         return Mono.zip(savedPiece$, sendRequestMessage$, (pieceEvent, sendMessagesNotifications) -> pieceEvent)
                 .doOnSubscribe(__ -> logger.debug(this.identifier + " - start sending request message: " + requestMessage))
+                .subscribeOn(downloadBlockScheduler)
+                // TODO: there maybe a situation where we already got the piece but after the timeout so in the next time we request it, we won't see it in this implementation because we don't replay saved pieces from FS.
                 .timeout(Duration.ofMillis(2500))
+                .onErrorResume(PeerExceptions.isTimeoutException.and(__ -> fileSystemLink.havePiece(requestMessage.getIndex())), throwable -> Mono.error(new DownloadingSavedPieceException(requestMessage.getIndex())))
                 .doOnError(TimeoutException.class, throwable -> logger.debug(this.identifier + " - no response to the request: " + requestMessage))
-                .doOnNext(__ -> logger.debug(this.identifier + " - end sending request message: " + requestMessage));
+                .doOnNext(__ -> logger.debug(this.identifier + " - received block for request: " + requestMessage));
     }
 }

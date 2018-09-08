@@ -1,60 +1,65 @@
 package main;
 
 import christophedetroyer.torrent.TorrentParser;
-import main.downloader.PieceEvent;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaderBuilder;
 import main.downloader.TorrentDownloaders;
-import main.file.system.FileSystemLink;
-import main.peer.IncomingPeerMessagesNotifier;
+import main.listener.ListenerAction;
 import main.peer.Link;
 import main.peer.SendMessagesNotifications;
-import main.peer.peerMessages.RequestMessage;
+import main.peer.peerMessages.HaveMessage;
 import main.torrent.status.TorrentStatusAction;
-import reactor.core.publisher.Flux;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Hooks;
-import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.AbstractMap;
 import java.util.HashSet;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class App {
+    public static Scheduler timeoutScheduler = Schedulers.newSingle("TIMEOUT");
+    public static Scheduler timeoutFallbackScheduler = Schedulers.newSingle("TIMEOUT-FALLBACK");
+    private static Logger logger = LoggerFactory.getLogger(App.class);
+
     private static String downloadPath = System.getProperty("user.dir") + File.separator + "torrents-test" + File.separator;
 
     private static void f5() throws IOException, InterruptedException {
-        TorrentDownloader torrentDownloader$ = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath);
-        TorrentDownloaders.getInstance().saveTorrentDownloader(torrentDownloader$);
+        TorrentDownloader torrentDownloader = TorrentDownloaderBuilder.buildDefault(getTorrentInfo(), "App", downloadPath);
 
-        torrentDownloader$.getIncomingPeerMessagesNotifier()
-                .getIncomingPeerMessages$()
-                .map(AbstractMap.SimpleEntry::getValue)
+        torrentDownloader.getFileSystemLink()
+                .savedPieces$()
+                .map(completedPieceIndex ->
+                        IntStream.range(0, torrentDownloader.getTorrentInfo().getPieces().size())
+                                .mapToObj(pieceIndex -> pieceIndex == completedPieceIndex ? "*" : torrentDownloader.getFileSystemLink().havePiece(pieceIndex) ? "1" : "0")
+                                .collect(Collectors.joining()))
                 .subscribe(System.out::println);
 
-        torrentDownloader$.getPeersCommunicatorFlux()
+//        torrentDownloader.getIncomingPeerMessagesNotifier()
+//                .getPieceMessageResponseFlux()
+//                .subscribe(System.out::println);
+
+        torrentDownloader.getPeersCommunicatorFlux()
                 .map(Link::sendMessages)
                 .flatMap(SendMessagesNotifications::sentPeerMessages$)
-                .filter(peerMessage -> peerMessage instanceof RequestMessage)
-                .cast(RequestMessage.class)
-                .map(requestMessage -> "request: index: " + requestMessage.getIndex() +
-                        ", begin: " + requestMessage.getBegin() + ", from: " + requestMessage.getTo())
-                .subscribe(System.out::println, Throwable::printStackTrace);
+                .filter(peerMessage -> peerMessage instanceof HaveMessage)
+                .cast(HaveMessage.class)
+                .map(haveMessage -> "sent: " + haveMessage.toString())
+                .subscribe(System.out::println);
 
-        torrentDownloader$.getFileSystemLink()
-                .savedBlocks$()
-                .map(PieceEvent::getReceivedPiece)
-                .map(pieceMessage -> "received: index: " + pieceMessage.getIndex() +
-                        ", begin: " + pieceMessage.getBegin() + ", from: " + pieceMessage.getFrom())
-                .subscribe(System.out::println, Throwable::printStackTrace);
-
-        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS);
-        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_UPLOAD_IN_PROGRESS);
-        torrentDownloader$.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS);
+        TorrentDownloaders.getListenStore().dispatchNonBlocking(ListenerAction.START_LISTENING_IN_PROGRESS);
+        torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS);
+        torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_UPLOAD_IN_PROGRESS);
+        torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS);
     }
 
 
@@ -62,7 +67,7 @@ public class App {
         deleteDownloadFolder();
         Hooks.onOperatorDebug();
         f5();
-        Thread.sleep(1000 * 1000);
+        Thread.sleep(10000 * 1000);
     }
 
     private static void deleteDownloadFolder() {
@@ -109,7 +114,12 @@ public class App {
                 "main" + File.separator +
                 "resources" + File.separator +
                 "torrents" + File.separator +
-                "tor.torrent";
-        return new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
+                "torrent2.torrent";
+        TorrentInfo torrentInfo = new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
+        System.out.println(torrentInfo);
+        System.out.println("--------------------------------------");
+        System.out.println("--------------------------------------");
+        System.out.println("--------------------------------------");
+        return torrentInfo;
     }
 }

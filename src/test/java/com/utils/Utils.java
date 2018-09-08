@@ -4,6 +4,9 @@ import christophedetroyer.torrent.TorrentFile;
 import christophedetroyer.torrent.TorrentParser;
 import com.steps.MyStepdefs;
 import main.TorrentInfo;
+import main.algorithms.BittorrentAlgorithm;
+import main.algorithms.DownloadAlgorithm;
+import main.algorithms.PeersToPiecesMapper;
 import main.downloader.TorrentDownloader;
 import main.downloader.TorrentDownloaders;
 import main.file.system.ActualFileImpl;
@@ -90,8 +93,8 @@ public class Utils {
 //                                        e.printStackTrace();
 //                                    }
                                 }
-//                                Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
-//                                        allocatorState.getFreeBlocksStatus().get(i));
+                                Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
+                                        allocatorState.getFreeBlocksStatus().get(i));
                             });
                 })
                 .flatMap(__ -> TorrentDownloaders.getAllocatorStore().freeAll())
@@ -163,6 +166,15 @@ public class Utils {
         torrentDownloaders.stream()
                 .map(TorrentDownloader::getTorrentStatusStore)
                 .forEach(Store::dispose);
+
+        torrentDownloaders.stream()
+                .filter(torrentDownloader -> torrentDownloader.getBittorrentAlgorithm() != null)
+                .map(TorrentDownloader::getBittorrentAlgorithm)
+                .filter(bittorrentAlgorithm -> bittorrentAlgorithm.getDownloadAlgorithm() != null)
+                .map(BittorrentAlgorithm::getDownloadAlgorithm)
+                .filter(downloadAlgorithm -> downloadAlgorithm.getPeersToPiecesMapper() != null)
+                .map(DownloadAlgorithm::getPeersToPiecesMapper)
+                .forEach(peersToPiecesMapper -> peersToPiecesMapper.dispose());
 
         TorrentDownloaders.getListenStore()
                 .dispatch(ListenerAction.RESTART_LISTENING_IN_PROGRESS)

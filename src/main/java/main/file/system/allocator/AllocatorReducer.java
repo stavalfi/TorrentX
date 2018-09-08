@@ -13,7 +13,7 @@ import java.util.BitSet;
 import java.util.stream.IntStream;
 
 public class AllocatorReducer implements Reducer<AllocatorState, AllocatorAction> {
-    public static AllocatorState defaultAllocatorState = createInitialState(1, 1);
+    public static AllocatorState defaultAllocatorState = createInitialState(50, 20_000);
 
     @Override
     public Result<AllocatorState, AllocatorAction> reducer(AllocatorState lastState, Request<AllocatorAction> request) {

@@ -17,6 +17,8 @@ public interface FileSystemLink {
 
     TorrentInfo getTorrentInfo();
 
+    boolean isDownloadCompleted();
+
     boolean havePiece(int pieceIndex);
 
     Flux<ActualFile> getTorrentFiles();

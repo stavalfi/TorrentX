@@ -28,12 +28,7 @@ public class BittorrentAlgorithmInitializer {
                                          IncomingPeerMessagesNotifier incomingPeerMessagesNotifier,
                                          Flux<Link> peersCommunicatorFlux,
                                          String identifier) {
-        Flux<Link> recordedPeerFlux = peersCommunicatorFlux
-                .flatMap(peersCommunicator ->
-                        peersCommunicator.sendMessages().sendInterestedMessage()
-                                .map(sendPeerMessages -> peersCommunicator))
-                .replay()
-                .autoConnect();
+        Flux<Link> recordedPeerFlux = peersCommunicatorFlux.replay().autoConnect();
 
         NotifyAboutCompletedPieceAlgorithm notifyAboutCompletedPieceAlgorithm =
                 new NotifyAboutCompletedPieceAlgorithmImpl(torrentInfo,
@@ -50,6 +45,7 @@ public class BittorrentAlgorithmInitializer {
 
         PeersToPiecesMapper peersToPiecesMapper =
                 new PeersToPiecesMapperImpl(torrentInfo,
+                        fileSystemLink,
                         incomingPeerMessagesNotifier,
                         recordedPeerFlux,
                         fileSystemLink.getUpdatedPiecesStatus());

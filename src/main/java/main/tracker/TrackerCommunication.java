@@ -22,6 +22,7 @@ import java.util.function.Function;
 
 class TrackerCommunication {
     private static Logger logger = LoggerFactory.getLogger(TrackerCommunication.class);
+    private static Scheduler connectToTrackersScheduler = Schedulers.newParallel("CONNECT-TRACKERS", 3);
 
     public static <Request extends TrackerRequest, Response extends TrackerResponse>
     Mono<Response> communicateMono(Request request, Function<ByteBuffer, Response> createResponse) {
@@ -59,12 +60,12 @@ class TrackerCommunication {
                 .doOnError(TrackerExceptions.communicationErrors, throwable ->
                         logger.debug("error signal: (the application retried to send" +
                                 " a request to the same tracker again and failed)." +
-                                "\nerror: " + throwable.getStackTrace()))
+                                "\nerror: " + throwable.toString()))
                 .onErrorResume(TrackerExceptions.communicationErrors, throwable -> Mono.empty())
                 .doOnError(TrackerExceptions.communicationErrors.negate(), throwable ->
                         logger.error("error signal: (the application doesn't try to send" +
                                 " a request again after this error)." +
-                                "\nerror: " + throwable.getStackTrace()));
+                                "\nerror: " + throwable.toString()));
     }
 
     private static <Request extends TrackerRequest> Mono<DatagramSocket> sendRequestMono(Request request) {
@@ -90,7 +91,7 @@ class TrackerCommunication {
                 error.setStackTrace(ex.getStackTrace());
                 sink.error(error);
             }
-        }).subscribeOn(Schedulers.parallel());
+        }).subscribeOn(connectToTrackersScheduler);
     }
 
     private static Mono<DatagramSocket> sendRequestMono(DatagramPacket request) {

@@ -43,7 +43,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
         this.identifier = identifier;
         EmitterProcessor<PeerMessage> sentMessages$ = EmitterProcessor.create();
         this.sentMessages$ = sentMessages$;
-        this.emitSentMessages = sentMessages$.sink();
+        this.emitSentMessages = sentMessages$.sink(FluxSink.OverflowStrategy.DROP);
         this.sendMessages = new SendMessages(peerDataOutputStream, closeConnectionMethod);
     }
 
@@ -117,6 +117,11 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
         int pieceLength = this.torrentInfo.getPieceLength(index);
         return this.allocatorStore.createRequestMessage(this.getMe(), this.getPeer(), index, begin, blockLength, pieceLength)
                 .flatMap(this::send);
+    }
+
+    @Override
+    public Mono<SendMessagesNotifications> sendRequestMessage(RequestMessage requestMessage) {
+        return send(requestMessage);
     }
 
     @Override

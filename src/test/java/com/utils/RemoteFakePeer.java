@@ -33,12 +33,16 @@ public class RemoteFakePeer {
                             return;
                         case RESPOND_WITH_DELAY_3000:
                             blockThread(3 * 1000);
-                            logger.info(identifier + " - delayed in 3000 mill the response. the fake peer did not response it");
+                            logger.info(identifier + " - delayed in 3000 mill the response. the fake peer did not response yet");
+                            return;
+                        case SEND_RESPOND_AFTER_TIMEOUT:
+                            blockThread(2550);
+                            logger.info(identifier + " - delayed in 2550 mill the response. the fake peer did not response yet");
                             return;
                     }
                 })
                 .index()
-                .flatMap(requestMessage -> {
+                .concatMap(requestMessage -> {
                     switch (fakePeerType) {
                         case CLOSE_IN_FIRST_REQUEST:
                             // its important because the socket may close up-to 4 min so it may be still
@@ -54,12 +58,10 @@ public class RemoteFakePeer {
                         default:
                             return Mono.just(requestMessage);
                     }
-                })
+                },1)
                 .map(Tuple2::getT2)
-                .flatMap(requestMessage -> {
-                    boolean doesFakePeerHaveThePiece = link.getPeerCurrentStatus()
-                            .getPiecesStatus()
-                            .get(requestMessage.getIndex());
+                .concatMap(requestMessage -> {
+                    boolean doesFakePeerHaveThePiece = link.getPeerCurrentStatus().doesPeerHavePiece(requestMessage.getIndex());
                     logger.info(identifier + " - does he have the piece: " + doesFakePeerHaveThePiece + " for request: " + requestMessage);
                     if (!doesFakePeerHaveThePiece)
                         return Mono.empty();
@@ -70,13 +72,16 @@ public class RemoteFakePeer {
                             int responseLength = requestMessage.getBlockLength() > 1 ? requestMessage.getBlockLength() - 1 : requestMessage.getBlockLength();
                             return sendPieceMessage(allocatorStore, link, identifier, requestMessage, pieceLength, responseLength);
                         case VALID:
+                        case VALID_AND_SEND_CHOKE_AFTER_2_REQUESTS:
                         case RESPOND_WITH_DELAY_100:
                         case RESPOND_WITH_DELAY_3000:
+                        case SEND_RESPOND_AFTER_TIMEOUT:
                             return sendPieceMessage(allocatorStore, link, identifier, requestMessage, pieceLength, requestMessage.getBlockLength());
                     }
                     // we will never be here... (by the current fake-peer-types).
                     return Mono.empty();
-                }).publish()
+                },1)
+                .publish()
                 .autoConnect(0);
     }
 

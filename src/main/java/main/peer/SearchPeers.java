@@ -39,22 +39,22 @@ public class SearchPeers {
         this.identifier = identifier;
 
         Flux<TorrentStatusState> startSearch$ = store.statesByAction(TorrentStatusAction.START_SEARCHING_PEERS_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.START_SEARCHING_PEERS_SELF_RESOLVED))
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.START_SEARCHING_PEERS_SELF_RESOLVED),1)
                 .publish()
                 .autoConnect(0);
 
         this.peers$ = store.statesByAction(TorrentStatusAction.RESUME_SEARCHING_PEERS_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_SEARCHING_PEERS_SELF_RESOLVED))
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.RESUME_SEARCHING_PEERS_SELF_RESOLVED),1)
                 .flatMap(__ -> this.trackerProvider.connectToTrackersFlux()
                         .as(this.peersProvider::connectToPeers$))
-                .doOnNext(link -> logger.info(this.identifier + " - search-peers-module connected to new peer: " + link))
-                .flatMap(link -> store.notifyWhen(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP, link))
+                .doOnNext(link -> logger.debug(this.identifier + " - search-peers-module connected to new peer: " + link))
+                .concatMap(link -> store.notifyWhen(TorrentStatusAction.RESUME_SEARCHING_PEERS_WIND_UP, link),1)
                 .doOnNext(link -> logger.debug(this.identifier + " - search-peers-module published new peer: " + link))
                 .publish()
                 .autoConnect(0);
 
         Flux<TorrentStatusState> pauseSearch$ = store.statesByAction(TorrentStatusAction.PAUSE_SEARCHING_PEERS_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_SEARCHING_PEERS_SELF_RESOLVED))
+                .concatMap(__ -> store.dispatch(TorrentStatusAction.PAUSE_SEARCHING_PEERS_SELF_RESOLVED),1)
                 .publish()
                 .autoConnect(0);
     }

@@ -155,8 +155,6 @@ public class MyStepdefs {
                                         case Announce:
                                             return TorrentDownloaders.getListener()
                                                     .getListeningPort()
-                                                    // If we get timeOut then it means that we are not listening so I will just fake a random port which will ignore incoming connections.
-                                                    .timeout(Duration.ofSeconds(2), Mono.just(12345))
                                                     .flatMap(listeningPort -> trackerConnection.announceMono(this.torrentInfo.getTorrentInfoHash(), listeningPort));
                                         case Scrape:
                                             return trackerConnection.scrapeMono(Collections.singletonList(this.torrentInfo.getTorrentInfoHash()));
@@ -424,7 +422,7 @@ public class MyStepdefs {
                 .doOnNext(pieces -> Assert.assertEquals("the FS notifier notified about other block which" +
                         " he saved than the block we expected to save.", pieces.getT1(), pieces.getT2()))
                 .map(Tuple2::getT1)
-                .doOnNext(pieceMessage -> System.out.println("saved from: " + pieceMessage.getBegin() +
+                .doOnNext(pieceMessage -> logger.debug("saved from: " + pieceMessage.getBegin() +
                         ", length: " + pieceMessage.getAllocatedBlock().getLength()))
                 .concatMap(pieceMessage -> TorrentDownloaders.getAllocatorStore()
                         .createRequestMessage(null, null, pieceMessage.getIndex(),
@@ -442,7 +440,7 @@ public class MyStepdefs {
                                         pieceMessage.getAllocatedBlock(), actualPieceMessage.getAllocatedBlock()))
                                 // free the write and read blocks.
                                 .flatMap(actualPieceMessage -> TorrentDownloaders.getAllocatorStore().free(actualPieceMessage.getAllocatedBlock()))
-                                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().free(pieceMessage.getAllocatedBlock()))))
+                                .flatMap(__ -> TorrentDownloaders.getAllocatorStore().free(pieceMessage.getAllocatedBlock()))), 1)
                 // tell upstream that we freed the buffer and he can give us one more signal (if he have any left)
                 .doOnNext(__ -> semaphore.release())
                 .collectList()
@@ -737,13 +735,13 @@ public class MyStepdefs {
                 .flatMap(peersProvider ->
                         TorrentDownloaders.getListener()
                                 .getListeningPort()
-                                .timeout(Duration.ofSeconds(2))
                                 // the fake-peer will connect to me.
                                 .map(listeningPort -> new Peer("localhost", listeningPort))
                                 .flatMap(me -> peersProvider.connectToPeerMono(me)))
                 .doOnNext(__ -> logger.debug("fake-peer connected to the app and start sending requests to the app."))
                 .cache();
-        this.requestsFromFakePeerToMeList$ = fakePeerToAppLink$
+
+        this.requestsFromFakePeerToMeList$ = this.fakePeerToAppLink$
                 .map(Link::sendMessages)
                 .flatMapMany(sendMessagesObject -> sendMessagesObject.sendInterestedMessage()
                         .flatMapMany(__ -> MyStepdefs.globalFakePeerAllocator.latestState$()
@@ -752,7 +750,7 @@ public class MyStepdefs {
                                 .flatMapMany(allocatedBlockLength -> Flux.fromIterable(peerRequestBlockList)
                                         .map(blockOfPiece -> Utils.fixBlockOfPiece(blockOfPiece, torrentInfo, allocatedBlockLength))))
                         .concatMap(blockOfPiece -> sendMessagesObject.sendRequestMessage(blockOfPiece.getPieceIndex(), blockOfPiece.getFrom(), blockOfPiece.getLength())
-                                .doOnNext(__ -> logger.debug("fake peer sent request for block: " + blockOfPiece))))
+                                .doOnNext(__ -> logger.debug("fake peer sent request for block: " + blockOfPiece)), 1))
                 .collectList()
                 .doOnNext(requestList -> Assert.assertEquals("We sent less requests then expected.",
                         peerRequestBlockList.size(), requestList.size()))
@@ -780,6 +778,8 @@ public class MyStepdefs {
         Flux<PieceMessage> recordedPieceMessageFlux = meToFakePeerLink
                 .map(Link::sendMessages)
                 .flatMapMany(SendMessagesNotifications::sentPeerMessages$)
+                // I'm going to block until I collect X sent messages.
+                .publishOn(Schedulers.parallel())
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
                 .cast(PieceMessage.class)
                 .replay()
@@ -872,6 +872,7 @@ public class MyStepdefs {
                 .autoConnect(0);
 
         TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        System.out.println(torrentInfo);
 
         TorrentDownloaders.getAllocatorStore()
                 .updateAllocations(10, torrentInfo.getPieceLength(0))
@@ -902,6 +903,7 @@ public class MyStepdefs {
                 .build();
         this.peersToPiecesMapper = new PeersToPiecesMapperImpl(
                 torrentDownloader.getTorrentInfo(),
+                torrentDownloader.getFileSystemLink(),
                 torrentDownloader.getIncomingPeerMessagesNotifier(),
                 torrentDownloader.getPeersCommunicatorFlux(),
                 torrentDownloader.getFileSystemLink().getUpdatedPiecesStatus());
@@ -1079,14 +1081,16 @@ public class MyStepdefs {
                                                                         List<PeersContainingPiece> peersContainingPieces) throws Throwable {
         synchronized (this.fakePeersByPort) {
             this.linksByAvailableMissingPiece$.take(peersContainingPieces.size())
-                    .timeout(Duration.ofSeconds(5))
+                    .subscribeOn(App.timeoutScheduler)
+                    .timeout(Duration.ofSeconds(5), App.timeoutFallbackScheduler)
                     .flatMap(linksContainingPiece -> {
                         List<Integer> expectedPeersContainingPiece = peersContainingPieces.stream()
                                 .filter(peer -> peer.getPieceIndex() == linksContainingPiece.key())
                                 .flatMap(peer -> peer.getPeers().stream())
                                 .collect(Collectors.toList());
                         return linksContainingPiece.take(expectedPeersContainingPiece.size())
-                                .timeout(Duration.ofSeconds(5))
+                                .subscribeOn(App.timeoutScheduler)
+                                .timeout(Duration.ofSeconds(5), App.timeoutFallbackScheduler)
                                 .flatMap(link ->
                                 {
                                     Mono<Integer> single = Flux.fromIterable(this.fakePeersByPort)
@@ -1141,7 +1145,8 @@ public class MyStepdefs {
                     .flatMap(link -> Flux.fromIterable(this.fakePeersByPort)
                             .filter(fakePeerByPort -> fakePeerByPort.getValue().getLink().equals(link)))
                     .map(AbstractMap.SimpleEntry::getKey)
-                    .timeout(Duration.ofMillis(50), Mono.empty())
+                    .subscribeOn(App.timeoutScheduler)
+                    .timeout(Duration.ofMillis(50), Mono.empty(), App.timeoutFallbackScheduler)
                     .collectList()
                     .doOnNext(actualPeersWithPiece -> Utils.assertListEqualNotByOrder(expectedAvailableFakePeerPortList, actualPeersWithPiece, Integer::equals))
                     .as(StepVerifier::create)
@@ -1614,7 +1619,6 @@ public class MyStepdefs {
 
         Mono<Link> publisher = TorrentDownloaders.getListener()
                 .getListeningPort()
-                .timeout(Duration.ofSeconds(2), Mono.just(12345))
                 .map(listeningPort -> new Peer("localhost", listeningPort))
                 .flatMap(app -> {
                     EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessagesFakePeer$ = EmitterProcessor.create();
@@ -1631,7 +1635,8 @@ public class MyStepdefs {
                     .verify();
 
         appToFakePeerLink$.doOnNext(Link::dispose)
-                .timeout(Duration.ofMillis(100), Mono.empty())
+                .subscribeOn(App.timeoutScheduler)
+                .timeout(Duration.ofMillis(100), Mono.empty(), App.timeoutFallbackScheduler)
                 .collectList()
                 .as(StepVerifier::create)
                 .expectNextCount(1)
@@ -1667,7 +1672,8 @@ public class MyStepdefs {
                 .verifyComplete();
 
         appToFakePeerLink$.doOnNext(Link::dispose)
-                .timeout(Duration.ofMillis(100), Mono.empty())
+                .subscribeOn(App.timeoutScheduler)
+                .timeout(Duration.ofMillis(100), Mono.empty(), App.timeoutFallbackScheduler)
                 .collectList()
                 .as(StepVerifier::create)
                 .expectNextCount(1)
@@ -1772,7 +1778,8 @@ public class MyStepdefs {
     public void applicationReceiveTheFollowingAvailablePiecesForTorrentNone(String torrentFileName) throws Throwable {
         this.peersToPiecesMapper.getLinksByAvailableMissingPiece$()
                 .map(GroupedFlux::key)
-                .timeout(Duration.ofMillis(50), Mono.empty())
+                .subscribeOn(App.timeoutScheduler)
+                .timeout(Duration.ofMillis(50), Mono.empty(), App.timeoutFallbackScheduler)
                 .collectList()
                 .doOnNext(actualAvailablePieces -> Assert.assertTrue(actualAvailablePieces.isEmpty()))
                 .as(StepVerifier::create)
@@ -1789,7 +1796,8 @@ public class MyStepdefs {
                     .flatMap(link -> Flux.fromIterable(this.fakePeersByPort)
                             .filter(fakePeerByPort -> fakePeerByPort.getValue().getLink().equals(link)))
                     .map(AbstractMap.SimpleEntry::getKey)
-                    .timeout(Duration.ofMillis(50), Mono.empty())
+                    .subscribeOn(App.timeoutScheduler)
+                    .timeout(Duration.ofMillis(50), Mono.empty(), App.timeoutFallbackScheduler)
                     .collectList()
                     .doOnNext(actualPeersWithPiece -> Assert.assertTrue(actualPeersWithPiece.isEmpty()))
                     .as(StepVerifier::create)
@@ -1858,7 +1866,6 @@ public class MyStepdefs {
 
         Mono<Link> fakePeerToAppLink$ = TorrentDownloaders.getListener()
                 .getListeningPort()
-                .timeout(Duration.ofSeconds(2), Mono.just(12345))
                 .map(listeningPort -> new Peer("localhost", listeningPort))
                 .flatMap(app -> {
                     EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessagesFakePeer$ = EmitterProcessor.create();
@@ -1906,15 +1913,19 @@ public class MyStepdefs {
         PieceDownloader pieceDownloader = new PieceDownloaderImpl(torrentDownloader.getAllocatorStore(), torrentInfo, torrentDownloader.getFileSystemLink(),
                 new BlockDownloaderImpl(torrentInfo, torrentDownloader.getFileSystemLink(), torrentDownloader.getIdentifier()));
 
-        this.downloadPieces$ = this.linksByAvailableMissingPiece$.flatMap(peersByPiece$ ->
-                        Flux.fromIterable(fixedExpectedPiecesToDownload)
-                                .map(pieceToDownload -> pieceToDownload >= 0 ?
-                                        pieceToDownload :
-                                        torrentInfo.getPieces().size() + pieceToDownload)
-                                .filter(pieceIndex -> pieceIndex.equals(peersByPiece$.key()))
-                                .flatMap(__ -> pieceDownloader.downloadPiece$(peersByPiece$.key(), peersByPiece$.replay().autoConnect(0)))
-                , fixedExpectedPiecesToDownload.size(), fixedExpectedPiecesToDownload.size())
-                .take(fixedExpectedPiecesToDownload.size())
+        this.downloadPieces$ = this.peersToPiecesMapper.availablePieces$()
+                .filter(pieceIndexToDownload -> fixedExpectedPiecesToDownload.stream()
+                        .map(pieceToDownload -> pieceToDownload >= 0 ?
+                                pieceToDownload :
+                                torrentInfo.getPieces().size() + pieceToDownload)
+                        .anyMatch(pieceIndex -> pieceIndex.equals(pieceIndexToDownload)))
+                // some fake-peers will only connected to me int he future so I can't send downstream the same piece more then once
+                // (the mapper send in loops the same available missing pieces).
+                .distinct()
+                // the limitRequest is because the availablePieces$ will keep bringing more and more
+                // pieces and when there is no more, he will repeat the all missing available pieces list again.
+                .limitRequest(fixedExpectedPiecesToDownload.size())
+                .concatMap(pieceIndexToDownload -> pieceDownloader.downloadPiece$(pieceIndexToDownload, this.peersToPiecesMapper.linksForPiece$(pieceIndexToDownload)), 1)
                 .collectList()
                 .doOnNext(actualDownloadedPieces -> Utils.assertListEqualNotByOrder(fixedExpectedPiecesToDownload, actualDownloadedPieces, Integer::equals))
                 .flux()
@@ -1930,7 +1941,31 @@ public class MyStepdefs {
 
         if (this.meToFakePeerLink$ != null) {
             this.meToFakePeerLink$.doOnNext(Link::dispose)
-                    .timeout(Duration.ofMillis(100), Mono.empty())
+                    .subscribeOn(App.timeoutScheduler)
+                    .timeout(Duration.ofMillis(100), Mono.empty(), App.timeoutFallbackScheduler)
+                    .collectList()
+                    .as(StepVerifier::create)
+                    .expectNextCount(1)
+                    .verifyComplete();
+            this.meToFakePeerLink$ = null;
+        }
+        if (this.peersToPiecesMapper != null)
+            this.peersToPiecesMapper.dispose();
+
+        this.fakePeersByPort.stream()
+                .map(AbstractMap.SimpleEntry::getValue)
+                .map(RemoteFakePeer::getLink)
+                .forEach(Link::dispose);
+
+        Utils.removeEverythingRelatedToLastTest();
+    }
+
+    @Then("^fake-peers disconnect- for torrent: \"([^\"]*)\"$")
+    public void fakePeersDisconnectForTorrent(String torrentFileName) throws Throwable {
+        if (this.meToFakePeerLink$ != null) {
+            this.meToFakePeerLink$.doOnNext(Link::dispose)
+                    .subscribeOn(App.timeoutScheduler)
+                    .timeout(Duration.ofMillis(100), Mono.empty(), App.timeoutFallbackScheduler)
                     .collectList()
                     .as(StepVerifier::create)
                     .expectNextCount(1)
@@ -1946,23 +1981,137 @@ public class MyStepdefs {
         Utils.removeEverythingRelatedToLastTest();
     }
 
-    @Then("^fake-peers disconnect- for torrent: \"([^\"]*)\"$")
-    public void fakePeersDisconnectForTorrent(String torrentFileName) throws Throwable {
-        if (this.meToFakePeerLink$ != null) {
-            this.meToFakePeerLink$.doOnNext(Link::dispose)
-                    .timeout(Duration.ofMillis(100), Mono.empty())
-                    .collectList()
-                    .as(StepVerifier::create)
-                    .expectNextCount(1)
-                    .verifyComplete();
-            this.meToFakePeerLink$ = null;
-        }
+    @Given("^link to \"([^\"]*)\" - fake-peer on port \"([^\"]*)\" without the following pieces - with delay: \"([^\"]*)\" milliseconds - for torrent: \"([^\"]*)\"$")
+    public void linkToFakePeerOnPortWithoutTheFollowingPiecesWithDelayMillisecondsForTorrent(FakePeerType fakePeerType,
+                                                                                             int fakePeerPort,
+                                                                                             int delayInMilliSeconds,
+                                                                                             String torrentFileName,
+                                                                                             List<Integer> fakePeerCompletedPieces) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
 
-        this.fakePeersByPort.stream()
-                .map(AbstractMap.SimpleEntry::getValue)
-                .map(RemoteFakePeer::getLink)
-                .forEach(Link::dispose);
+        // build a bitField message so I can send it to my app and also
+        // the fake-peer will update his status that he have those pieces.
+        BitSet bitSet = new BitSet(torrentInfo.getPieces().size());
+        bitSet.set(0, torrentInfo.getPieces().size());
+        fakePeerCompletedPieces.stream()
+                .map(completedPieceIndex -> completedPieceIndex >= 0 ?
+                        completedPieceIndex :
+                        torrentInfo.getPieces().size() + completedPieceIndex)
+                .forEach(completedPieceIndex -> bitSet.clear(completedPieceIndex));
 
-        Utils.removeEverythingRelatedToLastTest();
+        EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessagesFakePeer$ = EmitterProcessor.create();
+        TorrentDownloaders.getListener()
+                .getListeningPort()
+                .map(listeningPort -> new Peer("localhost", listeningPort))
+                .doOnNext(peer -> logger.info(fakePeerPort + " - received port from listener: " + peer))
+                .delayElement(Duration.ofMillis(delayInMilliSeconds))
+                .doOnNext(peer -> logger.info(fakePeerPort + " - waited: " + delayInMilliSeconds))
+                .flatMap(me -> {
+                    FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessagesFakePeer = incomingPeerMessagesFakePeer$.sink();
+                    return new PeersProvider(MyStepdefs.globalFakePeerAllocator, torrentInfo, "Fake-peer", emitIncomingPeerMessagesFakePeer).connectToPeerMono(me);
+                })
+                .doOnNext(peer -> logger.info("fake peer: " + fakePeerPort + " connected to app -->> " + peer.getMe().getPeerPort()))
+                .map(fakePeerToAppLink -> new RemoteFakePeer(MyStepdefs.globalFakePeerAllocator, fakePeerToAppLink, fakePeerType,
+                        "Fake-peer-" + fakePeerPort + "-" + fakePeerType.toString(),
+                        new IncomingPeerMessagesNotifierImpl(incomingPeerMessagesFakePeer$)))
+                .doOnNext(remoteFakePeer -> logger.info("created fake-peer " + remoteFakePeer.getLink().getMe().getPeerPort() + "  object"))
+                .doOnNext(remoteFakePeer -> {
+                    synchronized (this.fakePeersByPort) {
+                        this.fakePeersByPort.add(new AbstractMap.SimpleEntry<>(fakePeerPort, remoteFakePeer));
+                    }
+                })
+                .doOnNext(remoteFakePeer -> logger.info(remoteFakePeer.getLink().getMe().getPeerPort() + " - added fake peer to the list of fake peers"))
+                .flatMap(remoteFakePeer -> remoteFakePeer.getLink().sendMessages().sendBitFieldMessage(bitSet).map(sendPeerMessages -> remoteFakePeer)
+                        .doOnNext(peer -> logger.info("fake-peer " + remoteFakePeer.getLink().getMe().getPeerPort() + " sent to app a bitfield message:" + bitSet)))
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @Then("^application download the the torrent: \"([^\"]*)\":$")
+    public void applicationDownloadTheTheTorrent(String torrentFileName) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
+
+        PieceDownloader pieceDownloader = new PieceDownloaderImpl(torrentDownloader.getAllocatorStore(), torrentInfo, torrentDownloader.getFileSystemLink(),
+                new BlockDownloaderImpl(torrentInfo, torrentDownloader.getFileSystemLink(), torrentDownloader.getIdentifier()));
+
+        PiecesDownloader piecesDownloader = new PiecesDownloaderImpl(torrentDownloader.getAllocatorStore(), torrentInfo,
+                torrentDownloader.getTorrentStatusStore(), torrentDownloader.getFileSystemLink(), this.peersToPiecesMapper, pieceDownloader);
+
+        torrentDownloader.getFileSystemLink()
+                .savedPieces$()
+                .map(completedPieceIndex ->
+                        IntStream.range(0, torrentDownloader.getTorrentInfo().getPieces().size())
+                                .mapToObj(pieceIndex -> pieceIndex == completedPieceIndex ? "*" : torrentDownloader.getFileSystemLink().havePiece(pieceIndex) ? "1" : "0")
+                                .collect(Collectors.joining()))
+                .subscribe(x -> System.out.println(x));
+
+        torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS);
+    }
+
+    @Then("^wait until download of torrent is finished - for torrent: \"([^\"]*)\"$")
+    public void waitUntilDownloadOfTorrentIsFinishedForTorrent(String torrentFileName) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+        TorrentDownloader torrentDownloader = TorrentDownloaders.getInstance()
+                .findTorrentDownloader(torrentInfo.getTorrentInfoHash())
+                .orElseThrow(() -> new IllegalStateException("torrent downloader object should have been created but it didn't."));
+
+        torrentDownloader.getTorrentStatusStore()
+                .states$()
+                .filter(torrentStatusState -> torrentStatusState.fromAction(TorrentStatusAction.COMPLETED_DOWNLOADING_WIND_UP))
+                .take(1)
+                .single()
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
+    }
+
+    @Given("^the following saved pieces - for torrent: \"([^\"]*)\": - all$")
+    public void theFollowingSavedPiecesForTorrentAll(String torrentFileName) throws Throwable {
+        // TODO: fill it up such that we have all the pieces ***before*** we start downloading!
+    }
+
+    @Given("^link to \"([^\"]*)\" - fake-peer on port \"([^\"]*)\" without the following pieces - with delay: \"([^\"]*)\" milliseconds - for torrent: \"([^\"]*)\": - none$")
+    public void linkToFakePeerOnPortWithoutTheFollowingPiecesWithDelayMillisecondsForTorrentNone(FakePeerType fakePeerType,
+                                                                                                 int fakePeerPort,
+                                                                                                 int delayInMilliSeconds,
+                                                                                                 String torrentFileName) throws Throwable {
+        TorrentInfo torrentInfo = Utils.createTorrentInfo(torrentFileName);
+
+        // build a bitField message so I can send it to my app and also
+        // the fake-peer will update his status that he have those pieces.
+        BitSet bitSet = new BitSet(torrentInfo.getPieces().size());
+        bitSet.set(0, torrentInfo.getPieces().size());
+
+        EmitterProcessor<AbstractMap.SimpleEntry<Link, PeerMessage>> incomingPeerMessagesFakePeer$ = EmitterProcessor.create();
+        TorrentDownloaders.getListener()
+                .getListeningPort()
+                .map(listeningPort -> new Peer("localhost", listeningPort))
+                .doOnNext(peer -> logger.info(fakePeerPort + " - received port from listener: " + peer))
+                .delayElement(Duration.ofMillis(delayInMilliSeconds))
+                .doOnNext(peer -> logger.info(fakePeerPort + " - waited: " + delayInMilliSeconds))
+                .flatMap(me -> {
+                    FluxSink<AbstractMap.SimpleEntry<Link, PeerMessage>> emitIncomingPeerMessagesFakePeer = incomingPeerMessagesFakePeer$.sink();
+                    return new PeersProvider(MyStepdefs.globalFakePeerAllocator, torrentInfo, "Fake-peer", emitIncomingPeerMessagesFakePeer).connectToPeerMono(me);
+                })
+                .doOnNext(peer -> logger.info("fake peer: " + fakePeerPort + " connected to app -->> " + peer.getMe().getPeerPort()))
+                .map(fakePeerToAppLink -> new RemoteFakePeer(MyStepdefs.globalFakePeerAllocator, fakePeerToAppLink, fakePeerType,
+                        "Fake-peer-" + fakePeerPort + "-" + fakePeerType.toString(),
+                        new IncomingPeerMessagesNotifierImpl(incomingPeerMessagesFakePeer$)))
+                .doOnNext(remoteFakePeer -> logger.info("created fake-peer " + remoteFakePeer.getLink().getMe().getPeerPort() + "  object"))
+                .doOnNext(remoteFakePeer -> {
+                    synchronized (this.fakePeersByPort) {
+                        this.fakePeersByPort.add(new AbstractMap.SimpleEntry<>(fakePeerPort, remoteFakePeer));
+                    }
+                })
+                .doOnNext(remoteFakePeer -> logger.info(remoteFakePeer.getLink().getMe().getPeerPort() + " - added fake peer to the list of fake peers"))
+                .flatMap(remoteFakePeer -> remoteFakePeer.getLink().sendMessages().sendBitFieldMessage(bitSet).map(sendPeerMessages -> remoteFakePeer)
+                        .doOnNext(peer -> logger.info("fake-peer " + remoteFakePeer.getLink().getMe().getPeerPort() + " sent to app a bitfield message:" + bitSet)))
+                .as(StepVerifier::create)
+                .expectNextCount(1)
+                .verifyComplete();
     }
 }

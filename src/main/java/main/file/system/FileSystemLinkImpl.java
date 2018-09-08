@@ -68,19 +68,19 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .autoConnect(0);
 
         this.completeDownload$ = torrentStatusStore.statesByAction(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS)
-                .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.COMPLETED_DOWNLOADING_SELF_RESOLVED))
+                .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.COMPLETED_DOWNLOADING_SELF_RESOLVED),1)
                 .publish()
                 .autoConnect(0);
 
         // TODO: this status is useless because we don't use ActiveTorrents class
         this.removeTorrent$ = torrentStatusStore.statesByAction(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)
-                .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_TORRENT_SELF_RESOLVED))
+                .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_TORRENT_SELF_RESOLVED),1)
                 .publish()
                 .autoConnect(0);
 
         this.removeFiles$ = torrentStatusStore.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
-                .concatMap(__ -> deleteFileOnlyMono())
-                .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_FILES_SELF_RESOLVED))
+                .concatMap(__ -> deleteFileOnlyMono(),1)
+                .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_FILES_SELF_RESOLVED),1)
                 .publish()
                 .autoConnect(0);
 
@@ -96,7 +96,9 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .flatMapMany(isCompletedDownloading -> {
                     if (isCompletedDownloading) {
                         logger.info(this.identifier + " - Torrent: " + torrentInfo.getName() + ", the torrent download is already completed so we update our internal state that all the pieces are completed.");
-                        this.piecesStatus.set(0, torrentInfo.getPieces().size());
+                        synchronized (this.piecesStatus) {
+                            this.piecesStatus.set(0, torrentInfo.getPieces().size());
+                        }
                         return Flux.empty();
                     }
                     logger.info(this.identifier + " - Torrent: " + torrentInfo.getName() + ", the torrent download is not completed so we start accepting new incoming pieces.");
@@ -109,13 +111,13 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .doOnNext(pieceMessage -> logger.trace(this.identifier + " - finished saving piece-message: " + pieceMessage))
                 .doOnNext(__ -> {
                     // we may come here even if we got am empty flux but the download isn't yet completed.
-                    if (areAllPiecesSaved()) {
-                        logger.info(this.identifier + " - Torrent: " + torrentInfo + ", we finished to download the torrent and we dispatch a comeplete notification using redux.");
+                    if (isDownloadCompleted()) {
+                        logger.info(this.identifier + " - Torrent: " + torrentInfo + ", we finished to download the torrent and we dispatch a complete notification using redux.");
                         torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS);
                     }
                 })
                 // takeUntil will signal the last next signal he received and then he will send complete signal.
-                .takeUntil(pieceEvent -> areAllPiecesSaved())
+                .takeUntil(pieceEvent -> isDownloadCompleted())
                 .publish()
                 .autoConnect(0);
 
@@ -135,7 +137,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
     @Override
     public BitSet getUpdatedPiecesStatus() {
-        return this.piecesStatus;
+        return (BitSet) this.piecesStatus.clone();
     }
 
     @Override
@@ -145,15 +147,18 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
     @Override
     public BitFieldMessage buildBitFieldMessage(Peer from, Peer to) {
-        return new BitFieldMessage(from, to, this.piecesStatus);
+        synchronized (this.piecesStatus) {
+            return new BitFieldMessage(from, to, this.piecesStatus);
+        }
     }
 
     @Override
     public boolean havePiece(int pieceIndex) {
         assert 0 <= pieceIndex;
         assert pieceIndex <= super.getPieces().size();
-
-        return this.piecesStatus.get(pieceIndex);
+        synchronized (this.piecesStatus) {
+            return this.piecesStatus.get(pieceIndex);
+        }
     }
 
     @Override
@@ -185,10 +190,13 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 });
     }
 
-    private boolean areAllPiecesSaved() {
-        for (int i = 0; i < this.getPieces().size(); i++)
-            if (!this.piecesStatus.get(i))
-                return false;
+    @Override
+    public boolean isDownloadCompleted() {
+        synchronized (this.piecesStatus) {
+            for (int i = 0; i < this.getPieces().size(); i++)
+                if (!this.piecesStatus.get(i))
+                    return false;
+        }
         return true;
     }
 
@@ -281,14 +289,16 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                     long howMuchWeWroteUntilNowInThisPiece = this.downloadedBytesInPieces[pieceMessage.getIndex()];
                     logger.debug(this.identifier + " - end writing block to FS: " + pieceMessage);
                     if (howMuchWeWroteUntilNowInThisPiece >= pieceLength) {
-                        this.piecesStatus.set(pieceMessage.getIndex());
+                        synchronized (this.piecesStatus) {
+                            this.piecesStatus.set(pieceMessage.getIndex());
+                        }
                         PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.COMPLETED, pieceMessage);
                         sink.success(pieceEvent);
                     } else {
                         PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.DOWNLOADING, pieceMessage);
                         sink.success(pieceEvent);
                     }
-                }).doAfterSuccessOrError((__, ___) -> logger.debug(this.identifier + " - start cleaning-up piece-message-allocator: " + pieceMessage))
+                })
                         .flatMap(pieceEvent -> this.allocatorStore.free(pieceMessage.getAllocatedBlock()).map(__ -> pieceEvent))
                         .onErrorResume(throwable -> this.allocatorStore.free(pieceMessage.getAllocatedBlock()).flatMap(__ -> Mono.empty()))
                         .doAfterSuccessOrError((__, ___) -> logger.debug(this.identifier + " - finished cleaning-up piece-message-allocator: " + pieceMessage)));

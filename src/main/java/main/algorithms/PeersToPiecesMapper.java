@@ -11,4 +11,10 @@ public interface PeersToPiecesMapper {
      * @return flux of pieces numbers.
      */
     Flux<GroupedFlux<Integer, Link>> getLinksByAvailableMissingPiece$();
+
+    Flux<Integer> availablePieces$();
+
+    Flux<Link> linksForPiece$(int pieceIndex);
+
+    void dispose();
 }

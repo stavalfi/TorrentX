@@ -52,28 +52,28 @@ public class ListenerSideEffects {
                 .negate();
 
         this.startListen$ = store.statesByAction(ListenerAction.START_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> store.tryDispatchUntil(ListenerAction.START_LISTENING_WIND_UP, isStartCanceled))
-                .concatMap(__ -> store.dispatch(ListenerAction.RESUME_LISTENING_IN_PROGRESS))
+                .concatMap(__ -> store.tryDispatchUntil(ListenerAction.START_LISTENING_WIND_UP, isStartCanceled),1)
+                .concatMap(__ -> store.dispatch(ListenerAction.RESUME_LISTENING_IN_PROGRESS),1)
                 .publish()
                 .autoConnect(0);
 
         this.resumeListen$ = store.statesByAction(ListenerAction.RESUME_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> store.tryDispatchUntil(ListenerAction.RESUME_LISTENING_WIND_UP, isResumeCanceled))
+                .concatMap(__ -> store.tryDispatchUntil(ListenerAction.RESUME_LISTENING_WIND_UP, isResumeCanceled),1)
                 .publish()
                 .autoConnect(0);
 
         this.pauseListen$ = store.statesByAction(ListenerAction.PAUSE_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> store.notifyWhen(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED))
-                .concatMap(__ -> store.dispatch(ListenerAction.PAUSE_LISTENING_WIND_UP))
+                .concatMap(__ -> store.notifyWhen(ListenerAction.PAUSE_LISTENING_SELF_RESOLVED),1)
+                .concatMap(__ -> store.dispatch(ListenerAction.PAUSE_LISTENING_WIND_UP),1)
                 .publish()
                 .autoConnect(0);
 
         this.restartListen$ = store.statesByAction(ListenerAction.RESTART_LISTENING_IN_PROGRESS)
-                .concatMap(__ -> store.dispatch(ListenerAction.PAUSE_LISTENING_IN_PROGRESS))
-                .concatMap(__ -> store.notifyWhen(ListenerAction.RESTART_LISTENING_SELF_RESOLVED))
-                .concatMap(__ -> store.notifyWhen(ListenerAction.PAUSE_LISTENING_WIND_UP))
-                .concatMap(__ -> store.dispatch(ListenerAction.RESTART_LISTENING_WIND_UP))
-                .concatMap(__ -> store.dispatch(ListenerAction.INITIALIZE))
+                .concatMap(__ -> store.dispatch(ListenerAction.PAUSE_LISTENING_IN_PROGRESS),1)
+                .concatMap(__ -> store.notifyWhen(ListenerAction.RESTART_LISTENING_SELF_RESOLVED),1)
+                .concatMap(__ -> store.notifyWhen(ListenerAction.PAUSE_LISTENING_WIND_UP),1)
+                .concatMap(__ -> store.dispatch(ListenerAction.RESTART_LISTENING_WIND_UP),1)
+                .concatMap(__ -> store.dispatch(ListenerAction.INITIALIZE),1)
                 .publish()
                 .autoConnect(0);
     }
