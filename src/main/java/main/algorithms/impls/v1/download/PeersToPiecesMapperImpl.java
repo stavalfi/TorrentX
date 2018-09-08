@@ -3,8 +3,8 @@ package main.algorithms.impls.v1.download;
 import main.TorrentInfo;
 import main.algorithms.PeersToPiecesMapper;
 import main.file.system.FileSystemLink;
-import main.peer.IncomingPeerMessagesNotifier;
 import main.peer.Link;
+import main.peer.algorithms.IncomingPeerMessagesNotifier;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.HaveMessage;
 import org.slf4j.Logger;
@@ -14,10 +14,12 @@ import reactor.core.publisher.GroupedFlux;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {

@@ -1,13 +1,13 @@
 package main;
 
 import christophedetroyer.torrent.TorrentParser;
-import main.downloader.TorrentDownloader;
-import main.downloader.TorrentDownloaderBuilder;
-import main.downloader.TorrentDownloaders;
-import main.listener.ListenerAction;
+import main.download.manager.TorrentDownloader;
+import main.download.manager.TorrentDownloaderBuilder;
+import main.download.manager.TorrentDownloaders;
 import main.peer.Link;
-import main.peer.SendMessagesNotifications;
+import main.peer.algorithms.SendMessagesNotifications;
 import main.peer.peerMessages.HaveMessage;
+import main.peers.listener.ListenerAction;
 import main.torrent.status.TorrentStatusAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

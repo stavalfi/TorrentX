@@ -1,10 +1,10 @@
 package com.utils;
 
 import main.algorithms.impls.v1.download.BlockDownloaderImpl;
-import main.file.system.allocator.AllocatorStore;
-import main.peer.IncomingPeerMessagesNotifier;
+import main.allocator.AllocatorStore;
 import main.peer.Link;
-import main.peer.SendMessagesNotifications;
+import main.peer.algorithms.IncomingPeerMessagesNotifier;
+import main.peer.algorithms.SendMessagesNotifications;
 import main.peer.peerMessages.RequestMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

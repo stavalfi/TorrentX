@@ -2,9 +2,9 @@ package main.file.system;
 
 import christophedetroyer.torrent.TorrentFile;
 import main.TorrentInfo;
-import main.downloader.PieceEvent;
-import main.downloader.TorrentPieceStatus;
-import main.file.system.allocator.AllocatorStore;
+import main.algorithms.PieceEvent;
+import main.algorithms.impls.TorrentPieceStatus;
+import main.allocator.AllocatorStore;
 import main.file.system.exceptions.PieceNotDownloadedYetException;
 import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;

@@ -122,7 +122,7 @@ The API will let us listen for incoming messages and provide us a way to send me
 
 -----
 
-### Feature 4: Design a basic algorithm. `IN PROGRESS`
+### Feature 4: Design a basic algorithm. `DONE`
 
 ##### PBI-1: Design a torrent manager API to handle the download & upload of a specific torrent. `DONE`
 

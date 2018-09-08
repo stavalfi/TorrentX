@@ -2,8 +2,8 @@ package main.algorithms.impls.v1.notification;
 
 import main.TorrentInfo;
 import main.algorithms.NotifyAboutCompletedPieceAlgorithm;
-import main.downloader.PieceEvent;
-import main.downloader.TorrentPieceStatus;
+import main.algorithms.PieceEvent;
+import main.algorithms.impls.TorrentPieceStatus;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.peerMessages.PieceMessage;
@@ -11,7 +11,6 @@ import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import redux.store.Store;
 

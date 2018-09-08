@@ -1,7 +1,7 @@
 package main.peer.peerMessages;
 
 import main.peer.Peer;
-import main.peer.SendMessages;
+import main.peer.algorithms.SendMessages;
 import reactor.core.publisher.Mono;
 
 import java.nio.ByteBuffer;

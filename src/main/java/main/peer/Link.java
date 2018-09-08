@@ -1,13 +1,13 @@
 package main.peer;
 
 import main.TorrentInfo;
-import main.file.system.allocator.AllocatorStore;
+import main.allocator.AllocatorStore;
+import main.peer.algorithms.ReceivePeerMessages;
+import main.peer.algorithms.SendMessagesNotifications;
+import main.peer.algorithms.impls.SendMessagesNotificationsImpl;
 import main.peer.peerMessages.PeerMessage;
 import main.statistics.SpeedStatistics;
-import main.statistics.TorrentSpeedSpeedStatisticsImpl;
-import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.FluxSink;
-import reactor.core.publisher.UnicastProcessor;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;

@@ -1,9 +1,9 @@
 package main.algorithms.impls.v1.upload;
 
 import main.TorrentInfo;
+import main.algorithms.PieceEvent;
 import main.algorithms.UploadAlgorithm;
-import main.downloader.PieceEvent;
-import main.downloader.TorrentPieceStatus;
+import main.algorithms.impls.TorrentPieceStatus;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.peerMessages.RequestMessage;

@@ -1,7 +1,5 @@
 package main;
 
-import main.downloader.TorrentDownloaders;
-
 public class AppConfig {
 
     private static AppConfig instance = new AppConfig();
