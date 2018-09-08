@@ -93,8 +93,8 @@ public class Utils {
 //                                        e.printStackTrace();
 //                                    }
                                 }
-                                Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
-                                        allocatorState.getFreeBlocksStatus().get(i));
+//                                Assert.assertTrue("i: " + i + " - global app allocator: " + allocatorState.toString(),
+//                                        allocatorState.getFreeBlocksStatus().get(i));
                             });
                 })
                 .flatMap(__ -> TorrentDownloaders.getAllocatorStore().freeAll())
