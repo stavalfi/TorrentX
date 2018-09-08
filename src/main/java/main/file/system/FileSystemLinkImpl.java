@@ -298,7 +298,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                         PieceEvent pieceEvent = new PieceEvent(TorrentPieceStatus.DOWNLOADING, pieceMessage);
                         sink.success(pieceEvent);
                     }
-                }).doAfterSuccessOrError((__, ___) -> logger.debug(this.identifier + " - start cleaning-up piece-message-allocator: " + pieceMessage))
+                })
                         .flatMap(pieceEvent -> this.allocatorStore.free(pieceMessage.getAllocatedBlock()).map(__ -> pieceEvent))
                         .onErrorResume(throwable -> this.allocatorStore.free(pieceMessage.getAllocatedBlock()).flatMap(__ -> Mono.empty()))
                         .doAfterSuccessOrError((__, ___) -> logger.debug(this.identifier + " - finished cleaning-up piece-message-allocator: " + pieceMessage)));

@@ -422,7 +422,7 @@ public class MyStepdefs {
                 .doOnNext(pieces -> Assert.assertEquals("the FS notifier notified about other block which" +
                         " he saved than the block we expected to save.", pieces.getT1(), pieces.getT2()))
                 .map(Tuple2::getT1)
-                .doOnNext(pieceMessage -> System.out.println("saved from: " + pieceMessage.getBegin() +
+                .doOnNext(pieceMessage -> logger.debug("saved from: " + pieceMessage.getBegin() +
                         ", length: " + pieceMessage.getAllocatedBlock().getLength()))
                 .concatMap(pieceMessage -> TorrentDownloaders.getAllocatorStore()
                         .createRequestMessage(null, null, pieceMessage.getIndex(),
@@ -740,7 +740,8 @@ public class MyStepdefs {
                                 .flatMap(me -> peersProvider.connectToPeerMono(me)))
                 .doOnNext(__ -> logger.debug("fake-peer connected to the app and start sending requests to the app."))
                 .cache();
-        this.requestsFromFakePeerToMeList$ = fakePeerToAppLink$
+
+        this.requestsFromFakePeerToMeList$ = this.fakePeerToAppLink$
                 .map(Link::sendMessages)
                 .flatMapMany(sendMessagesObject -> sendMessagesObject.sendInterestedMessage()
                         .flatMapMany(__ -> MyStepdefs.globalFakePeerAllocator.latestState$()
@@ -777,6 +778,8 @@ public class MyStepdefs {
         Flux<PieceMessage> recordedPieceMessageFlux = meToFakePeerLink
                 .map(Link::sendMessages)
                 .flatMapMany(SendMessagesNotifications::sentPeerMessages$)
+                // I'm going to block until I collect X sent messages.
+                .publishOn(Schedulers.parallel())
                 .filter(peerMessage -> peerMessage instanceof PieceMessage)
                 .cast(PieceMessage.class)
                 .replay()

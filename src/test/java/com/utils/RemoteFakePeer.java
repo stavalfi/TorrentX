@@ -33,7 +33,11 @@ public class RemoteFakePeer {
                             return;
                         case RESPOND_WITH_DELAY_3000:
                             blockThread(3 * 1000);
-                            logger.info(identifier + " - delayed in 3000 mill the response. the fake peer did not response it");
+                            logger.info(identifier + " - delayed in 3000 mill the response. the fake peer did not response yet");
+                            return;
+                        case SEND_RESPOND_AFTER_TIMEOUT:
+                            blockThread(2550);
+                            logger.info(identifier + " - delayed in 2550 mill the response. the fake peer did not response yet");
                             return;
                     }
                 })
@@ -71,6 +75,7 @@ public class RemoteFakePeer {
                         case VALID_AND_SEND_CHOKE_AFTER_2_REQUESTS:
                         case RESPOND_WITH_DELAY_100:
                         case RESPOND_WITH_DELAY_3000:
+                        case SEND_RESPOND_AFTER_TIMEOUT:
                             return sendPieceMessage(allocatorStore, link, identifier, requestMessage, pieceLength, requestMessage.getBlockLength());
                     }
                     // we will never be here... (by the current fake-peer-types).

@@ -43,7 +43,7 @@ class SendMessagesNotificationsImpl implements SendMessagesNotifications {
         this.identifier = identifier;
         EmitterProcessor<PeerMessage> sentMessages$ = EmitterProcessor.create();
         this.sentMessages$ = sentMessages$;
-        this.emitSentMessages = sentMessages$.sink();
+        this.emitSentMessages = sentMessages$.sink(FluxSink.OverflowStrategy.DROP);
         this.sendMessages = new SendMessages(peerDataOutputStream, closeConnectionMethod);
     }
 

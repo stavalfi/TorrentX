@@ -17,7 +17,6 @@ import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
@@ -44,47 +43,53 @@ public class PieceDownloaderImpl implements PieceDownloader {
     @Override
     public Mono<Integer> downloadPiece$(int pieceIndex, Flux<Link> links$) {
         final int pieceLength = this.torrentInfo.getPieceLength(pieceIndex);
+//        final int maxRequestBlockLength = 16_384;
         final int maxRequestBlockLength = pieceLength;
 
         Predicate<Object> didISavedPieceAlready = __ -> fileSystemLink.havePiece(pieceIndex);
+
         return Mono.just(new Object())
                 // I want it to run only when someone subscribe to this stream.
                 .filter(didISavedPieceAlready.negate())
                 .doOnNext(__ -> logger.debug("start downloading piece: " + pieceIndex))
-                .flatMap(__ -> links$.takeWhile(didISavedPieceAlready.negate())
-                        .filter(link -> !link.getPeerCurrentStatus().getIsHeChokingMe())
-                        .concatMap(link -> {
-                            // TODO: I may send multiple interested messages if I will download from him concurrently multiple pieces.
-                            if (!link.getPeerCurrentStatus().getAmIInterestedInHim())
-                                return link.sendMessages().sendInterestedMessage()
-                                        .map(sendPeerMessages -> link);
-                            return Mono.just(link);
-                        }, 1)
-                        .concatMap(link ->
-                                        Flux.<Boolean>generate(sink -> sink.next(link.getPeerCurrentStatus().getIsHeChokingMe()))
-                                                // keep downloading blocks while he doesn't choke me and I didn't completely download the piece yet
-                                                .takeWhile(isHechokeMe -> !isHechokeMe)
-                                                .takeWhile(didISavedPieceAlready.negate())
-                                                .concatMap(___ ->
-                                                                Mono.just(this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex])
-                                                                        .flatMap(requestFrom ->
-                                                                                this.allocatorStore.createRequestMessage(link.getMe(), link.getPeer(), pieceIndex, requestFrom, maxRequestBlockLength, pieceLength)
-                                                                                        .doOnNext(requestMessage -> logger.debug("start downloading block: " + requestMessage))
-                                                                                        .flatMap(requestMessage -> blockDownloader.downloadBlock(link, requestMessage).doOnError(TimeoutException.class, throwable -> logger.debug("peer: " + link.getPeer() + " not responding to my request: " + requestMessage)))
-                                                                                        .doOnNext(pieceEvent -> logger.debug("ended downloading block: " + pieceEvent)))
-                                                        , 1)
-                                                // if the peer is down then I will get another peer to download from the rest of the piece.
-                                                .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty())
-                                , 1)
-                        .filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
-                        .map(pieceEvent -> pieceIndex)
-                        .doOnNext(___ -> logger.info("finished to download piece: " + pieceIndex))
-                        // its important to limit the requests upstream because i don't want to try to download the same block or piece more then once.
-                        .limitRequest(1)
-                        .single())
+                .flatMap(__ -> downloadPieceFromAvailablePeers(pieceIndex, links$, pieceLength, maxRequestBlockLength, didISavedPieceAlready))
                 .subscribeOn(downloadPieceScheduler)
-                .timeout(Duration.ofSeconds(300), Mono.empty(), App.timeoutFallbackScheduler)
+                .timeout(Duration.ofSeconds(30), Mono.empty(), App.timeoutFallbackScheduler)
                 .onErrorResume(PeerExceptions.isTimeoutException.or(throwable -> throwable instanceof DownloadingSavedPieceException), throwable -> Mono.empty());
+    }
+
+    private Mono<Integer> downloadPieceFromAvailablePeers(int pieceIndex, Flux<Link> links$, int pieceLength, int maxRequestBlockLength, Predicate<Object> didISavedPieceAlready) {
+        return links$.takeWhile(didISavedPieceAlready.negate())
+                .filter(link -> !link.getPeerCurrentStatus().getIsHeChokingMe())
+                .concatMap(link -> {
+                    // TODO: I may send multiple interested messages if I will download from him concurrently multiple pieces.
+                    if (!link.getPeerCurrentStatus().getAmIInterestedInHim())
+                        return link.sendMessages().sendInterestedMessage()
+                                .map(sendPeerMessages -> link);
+                    return Mono.just(link);
+                }, 1)
+                .concatMap(link ->
+                                Flux.<Boolean>generate(sink -> sink.next(link.getPeerCurrentStatus().getIsHeChokingMe()))
+                                        // keep downloading blocks while he doesn't choke me and I didn't completely download the piece yet
+                                        .takeWhile(isHeChokeMe -> !isHeChokeMe)
+                                        .takeWhile(didISavedPieceAlready.negate())
+                                        .concatMap(___ ->
+                                                        Mono.just(this.fileSystemLink.getDownloadedBytesInPieces()[pieceIndex])
+                                                                .flatMap(requestFrom ->
+                                                                        this.allocatorStore.createRequestMessage(link.getMe(), link.getPeer(), pieceIndex, requestFrom, maxRequestBlockLength, pieceLength)
+                                                                                .doOnNext(requestMessage -> logger.debug("start downloading block: " + requestMessage))
+                                                                                .flatMap(requestMessage -> this.blockDownloader.downloadBlock(link, requestMessage).doOnError(TimeoutException.class, throwable -> logger.debug("peer: " + link.getPeer() + " not responding to my request: " + requestMessage)))
+                                                                                .doOnNext(pieceEvent -> logger.debug("ended downloading block: " + pieceEvent)))
+                                                , 1)
+                                        // if the peer is down then I will get another peer to download from the rest of the piece.
+                                        .onErrorResume(PeerExceptions.peerNotResponding, throwable -> Mono.empty())
+                        , 1)
+                .filter(pieceEvent -> pieceEvent.getTorrentPieceStatus().equals(TorrentPieceStatus.COMPLETED))
+                .map(pieceEvent -> pieceIndex)
+                .doOnNext(___ -> logger.info("finished to download piece: " + pieceIndex))
+                // its important to limit the requests upstream because i don't want to try to download the same block or piece more then once.
+                .limitRequest(1)
+                .single();
     }
 
 

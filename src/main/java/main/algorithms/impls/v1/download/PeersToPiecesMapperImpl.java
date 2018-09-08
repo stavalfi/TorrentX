@@ -17,6 +17,7 @@ import reactor.core.scheduler.Schedulers;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
@@ -106,18 +107,16 @@ public class PeersToPiecesMapperImpl implements PeersToPiecesMapper {
                 .publish()
                 .autoConnect(0);
 
-        this.availablePieces$ = Flux.<Integer>create(sink -> {
-            while (!sink.isCancelled() && !fileSystemLink.isDownloadCompleted()) {
-                // TODO: remove completed pieces from the set.
-                this.availablePieces.stream().forEach(sink::next);
-            }
-            if (fileSystemLink.isDownloadCompleted())
-                sink.complete();
-        }).filter(pieceIndex -> {
-            synchronized (initialPiecesStatus) {
-                return !initialPiecesStatus.get(pieceIndex);
-            }
-        }).subscribeOn(this.listenToAvailablePiecesScheduler)
+        this.availablePieces$ = Flux.<ArrayList<Integer>>generate(sink -> sink.next(new ArrayList<Integer>(this.availablePieces)))
+                .takeWhile(__ -> !fileSystemLink.isDownloadCompleted())
+                .subscribeOn(this.listenToAvailablePiecesScheduler)
+                .flatMap(Flux::fromIterable)
+                .filter(pieceIndex -> {
+                    synchronized (initialPiecesStatus) {
+                        return !initialPiecesStatus.get(pieceIndex);
+                    }
+                })
+                .takeWhile(__ -> !fileSystemLink.isDownloadCompleted())
                 .publish()
                 .autoConnect(0);
     }
