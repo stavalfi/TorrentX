@@ -2047,7 +2047,7 @@ public class MyStepdefs {
                         IntStream.range(0, torrentDownloader.getTorrentInfo().getPieces().size())
                                 .mapToObj(pieceIndex -> pieceIndex == completedPieceIndex ? "*" : torrentDownloader.getFileSystemLink().havePiece(pieceIndex) ? "1" : "0")
                                 .collect(Collectors.joining()))
-                .subscribe(System.out::println);
+                .subscribe(x -> System.out.println(x));
 
         torrentDownloader.getTorrentStatusStore().dispatchNonBlocking(TorrentStatusAction.START_DOWNLOAD_IN_PROGRESS);
     }

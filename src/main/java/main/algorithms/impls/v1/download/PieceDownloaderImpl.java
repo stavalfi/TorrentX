@@ -43,8 +43,8 @@ public class PieceDownloaderImpl implements PieceDownloader {
     @Override
     public Mono<Integer> downloadPiece$(int pieceIndex, Flux<Link> links$) {
         final int pieceLength = this.torrentInfo.getPieceLength(pieceIndex);
-//        final int maxRequestBlockLength = 16_384;
-        final int maxRequestBlockLength = pieceLength;
+        final int maxRequestBlockLength = 16_384;
+//        final int maxRequestBlockLength = pieceLength;
 
         Predicate<Object> didISavedPieceAlready = __ -> fileSystemLink.havePiece(pieceIndex);
 

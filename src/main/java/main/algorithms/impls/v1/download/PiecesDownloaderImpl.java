@@ -39,13 +39,13 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
         // if not, we may lose some peers because we will listen to those new peers only after we start downloading.
         this.downloadedPieces$ = peersToPiecesMapper.availablePieces$()
                 .filter(pieceIndex -> !fileSystemLink.havePiece(pieceIndex))
-                .doOnNext(pieceIndex -> logger.info("trying to download piece: " + pieceIndex))
+//                .doOnNext(pieceIndex -> logger.info("trying to download piece: " + pieceIndex))
                 .flatMap(pieceIndex ->
                                 store.latestState$()
                                         .filter(torrentStatusState -> torrentStatusState.fromAction(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
                                         .flatMap(__ -> pieceDownloader.downloadPiece$(pieceIndex, peersToPiecesMapper.linksForPiece$(pieceIndex))
                                                 .onErrorResume(TimeoutException.class, throwable -> Mono.empty()))
-                        , 1, 1)
+                        , 5, 5)
                 .publish()
                 .autoConnect(0);
 
