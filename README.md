@@ -28,7 +28,7 @@ So many measurement and analytical studies have published suggestions for differ
 
 ## Dependencies
 * [Project Reactor](https://github.com/reactor/reactor-core)
-* [Cucumber](https://cucumber.io/) - 200+ tests
+* [Cucumber](https://cucumber.io/) - 100+ scenarions, 500+ steps
 * [PaperTrail](https://papertrailapp.com/) - Cloud logger
 
 ## Continues Integration
