@@ -1,6 +1,6 @@
 # TorrentX 
 
-TorrentX is a fully reactive client side software for downloading and uploading torrents.
+TorrentX is a fully functional and reactive implementation of the BitTorrent protocol.
 
 [![Build Status](https://travis-ci.org/stavalfi/TorrentX.svg?branch=master)](https://travis-ci.org/stavalfi/TorrentX)
 [![CircleCI](https://circleci.com/gh/stavalfi/TorrentX.svg?style=svg)](https://circleci.com/gh/stavalfi/TorrentX)
