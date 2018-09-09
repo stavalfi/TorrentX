@@ -22,13 +22,13 @@ So many measurement and analytical studies have published suggestions for differ
 
 
 ## Enviroment
-* Linux 14,16, Windows 7, macOS High Sierra
+* Support Ubuntu 14,16, Windows 7,10, macOS High Sierra
 * Java 8
 * Maven 3
 
 ## Dependencies
 * [Project Reactor](https://github.com/reactor/reactor-core)
-* [Cucumber](https://cucumber.io/) - 100+ scenarions, 500+ steps
+* [Cucumber](https://cucumber.io/) - 100+ scenarios, 500+ steps
 * [PaperTrail](https://papertrailapp.com/) - Cloud logger
 
 ## Continues Integration
