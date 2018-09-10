@@ -1,13 +1,13 @@
 package main.torrent.status.reducers;
 
+import main.redux.reducer.Reducer;
+import main.redux.store.Request;
+import main.redux.store.Result;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.DownloadState;
 import main.torrent.status.state.tree.SearchPeersState;
 import main.torrent.status.state.tree.TorrentFileSystemState;
 import main.torrent.status.state.tree.TorrentStatusState;
-import redux.reducer.Reducer;
-import redux.store.Request;
-import redux.store.Result;
 
 public class TorrentStatusReducer implements Reducer<TorrentStatusState, TorrentStatusAction> {
 

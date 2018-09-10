@@ -1,6 +1,6 @@
-package redux.store;
+package main.redux.store;
 
-import redux.state.State;
+import main.redux.state.State;
 
 import java.util.Objects;
 import java.util.UUID;

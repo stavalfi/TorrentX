@@ -20,6 +20,7 @@ import main.peer.peerMessages.RequestMessage;
 import main.peers.listener.ListenerAction;
 import main.peers.listener.reducers.ListenerReducer;
 import main.peers.listener.state.tree.ListenerState;
+import main.redux.store.Store;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.DownloadState;
 import main.torrent.status.state.tree.SearchPeersState;
@@ -31,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
-import redux.store.Store;
 
 import java.io.File;
 import java.io.IOException;

@@ -114,7 +114,7 @@ As a consequence of the above, TorrentX is fully [asynchronous](https://en.wikip
 
 ##### Builder
 
-In every use of redux, I use builder to build the new state. I have a required fields and an optional fields.
+In every use of main.redux, I use builder to build the new state. I have a required fields and an optional fields.
 
 ##### Visitor
 

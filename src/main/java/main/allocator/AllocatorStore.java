@@ -6,12 +6,12 @@ import main.allocator.requests.*;
 import main.peer.Peer;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
+import main.redux.store.Result;
+import main.redux.store.Store;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import redux.store.Result;
-import redux.store.Store;
 
 public class AllocatorStore {
     private static Logger logger = LoggerFactory.getLogger(AllocatorStore.class);

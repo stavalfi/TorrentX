@@ -1,7 +1,7 @@
 package main.allocator.requests;
 
 import main.allocator.AllocatorAction;
-import redux.store.Request;
+import main.redux.store.Request;
 
 public class UpdateAllocationArrayRequest extends Request<AllocatorAction> {
 	private int amountOfBlocks;

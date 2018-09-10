@@ -5,9 +5,9 @@ import main.allocator.Results.CreateRequestMessageResult;
 import main.allocator.requests.*;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
-import redux.reducer.Reducer;
-import redux.store.Request;
-import redux.store.Result;
+import main.redux.reducer.Reducer;
+import main.redux.store.Request;
+import main.redux.store.Result;
 
 import java.util.BitSet;
 import java.util.stream.IntStream;

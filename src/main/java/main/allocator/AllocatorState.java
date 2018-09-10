@@ -1,6 +1,6 @@
 package main.allocator;
 
-import redux.state.State;
+import main.redux.state.State;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.Arrays;

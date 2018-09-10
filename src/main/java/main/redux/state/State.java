@@ -1,4 +1,4 @@
-package redux.state;
+package main.redux.state;
 
 import java.util.Objects;
 

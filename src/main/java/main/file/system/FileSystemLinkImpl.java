@@ -10,6 +10,7 @@ import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
+import main.redux.store.Store;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import org.slf4j.Logger;
@@ -18,7 +19,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
-import redux.store.Store;
 
 import java.io.File;
 import java.io.IOException;
@@ -112,7 +112,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .doOnNext(__ -> {
                     // we may come here even if we got am empty flux but the download isn't yet completed.
                     if (isDownloadCompleted()) {
-                        logger.info(this.identifier + " - Torrent: " + torrentInfo + ", we finished to download the torrent and we dispatch a complete notification using redux.");
+                        logger.info(this.identifier + " - Torrent: " + torrentInfo + ", we finished to download the torrent and we dispatch a complete notification using main.redux.");
                         torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS);
                     }
                 })

@@ -1,8 +1,8 @@
-package redux.store;
+package main.redux.store;
 
+import main.redux.state.State;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import redux.state.State;
 
 public interface Notifier<S extends State<A>, A> {
     Mono<S> latestState$();

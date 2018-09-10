@@ -1,10 +1,10 @@
 package main.torrent.status.side.effects;
 
 import main.TorrentInfo;
+import main.redux.store.Store;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
-import redux.store.Store;
 
 import java.util.function.BiPredicate;
 

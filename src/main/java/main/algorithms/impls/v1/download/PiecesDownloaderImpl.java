@@ -6,13 +6,13 @@ import main.algorithms.PieceDownloader;
 import main.algorithms.PiecesDownloader;
 import main.allocator.AllocatorStore;
 import main.file.system.FileSystemLink;
+import main.redux.store.Store;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import redux.store.Store;
 
 import java.util.concurrent.TimeoutException;
 

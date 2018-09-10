@@ -4,7 +4,7 @@ import main.allocator.AllocatorAction;
 import main.allocator.AllocatorState;
 import main.allocator.requests.CreatePieceMessageRequest;
 import main.peer.peerMessages.PieceMessage;
-import redux.store.Result;
+import main.redux.store.Result;
 
 public class CreatePieceMessageResult extends Result<AllocatorState, AllocatorAction> {
 	private PieceMessage pieceMessage;

@@ -2,9 +2,9 @@ package main.peers.listener.reducers;
 
 import main.peers.listener.ListenerAction;
 import main.peers.listener.state.tree.ListenerState;
-import redux.reducer.Reducer;
-import redux.store.Request;
-import redux.store.Result;
+import main.redux.reducer.Reducer;
+import main.redux.store.Request;
+import main.redux.store.Result;
 
 import java.util.function.Predicate;
 

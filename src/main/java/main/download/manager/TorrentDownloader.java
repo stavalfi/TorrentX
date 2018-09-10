@@ -7,6 +7,7 @@ import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.algorithms.IncomingPeerMessagesNotifier;
 import main.peer.peerMessages.PeerMessage;
+import main.redux.store.Store;
 import main.search.peers.SearchPeers;
 import main.statistics.SpeedStatistics;
 import main.torrent.status.TorrentStatusAction;
@@ -14,7 +15,6 @@ import main.torrent.status.side.effects.TorrentStatesSideEffects;
 import main.torrent.status.state.tree.TorrentStatusState;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
-import redux.store.Store;
 
 import java.util.AbstractMap;
 
