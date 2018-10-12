@@ -1,9 +1,9 @@
 package main.torrent.status.side.effects;
 
 import main.TorrentInfo;
+import redux.store.Store;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
-import redux.store.Store;
 
 public class TorrentStatesSideEffects {
     private TorrentInfo torrentInfo;

@@ -1,6 +1,5 @@
 package main.algorithms;
 
-import main.downloader.PieceEvent;
 import main.peer.Link;
 import main.peer.peerMessages.RequestMessage;
 import reactor.core.publisher.Mono;

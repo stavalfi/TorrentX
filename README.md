@@ -1,17 +1,20 @@
-# TorrentX 
+# TorrentX
 
-TorrentX is a fully functional and reactive implementation of the BitTorrent protocol.
+<img src="https://i.imgur.com/bgb8Dq7.png" height="170" width="170"/>
 
 [![Build Status](https://travis-ci.org/stavalfi/TorrentX.svg?branch=master)](https://travis-ci.org/stavalfi/TorrentX)
 [![CircleCI](https://circleci.com/gh/stavalfi/TorrentX.svg?style=svg)](https://circleci.com/gh/stavalfi/TorrentX)
 
+TorrentX is a fully reactive client side software for downloading and uploading torrents.
+
+![](https://i.imgur.com/mGUDESi.gif)
+
 1. [Introduction](#introduction)  
 2. [Enviroment](#enviroment)  
 3. [Dependencies](#dependencies)  
-4. [Continues Integration](#continues-integration)  
-5. [Installation](#installation)
 
 ## Introduction
+
 
 BitTorrent is a peer-to-peer protocol, which means that the computers in a BitTorrent “swarm” (a group of computers downloading and uploading the same torrent) transfer data between each other without the need for a central server, where all the information passes through a particular server.
 The trackerUrl server keeps track of where file copies reside on peer machines, which ones are available at the time of the clients request, and helps coordinate efficient transmission and reassembly of the copied file.
@@ -30,14 +33,3 @@ So many measurement and analytical studies have published suggestions for differ
 * [Project Reactor](https://github.com/reactor/reactor-core)
 * [Cucumber](https://cucumber.io/) - 100+ scenarios, 500+ steps
 * [PaperTrail](https://papertrailapp.com/) - Cloud logger
-
-## Continues Integration
-* [Circle CI](https://circleci.com/)
-* [Travis CI](https://travis-ci.org/)
-
-## Installation
-1. Clone the repository: `git clone https://github.com/UniversityFinalProjects/TorrentX`
-2. Enter the project's folder: `cd TorrentX`
-3. Build: `mvn package`
-4. Enter the project's target folder: `cd target`
-5. run the jar

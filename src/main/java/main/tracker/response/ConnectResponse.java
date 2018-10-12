@@ -10,13 +10,13 @@ public class ConnectResponse extends TrackerResponse {
     /**
      * test we successfully connected
      * The server must return us a UDP packet with the following structure:
-     * <p>
      * Offset  Size            Name            Value
-     * 0       32-bit integer  action          0 // connect
+     * 0       32-bit integer  action          0      // connect response
      * 4       32-bit integer  transaction_id
      * 8       64-bit integer  connection_id
      * 16
      */
+
     public ConnectResponse(Tracker tracker, byte[] response) {
         super(tracker);
         ByteBuffer receiveData = ByteBuffer.wrap(response);

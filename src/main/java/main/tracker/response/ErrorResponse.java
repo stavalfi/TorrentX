@@ -10,6 +10,8 @@ public class ErrorResponse extends TrackerResponse {
     //    int32_t	action	The action, in this case 3, for error. See actions.
     //    int32_t	transaction_id	Must match the transaction_id sent from the client.
     //    int8_t[]	error_string	The rest of the packet is a string describing the error.
+
+
     public ErrorResponse(Tracker tracker, byte[] response) {
         super(tracker);
         ByteBuffer receiveData = ByteBuffer.wrap(response);

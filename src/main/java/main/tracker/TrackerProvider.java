@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import redux.store.Store;
 
 import java.nio.ByteBuffer;
 import java.util.function.Function;
@@ -29,7 +28,7 @@ public class TrackerProvider {
         return TrackerCommunication.communicateMono(connectRequest, createConnectResponse)
                 .onErrorResume(TrackerExceptions.communicationErrors, error -> Mono.empty())
                 .map(TrackerConnection::new)
-                .doOnNext(trackerConnection -> logger.info("connected to tracker: " + trackerConnection));
+                .doOnNext(trackerConnection -> System.out.println("Connected to tracker: " + trackerConnection.getTrackerUrl()+":"+trackerConnection.getUdpPort()));
     }
 
     public Flux<TrackerConnection> connectToTrackersFlux() {

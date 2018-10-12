@@ -1,15 +1,13 @@
 package redux.store;
 
+import redux.reducer.Reducer;
+import redux.state.State;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.UnicastProcessor;
-import reactor.core.scheduler.Scheduler;
-import reactor.core.scheduler.Schedulers;
-import redux.reducer.Reducer;
-import redux.state.State;
 
 import java.util.function.BiPredicate;
 

@@ -2,22 +2,20 @@ package main.algorithms.impls.v1.download;
 
 import main.TorrentInfo;
 import main.algorithms.BlockDownloader;
-import main.downloader.PieceEvent;
+import main.algorithms.PieceEvent;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
-import main.peer.PeerExceptions;
-import main.peer.SendMessagesNotifications;
+import main.peer.algorithms.SendMessagesNotifications;
+import main.peer.exceptions.PeerExceptions;
 import main.peer.peerMessages.RequestMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Predicate;
 
 public class BlockDownloaderImpl implements BlockDownloader {
     private static Logger logger = LoggerFactory.getLogger(BlockDownloaderImpl.class);

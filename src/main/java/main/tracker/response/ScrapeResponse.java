@@ -28,13 +28,15 @@ public class ScrapeResponse extends TrackerResponse {
 
     /**
      * Offset      Size            Name            Value
-     * 0           32-bit integer  action          2 // scrapeMono
+     * 0           32-bit integer  action          2  // scrape response
      * 4           32-bit integer  transaction_id
      * 8 + 12 * n  32-bit integer  downloaded
      * ?           32-bit integer  complete
      * ?           32-bit integer  incomplete
      * 8 + 12 * N
-     *
+
+
+
      * @param response          what the tracker sent me back.
      * @param torrentInfoHashes what torrents I asked about in the scrapeMono request.
      *                          The order is important and I assume that the answer

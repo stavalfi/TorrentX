@@ -4,15 +4,15 @@ import main.TorrentInfo;
 import main.algorithms.PeersToPiecesMapper;
 import main.algorithms.PieceDownloader;
 import main.algorithms.PiecesDownloader;
+import main.allocator.AllocatorStore;
 import main.file.system.FileSystemLink;
-import main.file.system.allocator.AllocatorStore;
+import redux.store.Store;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import redux.store.Store;
 
 import java.util.concurrent.TimeoutException;
 
@@ -42,7 +42,7 @@ public class PiecesDownloaderImpl implements PiecesDownloader {
                                         .filter(torrentStatusState -> torrentStatusState.fromAction(TorrentStatusAction.RESUME_DOWNLOAD_WIND_UP))
                                         .flatMap(__ -> pieceDownloader.downloadPiece$(pieceIndex, peersToPiecesMapper.linksForPiece$(pieceIndex))
                                                 .onErrorResume(TimeoutException.class, throwable -> Mono.empty()))
-                        , 5, 5)
+                        , 20, 20)
                 .doOnNext(pieceIndex -> logger.debug("finished to download piece: " + pieceIndex))
                 .publish()
                 .autoConnect(0);

@@ -17,13 +17,14 @@ public class ScrapeRequest extends TrackerRequest {
 
     /**
      * offset == bytes not bits!!!!!!
-     * Offset          Size            Name            Value
-     * 0               64-bit integer  connection_id   connectionId
-     * 8               32-bit integer  action          2                // scrapeMono
-     * 12              32-bit integer  transaction_id we-random-numbers
-     * 16 + 20 * n     20-byte string  torrentInfoHash  torrent_info_hash // the hash of the torrent we want to scrapeMono on
+     * Offset          Size            Name             Value
+     * 0               64-bit integer  connection_id    connectionId
+     * 8               32-bit integer  action           2                   // scrape request
+     * 12              32-bit integer  transaction_id   we-random-numbers
+     * 16 + 20 * n     20-byte string  torrentInfoHash  torrent_info_hash   // the hash of the torrent we want to scrapeMono on
      * 16 + 20 * N
      */
+
     @Override
     public ByteBuffer buildRequestPacket() {
 

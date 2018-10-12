@@ -18,9 +18,9 @@
 4. Paper - Introduction and related work.
 -----
 
-### Feature 4: Design a basic algorithm. `IN PROGRESS`
+### Feature 4: Design a basic algorithm. `DONE`
 
-1. Understand basic algorithms of Bittorrent protocol.
+1. Understand basic algorithms of BitTorrent protocol.
 2. Design without implementing API for a basic algorithm.
 3. Be able to connect to peers and peers connect to me.
 4. Implement an API for reading/writing from/to files on the local machine.
@@ -103,6 +103,7 @@
 ##### PBI-6: Design and implement reactive API for providing peers. `DONE` 
 
 1. Design a reactive API which provide peers we connected to them. (Stav)
+<br/>
 The API will let us listen for incoming messages and provide us a way to send messages to them.
     * Handshake
     * BitField
@@ -122,10 +123,10 @@ The API will let us listen for incoming messages and provide us a way to send me
 
 -----
 
-### Feature 4: Design a basic algorithm. `IN PROGRESS`
+### Feature 4: Design a basic algorithm. `DONE`
 
 ##### PBI-1: Design a torrent manager API to handle the download & upload of a specific torrent. `DONE`
 
-1. Learn about basic bittorrent algorithms. (Stav)
+1. Learn about basic BitTorrent algorithms. (Stav)
 2. Design an abstract API for download and upload a torrent. (Stav)
 

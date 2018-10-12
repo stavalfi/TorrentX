@@ -29,7 +29,7 @@ public class AnnounceResponse extends TrackerResponse {
 
     /**
      * Offset      Size            Name            Value
-     * 0           32-bit integer  action          1 // scrapeMono
+     * 0           32-bit integer  action          1        // announce response
      * 4           32-bit integer  transaction_id
      * 8           32-bit integer  interval
      * 12          32-bit integer  leechersAmount
@@ -38,6 +38,7 @@ public class AnnounceResponse extends TrackerResponse {
      * 24 + 6 * n  16-bit integer  TCP port
      * 20 + 6 * N
      */
+
     public AnnounceResponse(Tracker tracker, byte[] response, int maxPeersWeWantToGet) {
         super(tracker);
         ByteBuffer receiveData = ByteBuffer.wrap(response);

@@ -2,14 +2,15 @@ package main.file.system;
 
 import christophedetroyer.torrent.TorrentFile;
 import main.TorrentInfo;
-import main.downloader.PieceEvent;
-import main.downloader.TorrentPieceStatus;
-import main.file.system.allocator.AllocatorStore;
+import main.algorithms.PieceEvent;
+import main.algorithms.impls.TorrentPieceStatus;
+import main.allocator.AllocatorStore;
 import main.file.system.exceptions.PieceNotDownloadedYetException;
 import main.peer.Peer;
 import main.peer.peerMessages.BitFieldMessage;
 import main.peer.peerMessages.PieceMessage;
 import main.peer.peerMessages.RequestMessage;
+import redux.store.Store;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import org.slf4j.Logger;
@@ -18,7 +19,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
-import redux.store.Store;
 
 import java.io.File;
 import java.io.IOException;
@@ -74,11 +74,17 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
         // TODO: this status is useless because we don't use ActiveTorrents class
         this.removeTorrent$ = torrentStatusStore.statesByAction(TorrentStatusAction.REMOVE_TORRENT_IN_PROGRESS)
+                .concatMap(__ -> torrentStatusStore.notifyWhen(TorrentStatusAction.PAUSE_DOWNLOAD_WIND_UP))
+                .concatMap(__ -> torrentStatusStore.notifyWhen(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
+                .concatMap(__ -> torrentStatusStore.notifyWhen(TorrentStatusAction.PAUSE_SEARCHING_PEERS_WIND_UP))
                 .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_TORRENT_SELF_RESOLVED),1)
                 .publish()
                 .autoConnect(0);
 
         this.removeFiles$ = torrentStatusStore.statesByAction(TorrentStatusAction.REMOVE_FILES_IN_PROGRESS)
+                .concatMap(__ -> torrentStatusStore.notifyWhen(TorrentStatusAction.PAUSE_DOWNLOAD_WIND_UP))
+                .concatMap(__ -> torrentStatusStore.notifyWhen(TorrentStatusAction.PAUSE_UPLOAD_WIND_UP))
+                .concatMap(__ -> torrentStatusStore.notifyWhen(TorrentStatusAction.PAUSE_SEARCHING_PEERS_WIND_UP))
                 .concatMap(__ -> deleteFileOnlyMono(),1)
                 .concatMap(__ -> torrentStatusStore.dispatch(TorrentStatusAction.REMOVE_FILES_SELF_RESOLVED),1)
                 .publish()
@@ -86,7 +92,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
 
         // I must save all this incoming pieces before I exit the constructor because I subscribe to peerResponses$ **SOMETIMES**
         // after I exit the constructor because the subscription depends if COMPLETED_DOWNLOADING_WIND_UP==true.
-        // TODO: find something better then this solution and check it with ubuntu 14.04.5
+        // TODO: find something better then this solution and check it with Ubuntu 14.04.5
         Flux<PieceMessage> pieceMessageReplay$ = peerResponses$.replay()
                 .autoConnect(0);
 
@@ -112,7 +118,7 @@ public class FileSystemLinkImpl extends TorrentInfo implements FileSystemLink {
                 .doOnNext(__ -> {
                     // we may come here even if we got am empty flux but the download isn't yet completed.
                     if (isDownloadCompleted()) {
-                        logger.info(this.identifier + " - Torrent: " + torrentInfo + ", we finished to download the torrent and we dispatch a complete notification using redux.");
+                        logger.info(this.identifier + " - Torrent: " + torrentInfo.getName() + ", we finished to download the torrent and we dispatch a complete notification using redux.");
                         torrentStatusStore.dispatchNonBlocking(TorrentStatusAction.COMPLETED_DOWNLOADING_IN_PROGRESS);
                     }
                 })

@@ -1,13 +1,13 @@
 package main;
 
 import christophedetroyer.torrent.TorrentParser;
-import main.downloader.TorrentDownloader;
-import main.downloader.TorrentDownloaderBuilder;
-import main.downloader.TorrentDownloaders;
-import main.listener.ListenerAction;
+import main.download.manager.TorrentDownloader;
+import main.download.manager.TorrentDownloaderBuilder;
+import main.download.manager.TorrentDownloaders;
 import main.peer.Link;
-import main.peer.SendMessagesNotifications;
+import main.peer.algorithms.SendMessagesNotifications;
 import main.peer.peerMessages.HaveMessage;
+import main.peers.listener.ListenerAction;
 import main.torrent.status.TorrentStatusAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +42,7 @@ public class App {
                         IntStream.range(0, torrentDownloader.getTorrentInfo().getPieces().size())
                                 .mapToObj(pieceIndex -> pieceIndex == completedPieceIndex ? "*" : torrentDownloader.getFileSystemLink().havePiece(pieceIndex) ? "1" : "0")
                                 .collect(Collectors.joining()))
+                .map(str -> str.substring(0, 75))
                 .subscribe(System.out::println);
 
 //        torrentDownloader.getIncomingPeerMessagesNotifier()
@@ -114,7 +115,7 @@ public class App {
                 "main" + File.separator +
                 "resources" + File.separator +
                 "torrents" + File.separator +
-                "torrent2.torrent";
+                "80mb-20peers.torrent";
         TorrentInfo torrentInfo = new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
         System.out.println(torrentInfo);
         System.out.println("--------------------------------------");
