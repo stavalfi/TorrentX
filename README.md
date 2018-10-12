@@ -1,19 +1,19 @@
 # TorrentX
 
-<img src="https://i.imgur.com/bgb8Dq7.png" height="25%"/>
+<img src="https://i.imgur.com/bgb8Dq7.png" height="170" width="170"/>
 
 [![Build Status](https://travis-ci.org/stavalfi/TorrentX.svg?branch=master)](https://travis-ci.org/stavalfi/TorrentX)
 [![CircleCI](https://circleci.com/gh/stavalfi/TorrentX.svg?style=svg)](https://circleci.com/gh/stavalfi/TorrentX)
 
 TorrentX is a fully reactive client side software for downloading and uploading torrents.
 
+![](https://i.imgur.com/mGUDESi.gif)
+
 1. [Introduction](#introduction)  
 2. [Enviroment](#enviroment)  
 3. [Dependencies](#dependencies)  
 
 ## Introduction
-
-![](https://i.imgur.com/mGUDESi.gif)
 
 
 BitTorrent is a peer-to-peer protocol, which means that the computers in a BitTorrent “swarm” (a group of computers downloading and uploading the same torrent) transfer data between each other without the need for a central server, where all the information passes through a particular server.
