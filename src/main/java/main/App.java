@@ -42,6 +42,7 @@ public class App {
                         IntStream.range(0, torrentDownloader.getTorrentInfo().getPieces().size())
                                 .mapToObj(pieceIndex -> pieceIndex == completedPieceIndex ? "*" : torrentDownloader.getFileSystemLink().havePiece(pieceIndex) ? "1" : "0")
                                 .collect(Collectors.joining()))
+                .map(str -> str.substring(0, 140))
                 .subscribe(System.out::println);
 
 //        torrentDownloader.getIncomingPeerMessagesNotifier()
@@ -114,7 +115,7 @@ public class App {
                 "main" + File.separator +
                 "resources" + File.separator +
                 "torrents" + File.separator +
-                "torrent2.torrent";
+                "80mb-20peers.torrent";
         TorrentInfo torrentInfo = new TorrentInfo(torrentFilePath, TorrentParser.parseTorrent(torrentFilePath));
         System.out.println(torrentInfo);
         System.out.println("--------------------------------------");

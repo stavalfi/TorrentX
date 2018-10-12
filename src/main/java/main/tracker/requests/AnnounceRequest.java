@@ -49,21 +49,22 @@ public class AnnounceRequest extends TrackerRequest {
     /**
      * offset == bytes not bits!!!!!!
      * Offset  Size    Name    Value
-     * 0       64-bit integer  connection_id    same connection_id // the connectionId we received from the server after we successfully connected
-     * 8       32-bit integer  action          1                   // scrapeMono
-     * 12      32-bit integer  transaction_id                      // we randomly decide
-     * 16      20-byte string  info_hash  torrent_info_hash // the hash of the torrent we want to scrapeMono on
-     * 36      20-byte string  peer_id  my-peer-id-!??!!?! how do I get it omg?
-     * 56      64-bit integer  downloaded 0? // The number of byte you've downloaded in this session.
-     * 64      64-bit integer  left     0? //The number of bytes you have left to download until you're finished.
-     * 72      64-bit integer  uploaded 0? // The number of bytes you have uploaded in this session.
-     * 80      32-bit integer  event           0                   // 0: none; 1: completed; 2: started; 3: stopped
-     * 84      32-bit integer  IP address      0                   // 	Your ip address. Set to 0 if you want the tracker to use the sender of this udp packet.
-     * 88      32-bit integer  key            ????? // A unique key that is randomized by the client.
-     * 92      32-bit integer  num_want        10                  // The maximum number of peers you want in the reply. Use -1 for default.
-     * 96      16-bit integer  tcpPort       ???? // The tcpPort you're listening on.
+     * 0       64-bit integer  connection_id    same connection_id  // the connectionId we received from the server after we successfully connected
+     * 8       32-bit integer  action          1                    // scrapeMono
+     * 12      32-bit integer  transaction_id                       // we randomly decide
+     * 16      20-byte string  info_hash  torrent_info_hash         // the hash of the torrent we want to scrapeMono on
+     * 36      20-byte string  peer_id                              // choose this: "-AZ5750-TpkXttZLfpSH" and convert it to bytes
+     * 56      64-bit integer  downloaded 0?                        // The number of byte you've downloaded in this session.
+     * 64      64-bit integer  left     0?                          // The number of bytes you have left to download until you're finished.
+     * 72      64-bit integer  uploaded 0?                          // The number of bytes you have uploaded in this session.
+     * 80      32-bit integer  event           0                    // 0: none; 1: completed; 2: started; 3: stopped
+     * 84      32-bit integer  IP address      0                    // Your ip address. Set to 0 if you want the tracker to use the sender of this udp packet.
+     * 88      32-bit integer  key                                  // optional -  A unique key that is randomized by the client.
+     * 92      32-bit integer  num_want        10                   // The maximum number of peers you want in the reply. Use -1 for default.
+     * 96      16-bit integer  tcpPort                              // optional - The tcpPort you're listening on.
      * 98
      */
+
     @Override
     public ByteBuffer buildRequestPacket() {
 

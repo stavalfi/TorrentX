@@ -2,7 +2,7 @@ package main.allocator.requests;
 
 import main.allocator.AllocatorAction;
 import main.peer.Peer;
-import main.redux.store.Request;
+import redux.store.Request;
 
 public class CreateRequestMessageRequest extends Request<AllocatorAction> {
 	private Peer from;

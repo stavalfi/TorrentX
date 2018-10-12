@@ -13,7 +13,7 @@ import main.peers.listener.ListenerAction;
 import main.peers.listener.reducers.ListenerReducer;
 import main.peers.listener.side.effects.ListenerSideEffects;
 import main.peers.listener.state.tree.ListenerState;
-import main.redux.store.Store;
+import redux.store.Store;
 import main.search.peers.SearchPeers;
 import main.statistics.SpeedStatistics;
 import main.torrent.status.TorrentStatusAction;

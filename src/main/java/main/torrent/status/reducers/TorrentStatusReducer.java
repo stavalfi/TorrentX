@@ -1,8 +1,8 @@
 package main.torrent.status.reducers;
 
-import main.redux.reducer.Reducer;
-import main.redux.store.Request;
-import main.redux.store.Result;
+import redux.reducer.Reducer;
+import redux.store.Request;
+import redux.store.Result;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.DownloadState;
 import main.torrent.status.state.tree.SearchPeersState;

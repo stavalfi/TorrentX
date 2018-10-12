@@ -37,7 +37,7 @@ import main.peer.peerMessages.RequestMessage;
 import main.peers.listener.ListenerAction;
 import main.peers.listener.reducers.ListenerReducer;
 import main.peers.listener.state.tree.ListenerState;
-import main.redux.store.Store;
+import redux.store.Store;
 import main.search.peers.SearchPeers;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.reducers.TorrentStatusReducer;
@@ -1467,17 +1467,17 @@ public class MyStepdefs {
 
     @Given("^initial listen-status - default$")
     public void initialListenStatus() {
-        logger.debug("starting test of listener-main.redux with side effects.");
+        logger.debug("starting test of listener-redux with side effects.");
         Utils.removeEverythingRelatedToLastTest();
-        logger.debug("end cleaning up all reasources from last test of listener-main.redux with side effects.");
+        logger.debug("end cleaning up all reasources from last test of listener-redux with side effects.");
     }
 
 
     @Given("^initial listen-status - without dispaching anything - default$")
     public void initialListenStatusWithoutDispachingAnythingDefault() {
-        logger.debug("starting test of listener-main.redux with side effects - without dispaching anything.");
+        logger.debug("starting test of listener-redux with side effects - without dispaching anything.");
         Utils.removeEverythingRelatedToLastTest();
-        logger.debug("end cleaning up all reasources from last test of listener-main.redux with side effects - without dispaching anything.");
+        logger.debug("end cleaning up all reasources from last test of listener-redux with side effects - without dispaching anything.");
     }
 
     @When("^listen-status is trying to change to:$")

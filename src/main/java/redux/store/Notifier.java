@@ -1,6 +1,6 @@
-package main.redux.store;
+package redux.store;
 
-import main.redux.state.State;
+import redux.state.State;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 

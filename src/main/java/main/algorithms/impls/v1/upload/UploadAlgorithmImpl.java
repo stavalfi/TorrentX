@@ -7,7 +7,7 @@ import main.algorithms.impls.TorrentPieceStatus;
 import main.file.system.FileSystemLink;
 import main.peer.Link;
 import main.peer.peerMessages.RequestMessage;
-import main.redux.store.Store;
+import redux.store.Store;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import org.slf4j.Logger;

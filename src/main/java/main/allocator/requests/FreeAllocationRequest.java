@@ -2,7 +2,7 @@ package main.allocator.requests;
 
 import main.allocator.AllocatedBlock;
 import main.allocator.AllocatorAction;
-import main.redux.store.Request;
+import redux.store.Request;
 
 public class FreeAllocationRequest extends Request<AllocatorAction> {
 	private AllocatedBlock allocatedBlock;

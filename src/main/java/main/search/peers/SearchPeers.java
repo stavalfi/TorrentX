@@ -5,7 +5,7 @@ import main.allocator.AllocatorStore;
 import main.peer.Link;
 import main.peer.algorithms.PeersProvider;
 import main.peer.peerMessages.PeerMessage;
-import main.redux.store.Store;
+import redux.store.Store;
 import main.torrent.status.TorrentStatusAction;
 import main.torrent.status.state.tree.TorrentStatusState;
 import main.tracker.TrackerProvider;

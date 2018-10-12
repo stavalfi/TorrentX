@@ -1,7 +1,7 @@
 package main.allocator.requests;
 
 import main.allocator.AllocatorAction;
-import main.redux.store.Request;
+import redux.store.Request;
 
 public class FreeAllAllocationsRequest extends Request<AllocatorAction> {
 	public FreeAllAllocationsRequest() {

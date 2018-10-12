@@ -1,8 +1,8 @@
-package main.redux.reducer;
+package redux.reducer;
 
-import main.redux.state.State;
-import main.redux.store.Request;
-import main.redux.store.Result;
+import redux.state.State;
+import redux.store.Request;
+import redux.store.Result;
 
 @FunctionalInterface
 public interface Reducer<STATE_IMPL extends State<ACTION>, ACTION> {

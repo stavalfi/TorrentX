@@ -1,7 +1,7 @@
-package main.redux.store;
+package redux.store;
 
-import main.redux.reducer.Reducer;
-import main.redux.state.State;
+import redux.reducer.Reducer;
+import redux.state.State;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;

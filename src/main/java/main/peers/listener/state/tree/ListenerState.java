@@ -1,8 +1,8 @@
 package main.peers.listener.state.tree;
 
 import main.peers.listener.ListenerAction;
-import main.redux.state.State;
-import main.redux.store.Request;
+import redux.state.State;
+import redux.store.Request;
 
 public class ListenerState extends State<ListenerAction> {
 	private boolean isStartedListeningInProgress;

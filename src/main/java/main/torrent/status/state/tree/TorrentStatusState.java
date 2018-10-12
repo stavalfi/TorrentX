@@ -1,6 +1,6 @@
 package main.torrent.status.state.tree;
 
-import main.redux.state.State;
+import redux.state.State;
 import main.torrent.status.TorrentStatusAction;
 
 public class TorrentStatusState extends State<TorrentStatusAction> {

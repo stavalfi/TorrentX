@@ -12,7 +12,7 @@ import main.peer.exceptions.BadTorrentInfoHashHandShakeException;
 import main.peer.exceptions.PeerExceptions;
 import main.peer.peerMessages.HandShake;
 import main.peers.listener.state.tree.ListenerState;
-import main.redux.store.Store;
+import redux.store.Store;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -68,7 +68,7 @@ public class Listener {
                         .filter(listenerState -> listenerState.fromAction(ListenerAction.START_LISTENING_SELF_RESOLVED) ||
                                 listenerState.fromAction(ListenerAction.START_LISTENING_WIND_UP))
                         .map(__ -> serverSocket), 1)
-                .doOnNext(serverSocket -> logger.info(this.identifier + " - created server-socket under port: " + serverSocket.getLocalPort() + " (not listening to new incoming peers)."))
+                .doOnNext(serverSocket -> logger.info(this.identifier + " - created server-socket under port: " + serverSocket.getLocalPort() + "."))
                 .replay(1)
                 .autoConnect(0);
 

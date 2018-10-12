@@ -3,7 +3,7 @@ package main.peers.listener.side.effects;
 import main.peers.listener.ListenerAction;
 import main.peers.listener.reducers.ListenerReducer;
 import main.peers.listener.state.tree.ListenerState;
-import main.redux.store.Store;
+import redux.store.Store;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
