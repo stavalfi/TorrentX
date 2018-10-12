@@ -42,7 +42,7 @@ public class App {
                         IntStream.range(0, torrentDownloader.getTorrentInfo().getPieces().size())
                                 .mapToObj(pieceIndex -> pieceIndex == completedPieceIndex ? "*" : torrentDownloader.getFileSystemLink().havePiece(pieceIndex) ? "1" : "0")
                                 .collect(Collectors.joining()))
-                .map(str -> str.substring(0, 140))
+                .map(str -> str.substring(0, 75))
                 .subscribe(System.out::println);
 
 //        torrentDownloader.getIncomingPeerMessagesNotifier()

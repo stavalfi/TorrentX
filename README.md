@@ -13,6 +13,9 @@ TorrentX is a fully reactive client side software for downloading and uploading 
 
 ## Introduction
 
+![](https://i.imgur.com/mGUDESi.gif)
+
+
 BitTorrent is a peer-to-peer protocol, which means that the computers in a BitTorrent “swarm” (a group of computers downloading and uploading the same torrent) transfer data between each other without the need for a central server, where all the information passes through a particular server.
 The trackerUrl server keeps track of where file copies reside on peer machines, which ones are available at the time of the clients request, and helps coordinate efficient transmission and reassembly of the copied file.
 
