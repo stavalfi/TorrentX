@@ -7,8 +7,6 @@
 
 TorrentX is a fully reactive client side software for downloading and uploading torrents.
 
-![](https://media.giphy.com/media/tJpR6D9nivbO6MuK0s/giphy.gif)
-
 1. [Introduction](#introduction)  
 2. [Enviroment](#enviroment)  
 3. [Dependencies](#dependencies)  
